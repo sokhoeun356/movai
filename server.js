@@ -1095,11 +1095,12 @@ function apiRoute(req, res, urlPath) {
     return;
   }
   // GET /api/public/feed — PUBLIC. Only public posts, ranked by
-  // score = likes*10 + views (highest first). rank is 1-based; tier 1 =
-  // rank 1–50, tier 2 = 51–200, tier 3 = the rest.
+  // views (highest first); ties broken by more likes, then earlier
+  // createdAt. rank is 1-based; tier 1 = rank 1–50, tier 2 = 51–200,
+  // tier 3 = the rest.
   if (req.method === 'GET' && urlPath === '/api/public/feed') {
     const posts = loadPublicPosts().filter((p) => p && p.visibility === 'public');
-    posts.sort((a, b) => (((b.likes || 0) * 10 + (b.views || 0)) - ((a.likes || 0) * 10 + (a.views || 0))) || String(a.createdAt || '').localeCompare(String(b.createdAt || '')));
+    posts.sort((a, b) => ((b.views || 0) - (a.views || 0)) || ((b.likes || 0) - (a.likes || 0)) || String(a.createdAt || '').localeCompare(String(b.createdAt || '')));
     const out = posts.map((p, i) => {
       const rank = i + 1;
       const d = pubPost(p);
