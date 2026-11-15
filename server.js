@@ -242,11 +242,26 @@ function apiRoute(req, res, urlPath) {
           const j = await r.json().catch(() => null);
           if (j && (j.type === 'forbidden' || typeof j.error === 'string')) return sendJSON(res, 200, { ok: false, error: 'MusicAPI: ' + genErrText(j, 'HTTP ' + r.status) });
           const data = (j && j.data) || j || {};
+          // MusicAPI real shape: {code:200, data:[{clip_id, state:'succeeded', title, audio_url, ...}, ...]}
+          // The state lives INSIDE each clip in the data ARRAY — there is no top-level state.
+          if (Array.isArray(data) && data.length) {
+            const states = data.map((c) => (c && (c.state || c.status)) || '');
+            const allDone = states.every((s) => s === 'succeeded' || s === 'success' || s === 'completed');
+            if (allDone) {
+              const songs = [];
+              data.forEach((c) => { if (c && typeof c.audio_url === 'string' && c.audio_url) songs.push({ url: c.audio_url, title: typeof c.title === 'string' ? c.title : '' }); });
+              if (songs.length) return sendJSON(res, 200, { ok: true, status: 'done', songs });
+              return sendJSON(res, 200, { ok: true, status: 'done', songs: [], raw: j });
+            }
+            if (states.some((s) => s === 'failed' || s === 'error')) return sendJSON(res, 200, { ok: false, error: 'MusicAPI: ' + genErrText(j, 'បង្កើតមិនបានទេ') });
+            return sendJSON(res, 200, { ok: true, status: 'working', providerStatus: states.find((s) => s && s !== 'succeeded' && s !== 'success' && s !== 'completed') || 'queued' });
+          }
           const st = data.state || data.status || (j && (j.state || j.status));
           if (st === 'succeeded' || st === 'success' || st === 'completed') {
             const songs = [];
             const collect = (o) => {
               if (!o || typeof o !== 'object') return;
+              if (Array.isArray(o)) { o.forEach(collect); return; }
               if (typeof o.audio_url === 'string' && o.audio_url) songs.push({ url: o.audio_url, title: typeof o.title === 'string' ? o.title : '' });
               if (Array.isArray(o.audio_urls)) o.audio_urls.forEach((u) => { if (typeof u === 'string' && u) songs.push({ url: u }); });
               if (Array.isArray(o.clips)) o.clips.forEach(collect);
