@@ -185,6 +185,15 @@ const SETTINGS_DEFAULTS = {
   // Admin-locked models (master switch). Map "provider:model" -> true.
   // A locked model is not used/shown in MovAi. Empty = nothing locked.
   lockedModels: {},
+  // Payment settings (admin-controlled, read by the website for the Buy
+  // flow). khqrLink = Canadia Bank KHQR payment link (local payers);
+  // binanceUsdtAddress = Binance USDT wallet address (foreign payers).
+  // Only these two strings are stored — no bank account numbers, no
+  // holder names, no passwords, no keys.
+  payment: {
+    khqrLink: 'https://pay.canadiabank.com.kh/K6EkJR30W0BM3VVK',
+    binanceUsdtAddress: '',
+  },
 };
 function clampNum(v, lo, hi, dflt) {
   const n = Number(v);
@@ -236,6 +245,15 @@ function cleanSettings(j, base) {
     const baseLocked = (base && base.lockedModels && typeof base.lockedModels === 'object' && !Array.isArray(base.lockedModels)) ? base.lockedModels : {};
     s.lockedModels = Object.assign({}, baseLocked);
   }
+  // Payment settings. Both fields are plain strings (max 500 chars);
+  // missing/invalid fields keep the stored (base) value. An empty string
+  // is valid (means "not set yet").
+  const basePay = (base && base.payment && typeof base.payment === 'object' && !Array.isArray(base.payment)) ? base.payment : SETTINGS_DEFAULTS.payment;
+  const payIn = (j.payment && typeof j.payment === 'object' && !Array.isArray(j.payment)) ? j.payment : {};
+  s.payment = {
+    khqrLink: typeof payIn.khqrLink === 'string' ? payIn.khqrLink.trim().slice(0, 500) : (typeof basePay.khqrLink === 'string' ? basePay.khqrLink : SETTINGS_DEFAULTS.payment.khqrLink),
+    binanceUsdtAddress: typeof payIn.binanceUsdtAddress === 'string' ? payIn.binanceUsdtAddress.trim().slice(0, 500) : (typeof basePay.binanceUsdtAddress === 'string' ? basePay.binanceUsdtAddress : SETTINGS_DEFAULTS.payment.binanceUsdtAddress),
+  };
   return s;
 }
 function loadSettings() {
@@ -803,7 +821,7 @@ function apiRoute(req, res, urlPath) {
     return sendJSON(res, 200, { ok: true, settings: loadSettings() });
   }
   // POST /api/admin/settings — {smoothModeAuto, theme, font, glassClear,
-  // glassBlur, glassShine, tshadow, txtblur, bgb, brandfx, mode} — admin key
+  // glassBlur, glassShine, tshadow, txtblur, bgb, brandfx, mode, payment} — admin key
   // required. Fields sent are merged over the stored settings; missing
   // fields keep their stored value. Values are validated/clamped.
   if (req.method === 'POST' && urlPath === '/api/admin/settings') {
