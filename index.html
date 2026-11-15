@@ -565,6 +565,8 @@ html[data-mode="light"] .btn-free{color:#8a6100}
 .pub-meta .pm-id{font-variant-numeric:tabular-nums;letter-spacing:.03em}
 .pub-yt{display:inline-flex;align-items:center;gap:7px;margin-top:10px;border:1px solid rgba(255,77,77,.55);background:rgba(255,0,51,.10);color:#ff6b6b;border-radius:999px;padding:8px 14px;font-size:0.8125rem;font-weight:800;text-decoration:none;cursor:pointer}
 .pub-yt:active{opacity:.8}
+.pub-songlink{display:inline-flex;align-items:center;gap:7px;margin-top:10px;border:1px solid var(--line2);background:transparent;color:var(--text);border-radius:999px;padding:8px 14px;font-size:0.8125rem;font-weight:800;cursor:pointer;font-family:inherit}
+.pub-songlink:active{opacity:.8}
 .pub-dl-note{font-size:0.75rem;color:var(--muted);margin-top:8px;line-height:1.6}
 /* Log in sheet: the single Google connect option. The button follows
    the app accent/theme colour (the App Color the user picks in
@@ -1278,6 +1280,7 @@ km:{
  pubCatAll:'ទាំងអស់',pubCatSong:'បទចម្រៀង',pubCatImage:'រូបភាព',pubCatVideo:'វីដេអូ',
  pubEmptyCat:'មិនទាន់មានផុសប្រភេទនេះនៅឡើយទេ',
  pubShare:'ស៊ែរ',pubDislike:'មិនចូលចិត្ត',pubShared:'បានចម្លង link ហើយ ✓',
+ pubYtChannel:'YouTube Channel',pubSongLink:'Song Link',pubLinkCopied:'បានចម្លង Link ✓',
  pubTypeSong:'បទចម្រៀង',pubTypeImage:'រូបភាព',pubTypeVideo:'វីដេអូ',pubType3d:'3D',
  pubSongId:'ID បទចម្រៀង',pubDuration:'រយៈពេល',pubModel:'Model',pubPostedDate:'ថ្ងៃផុស',pubPostedBy:'អ្នកផុស',pubGenre:'ប្រភេទ',
  pubDlFreeLeft:'ទាញយកបទចម្រៀងហ្វ្រីនៅសល់ {n} ដង',
@@ -1459,6 +1462,7 @@ en:{
  pubCatAll:'All',pubCatSong:'Songs',pubCatImage:'Images',pubCatVideo:'Videos',
  pubEmptyCat:'Nothing of this type has been posted yet',
  pubShare:'Share',pubDislike:'Dislike',pubShared:'Link copied ✓',
+ pubYtChannel:'YouTube Channel',pubSongLink:'Song Link',pubLinkCopied:'Link copied ✓',
  pubTypeSong:'Song',pubTypeImage:'Image',pubTypeVideo:'Video',pubType3d:'3D',
  pubSongId:'Song ID',pubDuration:'Duration',pubModel:'Model',pubPostedDate:'Posted',pubPostedBy:'Posted by',pubGenre:'Genre',
  pubDlFreeLeft:'{n} free song downloads left',
@@ -5549,6 +5553,7 @@ function pubNormItem(x){
     model:String(x.model||x.modelName||''),
     genre:String(x.genre||x.style||''),
     youtube:String(x.youtube||x.youtubeUrl||x.youtube_url||''),
+    youtubeChannel:String(x.youtubeChannel||x.youtube_channel||x.channelUrl||x.channel_url||''),
     ts:x.ts||x.createdAt||x.created||null
   };
 }
@@ -5768,10 +5773,26 @@ function pubCardEl(it){
     if(dts)mh+='<div><b>'+escHtml(tx('pubPostedDate'))+'</b>'+escHtml(dts)+'</div>';
     meta.innerHTML=mh;
     card.appendChild(meta);
-    /* YouTube link (owner rule): when the server sent a YouTube
-       link for this song post (post.youtube), show a «YouTube ·
-       ស្ដាប់» link on the card — tapping it opens the YouTube
-       link in a new tab to listen. No youtube value → no link. */
+    /* Song-card links row (owner rule): the links sit together in
+       one wrapping row under the song details, each shown ONLY
+       when the server sent a real value for it:
+       — «YouTube · ស្ដាប់» (post.youtube): opens the YouTube link
+         in a new tab to listen. No youtube value → no link.
+       — «YouTube Channel» (post.youtubeChannel): opens the
+         poster's YouTube channel in a new tab.
+       — «Song Link» (post.url): copies the song's own URL to the
+         clipboard and confirms «បានចម្លង Link»; if copying fails
+         the URL opens in a new tab instead. */
+    var linksRow=null;
+    function pubAddLink(el){
+      if(!linksRow){
+        linksRow=document.createElement('div');
+        linksRow.style.cssText='display:flex;flex-wrap:wrap;gap:8px;margin-top:10px';
+        card.appendChild(linksRow);
+      }
+      el.style.marginTop='0';
+      linksRow.appendChild(el);
+    }
     if(it.youtube&&/^https?:\/\//i.test(it.youtube)){
       var yt=document.createElement('a');
       yt.className='pub-yt';
@@ -5779,7 +5800,24 @@ function pubCardEl(it){
       yt.target='_blank';
       yt.rel='noopener noreferrer';
       yt.innerHTML='<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M23 12s0-3.85-.5-5.7a2.9 2.9 0 0 0-2.05-2.05C18.6 3.75 12 3.75 12 3.75s-6.6 0-8.45.5A2.9 2.9 0 0 0 1.5 6.3C1 8.15 1 12 1 12s0 3.85.5 5.7a2.9 2.9 0 0 0 2.05 2.05c1.85.5 8.45.5 8.45.5s6.6 0 8.45-.5a2.9 2.9 0 0 0 2.05-2.05C23 15.85 23 12 23 12zM9.75 15.5v-7L15.5 12l-5.75 3.5z"/></svg><span>YouTube · ស្ដាប់</span>';
-      card.appendChild(yt);
+      pubAddLink(yt);
+    }
+    if(it.youtubeChannel&&/^https?:\/\//i.test(it.youtubeChannel)){
+      var ch=document.createElement('a');
+      ch.className='pub-yt';
+      ch.href=it.youtubeChannel;
+      ch.target='_blank';
+      ch.rel='noopener noreferrer';
+      ch.innerHTML='<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2.5" y="5" width="19" height="14" rx="3"/><path d="M10 9.5l5 2.5-5 2.5z" fill="currentColor" stroke="none"/></svg><span>'+escHtml(tx('pubYtChannel'))+'</span>';
+      pubAddLink(ch);
+    }
+    if(it.url){
+      var sl=document.createElement('button');
+      sl.type='button';
+      sl.className='pub-songlink';
+      sl.innerHTML='<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7"/><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7"/></svg><span>'+escHtml(tx('pubSongLink'))+'</span>';
+      sl.addEventListener('click',function(){pubCopySongLink(it,sl);});
+      pubAddLink(sl);
     }
   }
   var foot=document.createElement('div');
@@ -5904,6 +5942,33 @@ function pubSharePost(it,btn){
   }
   histCopyText(it.url||text,btn);
   if(btn){var sp=btn.querySelector('span:last-child');if(sp){var old=sp.textContent;sp.textContent=tx('pubShared');setTimeout(function(){if(sp.isConnected)sp.textContent=old;},2200);}}
+}
+/* «Song Link» button on a Public song card (owner rule): copies
+   the song's own URL (post.url) to the clipboard and the button
+   confirms «បានចម្លង Link». If every copy route fails, the URL
+   opens in a new tab instead so the tap still goes somewhere. */
+function pubCopySongLink(it,btn){
+  var url=it&&it.url;
+  if(!url)return;
+  function done(){
+    if(!btn)return;
+    var sp=btn.querySelector('span:last-child');
+    if(sp){var old=sp.textContent;sp.textContent=tx('pubLinkCopied');setTimeout(function(){if(sp.isConnected)sp.textContent=old;},2200);}
+  }
+  function openTab(){window.open(url,'_blank');}
+  function legacy(){
+    try{
+      var ta=document.createElement('textarea');
+      ta.value=url;ta.style.cssText='position:fixed;opacity:0';
+      document.body.appendChild(ta);ta.select();
+      var ok=false;try{ok=!!document.execCommand('copy');}catch(e){}
+      ta.remove();
+      if(ok)done();else openTab();
+    }catch(e){openTab();}
+  }
+  if(navigator.clipboard&&navigator.clipboard.writeText){
+    navigator.clipboard.writeText(url).then(done,legacy);
+  }else legacy();
 }
 /* ===== Public downloads =====
    Downloads happen FROM MovAi itself (owner rule): the file's
