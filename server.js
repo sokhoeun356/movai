@@ -168,6 +168,65 @@ function wrapGenLog(res, mode, ctx) {
     return origEnd(chunk, ...rest);
   };
 }
+// Notifications (./data/notifications.json) — real notifications for the
+// admin AND for users. The Admin app reads them (GET /api/admin/notifications)
+// and the website reads its own (GET /api/public/notifications?email=).
+// Each notification: {id, at, kind, email, title, text, read:false}.
+// Kinds: 'login' (new user first sync), 'purchase-request', 'purchase-approved',
+// 'purchase-rejected', 'gift-claimed' (new user claims the free gift),
+// 'grant' (admin grants credits), 'deduct' (admin deducts credits).
+// Stored newest first, capped at 5000 (oldest dropped).
+const NOTIFICATIONS_FILE = path.join(DATA_DIR, 'notifications.json');
+const NOTIFICATIONS_MAX = 5000;
+function loadNotifications() {
+  try { const j = JSON.parse(fs.readFileSync(NOTIFICATIONS_FILE, 'utf8')); if (Array.isArray(j)) return j; } catch (e) {}
+  return [];
+}
+function saveNotifications(arr) {
+  try { fs.mkdirSync(DATA_DIR, { recursive: true }); } catch (e) {}
+  fs.writeFileSync(NOTIFICATIONS_FILE, JSON.stringify(arr, null, 2));
+}
+function newNotificationId() {
+  return 'ntf_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+}
+// Create a notification. For admin-facing kinds (login, purchase-request,
+// gift-claimed) ALSO send a Telegram message to the admin (fire-and-forget:
+// it never blocks the response and its errors are swallowed). The bot token
+// is never logged and never returned by any endpoint.
+function addNotification(kind, email, title, text) {
+  const n = { id: newNotificationId(), at: new Date().toISOString(), kind, email: email || '', title: title || '', text: text || '', read: false };
+  try {
+    const arr = loadNotifications();
+    arr.unshift(n);
+    if (arr.length > NOTIFICATIONS_MAX) arr.length = NOTIFICATIONS_MAX;
+    saveNotifications(arr);
+  } catch (e) {}
+  if (kind === 'login' || kind === 'purchase-request' || kind === 'gift-claimed') {
+    sendTelegramAdmin('🔔 ' + n.title + '\n' + n.text);
+  }
+  return n;
+}
+function sendTelegramAdmin(text) {
+  try {
+    const s = loadSettings();
+    const tel = (s && s.telegram && typeof s.telegram === 'object' && !Array.isArray(s.telegram)) ? s.telegram : {};
+    const token = typeof tel.botToken === 'string' ? tel.botToken.trim() : '';
+    const chatId = typeof tel.chatId === 'string' ? tel.chatId.trim() : '';
+    if (!token || !chatId) return; // not configured — skip silently
+    fetch('https://api.telegram.org/bot' + token + '/sendMessage', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ chat_id: chatId, text: String(text).slice(0, 4000) }),
+      signal: AbortSignal.timeout(10000),
+    }).catch(() => {});
+  } catch (e) {}
+}
+function fmtCreditDelta(dMedia, dSong) {
+  const parts = [];
+  if (dMedia) parts.push((dMedia > 0 ? '+' : '') + dMedia + ' Image.Video');
+  if (dSong) parts.push((dSong > 0 ? '+' : '') + dSong + ' Song');
+  return parts.join(' / ') || '0';
+}
 // Server settings (admin-controlled, read by the website). smoothModeAuto:
 // when true, every MovAi website enables Smooth mode automatically.
 // Appearance fields mirror the website's own Settings (localStorage keys
@@ -193,6 +252,13 @@ const SETTINGS_DEFAULTS = {
   payment: {
     khqrLink: 'https://pay.canadiabank.com.kh/K6EkJR30W0BM3VVK',
     binanceUsdtAddress: '',
+  },
+  // Telegram notifications for the admin. botToken is a SECRET — it is
+  // never returned by any endpoint (GET /api/admin/settings exposes only
+  // hasBotToken) and never logged. chatId = the admin's Telegram chat.
+  telegram: {
+    botToken: '',
+    chatId: '',
   },
 };
 function clampNum(v, lo, hi, dflt) {
@@ -254,6 +320,22 @@ function cleanSettings(j, base) {
     khqrLink: typeof payIn.khqrLink === 'string' ? payIn.khqrLink.trim().slice(0, 500) : (typeof basePay.khqrLink === 'string' ? basePay.khqrLink : SETTINGS_DEFAULTS.payment.khqrLink),
     binanceUsdtAddress: typeof payIn.binanceUsdtAddress === 'string' ? payIn.binanceUsdtAddress.trim().slice(0, 500) : (typeof basePay.binanceUsdtAddress === 'string' ? basePay.binanceUsdtAddress : SETTINGS_DEFAULTS.payment.binanceUsdtAddress),
   };
+  // Telegram notifications for the admin. botToken is a SECRET: a
+  // non-empty string sets/rotates it; an empty string or missing field
+  // KEEPS the stored token (the Admin app leaves the field blank when it
+  // does not know the token — that must never wipe it); null clears it.
+  // chatId follows the same rule (non-empty sets, empty/missing keeps, null clears).
+  const baseTel = (base && base.telegram && typeof base.telegram === 'object' && !Array.isArray(base.telegram)) ? base.telegram : SETTINGS_DEFAULTS.telegram;
+  const telIn = (j.telegram && typeof j.telegram === 'object' && !Array.isArray(j.telegram)) ? j.telegram : {};
+  let botToken;
+  if (typeof telIn.botToken === 'string' && telIn.botToken.trim()) botToken = telIn.botToken.trim().slice(0, 500);
+  else if (telIn.botToken === null) botToken = '';
+  else botToken = typeof baseTel.botToken === 'string' ? baseTel.botToken : '';
+  let chatId;
+  if (typeof telIn.chatId === 'string' && telIn.chatId.trim()) chatId = telIn.chatId.trim().slice(0, 200);
+  else if (telIn.chatId === null) chatId = '';
+  else chatId = typeof baseTel.chatId === 'string' ? baseTel.chatId : '';
+  s.telegram = { botToken, chatId };
   return s;
 }
 function loadSettings() {
@@ -268,6 +350,17 @@ function saveSettings(s, base) {
   const out = cleanSettings(s, base);
   out.updatedAt = new Date().toISOString();
   fs.writeFileSync(SETTINGS_FILE, JSON.stringify(out, null, 2));
+  return out;
+}
+// Public-safe settings: the Telegram bot token is a secret and is NEVER
+// returned (GET /api/admin/settings is public). Clients only see
+// hasBotToken (whether a token is set) + chatId. To set/rotate the token,
+// POST telegram.botToken as a non-empty string; an empty/missing botToken
+// keeps the stored one.
+function publicSettings(s) {
+  const out = Object.assign({}, s);
+  const tel = (s && s.telegram && typeof s.telegram === 'object' && !Array.isArray(s.telegram)) ? s.telegram : {};
+  out.telegram = { hasBotToken: !!(typeof tel.botToken === 'string' && tel.botToken.trim()), chatId: typeof tel.chatId === 'string' ? tel.chatId : '' };
   return out;
 }
 // Admin provider keys (./data/admin-keys.json). The admin puts each
@@ -724,6 +817,7 @@ function apiRoute(req, res, urlPath) {
       const now = new Date().toISOString();
       logActivity({ at: now, mode: 'sync', email });
       const users = loadUsers();
+      const isNewUser = !users[email];
       let u = users[email];
       if (!u) {
         const takenIds = new Set(Object.values(users).map((x) => x.id).filter(Boolean));
@@ -757,6 +851,12 @@ function apiRoute(req, res, urlPath) {
       u.credits = Math.max(0, Math.floor(numOr(u.credits, 0)));
       u.songCredits = Math.max(0, Math.floor(numOr(u.songCredits, 0)));
       saveUsers(users);
+      if (isNewUser) {
+        addNotification('login', email, '👤 អ្នកប្រើថ្មី · New user', (u.name || email) + ' (' + email + ') បាន log in លើកដំបូង');
+      }
+      if (body && body.giftClaimed === true) {
+        addNotification('gift-claimed', email, '🎁 កាដូបានទទួល · Gift claimed', (u.name || email) + ' (' + email + ') បានទទួលកាដូ Free 250 Image.Video + 24 Song Credit');
+      }
       return sendJSON(res, 200, { ok: true, user: pubUser(u) });
     }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
     return;
@@ -798,6 +898,13 @@ function apiRoute(req, res, urlPath) {
       u.updatedAt = new Date().toISOString();
       saveUsers(users);
       logGrant({ email, credits: dMedia, songCredits: dSong, note: typeof body.note === 'string' ? body.note.slice(0, 200) : '', at: u.updatedAt });
+      const deltaText = fmtCreditDelta(dMedia, dSong);
+      const grantNote = typeof body.note === 'string' ? body.note.trim().slice(0, 200) : '';
+      if (dMedia < 0 || dSong < 0) {
+        addNotification('deduct', email, '➖ កាត់ Credit · Credits deducted', 'Admin បានកាត់ ' + deltaText + ' ពី ' + email + (grantNote ? ' — ' + grantNote : ''));
+      } else {
+        addNotification('grant', email, '➕ បន្ថែម Credit · Credits granted', 'Admin បានបន្ថែម ' + deltaText + ' ឲ្យ ' + email + (grantNote ? ' — ' + grantNote : ''));
+      }
       return sendJSON(res, 200, { ok: true, user: pubUser(u) });
     }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
     return;
@@ -818,7 +925,7 @@ function apiRoute(req, res, urlPath) {
   // GET /api/admin/settings — PUBLIC (no admin key). The MovAi website reads
   // it on load to know whether the admin turned Smooth mode Auto on.
   if (req.method === 'GET' && urlPath === '/api/admin/settings') {
-    return sendJSON(res, 200, { ok: true, settings: loadSettings() });
+    return sendJSON(res, 200, { ok: true, settings: publicSettings(loadSettings()) });
   }
   // POST /api/admin/settings — {smoothModeAuto, theme, font, glassClear,
   // glassBlur, glassShine, tshadow, txtblur, bgb, brandfx, mode, payment} — admin key
@@ -831,7 +938,7 @@ function apiRoute(req, res, urlPath) {
       const cur = loadSettings();
       const merged = Object.assign({}, cur, body && typeof body === 'object' && !Array.isArray(body) ? body : {});
       const saved = saveSettings(merged, cur);
-      return sendJSON(res, 200, { ok: true, settings: saved });
+      return sendJSON(res, 200, { ok: true, settings: publicSettings(saved) });
     }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
     return;
   }
@@ -1014,6 +1121,7 @@ function apiRoute(req, res, urlPath) {
       };
       reqs.push(r);
       savePurchaseRequests(reqs);
+      addNotification('purchase-request', email, '🛒 សំណើទិញកញ្ចប់ · Purchase request', email + ' បានស្នើទិញកញ្ចប់ ' + packageId + ' ($' + pkg.price + ')');
       return sendJSON(res, 200, { ok: true, request: r });
     }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
     return;
@@ -1059,6 +1167,7 @@ function apiRoute(req, res, urlPath) {
       r.decidedAt = now;
       r.updatedAt = now;
       savePurchaseRequests(reqs);
+      addNotification('purchase-approved', r.email, '✅ បានអនុម័ត · Purchase approved', 'កញ្ចប់ ' + r.packageId + ' របស់ ' + r.email + ' បានអនុម័ត — +' + pkg.credits + ' Image.Video / +' + pkg.songCredits + ' Song Credit');
       return sendJSON(res, 200, { ok: true, request: r, user: pubUser(u) });
     }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
     return;
@@ -1079,6 +1188,7 @@ function apiRoute(req, res, urlPath) {
       r.decidedAt = now;
       r.updatedAt = now;
       savePurchaseRequests(reqs);
+      addNotification('purchase-rejected', r.email, '❌ បដិសេធ · Purchase rejected', 'សំណើទិញកញ្ចប់ ' + r.packageId + ' របស់ ' + r.email + ' ត្រូវបានបដិសេធ');
       return sendJSON(res, 200, { ok: true, request: r });
     }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
     return;
@@ -1139,6 +1249,47 @@ function apiRoute(req, res, urlPath) {
     } catch (e) {
       return sendJSON(res, 200, { ok: true, stats: { usersToday: 0, usersWeek: 0, usersMonth: 0, songsToday: 0, videosToday: 0, imagesToday: 0, failuresToday: 0, recentErrors: [] } });
     }
+  }
+  // ---- Notifications ----
+  // GET /api/admin/notifications — admin key required. All notifications,
+  // newest first, limit 100. The Admin app polls this for its bell/feed.
+  if (req.method === 'GET' && urlPath === '/api/admin/notifications') {
+    const a = adminKeyOk(req);
+    if (!a.ok) return sendJSON(res, 200, { ok: false, error: a.error });
+    const list = loadNotifications().slice(0, 100);
+    return sendJSON(res, 200, { ok: true, notifications: list });
+  }
+  // POST /api/admin/notifications/read — {id} or {all:true} — admin key
+  // required. Marks one notification (or all) as read.
+  if (req.method === 'POST' && urlPath === '/api/admin/notifications/read') {
+    const a = adminKeyOk(req);
+    if (!a.ok) return sendJSON(res, 200, { ok: false, error: a.error });
+    readJSONBody(req, 64 * 1024).then((body) => {
+      const arr = loadNotifications();
+      let marked = 0;
+      if (body && body.all === true) {
+        for (const n of arr) { if (n && !n.read) { n.read = true; marked++; } }
+      } else {
+        const id = body && typeof body.id === 'string' ? body.id.trim() : '';
+        const n = arr.find((x) => x && x.id === id);
+        if (n && !n.read) { n.read = true; marked = 1; }
+      }
+      if (marked) saveNotifications(arr);
+      return sendJSON(res, 200, { ok: true, marked });
+    }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
+    return;
+  }
+  // GET /api/public/notifications?email= — PUBLIC. Only that user's own
+  // notifications (purchase-approved/rejected, grant, deduct, ...), newest
+  // first, limit 50. email is required; 'guest' returns an empty list.
+  if (req.method === 'GET' && urlPath === '/api/public/notifications') {
+    const rawEmail = (new URL(req.url, 'http://localhost').searchParams.get('email') || '').trim().toLowerCase();
+    if (!rawEmail) return sendJSON(res, 200, { ok: false, error: 'សូមដាក់ Gmail ត្រឹមត្រូវ' });
+    if (rawEmail === 'guest') return sendJSON(res, 200, { ok: true, notifications: [] });
+    const email = normEmail(rawEmail);
+    if (!email) return sendJSON(res, 200, { ok: false, error: 'សូមដាក់ Gmail ត្រឹមត្រូវ' });
+    const list = loadNotifications().filter((n) => n && n.email === email).slice(0, 50);
+    return sendJSON(res, 200, { ok: true, notifications: list });
   }
   // ---- Public feed (Public tab) ----
   // Anyone can post their creations as public (visible to everyone, ranked
