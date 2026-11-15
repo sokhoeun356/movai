@@ -106,6 +106,54 @@ function logGrant(entry) {
     fs.writeFileSync(GRANTS_FILE, JSON.stringify(arr, null, 2));
   } catch (e) {}
 }
+// Activity log (./data/activity.json) — one record per generation attempt
+// (create calls only: /api/gen/image, /api/gen/video, /api/gen/song) and
+// per /api/admin/sync call (user sign-in/app open), so the Admin app can
+// show daily/weekly/monthly users and per-day generations + failures.
+// Never logs API keys. Capped at 5000 records (oldest dropped).
+const ACTIVITY_FILE = path.join(DATA_DIR, 'activity.json');
+const ACTIVITY_MAX = 5000;
+function loadActivity() {
+  try { const j = JSON.parse(fs.readFileSync(ACTIVITY_FILE, 'utf8')); if (Array.isArray(j)) return j; } catch (e) {}
+  return [];
+}
+function saveActivity(arr) {
+  try { fs.mkdirSync(DATA_DIR, { recursive: true }); } catch (e) {}
+  fs.writeFileSync(ACTIVITY_FILE, JSON.stringify(arr, null, 2));
+}
+function logActivity(rec) {
+  try {
+    const arr = loadActivity();
+    arr.push(rec);
+    if (arr.length > ACTIVITY_MAX) arr.splice(0, arr.length - ACTIVITY_MAX);
+    saveActivity(arr);
+  } catch (e) {}
+}
+// Wrap res.end so exactly one activity record is written when a generation
+// endpoint sends its response. ctx = {provider, email} — the handler fills
+// it in after parsing the body; the wrapper reads it at response time.
+// mode = 'image' | 'video' | 'song'.
+function wrapGenLog(res, mode, ctx) {
+  const origEnd = res.end.bind(res);
+  let logged = false;
+  res.end = function (chunk, ...rest) {
+    if (!logged) {
+      logged = true;
+      try {
+        const j = chunk ? JSON.parse(chunk.toString('utf8')) : null;
+        const ok = !!(j && j.ok);
+        let err = '';
+        if (!ok && j) {
+          if (typeof j.error === 'string') err = j.error;
+          else if (j.message && typeof j.message === 'string') err = j.message;
+          else if (j.message && j.message.km) err = j.message.km;
+        }
+        logActivity({ at: new Date().toISOString(), mode, provider: ctx.provider || '', ok, error: String(err || '').slice(0, 200), email: ctx.email || '' });
+      } catch (e) {}
+    }
+    return origEnd(chunk, ...rest);
+  };
+}
 // Server settings (admin-controlled, read by the website). smoothModeAuto:
 // when true, every MovAi website enables Smooth mode automatically.
 // Appearance fields mirror the website's own Settings (localStorage keys
@@ -120,6 +168,9 @@ const SETTINGS_DEFAULTS = {
   // Active provider/model per mode, set by the admin. null = admin has not
   // set one yet — the website shows "admin មិនទាន់កំណត់" for that mode.
   providers: { image: null, video: null, song: null },
+  // Admin-locked models (master switch). Map "provider:model" -> true.
+  // A locked model is not used/shown in MovAi. Empty = nothing locked.
+  lockedModels: {},
 };
 function clampNum(v, lo, hi, dflt) {
   const n = Number(v);
@@ -157,6 +208,20 @@ function cleanSettings(j, base) {
     }
   }
   s.providers = prov;
+  // Admin-locked models (master switch). When the field is present it
+  // REPLACES the stored map (Admin app always sends the full object);
+  // when absent the stored value is kept. Only boolean true entries are
+  // kept; key format "provider:model".
+  if (j.lockedModels && typeof j.lockedModels === 'object' && !Array.isArray(j.lockedModels)) {
+    const locked = {};
+    for (const k of Object.keys(j.lockedModels)) {
+      if (j.lockedModels[k] === true) locked[k.slice(0, 100)] = true;
+    }
+    s.lockedModels = locked;
+  } else {
+    const baseLocked = (base && base.lockedModels && typeof base.lockedModels === 'object' && !Array.isArray(base.lockedModels)) ? base.lockedModels : {};
+    s.lockedModels = Object.assign({}, baseLocked);
+  }
   return s;
 }
 function loadSettings() {
@@ -227,7 +292,13 @@ function apiRoute(req, res, urlPath) {
   // The server NEVER stores keys — no file, no env var, no log.
   // POST /api/gen/image — {provider:'cloudflare'|'gemini'|'hf', key, accountId, prompt, width, height}
   if (req.method === 'POST' && urlPath === '/api/gen/image') {
+    const genCtx = { provider: '', email: '' };
+    wrapGenLog(res, 'image', genCtx);
     readJSONBody(req, 64 * 1024).then(async (body) => {
+      if (body && typeof body === 'object') {
+        if (typeof body.provider === 'string') genCtx.provider = body.provider;
+        if (typeof body.email === 'string') genCtx.email = body.email;
+      }
       try {
         if (!body || typeof body.prompt !== 'string' || !body.prompt.trim()) return sendJSON(res, 200, { ok: false, error: 'សូមសរសេរ prompt ជាមុនសិន' });
         const provider = body.provider;
@@ -329,7 +400,13 @@ function apiRoute(req, res, urlPath) {
   }
   // POST /api/gen/video — {provider:'novai'|'magichour'|'tavus'|'hf', key, prompt, duration, res, width, height, replicaId}
   if (req.method === 'POST' && urlPath === '/api/gen/video') {
+    const genCtx = { provider: '', email: '' };
+    wrapGenLog(res, 'video', genCtx);
     readJSONBody(req, 64 * 1024).then(async (body) => {
+      if (body && typeof body === 'object') {
+        if (typeof body.provider === 'string') genCtx.provider = body.provider;
+        if (typeof body.email === 'string') genCtx.email = body.email;
+      }
       try {
         if (!body || typeof body.prompt !== 'string' || !body.prompt.trim()) return sendJSON(res, 200, { ok: false, error: 'សូមសរសេរ prompt ជាមុនសិន' });
         const provider = body.provider;
@@ -432,7 +509,13 @@ function apiRoute(req, res, urlPath) {
   // MusicAPI is CORS-blocked from the browser, so the browser calls this proxy.
   // Keys arrive with each request only (from the visitor's own browser).
   if (req.method === 'POST' && urlPath === '/api/gen/song') {
+    const genCtx = { provider: '', email: '' };
+    wrapGenLog(res, 'song', genCtx);
     readJSONBody(req, 64 * 1024).then(async (body) => {
+      if (body && typeof body === 'object') {
+        if (typeof body.provider === 'string') genCtx.provider = body.provider;
+        if (typeof body.email === 'string') genCtx.email = body.email;
+      }
       try {
         if (!body || (typeof body.prompt !== 'string' && typeof body.title !== 'string' && typeof body.lyrics !== 'string' && typeof body.style !== 'string')) return sendJSON(res, 200, { ok: false, error: 'សូមសរសេរ prompt ជាមុនសិន' });
         const provider = body.provider;
@@ -607,6 +690,7 @@ function apiRoute(req, res, urlPath) {
       const email = normEmail(body && body.email);
       if (!email) return sendJSON(res, 200, { ok: false, error: 'សូមដាក់ Gmail ត្រឹមត្រូវ' });
       const now = new Date().toISOString();
+      logActivity({ at: now, mode: 'sync', email });
       const users = loadUsers();
       let u = users[email];
       if (!u) {
@@ -760,6 +844,177 @@ function apiRoute(req, res, urlPath) {
   if (req.method === 'GET' && urlPath === '/api/admin/providers') {
     const s = loadSettings();
     return sendJSON(res, 200, { ok: true, providers: s.providers || { image: null, video: null, song: null } });
+  }
+  // ---- Purchase requests (Buy → admin approval) ----
+  // The MovAi website's Buy button sends ONLY {email, packageId, plan,
+  // amount} — no credit amount. The server is the truth for what a package
+  // grants, keyed by packageId (from the artifact's PKG_PLANS /
+  // SONG_PKG_PLANS). 'song-free' never sends a request (its button is
+  // Automatic/disabled) and is rejected here if it ever arrives.
+  const PACKAGE_CATALOG = {
+    monthly: { credits: 11000, songCredits: 0, days: 30, amount: 25 },
+    yearly: { credits: 140000, songCredits: 0, days: 365, amount: 216 },
+    'song-trial': { credits: 0, songCredits: 750, days: 30, amount: 5 },
+    'song-popular': { credits: 0, songCredits: 1500, days: 30, amount: 10 },
+    'song-pro': { credits: 0, songCredits: 3750, days: 30, amount: 22 },
+  };
+  const PURCHASE_REQUESTS_FILE = path.join(DATA_DIR, 'purchase-requests.json');
+  function loadPurchaseRequests() {
+    try { const j = JSON.parse(fs.readFileSync(PURCHASE_REQUESTS_FILE, 'utf8')); if (Array.isArray(j)) return j; } catch (e) {}
+    return [];
+  }
+  function savePurchaseRequests(arr) {
+    try { fs.mkdirSync(DATA_DIR, { recursive: true }); } catch (e) {}
+    fs.writeFileSync(PURCHASE_REQUESTS_FILE, JSON.stringify(arr, null, 2));
+  }
+  function newPurchaseId() {
+    return 'pr_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+  }
+  // POST /api/admin/purchase-request — PUBLIC (no admin key). The website
+  // sends a buy request; credits are granted ONLY after the admin approves.
+  if (req.method === 'POST' && urlPath === '/api/admin/purchase-request') {
+    readJSONBody(req, 64 * 1024).then((body) => {
+      const email = normEmail(body && body.email);
+      if (!email) return sendJSON(res, 200, { ok: false, error: 'សូមដាក់ Gmail ត្រឹមត្រូវ' });
+      const packageId = typeof body.packageId === 'string' ? body.packageId.trim() : '';
+      const pkg = PACKAGE_CATALOG[packageId];
+      if (!pkg) return sendJSON(res, 200, { ok: false, error: 'កញ្ចប់នេះមិនស្គាល់ទេ' });
+      const now = new Date().toISOString();
+      const reqs = loadPurchaseRequests();
+      const r = {
+        id: newPurchaseId(), email, packageId,
+        plan: typeof body.plan === 'string' ? body.plan.slice(0, 50) : packageId,
+        amount: pkg.amount,
+        credits: pkg.credits, songCredits: pkg.songCredits, days: pkg.days,
+        status: 'pending', createdAt: now, updatedAt: now,
+      };
+      reqs.push(r);
+      savePurchaseRequests(reqs);
+      return sendJSON(res, 200, { ok: true, request: r });
+    }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
+    return;
+  }
+  // GET /api/admin/purchase-requests?status=pending|approved|rejected|all
+  // — admin key required. Pending first, then newest first.
+  if (req.method === 'GET' && urlPath === '/api/admin/purchase-requests') {
+    const a = adminKeyOk(req);
+    if (!a.ok) return sendJSON(res, 200, { ok: false, error: a.error });
+    const status = (new URL(req.url, 'http://localhost').searchParams.get('status') || 'all').trim().toLowerCase();
+    const reqs = loadPurchaseRequests();
+    const order = { pending: 0, approved: 1, rejected: 2 };
+    const list = reqs
+      .filter((r) => status === 'all' || r.status === status)
+      .sort((x, y) => ((order[x.status] ?? 3) - (order[y.status] ?? 3)) || String(y.createdAt || '').localeCompare(String(x.createdAt || '')));
+    return sendJSON(res, 200, { ok: true, requests: list });
+  }
+  // POST /api/admin/purchase-request/approve — {id} — admin key required.
+  // Grants the package credits to the user and marks the request approved.
+  if (req.method === 'POST' && urlPath === '/api/admin/purchase-request/approve') {
+    const a = adminKeyOk(req);
+    if (!a.ok) return sendJSON(res, 200, { ok: false, error: a.error });
+    readJSONBody(req, 64 * 1024).then((body) => {
+      const id = typeof body.id === 'string' ? body.id.trim() : '';
+      const reqs = loadPurchaseRequests();
+      const r = reqs.find((x) => x.id === id);
+      if (!r) return sendJSON(res, 200, { ok: false, error: 'រកសំណើនេះមិនឃើញទេ' });
+      if (r.status !== 'pending') return sendJSON(res, 200, { ok: false, error: 'សំណើនេះបានសម្រេចរួចហើយ' });
+      const pkg = PACKAGE_CATALOG[r.packageId];
+      if (!pkg) return sendJSON(res, 200, { ok: false, error: 'កញ្ចប់នេះមិនស្គាល់ទេ' });
+      const users = loadUsers();
+      const u = users[r.email];
+      if (!u) return sendJSON(res, 200, { ok: false, error: 'រកអ្នកប្រើនេះមិនឃើញទេ' });
+      const now = new Date().toISOString();
+      u.credits = Math.max(0, Math.floor(numOr(u.credits, 0)) + pkg.credits);
+      u.songCredits = Math.max(0, Math.floor(numOr(u.songCredits, 0)) + pkg.songCredits);
+      if (pkg.credits) u.plan = r.packageId;
+      if (pkg.songCredits) u.songPlan = r.packageId;
+      u.updatedAt = now;
+      saveUsers(users);
+      logGrant({ email: r.email, credits: pkg.credits, songCredits: pkg.songCredits, note: 'purchase:' + r.packageId, at: now });
+      r.status = 'approved';
+      r.decidedAt = now;
+      r.updatedAt = now;
+      savePurchaseRequests(reqs);
+      return sendJSON(res, 200, { ok: true, request: r, user: pubUser(u) });
+    }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
+    return;
+  }
+  // POST /api/admin/purchase-request/reject — {id} — admin key required.
+  // Marks the request rejected; no credits are granted.
+  if (req.method === 'POST' && urlPath === '/api/admin/purchase-request/reject') {
+    const a = adminKeyOk(req);
+    if (!a.ok) return sendJSON(res, 200, { ok: false, error: a.error });
+    readJSONBody(req, 64 * 1024).then((body) => {
+      const id = typeof body.id === 'string' ? body.id.trim() : '';
+      const reqs = loadPurchaseRequests();
+      const r = reqs.find((x) => x.id === id);
+      if (!r) return sendJSON(res, 200, { ok: false, error: 'រកសំណើនេះមិនឃើញទេ' });
+      if (r.status !== 'pending') return sendJSON(res, 200, { ok: false, error: 'សំណើនេះបានសម្រេចរួចហើយ' });
+      const now = new Date().toISOString();
+      r.status = 'rejected';
+      r.decidedAt = now;
+      r.updatedAt = now;
+      savePurchaseRequests(reqs);
+      return sendJSON(res, 200, { ok: true, request: r });
+    }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
+    return;
+  }
+  // GET /api/admin/stats — admin key required. Usage analytics for the
+  // Admin app: distinct users (by sync) in the last 1/7/30 days, today's
+  // successful generations by mode, today's failures, and recent errors.
+  // Never throws on empty data.
+  if (req.method === 'GET' && urlPath === '/api/admin/stats') {
+    const a = adminKeyOk(req);
+    if (!a.ok) return sendJSON(res, 200, { ok: false, error: a.error });
+    try {
+      const nowMs = Date.now();
+      const DAY = 24 * 60 * 60 * 1000;
+      const act = loadActivity();
+      const users = loadUsers();
+      function distinctSyncUsers(days) {
+        const since = nowMs - days * DAY;
+        const set = new Set();
+        for (const r of act) {
+          if (r && r.mode === 'sync' && r.email && r.at) {
+            const t = Date.parse(r.at);
+            if (Number.isFinite(t) && t >= since) set.add(r.email);
+          }
+        }
+        if (set.size) return set.size;
+        // Fallback: no sync records yet — count users created in the window.
+        let n = 0;
+        for (const u of Object.values(users)) {
+          const t = Date.parse(u.createdAt || '');
+          if (Number.isFinite(t) && t >= since) n++;
+        }
+        return n;
+      }
+      const todayStart = nowMs - DAY;
+      let songsToday = 0, videosToday = 0, imagesToday = 0, failuresToday = 0;
+      const failures = [];
+      for (const r of act) {
+        if (!r || !r.at) continue;
+        const t = Date.parse(r.at);
+        if (!Number.isFinite(t) || t < todayStart) continue;
+        if (r.mode === 'song' && r.ok) songsToday++;
+        else if (r.mode === 'video' && r.ok) videosToday++;
+        else if (r.mode === 'image' && r.ok) imagesToday++;
+        if ((r.mode === 'image' || r.mode === 'video' || r.mode === 'song') && r.ok === false) {
+          failuresToday++;
+          failures.push({ at: r.at, mode: r.mode, provider: r.provider || '', error: r.error || '' });
+        }
+      }
+      return sendJSON(res, 200, { ok: true, stats: {
+        usersToday: distinctSyncUsers(1),
+        usersWeek: distinctSyncUsers(7),
+        usersMonth: distinctSyncUsers(30),
+        songsToday, videosToday, imagesToday,
+        failuresToday,
+        recentErrors: failures.slice(-20).reverse(),
+      }});
+    } catch (e) {
+      return sendJSON(res, 200, { ok: true, stats: { usersToday: 0, usersWeek: 0, usersMonth: 0, songsToday: 0, videosToday: 0, imagesToday: 0, failuresToday: 0, recentErrors: [] } });
+    }
   }
   return sendJSON(res, 404, errBody('not_found', 'រកមិនឃើញទេ', 'Not found'));
 }
