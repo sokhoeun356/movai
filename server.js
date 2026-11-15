@@ -4,6 +4,7 @@
 // with each request only, from the visitor's own browser (localStorage).
 // Run:  node server.js        (PORT env var, default 3000)
 const http = require('http');
+const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
 
@@ -93,8 +94,21 @@ function saveUsers(u) {
   try { fs.mkdirSync(DATA_DIR, { recursive: true }); } catch (e) {}
   fs.writeFileSync(USERS_FILE, JSON.stringify(u, null, 2));
 }
+// User IDs: 10 chars, uppercase letters + digits, no confusing chars
+// (0/O and 1/I excluded). Auto-generated once on first sync; once assigned
+// it NEVER changes. Used in the user's Profile (with a Copy button) and in
+// the Admin app so the admin can tell users apart.
+const USER_ID_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+function genUserId(existingIds) {
+  let id = '';
+  do {
+    id = '';
+    for (let i = 0; i < 10; i++) id += USER_ID_CHARS[crypto.randomInt(USER_ID_CHARS.length)];
+  } while (existingIds && existingIds.has(id));
+  return id;
+}
 function pubUser(u) {
-  return { email: u.email, name: u.name || '', credits: u.credits, songCredits: u.songCredits, plan: u.plan || '', songPlan: u.songPlan || '', createdAt: u.createdAt, updatedAt: u.updatedAt };
+  return { id: u.id || '', email: u.email, name: u.name || '', firstName: u.firstName || '', lastName: u.lastName || '', credits: u.credits, songCredits: u.songCredits, plan: u.plan || '', songPlan: u.songPlan || '', createdAt: u.createdAt, updatedAt: u.updatedAt };
 }
 function logGrant(entry) {
   try {
@@ -694,9 +708,13 @@ function apiRoute(req, res, urlPath) {
       const users = loadUsers();
       let u = users[email];
       if (!u) {
+        const takenIds = new Set(Object.values(users).map((x) => x.id).filter(Boolean));
         u = {
+          id: genUserId(takenIds),
           email,
           name: typeof body.name === 'string' ? body.name.trim().slice(0, 100) : '',
+          firstName: typeof body.firstName === 'string' ? body.firstName.trim().slice(0, 50) : '',
+          lastName: typeof body.lastName === 'string' ? body.lastName.trim().slice(0, 50) : '',
           credits: numOr(body.credits, FREE_MEDIA_CREDITS),
           songCredits: numOr(body.songCredits, FREE_SONG_CREDITS),
           plan: typeof body.plan === 'string' ? body.plan.slice(0, 50) : '',
@@ -705,7 +723,15 @@ function apiRoute(req, res, urlPath) {
         };
         users[email] = u;
       } else {
+        // Legacy users created before IDs existed get one now; once an id
+        // exists it is NEVER changed.
+        if (!u.id) {
+          const takenIds = new Set(Object.values(users).map((x) => x.id).filter(Boolean));
+          u.id = genUserId(takenIds);
+        }
         if (typeof body.name === 'string' && body.name.trim()) u.name = body.name.trim().slice(0, 100);
+        if (typeof body.firstName === 'string' && body.firstName.trim()) u.firstName = body.firstName.trim().slice(0, 50);
+        if (typeof body.lastName === 'string' && body.lastName.trim()) u.lastName = body.lastName.trim().slice(0, 50);
         if (typeof body.plan === 'string') u.plan = body.plan.slice(0, 50);
         if (typeof body.songPlan === 'string') u.songPlan = body.songPlan.slice(0, 50);
         u.updatedAt = now;
