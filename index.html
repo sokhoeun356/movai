@@ -855,7 +855,7 @@ html[data-smooth="1"] .brand-frame,html[data-smooth="1"] .acct-chip,html[data-sm
 </section>
 <section id="page-gen" style="display:none">
   <div class="hero">
-    <h1 data-i18n="heroTitle">បង្កើតរូបភាព វីដេអូ<br><span class="grad">&amp; 3D Design</span></h1>
+    <h1 data-i18n="heroTitle">បង្កើតរូបភាព វីដេអូ</h1>
   </div>
   <div class="panel" id="sec-create">
     <div class="composer">
@@ -929,19 +929,16 @@ html[data-smooth="1"] .brand-frame,html[data-smooth="1"] .acct-chip,html[data-sm
               <input type="text" class="input" id="songTitle" data-i18n-ph="songTitlePh" placeholder="ឧ. ឈ្មោះបទចម្រៀងរបស់អ្នក..." maxlength="200" style="margin-top:6px;min-height:44px;padding:10px 14px">
             </div>
             <div>
-              <span class="chip-label" data-i18n="lblSongLyrics">អត្ថបទចម្រៀង</span>
               <textarea class="input" id="songLyrics" rows="5" data-i18n-ph="songLyricsPh" placeholder="សរសេរអត្ថបទចម្រៀង (lyrics) របស់អ្នកនៅទីនេះ..." style="margin-top:6px;border:1px solid var(--line2);background:var(--field);padding:12px 14px;min-height:110px;border-radius:12px"></textarea>
             </div>
             <div>
-              <span class="chip-label" data-i18n="lblSongStyle">ស្ទាយបទចម្រៀង</span>
-              <div style="display:flex;gap:8px;margin-top:6px">
+              <div style="display:flex;gap:8px">
                 <input type="text" class="input" id="songStyle" data-i18n-ph="songStylePh" placeholder="ឧ. Pop, Rock, សំឡេងខ្មែរបុរាណ..." maxlength="500" style="flex:1;min-width:0;min-height:44px;padding:10px 14px" onkeydown="if(event.key==='Enter'){event.preventDefault();songStyleAdd();}">
                 <button type="button" class="kbtn kbtn-black" style="flex:0 0 auto;min-height:44px;padding:10px 20px" onclick="songStyleAdd()" data-i18n="btnAddStyle">Add</button>
               </div>
               <div id="songStyleTags" style="display:flex;flex-wrap:wrap;gap:6px"></div>
             </div>
             <div class="tool-group">
-              <span class="chip-label" data-i18n="lblSongVoice">សំឡេង</span>
               <div id="songVoiceChips"></div>
             </div>
           </div>
@@ -949,7 +946,6 @@ html[data-smooth="1"] .brand-frame,html[data-smooth="1"] .acct-chip,html[data-sm
             <span class="chip-label" data-i18n="lblSongDur">រយៈពេលបទ</span>
             <div id="genSongDur"></div>
           </div>
-          <p id="songCost" style="flex-basis:100%;margin-top:2px;font-size:0.9375rem;font-weight:800;color:var(--accent-text);line-height:1.5"></p>
         </div>
       </div>
       <div id="d3Inline" style="display:none;margin-top:4px">
@@ -1210,7 +1206,7 @@ var LANG='km';
 var I18N={
 km:{
  docTitle:'MovAi — បង្កើតរូបភាព & វីដេអូ',menuLabel:'ម៉ឺនុយ',closeLabel:'បិទម៉ឺនុយ',
- heroTitle:'បង្កើតរូបភាព វីដេអូ<br><span class="grad">&amp; 3D Design</span>',
+ heroTitle:'បង្កើតរូបភាព វីដេអូ',
  navImage:'បង្កើតរូបភាព',navImageSub:'Image',navVideo:'បង្កើតវីដេអូ',navVideoSub:'Video',nav3d:'រូប 3D Design',
  keysTitle:'API Keys · កន្លែងដាក់ Key',
  acctTitle:'គណនីរបស់ខ្ញុំ',acctLogin:'ចូលគណនី',acctRegister:'ចុះឈ្មោះ',acctChipLogin:'ចូលគណនី',
@@ -1390,7 +1386,7 @@ km:{
 },
 en:{
  docTitle:'MovAi — Create Images & Videos',menuLabel:'Menu',closeLabel:'Close menu',
- heroTitle:'Create Images &amp; Videos<br><span class="grad">&amp; 3D Design</span>',
+ heroTitle:'Create Images &amp; Videos',
  navImage:'Create Image',navImageSub:'រូបភាព',navVideo:'Create Video',navVideoSub:'វីដេអូ',nav3d:'3D Design',
  keysTitle:'API Keys · Add Your Keys',
  acctTitle:'My Account',acctLogin:'Log in',acctRegister:'Sign up',acctChipLogin:'Log in',
@@ -2911,7 +2907,7 @@ function genSetDuration(d){
 function genSetRes(r){gen.res=r;genRenderOptions();genNote();}
 function genNote(){
   var el=document.getElementById('genNote');
-  if(el)el.textContent=gen.mode==='3d'?tx('note3d'):tx('noteAdminGen');
+  if(el)el.textContent=gen.mode==='3d'?tx('note3d'):(gen.mode==='song'?'':tx('noteAdminGen'));
   var lk=document.getElementById('genProviderLink');if(lk)lk.innerHTML='';
 }
 
@@ -3503,8 +3499,6 @@ function songRenderOpts(){
   if(box)box.innerHTML=SONG_DURS.map(function(m){return '<button class="kbtn '+(gen.songDur===m?'kbtn-black':'kbtn-white')+'" onclick="songSetDur('+m+')">'+m+' '+tx('unitM')+'</button>';}).join('');
   var vb=document.getElementById('songVoiceChips');
   if(vb)vb.innerHTML=[['male','voiceMale'],['female','voiceFemale'],['random','voiceRandom']].map(function(v){return '<button class="kbtn '+(gen.songVoice===v[0]?'kbtn-black':'kbtn-white')+'" onclick="songSetVoice(\''+v[0]+'\')">'+tx(v[1])+'</button>';}).join('');
-  var c=document.getElementById('songCost');
-  if(c)c.textContent=tx('songCostAdmin');
 }
 function songSetDur(m){gen.songDur=m;songRenderOpts();}
 function songSetVoice(v){gen.songVoice=v;songRenderOpts();}
