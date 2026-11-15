@@ -5390,6 +5390,17 @@ var pubLiked={};
 var pubDisliked={};
 var pubViewed={};
 var pubSheetItem=null;
+/* ===== Public auto-refresh (owner rule) =====
+   While the user is ON the Public tab the feed reloads SILENTLY
+   every 30 seconds, so a new post (from the Admin or another
+   user) appears on its own with no tap on «Refresh». Silent
+   means: no loading text, no spinner, no flicker and no scroll
+   jump — when nothing changed the DOM is not touched at all,
+   and when something did change the reading position is
+   restored around the same card. Leaving the Public tab stops
+   the timer (see appSetView). */
+var pubAutoTimer=null;
+var pubAutoBusy=false;
 /* Category filter (owner rule): posts are separated strictly by
    type — there is NO mixed «All» view. The feed always shows
    exactly one type: 'song' shows only songs, 'image' only images,
@@ -5507,8 +5518,8 @@ function appSetView(v){
   var tp=document.getElementById('viewTabPublic'),tc=document.getElementById('viewTabCreate');
   if(tp){tp.className='view-tab'+(onPub?' on':'');tp.setAttribute('aria-selected',onPub?'true':'false');}
   if(tc){tc.className='view-tab'+(!onPub?' on':'');tc.setAttribute('aria-selected',!onPub?'true':'false');}
-  if(onPub){pubLoadFeed(false);try{pubFollowLoad();}catch(e){}}
-  else{try{histRender();}catch(e){}}
+  if(onPub){pubLoadFeed(false);try{pubFollowLoad();}catch(e){}try{pubAutoStart();}catch(e){}}
+  else{try{pubAutoStop();}catch(e){}try{histRender();}catch(e){}}
   if(changed)window.scrollTo(0,0);
 }
 function pubSrvNum(v){
@@ -5615,6 +5626,87 @@ function pubLoadFeed(force){
     if(timer)clearTimeout(timer);
     pubLoading=false;
     pubRenderError();
+  });
+}
+/* Signature of a feed snapshot: when a silent tick returns the
+   same signature as what is already on screen, the tick changes
+   nothing at all — that is what makes the refresh invisible. */
+function pubFeedSig(items){
+  try{
+    return (items||[]).map(function(it){
+      return [it.id,it.type,it.url,it.title||'',it.views,it.likes,it.dislikes,it.tier,it.rank,it.image||'',it.aspect||'',it.youtube||'',it.youtubeChannel||''].join('|');
+    }).join(';;');
+  }catch(e){return '';}
+}
+function pubAutoStart(){
+  if(pubAutoTimer)return;
+  pubAutoTimer=setInterval(function(){pubSilentRefresh();},30000);
+}
+function pubAutoStop(){
+  if(pubAutoTimer){clearInterval(pubAutoTimer);pubAutoTimer=null;}
+}
+/* One silent reload of the Public feed. Never shows the loading
+   text, never shows the error state, and never moves the scroll
+   position: unchanged data leaves the DOM untouched, and changed
+   data re-renders with the viewport restored around the card
+   that was at its top. A song / video currently playing in the
+   feed is never interrupted — that tick is skipped and the next
+   one retries. */
+function pubSilentRefresh(){
+  if(APP_VIEW!=='public')return;
+  if(typeof document!=='undefined'&&document.hidden)return;
+  if(pubAutoBusy||pubLoading)return;
+  var box=document.getElementById('pubFeed');if(!box)return;
+  try{
+    var media=box.querySelectorAll('audio,video');
+    for(var mi=0;mi<media.length;mi++){if(!media[mi].paused&&!media[mi].ended)return;}
+  }catch(e){}
+  pubAutoBusy=true;
+  var ctrl=null,timer=null;
+  try{
+    if(window.AbortController){ctrl=new AbortController();timer=setTimeout(function(){try{ctrl.abort();}catch(e){}},30000);}
+  }catch(e){ctrl=null;}
+  var opts={method:'GET'};
+  if(ctrl)opts.signal=ctrl.signal;
+  fetch(pubFeedUrl(),opts).then(function(r){
+    if(timer)clearTimeout(timer);
+    if(!r||!r.ok)throw new Error('http '+(r?r.status:0));
+    return r.json();
+  }).then(function(data){
+    pubAutoBusy=false;
+    if(APP_VIEW!=='public')return;
+    var arr=Array.isArray(data)?data:(data&&(data.items||data.feed||data.posts||data.data));
+    if(!Array.isArray(arr))arr=[];
+    var out=[];
+    arr.forEach(function(x){var n=pubNormItem(x);if(n)out.push(n);});
+    out=pubSortItems(out);
+    if(pubLoaded&&pubFeedSig(out)===pubFeedSig(pubItems))return;
+    var sy=window.scrollY||window.pageYOffset||0;
+    var anchorId=null,anchorTop=0;
+    try{
+      var cards=box.querySelectorAll('[data-pub-id]');
+      for(var ci=0;ci<cards.length;ci++){
+        var rc=cards[ci].getBoundingClientRect();
+        if(rc.bottom>0){anchorId=cards[ci].getAttribute('data-pub-id');anchorTop=rc.top;break;}
+      }
+    }catch(e){}
+    pubItems=out;
+    pubItems.forEach(function(it){if(it.liked)pubLiked[it.id]=true;if(it.disliked)pubDisliked[it.id]=true;});
+    pubLoaded=true;
+    pubRender();
+    try{
+      var restored=false;
+      if(anchorId&&window.CSS&&CSS.escape){
+        var el=box.querySelector('[data-pub-id="'+CSS.escape(anchorId)+'"]');
+        if(el){var dy=el.getBoundingClientRect().top-anchorTop;if(dy){window.scrollTo(0,(window.scrollY||window.pageYOffset||0)+dy);restored=true;}}
+      }
+      if(!restored)window.scrollTo(0,sy);
+    }catch(e){try{window.scrollTo(0,sy);}catch(e2){}}
+  }).catch(function(){
+    if(timer)clearTimeout(timer);
+    pubAutoBusy=false;
+    /* Silent: a failed tick shows nothing and keeps the current
+       feed exactly as it is — the next tick retries. */
   });
 }
 function pubRenderError(){
