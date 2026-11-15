@@ -1825,6 +1825,30 @@ function apiRoute(req, res, urlPath) {
     }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
     return;
   }
+  // DELETE /api/public/post — ADMIN KEY required. {id}. Removes the post
+  // record from public.json (an uploaded file in ./data/uploads/ is left
+  // alone — only the post record is deleted). The GitHub flush is awaited
+  // before success is returned, so the deletion survives a restart
+  // (same pattern as POST /api/public/post).
+  if (req.method === 'DELETE' && urlPath === '/api/public/post') {
+    const a = adminKeyOk(req);
+    if (!a.ok) return sendJSON(res, 200, { ok: false, error: a.error });
+    readJSONBody(req, 64 * 1024).then(async (body) => {
+      const id = typeof body.id === 'string' ? body.id.trim() : '';
+      if (!id) return sendJSON(res, 200, { ok: false, error: 'សូមដាក់ post id' });
+      const posts = loadPublicPosts();
+      const idx = posts.findIndex((x) => x && x.id === id);
+      if (idx < 0) return sendJSON(res, 200, { ok: false, error: 'រកមិនឃើញ post នេះទេ' });
+      posts.splice(idx, 1);
+      savePublicPosts(posts);
+      // Critical write: confirm public.json is on GitHub BEFORE returning
+      // success, so a restart in the next second cannot resurrect a post
+      // the Admin app already reported as deleted.
+      await ghFlushFile(PUBLIC_FILE);
+      return sendJSON(res, 200, { ok: true, deletedId: id });
+    }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
+    return;
+  }
   // GET /api/public/feed — PUBLIC. Only public posts, ranked by
   // views (highest first); ties broken by more likes, then earlier
   // createdAt. rank is 1-based; tier 1 = rank 1–50, tier 2 = 51–200,
