@@ -123,6 +123,15 @@ textarea.input{resize:vertical}
 .d3-drop:hover{border-color:var(--accent-text)}
 .d3-preview{width:100%;border-radius:14px;display:block;margin-top:12px}
 .d3-step{font-size:0.8125rem;font-weight:700;color:var(--accent-text);margin-top:16px}
+.err-box{margin-top:10px;border:1px solid rgba(248,113,113,.45);background:rgba(248,113,113,.07);border-radius:12px;padding:12px}
+html[data-mode="light"] .err-box{background:rgba(220,38,38,.05);border-color:rgba(220,38,38,.35)}
+.err-head{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.err-title{font-size:0.8125rem;font-weight:800;color:#f87171;line-height:1.4}
+html[data-mode="light"] .err-title{color:#b91c1c}
+.err-copy-btn{flex:0 0 auto;border:none;border-radius:999px;padding:10px 16px;font-size:0.8125rem;font-weight:800;font-family:inherit;cursor:pointer;background:#f87171;color:#1a0505;min-height:40px}
+.err-copy-btn:active{opacity:.85}
+.err-text{width:100%;margin-top:10px;border:1px solid var(--line2);border-radius:10px;padding:10px;font-size:0.75rem;line-height:1.55;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;background:var(--field);color:var(--text2);resize:vertical;min-height:88px;max-height:220px}
+.err-copy-msg{font-size:0.75rem;color:var(--accent-text);margin-top:6px;min-height:16px;font-weight:700}
 footer{text-align:center;color:var(--faint);font-size:0.8125rem;padding:32px 16px 104px;line-height:1.7}
 .set-box{margin-top:22px;padding-top:20px;border-top:1px solid var(--line2)}
 .set-label{font-size:0.8125rem;font-weight:700;color:var(--label);letter-spacing:.02em}
@@ -336,6 +345,11 @@ html[data-mode="light"] [style*="border-top:1px solid rgba(255,255,255,.08)"]{bo
     </div>
     <button class="btn btn-green btn-block" id="d3MakeBtn" onclick="d3Make()" style="margin-top:20px" data-i18n="d3Make">ធ្វើជា 3D</button>
     <p id="d3Msg" style="font-size:0.8125rem;margin-top:12px;min-height:18px"></p>
+    <div id="d3ErrBox" class="err-box" style="display:none">
+      <div class="err-head"><span class="err-title" data-i18n="errTitle">បញ្ហាដែលកើតឡើង — ចម្លងទុកផ្ញើឲ្យអ្នកជួយមើល</span><button type="button" class="err-copy-btn" onclick="copyErrText('d3ErrText',this,'d3CopyMsg')" data-i18n="btnCopy">ចម្លងបញ្ហា</button></div>
+      <textarea id="d3ErrText" class="err-text" readonly rows="5" aria-label="Error details — copy this problem"></textarea>
+      <p id="d3CopyMsg" class="err-copy-msg" aria-live="polite"></p>
+    </div>
     <div id="d3Prog" style="display:none;margin-top:10px">
       <div style="display:flex;justify-content:space-between;font-size:0.8125rem"><span id="d3ProgTxt" data-i18n="d3Working">កំពុងធ្វើ…</span><b id="d3ProgSec">0s</b></div>
       <div style="height:8px;background:rgba(255,255,255,.1);border-radius:999px;margin-top:8px;overflow:hidden"><div id="d3ProgBar" style="height:100%;width:0%;background:var(--accent-fill);border-radius:999px"></div></div>
@@ -349,6 +363,11 @@ html[data-mode="light"] [style*="border-top:1px solid rgba(255,255,255,.08)"]{bo
       <button class="btn btn-green btn-block" id="genBtn" onclick="genGenerate()" style="margin-top:12px" data-i18n="btnGenerate">បង្កើត</button>
     </div>
     <p id="genMsg" style="font-size:0.8125rem;margin-top:12px;min-height:18px"></p>
+    <div id="genErrBox" class="err-box" style="display:none">
+      <div class="err-head"><span class="err-title" data-i18n="errTitle">បញ្ហាដែលកើតឡើង — ចម្លងទុកផ្ញើឲ្យអ្នកជួយមើល</span><button type="button" class="err-copy-btn" onclick="copyErrText('genErrText',this,'genCopyMsg')" data-i18n="btnCopy">ចម្លងបញ្ហា</button></div>
+      <textarea id="genErrText" class="err-text" readonly rows="5" aria-label="Error details — copy this problem"></textarea>
+      <p id="genCopyMsg" class="err-copy-msg" aria-live="polite"></p>
+    </div>
     <div id="genProg" style="display:none;margin-top:10px">
       <div style="display:flex;justify-content:space-between;font-size:0.8125rem"><span id="genProgTxt" data-i18n="progCreating">កំពុងបង្កើត…</span><b id="genProgSec">0s</b></div>
       <div style="height:8px;background:rgba(255,255,255,.1);border-radius:999px;margin-top:8px;overflow:hidden"><div id="genProgBar" style="height:100%;width:0%;background:var(--accent-fill);border-radius:999px"></div></div>
@@ -411,7 +430,7 @@ km:{
  progWaiting:'កំពុងរង់ចាំវីដេអូ… ',
  errTimeoutVideo:'អស់ពេលរង់ចាំ (10 នាទី) — វីដេអូអាចនៅកំពុងបង្កើតក្នុងគណនីរបស់អ្នក',
  errNoVideoUrl:'វីដេអូរួចរាល់ តែរក URL មិនឃើញ — សូមមើលក្នុងគណនីរបស់អ្នកផ្ទាល់',
- genFailed:'បង្កើតមិនបានទេ',unknownProvider:'Provider មិនស្គាល់ទេ',
+ genFailed:'បង្កើតមិនបានទេ',errTitle:'បញ្ហាដែលកើតឡើង — ចម្លងទុកផ្ញើឲ្យអ្នកជួយមើល',btnCopy:'ចម្លងបញ្ហា',copiedOk:'បានចម្លងហើយ ✓',copyFail:'ចម្លងមិនបាន — សូមចុចសង្កត់លើអត្ថបទក្នុងប្រអប់ ហើយជ្រើស Copy ដោយខ្លួនឯង',unknownProvider:'Provider មិនស្គាល់ទេ',
  badImgUrl:'Provider បានផ្ដល់ URL រូបភាពមិនត្រឹមត្រូវទេ',badVidUrl:'Provider បានផ្ដល់ URL វីដេអូមិនត្រឹមត្រូវទេ',
  puterRetry:'Puter.js មិនទាន់ផ្ទុកទេ — សូមព្យាយាមម្ដងទៀត',
  puterNoImg:'Puter: មិនបានរូបភាពទេ',puterNoVid:'Puter: មិនបានវីដេអូទេ',
@@ -475,7 +494,7 @@ en:{
  progWaiting:'Waiting for the video… ',
  errTimeoutVideo:'Timed out after 10 minutes — the video may still be generating in your account',
  errNoVideoUrl:'Video finished but no URL was returned — please check your account',
- genFailed:'Generation failed',unknownProvider:'Unknown provider',
+ genFailed:'Generation failed',errTitle:'Error details — copy this to share for help',btnCopy:'Copy error',copiedOk:'Copied ✓',copyFail:'Copy failed — long-press the text in the box and copy it manually',unknownProvider:'Unknown provider',
  badImgUrl:'The provider returned an invalid image URL',badVidUrl:'The provider returned an invalid video URL',
  puterRetry:'Puter.js has not loaded yet — please try again',
  puterNoImg:'Puter: no image returned',puterNoVid:'Puter: no video returned',
@@ -794,7 +813,37 @@ var GEN_KEY_PROVIDERS=[
 var gen={mode:'image',provider:'pollinations',aspect:'16:9',duration:5,res:720,progTimer:null,progSec:0,keyIdx:{},lastImg:null,lastVideo:null};
 var genKeyOpen={};
 var GEN_ASPECTS={'16:9':{w:768,h:432},'9:16':{w:432,h:768},'4:6':{w:512,h:768}};
-function genMsg(t){var el=document.getElementById('genMsg');if(el)el.textContent=t;}
+function updateErrBox(boxId,textId,msgId,t,contextLabel){
+  var box=document.getElementById(boxId);if(!box)return;
+  var ta=document.getElementById(textId);
+  var cm=document.getElementById(msgId);if(cm)cm.textContent='';
+  var infoVals=[tx('msgDone'),tx('d3MsgDone'),tx('d3MsgUploaded'),tx('d3MsgImgReady'),tx('d3MsgMpxOpening')];
+  if(!t||infoVals.indexOf(t)>=0){box.style.display='none';if(ta)ta.value='';return;}
+  box.style.display='block';
+  if(ta){
+    var when='';try{when=new Date().toLocaleString();}catch(e){}
+    ta.value='MovAi — Error report\n'+(contextLabel?('Where: '+contextLabel+'\n'):'')+(when?('Time: '+when+'\n'):'')+'---\n'+t;
+  }
+}
+function copyErrText(textId,btn,msgId){
+  var ta=document.getElementById(textId);if(!ta||!ta.value)return;
+  var cm=document.getElementById(msgId);
+  function done(ok){
+    if(cm)cm.textContent=ok?tx('copiedOk'):tx('copyFail');
+    if(btn){btn.textContent=ok?tx('copiedOk'):tx('btnCopy');setTimeout(function(){btn.textContent=tx('btnCopy');if(cm)cm.textContent='';},2500);}
+  }
+  function fallback(){
+    try{ta.focus();ta.select();ta.setSelectionRange(0,ta.value.length);done(!!document.execCommand('copy'));}catch(e){done(false);}
+  }
+  if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(ta.value).then(function(){done(true);},function(){fallback();});}
+  else fallback();
+}
+function genMsg(t){
+  var el=document.getElementById('genMsg');if(el)el.textContent=t;
+  var provName='';
+  try{var list=gen.mode==='video'?GEN_VID_PROVIDERS:GEN_IMG_PROVIDERS;for(var i=0;i<list.length;i++)if(list[i].id===gen.provider)provName=list[i].name;}catch(e){}
+  updateErrBox('genErrBox','genErrText','genCopyMsg',t,(gen.mode||'')+(provName?(' · '+provName):''));
+}
 function genProgTxt(t){var el=document.getElementById('genProgTxt');if(el)el.textContent=t;}
 function genStartProg(){
   gen.progSec=0;
@@ -1209,7 +1258,7 @@ function d3MakeMpx(){
   d3Msg(tx('d3MsgMpxOpening'));
   window.open('https://www.masterpiecex.com','_blank');
 }
-function d3Msg(t){var el=document.getElementById('d3Msg');if(el)el.textContent=t;}
+function d3Msg(t){var el=document.getElementById('d3Msg');if(el)el.textContent=t;updateErrBox('d3ErrBox','d3ErrText','d3CopyMsg',t,'3D Design · '+((typeof d3!=='undefined'&&d3.provider)?d3.provider:''));}
 function d3ProgTxt(t){var el=document.getElementById('d3ProgTxt');if(el)el.textContent=t;}
 function d3StartProg(txt){
   d3.progSec=0;
