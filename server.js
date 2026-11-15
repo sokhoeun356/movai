@@ -67,6 +67,7 @@ async function readJSONBody(req, limitBytes) {
 const DATA_DIR = path.join(ROOT, 'data');
 const USERS_FILE = path.join(DATA_DIR, 'users.json');
 const GRANTS_FILE = path.join(DATA_DIR, 'grants.json');
+const SETTINGS_FILE = path.join(DATA_DIR, 'settings.json');
 const FREE_MEDIA_CREDITS = 250;
 const FREE_SONG_CREDITS = 24;
 
@@ -104,6 +105,22 @@ function logGrant(entry) {
     if (arr.length > 1000) arr = arr.slice(-1000);
     fs.writeFileSync(GRANTS_FILE, JSON.stringify(arr, null, 2));
   } catch (e) {}
+}
+// Server settings (admin-controlled, read by the website). Only one setting
+// for now: smoothModeAuto — when true, every MovAi website enables Smooth
+// mode automatically; when false, each user controls it themselves.
+function loadSettings() {
+  try {
+    const j = JSON.parse(fs.readFileSync(SETTINGS_FILE, 'utf8'));
+    if (j && typeof j === 'object' && !Array.isArray(j)) return { smoothModeAuto: j.smoothModeAuto === true };
+  } catch (e) {}
+  return { smoothModeAuto: false };
+}
+function saveSettings(s) {
+  try { fs.mkdirSync(DATA_DIR, { recursive: true }); } catch (e) {}
+  const out = { smoothModeAuto: s.smoothModeAuto === true, updatedAt: new Date().toISOString() };
+  fs.writeFileSync(SETTINGS_FILE, JSON.stringify(out, null, 2));
+  return out;
 }
 
 /* --------------------------------- api ------------------------------------- */
@@ -460,6 +477,21 @@ function apiRoute(req, res, urlPath) {
     delete users[email];
     saveUsers(users);
     return sendJSON(res, 200, { ok: true, deleted: email });
+  }
+  // GET /api/admin/settings — PUBLIC (no admin key). The MovAi website reads
+  // it on load to know whether the admin turned Smooth mode Auto on.
+  if (req.method === 'GET' && urlPath === '/api/admin/settings') {
+    return sendJSON(res, 200, { ok: true, settings: loadSettings() });
+  }
+  // POST /api/admin/settings — {smoothModeAuto:boolean} — admin key required.
+  if (req.method === 'POST' && urlPath === '/api/admin/settings') {
+    const a = adminKeyOk(req);
+    if (!a.ok) return sendJSON(res, 200, { ok: false, error: a.error });
+    readJSONBody(req, 64 * 1024).then((body) => {
+      const saved = saveSettings({ smoothModeAuto: body && body.smoothModeAuto === true });
+      return sendJSON(res, 200, { ok: true, settings: saved });
+    }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
+    return;
   }
   return sendJSON(res, 404, errBody('not_found', 'រកមិនឃើញទេ', 'Not found'));
 }
