@@ -202,7 +202,9 @@ function wrapGenLog(res, mode, ctx) {
 // Each notification: {id, at, kind, email, title, text, read:false}.
 // Kinds: 'login' (new user first sync), 'purchase-request', 'purchase-approved',
 // 'purchase-rejected', 'gift-claimed' (new user claims the free gift),
-// 'grant' (admin grants credits), 'deduct' (admin deducts credits).
+// 'grant' (admin grants credits), 'deduct' (admin deducts credits),
+// 'post' (new PUBLIC post — broadcast: email '*', shown to every user
+// and pushed to every subscribed phone immediately).
 // Stored newest first, capped at 5000 (oldest dropped).
 const NOTIFICATIONS_FILE = path.join(DATA_DIR, 'notifications.json');
 const NOTIFICATIONS_MAX = 5000;
@@ -356,7 +358,9 @@ function sendPushForNotification(n) {
       const sEmail = String(s.email || '').toLowerCase();
       const isAdminSub = s.role === 'admin' || ADMIN_EMAILS.includes(sEmail);
       const isUserSub = !!n.email && sEmail === String(n.email).toLowerCase();
-      if ((ADMIN_KINDS.includes(n.kind) && isAdminSub) || (USER_KINDS.includes(n.kind) && isUserSub)) {
+      // Broadcast kinds (new public post) go to EVERY subscribed device.
+      const isBroadcast = n.kind === 'post' || n.email === '*';
+      if (isBroadcast || (ADMIN_KINDS.includes(n.kind) && isAdminSub) || (USER_KINDS.includes(n.kind) && isUserSub)) {
         targets.set(s.endpoint, s);
       }
     }
@@ -1438,7 +1442,7 @@ function apiRoute(req, res, urlPath) {
     if (rawEmail === 'guest') return sendJSON(res, 200, { ok: true, notifications: [] });
     const email = normEmail(rawEmail);
     if (!email) return sendJSON(res, 200, { ok: false, error: 'សូមដាក់ Gmail ត្រឹមត្រូវ' });
-    const list = loadNotifications().filter((n) => n && n.email === email).slice(0, 50);
+    const list = loadNotifications().filter((n) => n && (n.email === email || n.email === '*')).slice(0, 50);
     return sendJSON(res, 200, { ok: true, notifications: list });
   }
   // ---- Web Push (phone-native push, from the phone itself) ----
@@ -1591,6 +1595,13 @@ function apiRoute(req, res, urlPath) {
       posts.push(p);
       if (posts.length > PUBLIC_MAX) posts.splice(0, posts.length - PUBLIC_MAX);
       savePublicPosts(posts);
+      // New public post -> broadcast notification to EVERYONE at once:
+      // in-app notification in every user's feed + Web Push to all
+      // subscribed phones (Website + App) immediately. Private posts
+      // never notify anyone.
+      if (visibility === 'public') {
+        addNotification('post', '*', '📢 បានផុសថ្មី · New post', p.title + ' (' + mode + ') — ' + (p.name || email));
+      }
       return sendJSON(res, 200, { ok: true, post: pubPost(p) });
     }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
     return;
