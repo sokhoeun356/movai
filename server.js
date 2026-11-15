@@ -72,6 +72,109 @@ const SETTINGS_FILE = path.join(DATA_DIR, 'settings.json');
 const FREE_MEDIA_CREDITS = 250;
 const FREE_SONG_CREDITS = 24;
 
+/* ---------------- GitHub-backed persistent storage ----------------- */
+// Render free disk is ephemeral — ./data/*.json is wiped on restart, so
+// posts, credits and users vanish. When MOVAI_GITHUB_TOKEN is set, the 13
+// JSON data files are ALSO stored in a private GitHub repo (branch main,
+// repo root, same filenames). On startup the server pulls each file from
+// GitHub into the local ./data/ cache (overwriting local); on every local
+// write it ALSO pushes to GitHub (fire-and-forget — never blocks a
+// response, failures are only logged to console). When the token is unset,
+// behaviour is EXACTLY as before (local ./data/*.json only).
+// Uploads (./data/uploads/) are binary and stay local/ephemeral.
+// The token is NEVER hardcoded and NEVER logged — only process.env.
+const GH_REPO = process.env.MOVAI_DATA_REPO || 'sokhoeun356/movai-data';
+const GH_TOKEN = process.env.MOVAI_GITHUB_TOKEN || '';
+const GH_DATA_FILES = [
+  'users.json', 'grants.json', 'settings.json', 'admin-keys.json',
+  'activity.json', 'followers.json', 'notifications.json', 'vapid.json',
+  'push-subs.json', 'packages.json', 'purchase-requests.json',
+  'public.json', 'package-events.json',
+];
+const ghShaCache = {}; // filename -> GitHub blob sha (for PUT updates)
+function ghEnabled() { return !!GH_TOKEN; }
+function ghHeaders() {
+  return {
+    'Authorization': 'Bearer ' + GH_TOKEN,
+    'Accept': 'application/vnd.github+json',
+    'User-Agent': 'movai-proxy',
+    'X-GitHub-Api-Version': '2022-11-28',
+  };
+}
+function ghContentsUrl(name) {
+  return 'https://api.github.com/repos/' + GH_REPO + '/contents/' + encodeURIComponent(name);
+}
+// GET one file from GitHub. Returns {sha, text} or null (missing/unreachable).
+async function ghGetFile(name) {
+  const r = await fetch(ghContentsUrl(name) + '?ref=main', { headers: ghHeaders(), signal: AbortSignal.timeout(15000) });
+  if (r.status === 404) return null;
+  if (!r.ok) return null;
+  const j = await r.json().catch(() => null);
+  if (!j || typeof j.content !== 'string') return null;
+  const text = Buffer.from(j.content.replace(/\s/g, ''), 'base64').toString('utf8');
+  return { sha: typeof j.sha === 'string' ? j.sha : '', text };
+}
+// PUT one file to GitHub (create or update). Never throws; logs failures.
+async function ghPutFile(name, text) {
+  try {
+    let sha = ghShaCache[name] || '';
+    if (!sha) {
+      const cur = await ghGetFile(name);
+      if (cur && cur.sha) sha = cur.sha;
+    }
+    const send = async (useSha) => {
+      const body = { message: 'movai-proxy: update ' + name, content: Buffer.from(text, 'utf8').toString('base64'), branch: 'main' };
+      if (useSha) body.sha = useSha;
+      return fetch(ghContentsUrl(name), {
+        method: 'PUT',
+        headers: Object.assign({ 'Content-Type': 'application/json' }, ghHeaders()),
+        body: JSON.stringify(body),
+        signal: AbortSignal.timeout(20000),
+      });
+    };
+    let r = await send(sha);
+    if ((r.status === 409 || r.status === 422) && sha) {
+      // Sha went stale (concurrent update) — refetch and retry once.
+      const cur = await ghGetFile(name);
+      if (cur && cur.sha) r = await send(cur.sha);
+    }
+    if (!r.ok) { console.log('[github] PUT ' + name + ' failed: HTTP ' + r.status); return; }
+    const j = await r.json().catch(() => null);
+    if (j && j.content && typeof j.content.sha === 'string') ghShaCache[name] = j.content.sha;
+  } catch (e) {
+    console.log('[github] PUT ' + name + ' error: ' + (e && e.message ? e.message : e));
+  }
+}
+// Called AFTER a local write of a JSON data file. Fire-and-forget: never
+// blocks the API response and never throws. No-op when the token is unset.
+function ghPersistFile(filePath) {
+  if (!ghEnabled()) return;
+  const name = path.basename(filePath);
+  if (!GH_DATA_FILES.includes(name)) return;
+  let text;
+  try { text = fs.readFileSync(filePath, 'utf8'); } catch (e) { return; }
+  ghPutFile(name, text).catch(() => {});
+}
+// Startup restore: pull every JSON data file from GitHub into the local
+// ./data/ cache (overwrites local). Missing/unreachable files keep the
+// local copy. Never throws. Runs before the server starts listening.
+async function ghRestoreAll() {
+  if (!ghEnabled()) return;
+  try { fs.mkdirSync(DATA_DIR, { recursive: true }); } catch (e) {}
+  await Promise.all(GH_DATA_FILES.map(async (name) => {
+    try {
+      const cur = await ghGetFile(name);
+      if (!cur) return;
+      JSON.parse(cur.text); // validate JSON before overwriting the local cache
+      fs.writeFileSync(path.join(DATA_DIR, name), cur.text);
+      if (cur.sha) ghShaCache[name] = cur.sha;
+      console.log('[github] restored ' + name);
+    } catch (e) {
+      console.log('[github] restore ' + name + ' skipped: ' + (e && e.message ? e.message : e));
+    }
+  }));
+}
+
 function adminKeyOk(req) {
   const k = process.env.MOVAI_ADMIN_KEY;
   if (!k) return { ok: false, error: 'Admin key not configured on server' };
@@ -93,6 +196,7 @@ function loadUsers() {
 function saveUsers(u) {
   try { fs.mkdirSync(DATA_DIR, { recursive: true }); } catch (e) {}
   fs.writeFileSync(USERS_FILE, JSON.stringify(u, null, 2));
+  ghPersistFile(USERS_FILE);
 }
 // User IDs: 10 chars, uppercase letters + digits, no confusing chars
 // (0/O and 1/I excluded). Auto-generated once on first sync; once assigned
@@ -146,6 +250,7 @@ function logGrant(entry) {
     arr.push(entry);
     if (arr.length > 1000) arr = arr.slice(-1000);
     fs.writeFileSync(GRANTS_FILE, JSON.stringify(arr, null, 2));
+    ghPersistFile(GRANTS_FILE);
   } catch (e) {}
 }
 // Activity log (./data/activity.json) — one record per generation attempt
@@ -162,6 +267,7 @@ function loadActivity() {
 function saveActivity(arr) {
   try { fs.mkdirSync(DATA_DIR, { recursive: true }); } catch (e) {}
   fs.writeFileSync(ACTIVITY_FILE, JSON.stringify(arr, null, 2));
+  ghPersistFile(ACTIVITY_FILE);
 }
 function logActivity(rec) {
   try {
@@ -209,6 +315,7 @@ function loadFollowers() {
 function saveFollowers(arr) {
   try { fs.mkdirSync(DATA_DIR, { recursive: true }); } catch (e) {}
   fs.writeFileSync(FOLLOWERS_FILE, JSON.stringify(arr, null, 2));
+  ghPersistFile(FOLLOWERS_FILE);
 }
 // Notifications (./data/notifications.json) — real notifications for the
 // admin AND for users. The Admin app reads them (GET /api/admin/notifications)
@@ -229,6 +336,7 @@ function loadNotifications() {
 function saveNotifications(arr) {
   try { fs.mkdirSync(DATA_DIR, { recursive: true }); } catch (e) {}
   fs.writeFileSync(NOTIFICATIONS_FILE, JSON.stringify(arr, null, 2));
+  ghPersistFile(NOTIFICATIONS_FILE);
 }
 function newNotificationId() {
   return 'ntf_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
@@ -302,6 +410,7 @@ function getVapidKeys() {
       keys = wp.generateVAPIDKeys();
       try { fs.mkdirSync(DATA_DIR, { recursive: true }); } catch (e) {}
       fs.writeFileSync(VAPID_FILE, JSON.stringify(keys, null, 2));
+      ghPersistFile(VAPID_FILE);
     }
     wp.setVapidDetails(VAPID_SUBJECT, keys.publicKey, keys.privateKey);
     return keys;
@@ -318,6 +427,7 @@ function loadPushSubs() {
 function savePushSubs(arr) {
   try { fs.mkdirSync(DATA_DIR, { recursive: true }); } catch (e) {}
   fs.writeFileSync(PUSH_SUBS_FILE, JSON.stringify(arr, null, 2));
+  ghPersistFile(PUSH_SUBS_FILE);
 }
 // Validate a browser PushSubscription JSON. Returns {endpoint, keys} or null.
 function cleanPushSub(s) {
@@ -514,6 +624,7 @@ function saveSettings(s, base) {
   const out = cleanSettings(s, base);
   out.updatedAt = new Date().toISOString();
   fs.writeFileSync(SETTINGS_FILE, JSON.stringify(out, null, 2));
+  ghPersistFile(SETTINGS_FILE);
   return out;
 }
 // Public-safe settings: the Telegram bot token is a secret and is NEVER
@@ -548,6 +659,7 @@ function loadAdminKeys() {
 function saveAdminKeys(k) {
   try { fs.mkdirSync(DATA_DIR, { recursive: true }); } catch (e) {}
   fs.writeFileSync(ADMIN_KEYS_FILE, JSON.stringify(k, null, 2));
+  ghPersistFile(ADMIN_KEYS_FILE);
 }
 // {key, endpoint} stored for a provider, or null. endpoint is the Suno
 // gateway URL (only Suno needs one — the other providers have fixed hosts).
@@ -1213,6 +1325,7 @@ function apiRoute(req, res, urlPath) {
     try { fs.mkdirSync(DATA_DIR, { recursive: true }); } catch (e) {}
     const out = cleanPackages(map);
     fs.writeFileSync(PACKAGES_FILE, JSON.stringify(out, null, 2));
+    ghPersistFile(PACKAGES_FILE);
     return out;
   }
   // Public view: credits/durations exposed as mediaCredits/songCredits/durationDays.
@@ -1267,6 +1380,7 @@ function apiRoute(req, res, urlPath) {
   function savePurchaseRequests(arr) {
     try { fs.mkdirSync(DATA_DIR, { recursive: true }); } catch (e) {}
     fs.writeFileSync(PURCHASE_REQUESTS_FILE, JSON.stringify(arr, null, 2));
+    ghPersistFile(PURCHASE_REQUESTS_FILE);
   }
   function newPurchaseId() {
     return 'pr_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
@@ -1550,6 +1664,7 @@ function apiRoute(req, res, urlPath) {
   function savePublicPosts(arr) {
     try { fs.mkdirSync(DATA_DIR, { recursive: true }); } catch (e) {}
     fs.writeFileSync(PUBLIC_FILE, JSON.stringify(arr, null, 2));
+    ghPersistFile(PUBLIC_FILE);
   }
   function newPublicId() {
     return 'pub_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
@@ -1725,6 +1840,7 @@ function apiRoute(req, res, urlPath) {
   function savePkgEvents(arr) {
     try { fs.mkdirSync(DATA_DIR, { recursive: true }); } catch (e) {}
     fs.writeFileSync(PKG_EVENTS_FILE, JSON.stringify(arr, null, 2));
+    ghPersistFile(PKG_EVENTS_FILE);
   }
   // POST /api/public/package-event — PUBLIC. {email, packageId, action}
   // email may be 'guest' for visitors who are not signed in.
@@ -1789,6 +1905,10 @@ const server = http.createServer((req, res) => {
 });
 
 if (require.main === module) {
-  server.listen(PORT, () => console.log('MovAi Gen live on port ' + PORT));
+  // Restore persistent data from GitHub first (no-op without a token),
+  // so the server starts with the true data, then listen.
+  ghRestoreAll().catch(() => {}).finally(() => {
+    server.listen(PORT, () => console.log('MovAi Gen live on port ' + PORT));
+  });
 }
 module.exports = { server };
