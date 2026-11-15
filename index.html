@@ -941,13 +941,14 @@ function genRenderOptions(){
   /* NovAI's free video model (cogvideox-flash) can only do 5s at up to
      720p: while NovAI is the video provider, Duration shows 5s only and
      Quality stops at 720p, and any higher selection is clamped back.
-     Every other provider keeps the full 5s/10s + 480p-4K options. */
+     Every other provider keeps the full 5s/10s/15s/20s/30s + 480p-4K
+     options. */
   var novaiVid=(gen.mode==='video'&&gen.provider==='novai');
   if(novaiVid){
     if(gen.duration!==5)gen.duration=5;
     if(gen.res>720)gen.res=720;
   }
-  var durations=novaiVid?[5]:[5,10];
+  var durations=novaiVid?[5]:[5,10,15,20,30];
   var ress=novaiVid?[480,720]:[480,720,1080,4000];
   document.getElementById('genDuration').innerHTML=durations.map(function(d){return '<button class="kbtn '+(gen.duration===d?'kbtn-black':'kbtn-white')+'" onclick="genSetDuration('+d+')">'+d+'s</button>';}).join('');
   document.getElementById('genRes').innerHTML=ress.map(function(r){return '<button class="kbtn '+(gen.res===r?'kbtn-black':'kbtn-white')+'" onclick="genSetRes('+r+')">'+(r===4000?'4K':r+'p')+'</button>';}).join('');
