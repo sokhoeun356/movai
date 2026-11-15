@@ -1,7 +1,17 @@
-# Render Blueprint — MovAi static site
+# MovAi proxy — Render Blueprint
+# Creates ONLY the Node.js Web Service that proxies MusicAPI (CORS-blocked
+# from the browser). The existing Static Site "movai-1" is NOT managed here.
+# In the Render dashboard: New + -> Web Service -> select sokhoeun356/movai ->
+# Render prefills everything from this file -> Create Web Service (Free).
 services:
   - type: web
-    name: movai
-    env: static
-    buildCommand: ""
-    staticPublishPath: .
+    name: movai-proxy
+    env: node
+    plan: free
+    repo: https://github.com/sokhoeun356/movai
+    branch: main
+    buildCommand: npm install
+    startCommand: node server.js
+    envVars:
+      - key: NODE_VERSION
+        value: "20"
