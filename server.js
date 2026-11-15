@@ -78,9 +78,12 @@ const FREE_SONG_CREDITS = 24;
 // JSON data files are ALSO stored in a private GitHub repo (branch main,
 // repo root, same filenames). On startup the server pulls each file from
 // GitHub into the local ./data/ cache (overwriting local); on every local
-// write it ALSO pushes to GitHub (fire-and-forget — never blocks a
-// response, failures are only logged to console). When the token is unset,
-// behaviour is EXACTLY as before (local ./data/*.json only).
+// write it ALSO pushes to GitHub. Most files are fire-and-forget (never
+// blocks a response, failures only logged); the CRITICAL writes (public
+// post, grant, purchase approve, user sync) AWAIT the GitHub PUT via
+// ghFlushFile before returning success, so a restart cannot lose a write
+// already reported as ok. When the token is unset, behaviour is EXACTLY
+// as before (local ./data/*.json only).
 // Uploads (./data/uploads/) are binary and stay local/ephemeral.
 // The token is NEVER hardcoded and NEVER logged — only process.env.
 const GH_REPO = process.env.MOVAI_DATA_REPO || 'sokhoeun356/movai-data';
@@ -114,8 +117,23 @@ async function ghGetFile(name) {
   const text = Buffer.from(j.content.replace(/\s/g, ''), 'base64').toString('utf8');
   return { sha: typeof j.sha === 'string' ? j.sha : '', text };
 }
-// PUT one file to GitHub (create or update). Never throws; logs failures.
-async function ghPutFile(name, text) {
+// PUT one file to GitHub (create or update). Returns a Promise<boolean>:
+// true = confirmed on GitHub, false = failed (logged, never throws).
+// Writes for the SAME file are serialized through a per-file queue so
+// rapid successive writes each land in order (no lost updates, no sha
+// races); writes for different files run in parallel.
+const ghQueue = {}; // filename -> Promise<boolean> (tail of the chain)
+function ghPutFile(name, text) {
+  const prev = ghQueue[name] || Promise.resolve(true);
+  const p = prev.catch(() => {}).then(() => ghPutFileInner(name, text));
+  ghQueue[name] = p;
+  const done = p.then(
+    (ok) => { if (ghQueue[name] === p) delete ghQueue[name]; return ok; },
+    () => { if (ghQueue[name] === p) delete ghQueue[name]; return false; }
+  );
+  return done;
+}
+async function ghPutFileInner(name, text) {
   try {
     let sha = ghShaCache[name] || '';
     if (!sha) {
@@ -138,11 +156,13 @@ async function ghPutFile(name, text) {
       const cur = await ghGetFile(name);
       if (cur && cur.sha) r = await send(cur.sha);
     }
-    if (!r.ok) { console.log('[github] PUT ' + name + ' failed: HTTP ' + r.status); return; }
+    if (!r.ok) { console.log('[github] PUT ' + name + ' failed: HTTP ' + r.status); return false; }
     const j = await r.json().catch(() => null);
     if (j && j.content && typeof j.content.sha === 'string') ghShaCache[name] = j.content.sha;
+    return true;
   } catch (e) {
     console.log('[github] PUT ' + name + ' error: ' + (e && e.message ? e.message : e));
+    return false;
   }
 }
 // Called AFTER a local write of a JSON data file. Fire-and-forget: never
@@ -154,6 +174,24 @@ function ghPersistFile(filePath) {
   let text;
   try { text = fs.readFileSync(filePath, 'utf8'); } catch (e) { return; }
   ghPutFile(name, text).catch(() => {});
+}
+// Awaited flush for CRITICAL data (public post, grant, purchase approve,
+// user sync): waits until the latest local content of filePath is confirmed
+// on GitHub BEFORE the handler returns success, so a Render restart in the
+// next second cannot lose a write that was already reported as ok.
+// Returns true on success, false when GitHub failed — the local data is
+// still saved, so the caller must NOT fail the request for a GitHub
+// hiccup, only log it. Never throws. No-op (returns true) when GitHub is
+// disabled or the file is not a tracked data file.
+async function ghFlushFile(filePath) {
+  if (!ghEnabled()) return true;
+  const name = path.basename(filePath);
+  if (!GH_DATA_FILES.includes(name)) return true;
+  let text;
+  try { text = fs.readFileSync(filePath, 'utf8'); } catch (e) { return false; }
+  const ok = await ghPutFile(name, text);
+  if (!ok) console.log('[github] FLUSH ' + name + ' failed — local data saved, GitHub not yet updated (will retry on next write)');
+  return ok;
 }
 // Startup restore: pull every JSON data file from GitHub into the local
 // ./data/ cache (overwrites local). Missing/unreachable files keep the
@@ -1087,7 +1125,7 @@ function apiRoute(req, res, urlPath) {
   // on later syncs the SERVER credits are the truth — the client's credits
   // are ignored and the server values are returned.
   if (req.method === 'POST' && urlPath === '/api/admin/sync') {
-    readJSONBody(req, 64 * 1024).then((body) => {
+    readJSONBody(req, 64 * 1024).then(async (body) => {
       const email = normEmail(body && body.email);
       if (!email) return sendJSON(res, 200, { ok: false, error: 'សូមដាក់ Gmail ត្រឹមត្រូវ' });
       const now = new Date().toISOString();
@@ -1133,6 +1171,10 @@ function apiRoute(req, res, urlPath) {
       u.credits = Math.max(0, Math.floor(numOr(u.credits, 0)));
       u.songCredits = Math.max(0, Math.floor(numOr(u.songCredits, 0)));
       saveUsers(users);
+      // Critical write: confirm users.json is on GitHub BEFORE returning
+      // success, so a restart in the next second cannot lose this user
+      // (new account / first sync / credit truth).
+      await ghFlushFile(USERS_FILE);
       if (isNewUser) {
         addNotification('login', email, '👤 អ្នកប្រើថ្មី · New user', (u.name || email) + ' (' + email + ') បាន log in លើកដំបូង');
       }
@@ -1166,7 +1208,7 @@ function apiRoute(req, res, urlPath) {
   if (req.method === 'POST' && urlPath === '/api/admin/grant') {
     const a = adminKeyOk(req);
     if (!a.ok) return sendJSON(res, 200, { ok: false, error: a.error });
-    readJSONBody(req, 64 * 1024).then((body) => {
+    readJSONBody(req, 64 * 1024).then(async (body) => {
       const email = normEmail(body && body.email);
       if (!email) return sendJSON(res, 200, { ok: false, error: 'សូមដាក់ Gmail ត្រឹមត្រូវ' });
       const users = loadUsers();
@@ -1179,6 +1221,10 @@ function apiRoute(req, res, urlPath) {
       u.songCredits = Math.max(0, Math.floor(numOr(u.songCredits, 0)) + dSong);
       u.updatedAt = new Date().toISOString();
       saveUsers(users);
+      // Critical write: confirm the new balance is on GitHub BEFORE
+      // returning success, so a restart cannot lose a granted/deducted
+      // credit that the Admin app already reported as done.
+      await ghFlushFile(USERS_FILE);
       logGrant({ email, credits: dMedia, songCredits: dSong, note: typeof body.note === 'string' ? body.note.slice(0, 200) : '', at: u.updatedAt });
       const deltaText = fmtCreditDelta(dMedia, dSong);
       const grantNote = typeof body.note === 'string' ? body.note.trim().slice(0, 200) : '';
@@ -1428,7 +1474,7 @@ function apiRoute(req, res, urlPath) {
   if (req.method === 'POST' && urlPath === '/api/admin/purchase-request/approve') {
     const a = adminKeyOk(req);
     if (!a.ok) return sendJSON(res, 200, { ok: false, error: a.error });
-    readJSONBody(req, 64 * 1024).then((body) => {
+    readJSONBody(req, 64 * 1024).then(async (body) => {
       const id = typeof body.id === 'string' ? body.id.trim() : '';
       const reqs = loadPurchaseRequests();
       const r = reqs.find((x) => x.id === id);
@@ -1451,6 +1497,11 @@ function apiRoute(req, res, urlPath) {
       r.decidedAt = now;
       r.updatedAt = now;
       savePurchaseRequests(reqs);
+      // Critical writes: confirm BOTH the granted credits and the
+      // approved request are on GitHub BEFORE returning success, so a
+      // restart cannot lose a purchase the Admin app already approved.
+      await ghFlushFile(USERS_FILE);
+      await ghFlushFile(PURCHASE_REQUESTS_FILE);
       addNotification('purchase-approved', r.email, '✅ បានអនុម័ត · Purchase approved', 'កញ្ចប់ ' + r.packageId + ' របស់ ' + r.email + ' បានអនុម័ត — +' + pkg.credits + ' Image.Video / +' + pkg.songCredits + ' Song Credit');
       return sendJSON(res, 200, { ok: true, request: r, user: pubUser(u) });
     }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
@@ -1731,7 +1782,7 @@ function apiRoute(req, res, urlPath) {
   }
   // POST /api/public/post — PUBLIC. {email, name, userId?, mode, title, url, cover?, visibility?}
   if (req.method === 'POST' && urlPath === '/api/public/post') {
-    readJSONBody(req, 64 * 1024).then((body) => {
+    readJSONBody(req, 64 * 1024).then(async (body) => {
       const email = normEmail(body && body.email);
       if (!email) return sendJSON(res, 200, { ok: false, error: 'សូមដាក់ Gmail ត្រឹមត្រូវ' });
       const mode = typeof body.mode === 'string' ? body.mode.trim().toLowerCase() : '';
@@ -1758,6 +1809,10 @@ function apiRoute(req, res, urlPath) {
       posts.push(p);
       if (posts.length > PUBLIC_MAX) posts.splice(0, posts.length - PUBLIC_MAX);
       savePublicPosts(posts);
+      // Critical write: confirm public.json is on GitHub BEFORE returning
+      // success, so a restart in the next second cannot lose a post that
+      // the Admin app already reported as posted.
+      await ghFlushFile(PUBLIC_FILE);
       // New public post -> notify FOLLOWERS only (one 'post' notification
       // per follower, in-app + Web Push to their phones immediately).
       // Private posts never notify anyone.
