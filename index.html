@@ -132,7 +132,7 @@ html[data-mode="light"] .err-title{color:#b91c1c}
 .err-copy-btn:active{opacity:.85}
 .err-text{width:100%;margin-top:10px;border:1px solid var(--line2);border-radius:10px;padding:10px;font-size:0.75rem;line-height:1.55;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;background:var(--field);color:var(--text2);resize:vertical;min-height:88px;max-height:220px}
 .err-copy-msg{font-size:0.75rem;color:var(--accent-text);margin-top:6px;min-height:16px;font-weight:700}
-.ep-card{background:var(--card2);border:1px solid var(--line);border-radius:14px;padding:16px;margin-top:12px;-webkit-backdrop-filter:blur(var(--txtblur,0px));backdrop-filter:blur(var(--txtblur,0px))}
+.ep-card{background:var(--card2);border:1px solid var(--line);border-radius:14px;padding:14px;margin-top:10px;-webkit-backdrop-filter:blur(var(--txtblur,0px));backdrop-filter:blur(var(--txtblur,0px))}
 .ep-head{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
 .ep-head b{font-size:1rem;font-weight:800}
 .ep-dur{font-size:0.75rem;font-weight:700;color:var(--accent-text);background:rgba(var(--accent-rgb),.12);border-radius:999px;padding:5px 10px;white-space:nowrap}
@@ -333,6 +333,12 @@ html[data-mode="light"] [style*="border-top:1px solid rgba(255,255,255,.08)"]{bo
             <div id="genRes"></div>
           </div>
           <p id="genNovaiNote" style="display:none;flex-basis:100%;font-size:0.8125rem;color:var(--accent-text);font-weight:700;line-height:1.5" data-i18n="noteNovaiFree">NovAI ហ្វ្រីធ្វើបានតែ 5s · 720p ប៉ុណ្ណោះ</p>
+          <div class="tool-group" id="storyEpOpts" style="flex-basis:100%">
+            <span class="chip-label" data-i18n="storyCount">ចំនួនវគ្គ</span>
+            <div id="storyCountChips" style="display:flex;gap:6px;flex-wrap:wrap"></div>
+            <input type="number" class="input" id="storyCountInput" min="1" max="100" value="20" oninput="storySetCount(this.value,true)" style="width:92px;min-height:42px;padding:9px 12px" aria-label="ចំនួនវគ្គ · Episode count">
+          </div>
+          <p id="storyTotal" style="flex-basis:100%;margin-top:2px;font-size:0.9375rem;font-weight:800;color:var(--accent-text);line-height:1.5"></p>
         </div>
       </div>
       <div id="d3Inline" style="display:none;margin-top:4px">
@@ -374,19 +380,13 @@ html[data-mode="light"] [style*="border-top:1px solid rgba(255,255,255,.08)"]{bo
         <button class="btn" id="genAutoBtn" onclick="genAutoGenerate()" style="background:var(--card);border:1px solid var(--line2);color:var(--accent-text);flex:0 0 auto" title="ប្តូរទៅ Pollinations ហើយបង្កើតរូប · Switch to Pollinations &amp; generate" data-i18n="btnAuto">អូតូ</button>
       </div>
     </div>
-    <div id="storyBox" style="display:none;margin-top:18px;border-top:1px solid var(--line);padding-top:18px">
-      <h3 style="font-size:1.0625rem;font-weight:800" data-i18n="storyTitle">រឿង · វគ្គ</h3>
-      <p class="hint" data-i18n="storyHint">ដាក់អត្ថបទរឿងពេញម្ដង — MovAi បែងចែកជាវគ្គៗតាមចំនួនដែលអ្នកជ្រើស រួចបង្កើតវីដេអូមួយវគ្គម្ដងៗ</p>
-      <span class="chip-label" style="display:block;margin-top:14px" data-i18n="storyTextLabel">អត្ថបទរឿងពេញ</span>
-      <textarea class="input" id="storyText" rows="7" data-i18n-ph="storyPh" placeholder="ដាក់អត្ថបទរឿងពេញនៅទីនេះ…" style="width:100%;margin-top:8px;line-height:1.7"></textarea>
-      <div class="tool-group" style="margin-top:14px">
-        <span class="chip-label" data-i18n="storyCount">ចំនួនវគ្គ</span>
-        <div id="storyCountChips" style="display:flex;gap:6px;flex-wrap:wrap"></div>
-        <input type="number" class="input" id="storyCountInput" min="1" max="100" value="20" oninput="storySetCount(this.value,true)" style="width:92px;min-height:42px;padding:9px 12px" aria-label="ចំនួនវគ្គ · Episode count">
-      </div>
-      <p id="storyTotal" style="margin-top:14px;font-size:1rem;font-weight:800;color:var(--accent-text);line-height:1.6"></p>
-      <button class="btn btn-green btn-block" id="storySplitBtn" onclick="storySplit()" style="margin-top:12px" data-i18n="storySplit">បែងចែកជាវគ្គ</button>
-      <p id="storyMsg" style="font-size:0.8125rem;margin-top:10px;min-height:16px;line-height:1.5"></p>
+    <div id="storyBox" style="display:none;margin-top:12px;border-top:1px solid var(--line);padding-top:12px">
+      <h3 style="font-size:1rem;font-weight:800" data-i18n="storyTitle">រឿង · វគ្គ</h3>
+      <p class="hint" style="margin-top:4px" data-i18n="storyHint">ដាក់អត្ថបទរឿងពេញម្ដង — MovAi បែងចែកជាវគ្គៗតាមចំនួនដែលអ្នកជ្រើស រួចបង្កើតវីដេអូមួយវគ្គម្ដងៗ</p>
+      <span class="chip-label" style="display:block;margin-top:8px" data-i18n="storyTextLabel">អត្ថបទរឿងពេញ</span>
+      <textarea class="input" id="storyText" rows="3" data-i18n-ph="storyPh" placeholder="ដាក់អត្ថបទរឿងពេញនៅទីនេះ…" style="width:100%;margin-top:6px;line-height:1.55"></textarea>
+      <button class="btn btn-green btn-block" id="storySplitBtn" onclick="storySplit()" style="margin-top:10px" data-i18n="storySplit">បែងចែកជាវគ្គ</button>
+      <p id="storyMsg" style="font-size:0.8125rem;margin-top:8px;min-height:16px;line-height:1.5"></p>
       <div id="storyList"></div>
     </div>
     <p id="genMsg" style="font-size:0.8125rem;margin-top:12px;min-height:18px"></p>
