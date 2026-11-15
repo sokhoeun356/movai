@@ -435,6 +435,7 @@ km:{
  puterRetry:'Puter.js មិនទាន់ផ្ទុកទេ — សូមព្យាយាមម្ដងទៀត',
  puterNoImg:'Puter: មិនបានរូបភាពទេ',puterNoVid:'Puter: មិនបានវីដេអូទេ',
  gemini429:' — Key ឥឡូវថ្មីអាចបាន 429',
+ msgAutoFallback:'{name} បង្កើតមិនបានទេ — បានប្តូរទៅ Pollinations ឲ្យដោយស្វ័យប្រវត្តិ ហើយបង្កើតរូបឲ្យនៅទីនេះហើយ',progFallback:'កំពុងប្តូរទៅ Pollinations…',
  dlImage:'ទាញយករូបភាព',dlVideo:'ទាញយកវីដេអូ',dlPrefix:'ទាញយក ',
  imgAltCreated:'រូបភាពដែលបានបង្កើត',alt3dPreview:'រូបមើលមុនរបស់ 3D model',
  noKeyNeeded:'មិនបាច់ Key',
@@ -499,6 +500,7 @@ en:{
  puterRetry:'Puter.js has not loaded yet — please try again',
  puterNoImg:'Puter: no image returned',puterNoVid:'Puter: no video returned',
  gemini429:' — new keys may return 429',
+ msgAutoFallback:'{name} could not generate — automatically switched to Pollinations and created your image right here',progFallback:'Switching to Pollinations…',
  dlImage:'Download Image',dlVideo:'Download Video',dlPrefix:'Download ',
  imgAltCreated:'Generated image',alt3dPreview:'3D model preview',
  noKeyNeeded:'No key needed',
@@ -789,8 +791,8 @@ function genErrText(j, fb){
 var GEN_IMG_PROVIDERS=[
  {id:'pollinations',name:'Pollinations',limit:{km:'ហ្វ្រី · មិនបាច់ Key · ~1 រូប/15-45 វិនាទី',en:'Free · No key · ~1 image/15-45s'},note:{km:'មិនត្រូវការ API key — បង្កើតបានភ្លាម។ រូបមាន logo តូច។',en:'No API key needed — generate right away. Images carry a small logo.'}},
  {id:'puter',name:'Puter.js',limit:{km:'ហ្វ្រី · ចូលគណនី Puter',en:'Free · Puter account'},puter:true,note:{km:'អ្នកប្រើម្នាក់ៗចូលគណនី Puter ហ្វ្រីរបស់ខ្លួន (User-Pays) — អ្នកបង្កើតមិនបង់អ្វីទេ។',en:'Each user signs in with their own free Puter account (User-Pays) — the creator pays nothing.'}},
- {id:'cloudflare',name:'Cloudflare',limit:{km:'~230 រូប/ថ្ងៃ · FLUX',en:'~230 images/day · FLUX'},key:'cloudflare',note:{km:'ត្រូវការ Account ID + API Token (ចុះឈ្មោះ Cloudflare ហ្វ្រី មិនបាច់កាត)។',en:'Needs an Account ID + API Token (free Cloudflare signup, no card).'}},
- {id:'gemini',name:'Gemini',limit:{km:'Key ហ្វ្រី · Nano Banana',en:'Free key · Nano Banana'},key:'gemini',note:{km:'ត្រូវការ API Key ហ្វ្រីពី AI Studio (មិនបាច់កាត)។ សាកល្បងខែ 9/2026 រូបភាពលើ Key ថ្មីអាចបាន 429 — អាចមិនដំណើរការ។',en:'Needs a free API key from AI Studio (no card). Tested 9/2026: image requests on new keys may return 429 — may not work.'}},
+ {id:'cloudflare',name:'Cloudflare',limit:{km:'~230 រូប/ថ្ងៃ · FLUX',en:'~230 images/day · FLUX'},key:'cloudflare',note:{km:'ត្រូវការ Account ID + API Token (ចុះឈ្មោះ Cloudflare ហ្វ្រី មិនបាច់កាត)។ បញ្ជាក់៖ Cloudflare មិនអនុញ្ញាតឲ្យ browser ហៅត្រង់ទេ (CORS) ទើបបង្កើតនៅទីនេះមិនបាន — ពេលនោះ MovAi នឹងប្តូរទៅ Pollinations ឲ្យដោយស្វ័យប្រវត្តិ។',en:'Needs an Account ID + API Token (free Cloudflare signup, no card). Note: Cloudflare does not allow direct browser calls (CORS), so it cannot generate here — MovAi will automatically switch to Pollinations instead.'}},
+ {id:'gemini',name:'Gemini',limit:{km:'Key ហ្វ្រី · Nano Banana',en:'Free key · Nano Banana'},key:'gemini',note:{km:'ត្រូវការ API Key ហ្វ្រីពី AI Studio (មិនបាច់កាត)។ បញ្ជាក់៖ Google មិនឲ្យបង្កើតរូបភាពហ្វ្រីតាម API Key ទេ (limit 0) ទើបបង្កើតមិនបាន — ពេលនោះ MovAi នឹងប្តូរទៅ Pollinations ឲ្យដោយស្វ័យប្រវត្តិ។',en:'Needs a free API key from AI Studio (no card). Note: Google does not allow free image generation via API key (limit 0), so it cannot generate here — MovAi will automatically switch to Pollinations instead.'}},
  {id:'hf',name:'Hugging Face',limit:{km:'$0.10/ខែ · តិចណាស់',en:'$0.10/mo · very little'},key:'hf',note:{km:'ត្រូវការ Token ហ្វ្រី។ $0.10/ខែ បានតែប៉ុន្មានរូបទេ។',en:'Needs a free token. $0.10/month covers only a few images.'}}
 ];
 var GEN_VID_PROVIDERS=[
@@ -1040,7 +1042,20 @@ async function genGenerate(){
   }catch(e){
     var m=(e&&e.message?e.message:String(e));
     if(/failed to fetch|networkerror|load failed/i.test(m))m=tx('msgNetErr');
-    genMsg(m);
+    var fellBack=false;
+    if(gen.mode==='image'&&p.id!=='pollinations'){
+      try{
+        genProgTxt(tx('progFallback'));
+        var pol=null;for(var fi=0;fi<GEN_IMG_PROVIDERS.length;fi++)if(GEN_IMG_PROVIDERS[fi].id==='pollinations')pol=GEN_IMG_PROVIDERS[fi];
+        if(pol){await genDoImage(pol,prompt,null,'');fellBack=true;}
+      }catch(e2){fellBack=false;}
+    }
+    if(fellBack){
+      genMsg(tx('msgAutoFallback').replace('{name}',p.name));
+      var eb=document.getElementById('genErrBox');if(eb)eb.style.display='none';
+    }else{
+      genMsg(m);
+    }
   }
   finally{genStopProg();btn.disabled=false;}
 }
