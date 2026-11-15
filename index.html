@@ -541,6 +541,20 @@ html[data-mode="light"] .btn-free{color:#8a6100}
 .pub-filters{display:flex;gap:8px;margin-top:14px;flex-wrap:wrap}
 .pub-fchip{flex:1 1 0;min-width:64px;padding:10px 6px;border-radius:999px;border:1px solid var(--line2);background:transparent;color:var(--muted);font-family:inherit;font-size:0.8125rem;font-weight:800;cursor:pointer;min-height:42px;white-space:nowrap}
 .pub-fchip.on{background:var(--accent-fill);color:#0d1005;border-color:transparent}
+/* ===== Public Follow =====
+   Circle button with a + inside at the top of the Public panel:
+   tap to Follow the Public page, tap again to Unfollow. When
+   following, the circle fills with the accent and shows a check
+   instead of the +, and the follower count sits beside it. */
+.pub-follow-row{display:flex;align-items:center;gap:12px;margin-top:14px;padding:12px;border:1px solid var(--line);border-radius:14px;background:var(--card2)}
+.pub-follow-btn{width:48px;height:48px;flex:0 0 auto;border-radius:50%;border:2px solid var(--accent);background:transparent;color:var(--accent-text);display:inline-flex;align-items:center;justify-content:center;cursor:pointer;padding:0;font-family:inherit;-webkit-tap-highlight-color:transparent;line-height:1}
+.pub-follow-btn:active{opacity:.8}
+.pub-follow-btn.following{background:var(--accent-fill);color:#0d1005;border-color:transparent}
+.pub-follow-btn:disabled{opacity:.55;cursor:wait}
+.pub-follow-meta{flex:1 1 auto;min-width:0}
+.pub-follow-title{font-size:0.9375rem;font-weight:900;line-height:1.35;color:var(--text)}
+.pub-follow-sub{font-size:0.8125rem;color:var(--muted);line-height:1.55;margin-top:2px;overflow-wrap:break-word}
+.pub-follow-sub b{color:var(--text);font-variant-numeric:tabular-nums}
 .pub-type{font-size:0.6875rem;font-weight:800;color:var(--muted);border:1px solid var(--line);border-radius:999px;padding:3px 9px;white-space:nowrap}
 .pub-act{display:inline-flex;align-items:center;gap:6px;padding:8px 13px;border-radius:999px;border:1px solid var(--line2);background:transparent;color:var(--muted);font-family:inherit;font-size:0.8125rem;font-weight:700;cursor:pointer;min-height:38px;font-variant-numeric:tabular-nums}
 .pub-act:active{opacity:.8}
@@ -549,6 +563,8 @@ html[data-mode="light"] .btn-free{color:#8a6100}
 .pub-meta{margin-top:10px;border:1px solid var(--line);border-radius:10px;padding:10px 12px;font-size:0.8125rem;line-height:1.75;color:var(--text2);overflow-wrap:break-word}
 .pub-meta b{color:var(--muted);font-weight:700;margin-right:6px}
 .pub-meta .pm-id{font-variant-numeric:tabular-nums;letter-spacing:.03em}
+.pub-yt{display:inline-flex;align-items:center;gap:7px;margin-top:10px;border:1px solid rgba(255,77,77,.55);background:rgba(255,0,51,.10);color:#ff6b6b;border-radius:999px;padding:8px 14px;font-size:0.8125rem;font-weight:800;text-decoration:none;cursor:pointer}
+.pub-yt:active{opacity:.8}
 .pub-dl-note{font-size:0.75rem;color:var(--muted);margin-top:8px;line-height:1.6}
 /* Log in sheet: the single Google connect option. The button follows
    the app accent/theme colour (the App Color the user picks in
@@ -859,6 +875,13 @@ html[data-smooth="1"] .brand-frame,html[data-smooth="1"] .acct-chip,html[data-sm
       <button type="button" class="kbtn kbtn-white" onclick="pubLoadFeed(true)" data-i18n="pubRefresh">ផ្ទុកថ្មី</button>
     </div>
     <p style="font-size:0.8125rem;color:var(--muted);margin-top:8px;line-height:1.6" data-i18n="pubRankNote">រាំង (Ranking) រាប់តាមចំនួនអ្នកមើល (View) — អ្នកណា View ច្រើនជាងគេ គឺលេខ 1</p>
+    <div class="pub-follow-row" id="pubFollowRow">
+      <button type="button" class="pub-follow-btn" id="pubFollowBtn" onclick="pubFollowToggle()" aria-label="Follow" aria-pressed="false"><span id="pubFollowIcon" aria-hidden="true" style="font-size:1.625rem;font-weight:900;line-height:1">+</span></button>
+      <div class="pub-follow-meta">
+        <div class="pub-follow-title" id="pubFollowLabel">Follow · តាមដាន</div>
+        <div class="pub-follow-sub"><b id="pubFollowCount">0</b> <span data-i18n="pubFollowers">អ្នកតាមដាន (Followers)</span><span aria-hidden="true"> · </span><span data-i18n="pubFollowHint">ទទួលដំណឹងភ្លាមៗពេលមានផុសថ្មី</span></div>
+      </div>
+    </div>
     <div class="pub-filters" role="tablist" aria-label="Public category">
       <button type="button" class="pub-fchip on" id="pubFchip-song" onclick="pubSetFilter('song')" data-i18n="pubCatSong">បទចម្រៀង</button>
       <button type="button" class="pub-fchip" id="pubFchip-image" onclick="pubSetFilter('image')" data-i18n="pubCatImage">រូបភាព</button>
@@ -1246,6 +1269,7 @@ km:{
  pubError:'ផ្ទុក Public feed មិនបាន — server អាចកំពុងដេក សូមចុចព្យាយាមម្ដងទៀត',pubRetry:'ព្យាយាមម្ដងទៀត',
  pubTier1:'Tier 1',pubTier1Sub:'Top 50 · ល្អបំផុត',pubTier2:'Tier 2',pubTier2Sub:'មធ្យម',pubTier3:'Tier 3',pubTier3Sub:'ទាប',
  pubViews:'អ្នកមើល',pubPostBtn:'ផុសទៅ Public',pubPostTitle:'ផុសទៅ Public',
+ pubFollow:'Follow · តាមដាន',pubFollowing:'Following · កំពុងតាមដាន',pubFollowers:'អ្នកតាមដាន (Followers)',pubFollowHint:'ទទួលដំណឹងភ្លាមៗពេលមានផុសថ្មី',pubFollowAria:'Follow ទំព័រ Public',pubUnfollowAria:'Unfollow ទំព័រ Public',
  pubOptPublic:'Public — គ្រប់គ្នាមើលបាន',pubOptPrivate:'Private — មានតែខ្ញុំមើលបាន',
  pubPosting:'កំពុងផុស...',pubPostedOk:'បានផុសហើយ! វានឹងបង្ហាញក្នុង Public feed',pubPrivateOk:'បានរក្សាទុកជា Private ហើយ — មានតែអ្នកមើលបាន',
  pubPostedAlready:'បានផុសទៅ Public រួចហើយ',pubPostFail:'ផុសមិនបាន — server អាចកំពុងដេក សូមព្យាយាមម្ដងទៀត',
@@ -1426,6 +1450,7 @@ en:{
  pubError:'Could not load the Public feed — the server may be asleep. Please try again',pubRetry:'Try again',
  pubTier1:'Tier 1',pubTier1Sub:'Top 50 · Best',pubTier2:'Tier 2',pubTier2Sub:'Middle',pubTier3:'Tier 3',pubTier3Sub:'Lower',
  pubViews:'views',pubPostBtn:'Post to Public',pubPostTitle:'Post to Public',
+ pubFollow:'Follow',pubFollowing:'Following',pubFollowers:'Followers',pubFollowHint:'Get notified instantly when a new post arrives',pubFollowAria:'Follow the Public page',pubUnfollowAria:'Unfollow the Public page',
  pubOptPublic:'Public — everyone can see it',pubOptPrivate:'Private — only I can see it',
  pubPosting:'Posting...',pubPostedOk:'Posted! It will show in the Public feed',pubPrivateOk:'Saved as Private — only you can see it',
  pubPostedAlready:'Already posted to Public',pubPostFail:'Could not post — the server may be asleep. Please try again',
@@ -1849,6 +1874,7 @@ function applyLang(){
   d3SetProvider(d3.provider);
   d3SetOpt(d3.opt);
   acctRender();
+  try{pubFollowRender();}catch(e){}
   try{histRender();}catch(e){}
   /* Package prices follow the live server values — re-apply them
      after the language pass resets the static price markup. */
@@ -5366,6 +5392,95 @@ var pubSheetItem=null;
    'video' only videos, '3d' only 3D. The default on open is
    'song'; any other value falls back to 'song'. */
 var pubFilter='song';
+/* ===== Public Follow =====
+   The circle + button at the top of the Public panel Follows the
+   Public page itself (not a single post). Followers are the ones
+   the server notifies instantly on a new post (in-app «post»
+   notice + Web Push — handled server-side for followers only).
+   - State: GET PUB_API + '/follow?email=<gmail>' when the Public
+     tab opens (pubFollowLoad, called from appSetView). Guests may
+     still read the total follower count from the same endpoint.
+   - Toggle: POST PUB_API + '/follow' {email, follow} — follow is
+     the DESIRED state (true = follow, false = unfollow).
+   - Guests: tapping the button opens the log-in sheet instead —
+     no follow call is made without an account.
+   - The button is optimistic like the Like buttons: it flips at
+     once, the count moves with it, and a server response carrying
+     following / followers replaces the local values when it lands.
+     A failed call never breaks the page. */
+var pubFollow={following:false,followers:0,loaded:false,busy:false};
+function pubFollowRender(){
+  var btn=document.getElementById('pubFollowBtn');if(!btn)return;
+  var icon=document.getElementById('pubFollowIcon');
+  var label=document.getElementById('pubFollowLabel');
+  var count=document.getElementById('pubFollowCount');
+  btn.className='pub-follow-btn'+(pubFollow.following?' following':'');
+  btn.disabled=!!pubFollow.busy;
+  btn.setAttribute('aria-pressed',pubFollow.following?'true':'false');
+  btn.setAttribute('aria-label',tx(pubFollow.following?'pubUnfollowAria':'pubFollowAria'));
+  if(icon)icon.textContent=pubFollow.following?'✓':'+';
+  if(label)label.textContent=tx(pubFollow.following?'pubFollowing':'pubFollow');
+  if(count){var n=Math.max(0,Math.floor(pubFollow.followers||0));try{count.textContent=(typeof acctFmtBal==='function')?acctFmtBal(n):String(n);}catch(e){count.textContent=String(n);}}
+}
+function pubFollowApply(data){
+  if(!data||typeof data!=='object')return false;
+  var d=data;
+  if(d.data&&typeof d.data==='object'&&(d.data.following!==undefined||d.data.followers!==undefined||d.data.followerCount!==undefined))d=d.data;
+  else if(d.follow&&typeof d.follow==='object')d=d.follow;
+  var changed=false;
+  var f=(d.following!==undefined)?d.following:((d.isFollowing!==undefined)?d.isFollowing:d.followed);
+  if(f!==undefined){pubFollow.following=!!f;changed=true;}
+  var c=pubSrvNum(d.followers);if(c===null)c=pubSrvNum(d.followerCount);if(c===null)c=pubSrvNum(d.count);
+  if(c!==null){pubFollow.followers=Math.max(0,Math.floor(c));changed=true;}
+  return changed;
+}
+function pubFollowLoad(){
+  var u=null;try{u=acctCurrent();}catch(e){}
+  var url=PUB_API+'/follow';
+  if(u&&u.email)url+='?email='+encodeURIComponent(u.email);
+  try{
+    fetch(url,{method:'GET'}).then(function(r){
+      if(!r||!r.ok)throw new Error('http '+(r?r.status:0));
+      return r.json();
+    }).then(function(data){
+      pubFollowApply(data);
+      pubFollow.loaded=true;
+      pubFollowRender();
+    }).catch(function(){pubFollowRender();});
+  }catch(e){pubFollowRender();}
+}
+function pubFollowToggle(){
+  var u=null;try{u=acctCurrent();}catch(e){}
+  if(!u||!u.email){loginSheetOpen();return;}
+  if(pubFollow.busy)return;
+  var want=!pubFollow.following;
+  var prevF=pubFollow.following,prevC=pubFollow.followers;
+  pubFollow.following=want;
+  pubFollow.followers=Math.max(0,pubFollow.followers+(want?1:-1));
+  pubFollow.busy=true;
+  pubFollowRender();
+  try{
+    fetch(PUB_API+'/follow',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:u.email,follow:want})}).then(function(r){
+      if(!r||!r.ok)throw new Error('http '+(r?r.status:0));
+      return r.json().catch(function(){return null;});
+    }).then(function(data){
+      pubFollow.busy=false;
+      if(data)pubFollowApply(data);
+      pubFollow.loaded=true;
+      pubFollowRender();
+    }).catch(function(){
+      /* Server unreachable (asleep / offline): keep the optimistic
+         state on screen, exactly like the Like buttons — the next
+         Public-tab open reloads the true state from the server. */
+      pubFollow.busy=false;
+      pubFollowRender();
+    });
+  }catch(e){
+    pubFollow.busy=false;
+    pubFollow.following=prevF;pubFollow.followers=prevC;
+    pubFollowRender();
+  }
+}
 function pubSetFilter(f){
   pubFilter=(f==='song'||f==='image'||f==='video'||f==='3d')?f:'song';
   ['song','image','video','3d'].forEach(function(k){
@@ -5388,7 +5503,7 @@ function appSetView(v){
   var tp=document.getElementById('viewTabPublic'),tc=document.getElementById('viewTabCreate');
   if(tp){tp.className='view-tab'+(onPub?' on':'');tp.setAttribute('aria-selected',onPub?'true':'false');}
   if(tc){tc.className='view-tab'+(!onPub?' on':'');tc.setAttribute('aria-selected',!onPub?'true':'false');}
-  if(onPub)pubLoadFeed(false);
+  if(onPub){pubLoadFeed(false);try{pubFollowLoad();}catch(e){}}
   else{try{histRender();}catch(e){}}
   if(changed)window.scrollTo(0,0);
 }
@@ -5433,6 +5548,7 @@ function pubNormItem(x){
     duration:(dur===null?null:dur),
     model:String(x.model||x.modelName||''),
     genre:String(x.genre||x.style||''),
+    youtube:String(x.youtube||x.youtubeUrl||x.youtube_url||''),
     ts:x.ts||x.createdAt||x.created||null
   };
 }
@@ -5652,6 +5768,19 @@ function pubCardEl(it){
     if(dts)mh+='<div><b>'+escHtml(tx('pubPostedDate'))+'</b>'+escHtml(dts)+'</div>';
     meta.innerHTML=mh;
     card.appendChild(meta);
+    /* YouTube link (owner rule): when the server sent a YouTube
+       link for this song post (post.youtube), show a «YouTube ·
+       ស្ដាប់» link on the card — tapping it opens the YouTube
+       link in a new tab to listen. No youtube value → no link. */
+    if(it.youtube&&/^https?:\/\//i.test(it.youtube)){
+      var yt=document.createElement('a');
+      yt.className='pub-yt';
+      yt.href=it.youtube;
+      yt.target='_blank';
+      yt.rel='noopener noreferrer';
+      yt.innerHTML='<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M23 12s0-3.85-.5-5.7a2.9 2.9 0 0 0-2.05-2.05C18.6 3.75 12 3.75 12 3.75s-6.6 0-8.45.5A2.9 2.9 0 0 0 1.5 6.3C1 8.15 1 12 1 12s0 3.85.5 5.7a2.9 2.9 0 0 0 2.05 2.05c1.85.5 8.45.5 8.45.5s6.6 0 8.45-.5a2.9 2.9 0 0 0 2.05-2.05C23 15.85 23 12 23 12zM9.75 15.5v-7L15.5 12l-5.75 3.5z"/></svg><span>YouTube · ស្ដាប់</span>';
+      card.appendChild(yt);
+    }
   }
   var foot=document.createElement('div');
   foot.className='pub-foot';
