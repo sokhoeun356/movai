@@ -6069,18 +6069,11 @@ function pubCardEl(it){
     }
   }
   if(it.type==='song'){
-    /* Music Library actions: three accent-outline pills —
-       Download / Like / Share — wired to the same real actions
-       as everywhere else (quota-limited download, server like,
-       Web Share). */
+    /* Music Library actions: two accent-outline pills —
+       Like / Share. No Download pill: a Public post belongs to
+       its poster, so viewers cannot download it (owner rule). */
     var sfoot=document.createElement('div');
     sfoot.className='pub-pills';
-    var sdl=document.createElement('button');
-    sdl.type='button';sdl.className='pub-pill';
-    sdl.innerHTML=pubDlSvg()+'<span>'+escHtml(tx('histDownload'))+'</span>';
-    sdl.setAttribute('aria-label',tx('histDownload'));
-    sdl.addEventListener('click',function(){pubDownloadPost(it,sdl);});
-    sfoot.appendChild(sdl);
     var slk=document.createElement('button');
     slk.type='button';slk.className='pub-pill'+(pubLiked[it.id]?' liked':'');
     slk.setAttribute('data-pub-like',it.id);
@@ -6141,21 +6134,7 @@ function pubCardEl(it){
   sh.setAttribute('aria-label',tx('pubShare'));
   sh.addEventListener('click',function(){pubSharePost(it,sh);});
   foot.appendChild(sh);
-  var dl=document.createElement('button');
-  dl.type='button';dl.className='pub-act pub-dl';
-  dl.innerHTML=pubDlSvg()+'<span>'+escHtml(tx('histDownload'))+'</span>';
-  dl.setAttribute('aria-label',tx('histDownload'));
-  dl.addEventListener('click',function(){pubDownloadPost(it,dl);});
-  foot.appendChild(dl);
   card.appendChild(foot);
-  }
-  if(it.type==='song'&&!pubHasSongPlan()){
-    var left=pubSongDlLeft();
-    var note=document.createElement('p');
-    note.className='pub-dl-note';
-    note.setAttribute('data-pub-dlnote','1');
-    note.textContent=tx('pubDlFreeLeft').replace('{n}',left);
-    card.appendChild(note);
   }
   return card;
 }
