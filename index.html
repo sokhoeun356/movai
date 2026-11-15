@@ -568,6 +568,28 @@ html[data-mode="light"] .btn-free{color:#8a6100}
 .pub-songlink{display:inline-flex;align-items:center;gap:7px;margin-top:10px;border:1px solid var(--line2);background:transparent;color:var(--text);border-radius:999px;padding:8px 14px;font-size:0.8125rem;font-weight:800;cursor:pointer;font-family:inherit}
 .pub-songlink:active{opacity:.8}
 .pub-dl-note{font-size:0.75rem;color:var(--muted);margin-top:8px;line-height:1.6}
+/* ===== Public song card — Music Library style =====
+   Song posts lead with a big square cover, the title under it,
+   then a custom player: a round accent Play button, an accent
+   progress bar with a knob, and current / total time — followed
+   by three accent-outline pills: Download / Like / Share. The
+   accent is the app lime green, so the «green» of the design
+   follows the user's chosen App Color like everything else. */
+.pub-song-cover{display:block;width:min(74%,330px);aspect-ratio:1/1;object-fit:cover;margin:14px auto 0;border-radius:14px;background:#000}
+.pub-song-cover-none{display:flex;align-items:center;justify-content:center;background:var(--card);border:1px solid var(--line);color:var(--accent-text)}
+.pub-song-title{font-weight:800;font-size:1.0625rem;margin-top:14px;line-height:1.5;overflow-wrap:break-word}
+.pub-player{display:flex;align-items:center;gap:12px;margin-top:12px}
+.pub-playbtn{width:54px;height:54px;flex:0 0 auto;border-radius:50%;border:none;background:var(--accent-fill);color:#0d1005;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;padding:0;-webkit-tap-highlight-color:transparent;box-shadow:0 4px 14px rgba(var(--accent-rgb),.35)}
+.pub-playbtn:active{filter:brightness(.93)}
+.pub-prog{position:relative;flex:1 1 auto;height:22px;display:flex;align-items:center;cursor:pointer;touch-action:pan-y}
+.pub-prog::before{content:'';position:absolute;left:0;right:0;top:50%;transform:translateY(-50%);height:5px;border-radius:999px;background:var(--line2)}
+.pub-prog-fill{position:relative;height:5px;border-radius:999px;background:var(--accent-fill);width:0%;z-index:1}
+.pub-prog-knob{position:absolute;right:-8px;top:50%;transform:translateY(-50%);width:16px;height:16px;border-radius:50%;background:var(--accent-fill);box-shadow:0 1px 5px rgba(0,0,0,.45)}
+.pub-time{flex:0 0 auto;font-size:0.8125rem;font-weight:700;color:var(--text2);font-variant-numeric:tabular-nums;white-space:nowrap}
+.pub-pills{display:flex;gap:8px;margin-top:14px;flex-wrap:wrap}
+.pub-pill{flex:1 1 0;display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:9px 10px;border-radius:999px;border:1.5px solid var(--accent);background:transparent;color:var(--accent-text);font-family:inherit;font-size:0.8125rem;font-weight:800;cursor:pointer;min-height:40px;font-variant-numeric:tabular-nums;white-space:nowrap}
+.pub-pill:active{opacity:.8}
+.pub-pill.liked{background:rgba(var(--accent-rgb),.14)}
 /* Log in sheet: the single Google connect option. The button follows
    the app accent/theme colour (the App Color the user picks in
    Settings) — like the other primary buttons, NOT a fixed white.
@@ -5504,6 +5526,40 @@ function pubSetFilter(f){
   });
   pubRender();
 }
+/* ===== Public swipe navigation =====
+   On the Public panel a horizontal swipe switches category —
+   swipe LEFT moves to the next category (Songs → Images →
+   Videos → 3D), swipe RIGHT goes back — the same order as the
+   filter chips, which stay in sync through pubSetFilter.
+   Vertical swipes are left completely alone: the page scrolls
+   through the posts of the current category as usual. Touches
+   that start on a control (buttons, links, media, the song
+   progress bar, inputs) never trigger a category switch, so
+   playing, seeking and tapping keep working exactly as before. */
+(function(){
+  var sec=document.getElementById('page-public');
+  if(!sec||!sec.addEventListener)return;
+  var sx=0,sy=0,armed=false;
+  sec.addEventListener('touchstart',function(e){
+    armed=false;
+    if(!e.touches||e.touches.length!==1)return;
+    var t=e.target;
+    if(t&&t.closest&&t.closest('button,a,audio,video,input,textarea,select,.pub-prog'))return;
+    sx=e.touches[0].clientX;sy=e.touches[0].clientY;armed=true;
+  },{passive:true});
+  sec.addEventListener('touchend',function(e){
+    if(!armed)return;armed=false;
+    if(!e.changedTouches||!e.changedTouches.length)return;
+    var dx=e.changedTouches[0].clientX-sx;
+    var dy=e.changedTouches[0].clientY-sy;
+    if(Math.abs(dx)<56)return;
+    if(Math.abs(dx)<Math.abs(dy)*1.5)return;
+    var order=['song','image','video','3d'];
+    var i=order.indexOf(pubFilter);if(i<0)i=0;
+    var ni=(dx<0)?Math.min(order.length-1,i+1):Math.max(0,i-1);
+    if(order[ni]!==pubFilter)pubSetFilter(order[ni]);
+  },{passive:true});
+})();
 function appSetView(v){
   var nv=(v==='create')?'create':'public';
   var changed=(APP_VIEW!==nv);
@@ -5725,6 +5781,24 @@ function pubRenderError(){
 function pubEyeSvg(){
   return '<svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg>';
 }
+function pubPlaySvg(){
+  return '<svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5.14v13.72c0 .8.87 1.3 1.56.88l10.5-6.86a1.02 1.02 0 0 0 0-1.76L9.56 4.26A1.02 1.02 0 0 0 8 5.14z"/></svg>';
+}
+function pubPauseSvg(){
+  return '<svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="6" y="4.5" width="4" height="15" rx="1.2"/><rect x="14" y="4.5" width="4" height="15" rx="1.2"/></svg>';
+}
+/* Square cover placeholder for a song post that carries no cover
+   image (or whose cover failed to load): a music note on a plain
+   panel, in the same frame the real cover would take — including
+   the Admin-chosen 1x1 / 4x6 aspect when the post carries one. */
+function pubSongCoverFallback(it){
+  var d=document.createElement('div');
+  d.className='pub-song-cover pub-song-cover-none';
+  d.setAttribute('aria-hidden','true');
+  d.innerHTML='<svg width="54" height="54" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>';
+  if(it&&it.aspect)d.style.cssText=pubAspectCss(it.aspect);
+  return d;
+}
 function pubRender(){
   var box=document.getElementById('pubFeed');if(!box)return;
   box.innerHTML='';
@@ -5808,7 +5882,7 @@ function pubCardEl(it){
   tch2.textContent=pubTypeLabel(it.type);
   head.appendChild(tch2);
   card.appendChild(head);
-  if(it.title){
+  if(it.title&&it.type!=='song'){
     var tp=document.createElement('p');
     tp.style.cssText='font-weight:800;font-size:0.9375rem;margin-top:10px;line-height:1.5;overflow-wrap:break-word';
     tp.textContent=it.title;
@@ -5839,16 +5913,98 @@ function pubCardEl(it){
       card.appendChild(pb);
     }
   }else if(it.type==='song'){
+    /* Song details + links are collected into a fragment and
+       appended AFTER the action pills (see the song foot below),
+       so the card reads like the Music Library design: cover,
+       title, player, pills — details underneath. */
+    var songExtra=document.createDocumentFragment();
     if(it.image&&/^https:/i.test(it.image)){
       var cv=document.createElement('img');
-      cv.src=it.image;cv.alt=it.title||'';cv.className='pub-media';cv.style.cssText=it.aspect?pubAspectCss(it.aspect):'aspect-ratio:1/1;object-fit:cover;background:transparent';cv.loading='lazy';
-      cv.addEventListener('error',function(){cv.remove();});
+      cv.src=it.image;cv.alt=it.title||'';cv.className='pub-song-cover';cv.loading='lazy';
+      if(it.aspect)cv.style.cssText=pubAspectCss(it.aspect);
+      cv.addEventListener('error',function(){cv.replaceWith(pubSongCoverFallback(it));});
       card.appendChild(cv);
+    }else{
+      card.appendChild(pubSongCoverFallback(it));
     }
+    if(it.title){
+      var stp=document.createElement('p');
+      stp.className='pub-song-title';
+      stp.textContent=it.title;
+      card.appendChild(stp);
+    }
+    /* Custom player (Music Library style): a big round accent
+       Play button, an accent progress bar that follows the REAL
+       playback position, and current / total time read from the
+       audio element itself. The hidden <audio> does the actual
+       playing — its src is the post's own URL — and its play
+       event still counts the view, exactly as before. Tapping
+       the progress bar seeks. Only one feed song plays at a
+       time: starting one pauses the others. */
+    var pl=document.createElement('div');
+    pl.className='pub-player';
     var au=document.createElement('audio');
-    au.src=it.url;au.controls=true;au.preload='metadata';au.className='pub-audio';
-    au.addEventListener('play',function(){pubCountView(it.id);});
-    card.appendChild(au);
+    au.src=it.url;au.preload='metadata';au.style.display='none';
+    var pbtn=document.createElement('button');
+    pbtn.type='button';pbtn.className='pub-playbtn';
+    pbtn.setAttribute('aria-label','Play');
+    pbtn.innerHTML=pubPlaySvg();
+    var prog=document.createElement('div');
+    prog.className='pub-prog';
+    prog.setAttribute('role','slider');
+    prog.setAttribute('aria-label','Seek');
+    var pfill=document.createElement('div');
+    pfill.className='pub-prog-fill';
+    var pknob=document.createElement('span');
+    pknob.className='pub-prog-knob';
+    pfill.appendChild(pknob);
+    prog.appendChild(pfill);
+    var ptm=document.createElement('span');
+    ptm.className='pub-time';
+    var pcur=document.createElement('span');pcur.textContent='0:00';
+    var ptot=document.createElement('span');ptot.textContent=(it.duration&&it.duration>0)?histFmtTime(it.duration):'0:00';
+    ptm.appendChild(pcur);
+    ptm.appendChild(document.createTextNode(' / '));
+    ptm.appendChild(ptot);
+    pl.appendChild(pbtn);
+    pl.appendChild(prog);
+    pl.appendChild(ptm);
+    pl.appendChild(au);
+    card.appendChild(pl);
+    var pubUiSync=function(){
+      var d=au.duration;
+      var has=isFinite(d)&&d>0;
+      if(has)ptot.textContent=histFmtTime(d);
+      pfill.style.width=(has?(au.currentTime/d*100):0)+'%';
+      pcur.textContent=histFmtTime(au.currentTime||0);
+      pbtn.innerHTML=au.paused?pubPlaySvg():pubPauseSvg();
+      pbtn.setAttribute('aria-label',au.paused?'Play':'Pause');
+    };
+    au.addEventListener('play',function(){
+      pubCountView(it.id);
+      try{
+        var all=document.querySelectorAll('#pubFeed audio');
+        for(var ai=0;ai<all.length;ai++){if(all[ai]!==au&&!all[ai].paused)all[ai].pause();}
+      }catch(e){}
+      pubUiSync();
+    });
+    au.addEventListener('pause',pubUiSync);
+    au.addEventListener('timeupdate',pubUiSync);
+    au.addEventListener('loadedmetadata',pubUiSync);
+    au.addEventListener('durationchange',pubUiSync);
+    au.addEventListener('ended',pubUiSync);
+    pbtn.addEventListener('click',function(){
+      if(au.paused){var pr=au.play();if(pr&&pr.catch)pr.catch(function(){});}
+      else au.pause();
+    });
+    prog.addEventListener('click',function(ev){
+      var d=au.duration;if(!isFinite(d)||d<=0)return;
+      var r=prog.getBoundingClientRect();if(!r.width)return;
+      var ratio=(ev.clientX-r.left)/r.width;
+      ratio=Math.max(0,Math.min(1,ratio));
+      try{au.currentTime=ratio*d;}catch(e){}
+      pubUiSync();
+    });
     /* Song details (owner rule): every song post shows its ID,
        its name/title and its other info — duration, model, genre
        and post date, each only when the server sent it. */
@@ -5864,7 +6020,7 @@ function pubCardEl(it){
     var dts=pubFmtDate(it.ts);
     if(dts)mh+='<div><b>'+escHtml(tx('pubPostedDate'))+'</b>'+escHtml(dts)+'</div>';
     meta.innerHTML=mh;
-    card.appendChild(meta);
+    songExtra.appendChild(meta);
     /* Song-card links row (owner rule): the links sit together in
        one wrapping row under the song details, each shown ONLY
        when the server sent a real value for it:
@@ -5880,7 +6036,7 @@ function pubCardEl(it){
       if(!linksRow){
         linksRow=document.createElement('div');
         linksRow.style.cssText='display:flex;flex-wrap:wrap;gap:8px;margin-top:10px';
-        card.appendChild(linksRow);
+        songExtra.appendChild(linksRow);
       }
       el.style.marginTop='0';
       linksRow.appendChild(el);
@@ -5912,6 +6068,53 @@ function pubCardEl(it){
       pubAddLink(sl);
     }
   }
+  if(it.type==='song'){
+    /* Music Library actions: three accent-outline pills —
+       Download / Like / Share — wired to the same real actions
+       as everywhere else (quota-limited download, server like,
+       Web Share). */
+    var sfoot=document.createElement('div');
+    sfoot.className='pub-pills';
+    var sdl=document.createElement('button');
+    sdl.type='button';sdl.className='pub-pill';
+    sdl.innerHTML=pubDlSvg()+'<span>'+escHtml(tx('histDownload'))+'</span>';
+    sdl.setAttribute('aria-label',tx('histDownload'));
+    sdl.addEventListener('click',function(){pubDownloadPost(it,sdl);});
+    sfoot.appendChild(sdl);
+    var slk=document.createElement('button');
+    slk.type='button';slk.className='pub-pill'+(pubLiked[it.id]?' liked':'');
+    slk.setAttribute('data-pub-like',it.id);
+    slk.innerHTML=histHeartSvg(!!pubLiked[it.id])+'<span>'+escHtml(tx('histLike'))+'</span><span>'+acctFmtBal(it.likes)+'</span>';
+    slk.setAttribute('aria-label',tx('histLike'));
+    slk.addEventListener('click',function(){pubToggleLike(it.id);});
+    sfoot.appendChild(slk);
+    var ssh=document.createElement('button');
+    ssh.type='button';ssh.className='pub-pill';
+    ssh.innerHTML=pubShareSvg()+'<span>'+escHtml(tx('pubShare'))+'</span>';
+    ssh.setAttribute('aria-label',tx('pubShare'));
+    ssh.addEventListener('click',function(){pubSharePost(it,ssh);});
+    sfoot.appendChild(ssh);
+    card.appendChild(sfoot);
+    /* Views (the ranking stat) + thumbs-down stay available on a
+       quiet second row under the pills, then the song details
+       and links collected earlier. */
+    var srow=document.createElement('div');
+    srow.className='pub-foot';
+    srow.style.marginTop='10px';
+    var svw=document.createElement('span');
+    svw.className='pub-views';
+    svw.innerHTML=pubEyeSvg()+'<span data-pub-views="'+escHtml(it.id)+'">'+acctFmtBal(it.views)+'</span><small>'+escHtml(tx('pubViews'))+'</small>';
+    srow.appendChild(svw);
+    var sdk=document.createElement('button');
+    sdk.type='button';sdk.className='pub-act'+(pubDisliked[it.id]?' disliked':'');
+    sdk.setAttribute('data-pub-dislike',it.id);
+    sdk.innerHTML='<span style="display:inline-flex;transform:rotate(180deg)">'+pubThumbSvg()+'</span><span>'+acctFmtBal(it.dislikes)+'</span>';
+    sdk.setAttribute('aria-label',tx('pubDislike'));
+    sdk.addEventListener('click',function(){pubToggleDislike(it.id);});
+    srow.appendChild(sdk);
+    card.appendChild(srow);
+    if(songExtra)card.appendChild(songExtra);
+  }else{
   var foot=document.createElement('div');
   foot.className='pub-foot';
   var vw=document.createElement('span');
@@ -5945,6 +6148,7 @@ function pubCardEl(it){
   dl.addEventListener('click',function(){pubDownloadPost(it,dl);});
   foot.appendChild(dl);
   card.appendChild(foot);
+  }
   if(it.type==='song'&&!pubHasSongPlan()){
     var left=pubSongDlLeft();
     var note=document.createElement('p');
@@ -5965,6 +6169,12 @@ function pubUpdateLike(id){
   var it=null;for(var i=0;i<pubItems.length;i++)if(pubItems[i].id===id)it=pubItems[i];
   var btn=document.querySelector('[data-pub-like="'+CSS.escape(id)+'"]');
   if(!btn||!it)return;
+  if(btn.classList.contains('pub-pill')){
+    /* Song-card pill: keep the «Like» label, refresh heart + count. */
+    btn.classList.toggle('liked',!!pubLiked[id]);
+    btn.innerHTML=histHeartSvg(!!pubLiked[id])+'<span>'+escHtml(tx('histLike'))+'</span><span>'+acctFmtBal(it.likes)+'</span>';
+    return;
+  }
   btn.className='pub-like'+(pubLiked[id]?' liked':'');
   btn.innerHTML=histHeartSvg(!!pubLiked[id])+'<span>'+acctFmtBal(it.likes)+'</span>';
 }
