@@ -877,13 +877,93 @@ function apiRoute(req, res, urlPath) {
   // grants, keyed by packageId (from the artifact's PKG_PLANS /
   // SONG_PKG_PLANS). 'song-free' never sends a request (its button is
   // Automatic/disabled) and is rejected here if it ever arrives.
-  const PACKAGE_CATALOG = {
-    monthly: { credits: 11000, songCredits: 0, days: 30, amount: 25 },
-    yearly: { credits: 140000, songCredits: 0, days: 365, amount: 216 },
-    'song-trial': { credits: 0, songCredits: 750, days: 30, amount: 5 },
-    'song-popular': { credits: 0, songCredits: 1500, days: 30, amount: 10 },
-    'song-pro': { credits: 0, songCredits: 3750, days: 30, amount: 22 },
+  // Editable package catalog (./data/packages.json). The admin edits prices
+  // from the Admin app; the website reads the live prices from
+  // GET /api/public/packages. price = current sale price, originalPrice =
+  // the pre-discount price — when price < originalPrice the client shows a
+  // discount percent. Credits/durations NEVER change via price edits.
+  // 'song-free' ($0, 24 song Cr) is NOT a purchase package — never here.
+  const PACKAGE_SEED = {
+    monthly: { credits: 11000, songCredits: 0, days: 30, price: 25 },
+    yearly: { credits: 140000, songCredits: 0, days: 365, price: 216 },
+    'song-trial': { credits: 0, songCredits: 750, days: 30, price: 5 },
+    'song-popular': { credits: 0, songCredits: 1500, days: 30, price: 10 },
+    'song-pro': { credits: 0, songCredits: 3750, days: 30, price: 22 },
   };
+  const PACKAGE_ORDER = ['monthly', 'yearly', 'song-trial', 'song-popular', 'song-pro'];
+  const PACKAGES_FILE = path.join(DATA_DIR, 'packages.json');
+  function cleanPackages(j) {
+    const out = {};
+    for (const id of PACKAGE_ORDER) {
+      const seed = PACKAGE_SEED[id];
+      const v = j && typeof j === 'object' && j[id] && typeof j[id] === 'object' ? j[id] : {};
+      const price = numOr(v.price, seed.price);
+      const originalPrice = numOr(v.originalPrice, seed.price);
+      out[id] = {
+        id,
+        price: Number.isFinite(price) && price >= 0 ? price : seed.price,
+        originalPrice: Number.isFinite(originalPrice) && originalPrice >= 0 ? originalPrice : seed.price,
+        credits: seed.credits,
+        songCredits: seed.songCredits,
+        days: seed.days,
+      };
+    }
+    return out;
+  }
+  function loadPackages() {
+    try { const j = JSON.parse(fs.readFileSync(PACKAGES_FILE, 'utf8')); return cleanPackages(j); } catch (e) {}
+    return cleanPackages(null);
+  }
+  function savePackages(map) {
+    try { fs.mkdirSync(DATA_DIR, { recursive: true }); } catch (e) {}
+    const out = cleanPackages(map);
+    fs.writeFileSync(PACKAGES_FILE, JSON.stringify(out, null, 2));
+    return out;
+  }
+  // Public view: credits/durations exposed as mediaCredits/songCredits/durationDays.
+  function pubPackages() {
+    const map = loadPackages();
+    return PACKAGE_ORDER.map((id) => {
+      const p = map[id];
+      return { id: p.id, price: p.price, originalPrice: p.originalPrice, mediaCredits: p.credits, songCredits: p.songCredits, durationDays: p.days };
+    });
+  }
+  // GET /api/public/packages — PUBLIC. The website reads live package prices
+  // from here (discount % = round((originalPrice-price)/originalPrice*100)
+  // when price < originalPrice, computed by the client).
+  if (req.method === 'GET' && urlPath === '/api/public/packages') {
+    return sendJSON(res, 200, { ok: true, packages: pubPackages() });
+  }
+  // POST /api/admin/packages — {packages:[{id, price, originalPrice?}]}
+  // — admin key required. Edits price and/or originalPrice per package id.
+  // Unknown ids are rejected; price/originalPrice must be >= 0. Returns the
+  // full updated list.
+  if (req.method === 'POST' && urlPath === '/api/admin/packages') {
+    const a = adminKeyOk(req);
+    if (!a.ok) return sendJSON(res, 200, { ok: false, error: a.error });
+    readJSONBody(req, 64 * 1024).then((body) => {
+      const list = body && Array.isArray(body.packages) ? body.packages : null;
+      if (!list || !list.length) return sendJSON(res, 200, { ok: false, error: 'សូមដាក់កញ្ចប់ដែលចង់កែ' });
+      const map = loadPackages();
+      for (const item of list) {
+        const id = item && typeof item.id === 'string' ? item.id.trim() : '';
+        if (!PACKAGE_ORDER.includes(id)) return sendJSON(res, 200, { ok: false, error: 'កញ្ចប់នេះមិនស្គាល់ទេ: ' + (id || '?') });
+        if (item.price !== undefined) {
+          const p = Number(item.price);
+          if (!Number.isFinite(p) || p < 0) return sendJSON(res, 200, { ok: false, error: 'តម្លៃមិនត្រឹមត្រូវទេ: ' + id });
+          map[id].price = p;
+        }
+        if (item.originalPrice !== undefined) {
+          const op = Number(item.originalPrice);
+          if (!Number.isFinite(op) || op < 0) return sendJSON(res, 200, { ok: false, error: 'តម្លៃដើមមិនត្រឹមត្រូវទេ: ' + id });
+          map[id].originalPrice = op;
+        }
+      }
+      savePackages(map);
+      return sendJSON(res, 200, { ok: true, packages: pubPackages() });
+    }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
+    return;
+  }
   const PURCHASE_REQUESTS_FILE = path.join(DATA_DIR, 'purchase-requests.json');
   function loadPurchaseRequests() {
     try { const j = JSON.parse(fs.readFileSync(PURCHASE_REQUESTS_FILE, 'utf8')); if (Array.isArray(j)) return j; } catch (e) {}
@@ -903,14 +983,14 @@ function apiRoute(req, res, urlPath) {
       const email = normEmail(body && body.email);
       if (!email) return sendJSON(res, 200, { ok: false, error: 'សូមដាក់ Gmail ត្រឹមត្រូវ' });
       const packageId = typeof body.packageId === 'string' ? body.packageId.trim() : '';
-      const pkg = PACKAGE_CATALOG[packageId];
+      const pkg = loadPackages()[packageId];
       if (!pkg) return sendJSON(res, 200, { ok: false, error: 'កញ្ចប់នេះមិនស្គាល់ទេ' });
       const now = new Date().toISOString();
       const reqs = loadPurchaseRequests();
       const r = {
         id: newPurchaseId(), email, packageId,
         plan: typeof body.plan === 'string' ? body.plan.slice(0, 50) : packageId,
-        amount: pkg.amount,
+        amount: pkg.price,
         credits: pkg.credits, songCredits: pkg.songCredits, days: pkg.days,
         status: 'pending', createdAt: now, updatedAt: now,
       };
@@ -944,7 +1024,7 @@ function apiRoute(req, res, urlPath) {
       const r = reqs.find((x) => x.id === id);
       if (!r) return sendJSON(res, 200, { ok: false, error: 'រកសំណើនេះមិនឃើញទេ' });
       if (r.status !== 'pending') return sendJSON(res, 200, { ok: false, error: 'សំណើនេះបានសម្រេចរួចហើយ' });
-      const pkg = PACKAGE_CATALOG[r.packageId];
+      const pkg = loadPackages()[r.packageId];
       if (!pkg) return sendJSON(res, 200, { ok: false, error: 'កញ្ចប់នេះមិនស្គាល់ទេ' });
       const users = loadUsers();
       const u = users[r.email];
