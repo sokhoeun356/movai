@@ -360,7 +360,10 @@ html[data-mode="light"] [style*="border-top:1px solid rgba(255,255,255,.08)"]{bo
       </div>
       <div id="genNote" style="font-size:0.8125rem;color:#9a9ea6;line-height:1.6;margin-top:12px;min-height:18px"></div>
       <div id="genProviderLink" style="margin-top:2px;min-height:20px"></div>
-      <button class="btn btn-green btn-block" id="genBtn" onclick="genGenerate()" style="margin-top:12px" data-i18n="btnGenerate">បង្កើត</button>
+      <div id="genBtnRow" style="display:flex;gap:10px;margin-top:12px">
+        <button class="btn btn-green" id="genBtn" onclick="genGenerate()" style="flex:1" data-i18n="btnGenerate">បង្កើត</button>
+        <button class="btn" id="genAutoBtn" onclick="genAutoGenerate()" style="background:var(--card);border:1px solid var(--line2);color:var(--accent-text);flex:0 0 auto" title="ប្តូរទៅ Pollinations ហើយបង្កើតរូប · Switch to Pollinations &amp; generate" data-i18n="btnAuto">អូតូ</button>
+      </div>
     </div>
     <p id="genMsg" style="font-size:0.8125rem;margin-top:12px;min-height:18px"></p>
     <div id="genErrBox" class="err-box" style="display:none">
@@ -411,7 +414,7 @@ km:{
  tabImage:'រូបភាព',tabVideo:'វីដេអូ',
  tavusText:'Tavus បង្កើតវីដេអូ avatar និយាយតាម script — ដាក់ Replica ID (Face ID) របស់អ្នក៖',tavusPh:'r... (Face ID ពី Tavus)',
  lblSize:'ទំហំ',lblDuration:'រយៈពេល',lblQuality:'គុណភាព',
- btnGenerate:'បង្កើត',progCreating:'កំពុងបង្កើត…',
+ btnGenerate:'បង្កើត',btnAuto:'អូតូ',progCreating:'កំពុងបង្កើត…',
  promptLabel:'Prompt · អ្វីដែលចង់បង្កើត',promptLabel3d:'Prompt · អត្ថបទសម្រាប់ធ្វើ 3D',
  promptPh:'ឧ. ទេសភាពព្រៃឈើពេលល្ងាច មានផ្ទះឈើ...',promptPh3d:'ឧ. កៅអីឈើពណ៌ត្នោត បែបទំនើប...',
  d3HintHunyuan:'ត្រូវមាន Hunyuan3D Key ក្នុងម៉ឺនុយ ☰ → API Keys ជាមុនសិន។',d3HintMpx:'ត្រូវមាន Masterpiece X Key ក្នុងម៉ឺនុយ ☰ → API Keys ជាមុនសិន។',
@@ -476,7 +479,7 @@ en:{
  tabImage:'Image',tabVideo:'Video',
  tavusText:'Tavus creates a talking avatar video from a script — enter your Replica ID (Face ID):',tavusPh:'r... (Face ID from Tavus)',
  lblSize:'Size',lblDuration:'Duration',lblQuality:'Quality',
- btnGenerate:'Generate',progCreating:'Generating…',
+ btnGenerate:'Generate',btnAuto:'Auto',progCreating:'Generating…',
  promptLabel:'Prompt · What do you want to create',promptLabel3d:'Prompt · Text for making 3D',
  promptPh:'e.g. A forest landscape at dusk with a wooden house...',promptPh3d:'e.g. A modern brown wooden chair...',
  d3HintHunyuan:'You need a Hunyuan3D key in the ☰ menu → API Keys first.',d3HintMpx:'You need a Masterpiece X key in the ☰ menu → API Keys first.',
@@ -791,8 +794,8 @@ function genErrText(j, fb){
 var GEN_IMG_PROVIDERS=[
  {id:'pollinations',name:'Pollinations',limit:{km:'ហ្វ្រី · មិនបាច់ Key · ~1 រូប/15-45 វិនាទី',en:'Free · No key · ~1 image/15-45s'},note:{km:'មិនត្រូវការ API key — បង្កើតបានភ្លាម។ រូបមាន logo តូច។',en:'No API key needed — generate right away. Images carry a small logo.'}},
  {id:'puter',name:'Puter.js',limit:{km:'ហ្វ្រី · ចូលគណនី Puter',en:'Free · Puter account'},puter:true,note:{km:'អ្នកប្រើម្នាក់ៗចូលគណនី Puter ហ្វ្រីរបស់ខ្លួន (User-Pays) — អ្នកបង្កើតមិនបង់អ្វីទេ។',en:'Each user signs in with their own free Puter account (User-Pays) — the creator pays nothing.'}},
- {id:'cloudflare',name:'Cloudflare',limit:{km:'~230 រូប/ថ្ងៃ · FLUX',en:'~230 images/day · FLUX'},key:'cloudflare',note:{km:'ត្រូវការ Account ID + API Token (ចុះឈ្មោះ Cloudflare ហ្វ្រី មិនបាច់កាត)។ បញ្ជាក់៖ Cloudflare មិនអនុញ្ញាតឲ្យ browser ហៅត្រង់ទេ (CORS) ទើបបង្កើតនៅទីនេះមិនបាន — ពេលនោះ MovAi នឹងប្តូរទៅ Pollinations ឲ្យដោយស្វ័យប្រវត្តិ។',en:'Needs an Account ID + API Token (free Cloudflare signup, no card). Note: Cloudflare does not allow direct browser calls (CORS), so it cannot generate here — MovAi will automatically switch to Pollinations instead.'}},
- {id:'gemini',name:'Gemini',limit:{km:'Key ហ្វ្រី · Nano Banana',en:'Free key · Nano Banana'},key:'gemini',note:{km:'ត្រូវការ API Key ហ្វ្រីពី AI Studio (មិនបាច់កាត)។ បញ្ជាក់៖ Google មិនឲ្យបង្កើតរូបភាពហ្វ្រីតាម API Key ទេ (limit 0) ទើបបង្កើតមិនបាន — ពេលនោះ MovAi នឹងប្តូរទៅ Pollinations ឲ្យដោយស្វ័យប្រវត្តិ។',en:'Needs a free API key from AI Studio (no card). Note: Google does not allow free image generation via API key (limit 0), so it cannot generate here — MovAi will automatically switch to Pollinations instead.'}},
+ {id:'cloudflare',name:'Cloudflare',limit:{km:'~230 រូប/ថ្ងៃ · FLUX',en:'~230 images/day · FLUX'},key:'cloudflare',note:{km:'ត្រូវការ Account ID + API Token (ចុះឈ្មោះ Cloudflare ហ្វ្រី មិនបាច់កាត)។ បញ្ជាក់៖ Cloudflare មិនអនុញ្ញាតឲ្យ browser ហៅត្រង់ទេ (CORS) ទើបបង្កើតនៅទីនេះមិនបាន — ចុចប៊ូតុង «អូតូ» នៅក្បែរ Generate ដើម្បីប្តូរទៅ Pollinations ហើយបង្កើតរូប។',en:'Needs an Account ID + API Token (free Cloudflare signup, no card). Note: Cloudflare does not allow direct browser calls (CORS), so it cannot generate here — tap the "Auto" button next to Generate to switch to Pollinations and create your image.'}},
+ {id:'gemini',name:'Gemini',limit:{km:'Key ហ្វ្រី · Nano Banana',en:'Free key · Nano Banana'},key:'gemini',note:{km:'ត្រូវការ API Key ហ្វ្រីពី AI Studio (មិនបាច់កាត)។ បញ្ជាក់៖ Google មិនឲ្យបង្កើតរូបភាពហ្វ្រីតាម API Key ទេ (limit 0) ទើបបង្កើតមិនបាន — ចុចប៊ូតុង «អូតូ» នៅក្បែរ Generate ដើម្បីប្តូរទៅ Pollinations ហើយបង្កើតរូប។',en:'Needs a free API key from AI Studio (no card). Note: Google does not allow free image generation via API key (limit 0), so it cannot generate here — tap the "Auto" button next to Generate to switch to Pollinations and create your image.'}},
  {id:'hf',name:'Hugging Face',limit:{km:'$0.10/ខែ · តិចណាស់',en:'$0.10/mo · very little'},key:'hf',note:{km:'ត្រូវការ Token ហ្វ្រី។ $0.10/ខែ បានតែប៉ុន្មានរូបទេ។',en:'Needs a free token. $0.10/month covers only a few images.'}}
 ];
 var GEN_VID_PROVIDERS=[
@@ -872,7 +875,7 @@ function genSetMode(m){
   var pf=document.getElementById('genProviderField');if(pf)pf.style.display=m==='3d'?'none':'flex';
   var d3s=document.getElementById('genD3ProvSlot');if(d3s)d3s.style.display=m==='3d'?'flex':'none';
   var d3i=document.getElementById('d3Inline');if(d3i)d3i.style.display=m==='3d'?'block':'none';
-  var gb=document.getElementById('genBtn');if(gb)gb.style.display=m==='3d'?'none':'block';
+  var gb=document.getElementById('genBtnRow');if(gb)gb.style.display=m==='3d'?'none':'flex';
   var gp=document.getElementById('genPrompt');
   if(gp){gp.style.display='block';gp.placeholder=m==='3d'?tx('promptPh3d'):tx('promptPh');}
   var gl=document.getElementById('genPromptLabel');
@@ -1031,6 +1034,7 @@ async function genGenerate(){
     if(!rid){genMsg(tx('msgTavusId'));return;}
   }
   var btn=document.getElementById('genBtn');btn.disabled=true;
+  var abtn=document.getElementById('genAutoBtn');if(abtn)abtn.disabled=true;
   document.getElementById('genResult').innerHTML='';
   gen.lastImg=null;gen.lastVideo=null;
   genMsg('');
@@ -1042,22 +1046,17 @@ async function genGenerate(){
   }catch(e){
     var m=(e&&e.message?e.message:String(e));
     if(/failed to fetch|networkerror|load failed/i.test(m))m=tx('msgNetErr');
-    var fellBack=false;
-    if(gen.mode==='image'&&p.id!=='pollinations'){
-      try{
-        genProgTxt(tx('progFallback'));
-        var pol=null;for(var fi=0;fi<GEN_IMG_PROVIDERS.length;fi++)if(GEN_IMG_PROVIDERS[fi].id==='pollinations')pol=GEN_IMG_PROVIDERS[fi];
-        if(pol){await genDoImage(pol,prompt,null,'');fellBack=true;}
-      }catch(e2){fellBack=false;}
-    }
-    if(fellBack){
-      genMsg(tx('msgAutoFallback').replace('{name}',p.name));
-      var eb=document.getElementById('genErrBox');if(eb)eb.style.display='none';
-    }else{
-      genMsg(m);
-    }
+    genMsg(m);
   }
-  finally{genStopProg();btn.disabled=false;}
+  finally{genStopProg();btn.disabled=false;if(abtn)abtn.disabled=false;}
+}
+/* Manual «អូតូ» (Auto) button next to Generate: nothing switches on its own —
+   only when the user taps it does it switch the provider to Pollinations
+   and generate the image with the current prompt. */
+async function genAutoGenerate(){
+  if(gen.mode!=='image')genSetMode('image');
+  genSetProvider('pollinations');
+  await genGenerate();
 }
 async function genDoImage(p,prompt,key,accountId){
   var a=GEN_ASPECTS[gen.aspect];
