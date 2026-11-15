@@ -117,6 +117,9 @@ const SETTINGS_DEFAULTS = {
   theme: 0, font: 50,
   glassClear: 45, glassBlur: 65, glassShine: 55,
   tshadow: 'none', txtblur: 0, bgb: 50, brandfx: 'none', mode: 'dark',
+  // Active provider/model per mode, set by the admin. null = admin has not
+  // set one yet — the website shows "admin មិនទាន់កំណត់" for that mode.
+  providers: { image: null, video: null, song: null },
 };
 function clampNum(v, lo, hi, dflt) {
   const n = Number(v);
@@ -139,6 +142,21 @@ function cleanSettings(j, base) {
   s.bgb = clampNum(j.bgb, 0, 100, s.bgb);
   if (typeof j.brandfx === 'string' && j.brandfx) s.brandfx = j.brandfx.slice(0, 50);
   if (j.mode === 'dark' || j.mode === 'light' || j.mode === 'auto') s.mode = j.mode;
+  // Active providers per mode. A mode is valid only when it has a provider
+  // name; null clears it; missing/invalid keeps the stored (base) value.
+  const baseProv = (base && base.providers && typeof base.providers === 'object') ? base.providers : SETTINGS_DEFAULTS.providers;
+  const prov = {};
+  for (const m of ['image', 'video', 'song']) {
+    const v = j.providers && typeof j.providers === 'object' ? j.providers[m] : undefined;
+    if (v && typeof v === 'object' && typeof v.provider === 'string' && v.provider.trim()) {
+      prov[m] = { provider: v.provider.trim().toLowerCase().slice(0, 100), model: typeof v.model === 'string' ? v.model.trim().slice(0, 100) : '' };
+    } else if (v === null) {
+      prov[m] = null;
+    } else {
+      prov[m] = baseProv[m] || null;
+    }
+  }
+  s.providers = prov;
   return s;
 }
 function loadSettings() {
@@ -154,6 +172,45 @@ function saveSettings(s, base) {
   out.updatedAt = new Date().toISOString();
   fs.writeFileSync(SETTINGS_FILE, JSON.stringify(out, null, 2));
   return out;
+}
+// Admin provider keys (./data/admin-keys.json). The admin puts each
+// provider's API key here from the Admin app; the server uses them to call
+// providers so the browser never holds a key. Key VALUES are never returned
+// by any endpoint and never go into git — only the file on this server.
+// Providers: novai, magichour, masterpiecex, hunyuan3d, suno, acemusic,
+// musicapi (tavus kept for the legacy proxy branch).
+const ADMIN_KEYS_FILE = path.join(DATA_DIR, 'admin-keys.json');
+const KNOWN_KEY_PROVIDERS = ['novai', 'magichour', 'masterpiecex', 'hunyuan3d', 'suno', 'acemusic', 'musicapi', 'tavus'];
+function normProvider(v) {
+  if (typeof v !== 'string') return '';
+  let p = v.trim().toLowerCase().replace(/[\s_-]+/g, '');
+  if (p === 'movai') p = 'suno'; // MovAi is the display name of the Suno provider
+  return p;
+}
+function loadAdminKeys() {
+  try { const j = JSON.parse(fs.readFileSync(ADMIN_KEYS_FILE, 'utf8')); if (j && typeof j === 'object' && !Array.isArray(j)) return j; } catch (e) {}
+  return {};
+}
+function saveAdminKeys(k) {
+  try { fs.mkdirSync(DATA_DIR, { recursive: true }); } catch (e) {}
+  fs.writeFileSync(ADMIN_KEYS_FILE, JSON.stringify(k, null, 2));
+}
+// {key, endpoint} stored for a provider, or null. endpoint is the Suno
+// gateway URL (only Suno needs one — the other providers have fixed hosts).
+function adminProviderKey(provider) {
+  const k = loadAdminKeys()[normProvider(provider)];
+  if (!k || typeof k !== 'object') return null;
+  return {
+    key: typeof k.key === 'string' ? k.key.trim() : '',
+    endpoint: typeof k.endpoint === 'string' ? k.endpoint.trim() : '',
+  };
+}
+// Resolve a provider API key: the request's own key first, else the
+// admin-stored key. The browser now sends no key — the admin key is used.
+function resolveProviderKey(reqKey, provider) {
+  if (typeof reqKey === 'string' && reqKey.trim()) return reqKey.trim();
+  const a = adminProviderKey(provider);
+  return a && a.key ? a.key : '';
 }
 
 /* --------------------------------- api ------------------------------------- */
@@ -178,6 +235,30 @@ function apiRoute(req, res, urlPath) {
         const prompt = body.prompt.trim().slice(0, 2000);
         const width = Math.max(64, Math.min(2048, Number(body.width) || 768));
         const height = Math.max(64, Math.min(2048, Number(body.height) || 768));
+        if (provider === 'magichour') {
+          // Magic Hour image via the admin-stored key (browser sends no key).
+          const k = resolveProviderKey(key, 'magichour');
+          if (!k) return sendJSON(res, 200, { ok: false, error: 'Admin មិនទាន់ដាក់ Magic Hour Key ទេ' });
+          const model = typeof body.model === 'string' && body.model.trim() ? body.model.trim().slice(0, 100) : 'z-image-turbo';
+          const r = await fetch('https://api.magichour.ai/v1/ai-image-generator', { method: 'POST', headers: { 'Authorization': 'Bearer ' + k, 'Content-Type': 'application/json' }, body: JSON.stringify({ name: 'MovAi image', model, style: { prompt } }), signal: AbortSignal.timeout(60000) });
+          const j = await r.json().catch(() => null);
+          const id = j && j.id;
+          if (id) return sendJSON(res, 200, { ok: true, jobId: id });
+          return sendJSON(res, 200, { ok: false, error: 'Magic Hour: ' + genErrText(j, 'HTTP ' + r.status) });
+        }
+        if (provider === 'novai') {
+          // NovAI image via the admin-stored key (browser sends no key).
+          const k = resolveProviderKey(key, 'novai');
+          if (!k) return sendJSON(res, 200, { ok: false, error: 'Admin មិនទាន់ដាក់ NovAI Key ទេ' });
+          const size = Math.min(2048, Math.max(64, width)) + 'x' + Math.min(2048, Math.max(64, height));
+          const r = await fetch('https://aiapi-pro.com/v1/images/generations', { method: 'POST', headers: { 'Authorization': 'Bearer ' + k, 'Content-Type': 'application/json' }, body: JSON.stringify({ model: 'cogview-3-flash', prompt, size }), signal: AbortSignal.timeout(120000) });
+          const j = await r.json().catch(() => null);
+          const url = j && j.data && j.data[0] && j.data[0].url;
+          if (url) return sendJSON(res, 200, { ok: true, done: true, imageUrl: url });
+          const id = j && (j.id || (j.data && j.data.id));
+          if (id) return sendJSON(res, 200, { ok: true, jobId: id });
+          return sendJSON(res, 200, { ok: false, error: 'NovAI: ' + genErrText(j, 'HTTP ' + r.status) });
+        }
         if (provider === 'cloudflare') {
           const accountId = String(body.accountId || '').trim();
           if (!key || !accountId) return sendJSON(res, 200, { ok: false, error: 'មិនទាន់មាន Cloudflare Account ID / API Token ទេ' });
@@ -209,16 +290,56 @@ function apiRoute(req, res, urlPath) {
     }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
     return;
   }
+  // POST /api/gen/image/status — {provider:'magichour'|'novai', key, jobId}
+  if (req.method === 'POST' && urlPath === '/api/gen/image/status') {
+    readJSONBody(req, 64 * 1024).then(async (body) => {
+      try {
+        const provider = body.provider;
+        const jobId = String(body.jobId || '');
+        if (!jobId) return sendJSON(res, 200, { ok: false, error: 'មិនមាន jobId ទេ' });
+        if (provider === 'magichour') {
+          const k = resolveProviderKey(body.key, 'magichour');
+          if (!k) return sendJSON(res, 200, { ok: false, error: 'Admin មិនទាន់ដាក់ Magic Hour Key ទេ' });
+          const r = await fetch('https://api.magichour.ai/v1/image-projects/' + encodeURIComponent(jobId), { headers: { 'Authorization': 'Bearer ' + k }, signal: AbortSignal.timeout(30000) });
+          const j = await r.json().catch(() => null);
+          const st = j && j.status;
+          if (st === 'complete') {
+            const dl = j.downloads && j.downloads[0] && j.downloads[0].url;
+            if (dl) return sendJSON(res, 200, { ok: true, status: 'done', imageUrl: dl });
+            return sendJSON(res, 200, { ok: true, status: 'done', imageUrl: '', raw: j });
+          }
+          if (st === 'error') return sendJSON(res, 200, { ok: false, error: 'Magic Hour: ' + ((j && j.error) || 'បង្កើតមិនបានទេ') });
+          return sendJSON(res, 200, { ok: true, status: 'working', providerStatus: st || 'queued' });
+        }
+        if (provider === 'novai') {
+          const k = resolveProviderKey(body.key, 'novai');
+          if (!k) return sendJSON(res, 200, { ok: false, error: 'Admin មិនទាន់ដាក់ NovAI Key ទេ' });
+          const r = await fetch('https://aiapi-pro.com/v1/images/generations/' + encodeURIComponent(jobId), { headers: { 'Authorization': 'Bearer ' + k }, signal: AbortSignal.timeout(30000) });
+          const j = await r.json().catch(() => null);
+          const url = j && j.data && j.data[0] && j.data[0].url;
+          if (url) return sendJSON(res, 200, { ok: true, status: 'done', imageUrl: url });
+          const st = j && (j.status || (j.data && j.data.status));
+          if (st === 'failed' || st === 'error') return sendJSON(res, 200, { ok: false, error: 'NovAI: បង្កើតមិនបានទេ' });
+          return sendJSON(res, 200, { ok: true, status: 'working', providerStatus: st || 'queued' });
+        }
+        return sendJSON(res, 200, { ok: false, error: 'Provider មិនស្គាល់ទេ' });
+      } catch (e) { return sendJSON(res, 200, { ok: false, error: 'សួរព័ត៌មានមិនបានទេ៖ ' + (e && e.message ? e.message : 'unknown') }); }
+    }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
+    return;
+  }
   // POST /api/gen/video — {provider:'novai'|'magichour'|'tavus'|'hf', key, prompt, duration, res, width, height, replicaId}
   if (req.method === 'POST' && urlPath === '/api/gen/video') {
     readJSONBody(req, 64 * 1024).then(async (body) => {
       try {
         if (!body || typeof body.prompt !== 'string' || !body.prompt.trim()) return sendJSON(res, 200, { ok: false, error: 'សូមសរសេរ prompt ជាមុនសិន' });
         const provider = body.provider;
-        const key = typeof body.key === 'string' ? body.key : '';
+        const key = resolveProviderKey(typeof body.key === 'string' ? body.key : '', provider);
         const prompt = body.prompt.trim().slice(0, 4000);
         const duration = [5, 10].includes(Number(body.duration)) ? Number(body.duration) : 5;
-        if (!key) return sendJSON(res, 200, { ok: false, error: 'មិនទាន់មាន API Key ទេ' });
+        if (!key) {
+          const pname = provider === 'novai' ? 'NovAI' : provider === 'magichour' ? 'Magic Hour' : provider === 'tavus' ? 'Tavus' : null;
+          return sendJSON(res, 200, { ok: false, error: pname ? ('Admin មិនទាន់ដាក់ ' + pname + ' Key ទេ') : 'មិនទាន់មាន API Key ទេ' });
+        }
         if (provider === 'novai') {
           const r = await fetch('https://aiapi-pro.com/v1/video/generations', { method: 'POST', headers: { 'Authorization': 'Bearer ' + key, 'Content-Type': 'application/json' }, body: JSON.stringify({ model: 'cogvideox-flash', prompt }), signal: AbortSignal.timeout(60000) });
           const j = await r.json().catch(() => null);
@@ -260,9 +381,13 @@ function apiRoute(req, res, urlPath) {
     readJSONBody(req, 64 * 1024).then(async (body) => {
       try {
         const provider = body.provider;
-        const key = typeof body.key === 'string' ? body.key : '';
+        const key = resolveProviderKey(typeof body.key === 'string' ? body.key : '', provider);
         const jobId = String(body.jobId || '');
         if (!jobId) return sendJSON(res, 200, { ok: false, error: 'មិនមាន jobId ទេ' });
+        if (!key) {
+          const pname = provider === 'novai' ? 'NovAI' : provider === 'magichour' ? 'Magic Hour' : provider === 'tavus' ? 'Tavus' : null;
+          return sendJSON(res, 200, { ok: false, error: pname ? ('Admin មិនទាន់ដាក់ ' + pname + ' Key ទេ') : 'មិនទាន់មាន API Key ទេ' });
+        }
         if (provider === 'novai') {
           const r = await fetch('https://aiapi-pro.com/v1/video/generations/' + encodeURIComponent(jobId), { headers: { 'Authorization': 'Bearer ' + key }, signal: AbortSignal.timeout(30000) });
           const j = await r.json().catch(() => null);
@@ -311,14 +436,15 @@ function apiRoute(req, res, urlPath) {
       try {
         if (!body || (typeof body.prompt !== 'string' && typeof body.title !== 'string' && typeof body.lyrics !== 'string' && typeof body.style !== 'string')) return sendJSON(res, 200, { ok: false, error: 'សូមសរសេរ prompt ជាមុនសិន' });
         const provider = body.provider;
-        const key = typeof body.key === 'string' ? body.key : '';
+        const key = resolveProviderKey(typeof body.key === 'string' ? body.key : '', 'musicapi');
         const title = typeof body.title === 'string' ? body.title.trim().slice(0, 200) : '';
         const lyrics = typeof body.lyrics === 'string' ? body.lyrics.trim().slice(0, 4000) : '';
         const style = typeof body.style === 'string' ? body.style.trim().slice(0, 500) : '';
         const voice = body.voice === 'male' || body.voice === 'female' ? body.voice : 'random';
         const prompt = typeof body.prompt === 'string' ? body.prompt.trim().slice(0, 2000) : '';
+        const model = typeof body.model === 'string' && body.model.trim() ? body.model.trim().slice(0, 50) : 'v6';
         if (!title && !lyrics && !style && !prompt) return sendJSON(res, 200, { ok: false, error: 'សូមសរសេរ prompt ជាមុនសិន' });
-        if (!key) return sendJSON(res, 200, { ok: false, error: 'មិនទាន់មាន API Key ទេ' });
+        if (provider === 'musicapi' && !key) return sendJSON(res, 200, { ok: false, error: 'Admin មិនទាន់ដាក់ MusicAPI Key ទេ' });
         if (provider === 'musicapi') {
           let reqBody;
           if (lyrics) {
@@ -350,6 +476,38 @@ function apiRoute(req, res, urlPath) {
           if (taskId) return sendJSON(res, 200, { ok: true, jobId: taskId });
           return sendJSON(res, 200, { ok: false, error: 'MusicAPI: ' + genErrText(j, 'HTTP ' + r.status) });
         }
+        if (provider === 'suno') {
+          // Suno (MovAi) via the admin-stored gateway endpoint + key.
+          // The browser sends no key and no endpoint — both live on the server.
+          const a = adminProviderKey('suno');
+          if (!a || !a.key) return sendJSON(res, 200, { ok: false, error: 'Admin មិនទាន់ដាក់ Suno Key ទេ' });
+          if (!a.endpoint) return sendJSON(res, 200, { ok: false, error: 'Admin មិនទាន់ដាក់ Suno endpoint ទេ' });
+          const genBody = {
+            prompt: lyrics || (style ? style + (title ? ' titled "' + title + '"' : '') : (title || prompt)),
+            tags: style || '',
+            model,
+            make_instrumental: false,
+          };
+          if (title) genBody.title = title;
+          const ep = a.endpoint.replace(/\/+$/, '');
+          const r = await fetch(ep + '/api/generate', { method: 'POST', headers: { 'Authorization': 'Bearer ' + a.key, 'Content-Type': 'application/json' }, body: JSON.stringify(genBody), signal: AbortSignal.timeout(60000) });
+          const j = await r.json().catch(() => null);
+          const ids = [];
+          const collectIds = (o) => {
+            if (!o) return;
+            if (Array.isArray(o)) { o.forEach(collectIds); return; }
+            if (typeof o === 'object') {
+              if (typeof o.id === 'string' && o.id) ids.push(o.id);
+              if (Array.isArray(o.clips)) o.clips.forEach(collectIds);
+              if (Array.isArray(o.data)) o.data.forEach(collectIds);
+              else if (o.data && typeof o.data === 'object') collectIds(o.data);
+            }
+          };
+          collectIds(j);
+          const uniq = [...new Set(ids)];
+          if (uniq.length) return sendJSON(res, 200, { ok: true, jobId: uniq.join(',') });
+          return sendJSON(res, 200, { ok: false, error: 'Suno: ' + genErrText(j, 'HTTP ' + r.status) });
+        }
         return sendJSON(res, 200, { ok: false, error: 'Provider មិនស្គាល់ទេ' });
       } catch (e) { return sendJSON(res, 200, { ok: false, error: 'ហៅ API មិនបានទេ៖ ' + (e && e.message ? e.message : 'unknown') }); }
     }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
@@ -360,10 +518,28 @@ function apiRoute(req, res, urlPath) {
     readJSONBody(req, 64 * 1024).then(async (body) => {
       try {
         const provider = body.provider;
-        const key = typeof body.key === 'string' ? body.key : '';
+        const key = resolveProviderKey(typeof body.key === 'string' ? body.key : '', 'musicapi');
         const jobId = String(body.jobId || '');
         if (!jobId) return sendJSON(res, 200, { ok: false, error: 'មិនមាន jobId ទេ' });
+        if (provider === 'suno') {
+          // Suno status: poll the admin gateway /api/get?ids=<clip ids>.
+          const a = adminProviderKey('suno');
+          if (!a || !a.key) return sendJSON(res, 200, { ok: false, error: 'Admin មិនទាន់ដាក់ Suno Key ទេ' });
+          if (!a.endpoint) return sendJSON(res, 200, { ok: false, error: 'Admin មិនទាន់ដាក់ Suno endpoint ទេ' });
+          const ep = a.endpoint.replace(/\/+$/, '');
+          const r = await fetch(ep + '/api/get?ids=' + encodeURIComponent(jobId), { headers: { 'Authorization': 'Bearer ' + a.key }, signal: AbortSignal.timeout(30000) });
+          const j = await r.json().catch(() => null);
+          if (j && typeof j.error === 'string' && j.error) return sendJSON(res, 200, { ok: false, error: 'Suno: ' + j.error });
+          const clips = Array.isArray(j) ? j : (j && Array.isArray(j.data) ? j.data : []);
+          if (clips.length && clips.every((c) => c && typeof c.audio_url === 'string' && c.audio_url)) {
+            const songs = clips.map((c) => ({ url: c.audio_url, title: typeof c.title === 'string' ? c.title : '', image: typeof c.image_url === 'string' ? c.image_url : '' }));
+            return sendJSON(res, 200, { ok: true, status: 'done', songs });
+          }
+          if (clips.some((c) => c && (c.status === 'failed' || c.state === 'failed' || c.status === 'error' || c.state === 'error'))) return sendJSON(res, 200, { ok: false, error: 'Suno: បង្កើតមិនបានទេ' });
+          return sendJSON(res, 200, { ok: true, status: 'working', providerStatus: 'queued' });
+        }
         if (provider === 'musicapi') {
+          if (!key) return sendJSON(res, 200, { ok: false, error: 'Admin មិនទាន់ដាក់ MusicAPI Key ទេ' });
           const r = await fetch('https://api.musicapi.ai/api/v1/sonic/task/' + encodeURIComponent(jobId), { headers: { 'Authorization': 'Bearer ' + key }, signal: AbortSignal.timeout(30000) });
           const j = await r.json().catch(() => null);
           if (j && (j.type === 'forbidden' || typeof j.error === 'string')) return sendJSON(res, 200, { ok: false, error: 'MusicAPI: ' + genErrText(j, 'HTTP ' + r.status) });
@@ -530,6 +706,60 @@ function apiRoute(req, res, urlPath) {
       return sendJSON(res, 200, { ok: true, settings: saved });
     }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
     return;
+  }
+  // POST /api/admin/keys — {provider, key, endpoint?} — admin key required.
+  // Stores a provider API key on the server. The response NEVER contains
+  // the key value. endpoint is only needed for Suno (its gateway URL).
+  if (req.method === 'POST' && urlPath === '/api/admin/keys') {
+    const a = adminKeyOk(req);
+    if (!a.ok) return sendJSON(res, 200, { ok: false, error: a.error });
+    readJSONBody(req, 64 * 1024).then((body) => {
+      const provider = normProvider(body && body.provider);
+      if (!KNOWN_KEY_PROVIDERS.includes(provider)) return sendJSON(res, 200, { ok: false, error: 'Provider មិនស្គាល់ទេ' });
+      const key = typeof body.key === 'string' ? body.key.trim() : '';
+      if (!key) return sendJSON(res, 200, { ok: false, error: 'សូមដាក់ API Key' });
+      const endpoint = typeof body.endpoint === 'string' ? body.endpoint.trim().slice(0, 500) : '';
+      const keys = loadAdminKeys();
+      keys[provider] = { key, endpoint, updatedAt: new Date().toISOString() };
+      saveAdminKeys(keys);
+      return sendJSON(res, 200, { ok: true, provider, hasKey: true, hasEndpoint: !!endpoint });
+    }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
+    return;
+  }
+  // GET /api/admin/keys — admin key required. Lists ONLY which providers
+  // have a key stored (and whether an endpoint is set). Key values are
+  // NEVER returned.
+  if (req.method === 'GET' && urlPath === '/api/admin/keys') {
+    const a = adminKeyOk(req);
+    if (!a.ok) return sendJSON(res, 200, { ok: false, error: a.error });
+    const keys = loadAdminKeys();
+    const list = Object.keys(keys).sort().map((p) => ({ provider: p, hasKey: true, hasEndpoint: !!(keys[p].endpoint && keys[p].endpoint.trim()) }));
+    return sendJSON(res, 200, { ok: true, keys: list });
+  }
+  // POST /api/admin/providers — {mode:'image'|'video'|'song', provider, model}
+  // — admin key required. Sets the active provider/model for one mode.
+  if (req.method === 'POST' && urlPath === '/api/admin/providers') {
+    const a = adminKeyOk(req);
+    if (!a.ok) return sendJSON(res, 200, { ok: false, error: a.error });
+    readJSONBody(req, 64 * 1024).then((body) => {
+      const mode = typeof body.mode === 'string' ? body.mode.trim().toLowerCase() : '';
+      if (!['image', 'video', 'song'].includes(mode)) return sendJSON(res, 200, { ok: false, error: 'Mode មិនត្រឹមត្រូវទេ' });
+      const provider = normProvider(body && body.provider);
+      if (!provider) return sendJSON(res, 200, { ok: false, error: 'សូមជ្រើស provider' });
+      const model = typeof body.model === 'string' ? body.model.trim().slice(0, 100) : '';
+      const cur = loadSettings();
+      cur.providers[mode] = { provider, model };
+      const saved = saveSettings(cur, cur);
+      return sendJSON(res, 200, { ok: true, providers: saved.providers });
+    }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
+    return;
+  }
+  // GET /api/admin/providers — PUBLIC (no admin key). The MovAi website
+  // reads it to know which provider/model the admin set for each mode.
+  // A mode is null when the admin has not set it yet.
+  if (req.method === 'GET' && urlPath === '/api/admin/providers') {
+    const s = loadSettings();
+    return sendJSON(res, 200, { ok: true, providers: s.providers || { image: null, video: null, song: null } });
   }
   return sendJSON(res, 404, errBody('not_found', 'រកមិនឃើញទេ', 'Not found'));
 }
