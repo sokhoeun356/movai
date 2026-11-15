@@ -301,7 +301,8 @@ html[data-mode="light"] [style*="border-top:1px solid rgba(255,255,255,.08)"]{bo
   <div class="panel" id="sec-create">
     <div class="composer">
       <span class="chip-label" id="genPromptLabel">Prompt · អ្វីដែលចង់បង្កើត</span>
-      <textarea class="input" id="genPrompt" rows="4" placeholder="ឧ. ទេសភាពព្រៃឈើពេលល្ងាច មានផ្ទះឈើ..." style="width:100%"></textarea>
+      <textarea class="input" id="genPrompt" rows="4" maxlength="100000" oninput="updatePromptCount()" placeholder="ឧ. ទេសភាពព្រៃឈើពេលល្ងាច មានផ្ទះឈើ..." style="width:100%"></textarea>
+      <div style="display:flex;justify-content:flex-end;margin-top:2px"><span id="genPromptCount" style="font-size:0.75rem;color:var(--muted)" aria-live="polite">0 / 100,000</span></div>
       <div class="composer-tools">
         <div class="modes">
           <button class="kbtn kbtn-black" id="genTabImg" onclick="genSetMode('image')" data-i18n="tabImage">រូបភាព</button>
@@ -382,9 +383,7 @@ html[data-mode="light"] [style*="border-top:1px solid rgba(255,255,255,.08)"]{bo
     </div>
     <div id="storyBox" style="display:none;margin-top:12px;border-top:1px solid var(--line);padding-top:12px">
       <h3 style="font-size:1rem;font-weight:800" data-i18n="storyTitle">រឿង · វគ្គ</h3>
-      <p class="hint" style="margin-top:4px" data-i18n="storyHint">ដាក់អត្ថបទរឿងពេញម្ដង — MovAi បែងចែកជាវគ្គៗតាមចំនួនដែលអ្នកជ្រើស រួចបង្កើតវីដេអូមួយវគ្គម្ដងៗ</p>
-      <span class="chip-label" style="display:block;margin-top:8px" data-i18n="storyTextLabel">អត្ថបទរឿងពេញ</span>
-      <textarea class="input" id="storyText" rows="3" data-i18n-ph="storyPh" placeholder="ដាក់អត្ថបទរឿងពេញនៅទីនេះ…" style="width:100%;margin-top:6px;line-height:1.55"></textarea>
+      <p class="hint" style="margin-top:4px" data-i18n="storyHint">បិទភ្ជាប់អត្ថបទរឿងពេញក្នុងប្រអប់ Prompt ខាងលើ (ដាក់បានរហូតដល់ 100,000 តួអក្សរ) — MovAi បែងចែកជាវគ្គៗតាមចំនួនដែលអ្នកជ្រើស រួចបង្កើតវីដេអូមួយវគ្គម្ដងៗ</p>
       <button class="btn btn-green btn-block" id="storySplitBtn" onclick="storySplit()" style="margin-top:10px" data-i18n="storySplit">បែងចែកជាវគ្គ</button>
       <p id="storyMsg" style="font-size:0.8125rem;margin-top:8px;min-height:16px;line-height:1.5"></p>
       <div id="storyList"></div>
@@ -494,10 +493,10 @@ km:{
  errNo3dFile:'Hunyuan3D: រួចរាល់ តែមិនមានឯកសារ 3D ទេ',d3MsgDone:'ធ្វើជា 3D រួចរាល់',
  errHunyuanNet:'ហៅ Hunyuan3D API មិនបានទេ — អ៊ីនធឺណិតមានបញ្ហា ឬ Tencent Cloud មិនអនុញ្ញាតឲ្យ browser ហៅត្រង់ (CORS)។',
  errImgRead2:'អានរូបភាពមិនបានទេ',
- storyTitle:'រឿង · វគ្គ',storyHint:'ដាក់អត្ថបទរឿងពេញម្ដង — MovAi បែងចែកជាវគ្គៗតាមចំនួនដែលអ្នកជ្រើស រួចបង្កើតវីដេអូមួយវគ្គម្ដងៗ',
- storyTextLabel:'អត្ថបទរឿងពេញ',storyPh:'ដាក់អត្ថបទរឿងពេញនៅទីនេះ…',storyCount:'ចំនួនវគ្គ',storySplit:'បែងចែកជាវគ្គ',
+ storyTitle:'រឿង · វគ្គ',storyHint:'បិទភ្ជាប់អត្ថបទរឿងពេញក្នុងប្រអប់ Prompt ខាងលើ (ដាក់បានរហូតដល់ 100,000 តួអក្សរ) — MovAi បែងចែកជាវគ្គៗតាមចំនួនដែលអ្នកជ្រើស រួចបង្កើតវីដេអូមួយវគ្គម្ដងៗ',
+ storyCount:'ចំនួនវគ្គ',storySplit:'បែងចែកជាវគ្គ',
  storyTotalFmt:'ពេលសរុប៖ {n} វគ្គ × {d}s = {s}s · {t}',
- storyEmpty:'សូមដាក់អត្ថបទរឿងពេញជាមុនសិន',storySplitDone:'បានបែងចែកជា {n} វគ្គ — ចុច «បង្កើតវីដេអូ» លើវគ្គនីមួយៗ',
+ storyEmpty:'សូមដាក់អត្ថបទរឿងពេញក្នុងប្រអប់ Prompt ខាងលើជាមុនសិន',storySplitDone:'បានបែងចែកជា {n} វគ្គ — ចុច «បង្កើតវីដេអូ» លើវគ្គនីមួយៗ',
  storyShort:'អត្ថបទខ្លីពេក — បែងចែកបានតែ {n} វគ្គប៉ុណ្ណោះ',
  epLabel:'វគ្គទី',epGen:'បង្កើតវីដេអូ',unitH:'ម៉ោង',unitM:'នាទី',unitS:'វិនាទី'
 },
@@ -568,10 +567,10 @@ en:{
  errNo3dFile:'Hunyuan3D: finished, but no 3D file was returned',d3MsgDone:'3D created',
  errHunyuanNet:'Could not reach the Hunyuan3D API — connection problem, or Tencent Cloud does not allow direct browser calls (CORS).',
  errImgRead2:'Could not read the image',
- storyTitle:'Story · Episodes',storyHint:'Paste the full story once — MovAi splits it into the number of episodes you choose, then creates one video per episode',
- storyTextLabel:'Full Story Text',storyPh:'Paste the full story text here…',storyCount:'Episodes',storySplit:'Split into Episodes',
+ storyTitle:'Story · Episodes',storyHint:'Paste the full story in the Prompt box above (up to 100,000 characters) — MovAi splits it into the number of episodes you choose, then creates one video per episode',
+ storyCount:'Episodes',storySplit:'Split into Episodes',
  storyTotalFmt:'Total time: {n} episodes × {d}s = {s}s · {t}',
- storyEmpty:'Please paste the full story text first',storySplitDone:'Split into {n} episodes — tap "Create Video" on each episode',
+ storyEmpty:'Please paste the full story in the Prompt box above first',storySplitDone:'Split into {n} episodes — tap "Create Video" on each episode',
  storyShort:'The text is too short — only {n} episodes could be made',
  epLabel:'Episode',epGen:'Create Video',unitH:'h',unitM:'min',unitS:'s'
 }};
@@ -824,6 +823,7 @@ function uiInit(){
   var lg='km';try{lg=localStorage.getItem('movai-lang')||'km';}catch(e){}
   LANG=(lg==='en')?'en':'km';
   applyLang();
+  updatePromptCount();
 }
 function maskKey(k){return k.length>10?k.slice(0,4)+'…'+k.slice(-4):'••••'}
 function genErrText(j, fb){
@@ -1329,6 +1329,13 @@ async function genDownloadVideo(src){
    quality, reusing genDoVideo with the progress + result display
    redirected into that episode's own card. One episode at a time
    (genAnyBusy), exactly like the main Generate flow, busy-wait included. */
+function updatePromptCount(){
+  var gp=document.getElementById('genPrompt');
+  var el=document.getElementById('genPromptCount');
+  if(!el)return;
+  var n=gp?gp.value.length:0;
+  el.textContent=n.toLocaleString('en-US')+' / 100,000';
+}
 function storySetCount(n,fromInput){
   n=parseInt(n,10);
   if(isNaN(n)){if(fromInput)return;n=20;}
@@ -1368,7 +1375,7 @@ function storyChunk(units,n){
 function storySplit(){
   if(genAnyBusy)return;
   var msg=document.getElementById('storyMsg');
-  var text=(document.getElementById('storyText').value||'').trim();
+  var text=(document.getElementById('genPrompt').value||'').trim();
   if(!text){if(msg){msg.textContent=tx('storyEmpty');msg.style.color='#f87171';}return;}
   var paras=text.split(/\n+/).map(function(s){return s.trim();}).filter(function(s){return s.length>0;});
   var units,joiner;
