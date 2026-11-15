@@ -1,0 +1,1451 @@
+<!DOCTYPE html>
+<html lang="km">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#0a0b0d">
+<meta name="color-scheme" content="light dark">
+<link rel="icon" href="data:,">
+<title>MovAi — បង្កើតរូបភាព &amp; វីដេអូ</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Kantumruy+Pro:wght@400;700;900&family=Nunito:wght@700;900&display=swap" rel="stylesheet">
+<script src="https://js.puter.com/v2/" defer></script>
+<script>try{var _de=document.documentElement;var _th=[['#addc29','173,220,41','#63910c'],['#ff2e88','255,46,136','#d6006d'],['#ff6a00','255,106,0','#cf5200'],['#ffe600','255,230,0','#857200'],['#00e5ff','0,229,255','#007d99'],['#b537f2','181,55,242','#8f27c9']];var _ti=parseInt(localStorage.getItem('movai-theme')||'0',10)||0;if(_ti<0||_ti>6)_ti=0;var _md=localStorage.getItem('movai-mode')||'dark';var _dark=_md==='dark'||(_md==='auto'&&window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches);_de.setAttribute('data-mode',_dark?'dark':'light');if(_ti===6){_de.style.setProperty('--accent','#b537f2');_de.style.setProperty('--accent-rgb','181,55,242');_de.style.setProperty('--accent-fill','linear-gradient(100deg,#ff2e88,#b537f2 52%,#00e5ff)');_de.style.setProperty('--accent-text',_dark?'#b537f2':'#8f27c9');}else{var _tt=_th[_ti];_de.style.setProperty('--accent',_tt[0]);_de.style.setProperty('--accent-rgb',_tt[1]);_de.style.setProperty('--accent-text',_dark?_tt[0]:_tt[2]);}function _gv(k,d){var x=parseInt(localStorage.getItem(k),10);if(isNaN(x))return d;if(x<0)x=0;if(x>100)x=100;return x;}var _leg=null;['movai-glass-fab','movai-glass-drawer','movai-glass-brand','movai-glass'].forEach(function(k){if(_leg===null){var t=parseInt(localStorage.getItem(k),10);if(!isNaN(t))_leg=t;}});var _gc=_gv('movai-glass-clear',_leg===null?45:100-_leg);var _gb=_gv('movai-glass-blur',_leg===null?65:_leg);var _gsh=_gv('movai-glass-shine',55);_de.style.setProperty('--glass-alpha',(0.75+((100-_gc)/100)*0.23).toFixed(3));_de.style.setProperty('--glass-blur',((_gb/100)*28).toFixed(1)+'px');_de.style.setProperty('--glass-shine',(_gsh/100).toFixed(3));_de.style.setProperty('--glass-frost',(_gb/100).toFixed(3));var _tbv=_gv('movai-txtblur',0);_de.style.setProperty('--txtblur',((_tbv/100)*16).toFixed(1)+'px');var _bgv=_gv('movai-bgb',50);var _base=_dark?[10,11,13]:[243,244,246];var _bc;if(_bgv<=50){var _f1=1-((50-_bgv)/50)*0.9;_bc=_base.map(function(c){return Math.round(c*_f1);});}else{var _f2=(_bgv-50)/50;_bc=_base.map(function(c){return Math.round(c+(255-c)*_f2*0.95);});}var _bgs='rgb('+_bc.join(',')+')';_de.style.setProperty('--bg',_bgs);_de.style.setProperty('--bg1',_bgs);_de.style.setProperty('--bg2',_bgs);var _tsv=localStorage.getItem('movai-tshadow');if(_tsv&&_tsv!=='none')_de.style.setProperty('--tshadow',_tsv);var _bfx=localStorage.getItem('movai-brandfx');if(_bfx)_de.setAttribute('data-brandfx',_bfx);var _fv=parseInt(localStorage.getItem('movai-font')||'50',10);if(isNaN(_fv))_fv=50;if(_fv<0)_fv=0;if(_fv>100)_fv=100;var _ff=_fv<=50?0.6+(_fv/50)*0.4:1+((_fv-50)/50)*1.2;_de.style.fontSize=(16*_ff)+'px';}catch(e){}</script>
+<style>
+:root{color-scheme:dark;--accent:#addc29;--accent-rgb:173,220,41;--accent-fill:var(--accent);--accent-text:var(--accent);--accent2:var(--accent);--accent-soft:#1c1e22;--accent-light:#23252a;--bg:#0a0b0d;--bg1:#0a0b0d;--bg2:#0a0b0d;--card:#14161a;--card2:#16181d;--field:#0d0f11;--composer:#0d0f11;--text:#f4f5f0;--text2:#c9ccd1;--label:#d6d8dc;--muted:#9a9ea6;--faint:#62666e;--movai:var(--accent);--movai-light:var(--accent);--line:rgba(255,255,255,.08);--line2:rgba(255,255,255,.12);--line3:rgba(255,255,255,.16);--shadow:none;--tshadow:none;--glass-alpha:.877;--glass-blur:18.2px;--glass-shine:.55;--glass-frost:.65;--txtblur:0px;--glass-tint:20,22,26;--glass-text:#f4f5f0;--glass-text2:#e8eaee;--glass-muted:#9a9ea6;--glass-faint:rgba(255,255,255,.45);--glass-line:rgba(255,255,255,.16);--glass-line2:rgba(255,255,255,.26);--glass-text-rgb:244,245,240;--glass-shadow-rgb:0,0,0}
+html[data-mode="light"]{color-scheme:light;--accent-soft:rgba(20,22,30,.07);--bg:#f3f4f6;--card:#ffffff;--card2:#ffffff;--field:#ffffff;--composer:#ffffff;--text:#17181c;--text2:#33363d;--label:#2c2f36;--muted:#5f646e;--faint:#8b9099;--line:rgba(20,22,30,.1);--line2:rgba(20,22,30,.16);--line3:rgba(20,22,30,.22);--glass-tint:255,255,255;--glass-text:#17181c;--glass-text2:#33363d;--glass-muted:#5f646e;--glass-faint:rgba(20,22,30,.5);--glass-line:rgba(20,22,30,.15);--glass-line2:rgba(20,22,30,.24);--glass-text-rgb:23,24,28;--glass-shadow-rgb:255,255,255}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:"Kantumruy Pro","Nunito",sans-serif;background:var(--bg);color:var(--text);min-height:100vh;text-shadow:var(--tshadow,none);-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+button{font-family:inherit;cursor:pointer}
+main{max-width:720px;margin:0 auto;padding:4.75rem 18px 48px}
+.menuwrap{position:fixed;top:12px;left:max(18px,calc(50% - 342px));z-index:30;display:flex}
+.brand-frame{display:inline-flex;align-items:center;gap:10px;background:linear-gradient(135deg,rgba(255,255,255,calc(.04 + var(--glass-shine,.55)*.4)),rgba(255,255,255,calc(var(--glass-shine,.55)*.1)) 42%,rgba(190,198,212,calc(var(--glass-frost,.65)*.24)) 80%,rgba(var(--glass-tint),.22));background-color:rgba(var(--glass-tint),var(--glass-alpha,.5));-webkit-backdrop-filter:blur(var(--glass-blur,18px)) saturate(170%);backdrop-filter:blur(var(--glass-blur,18px)) saturate(170%);border:1px solid rgba(var(--glass-text-rgb),calc(.16 + var(--glass-shine,.55)*.22));border-radius:999px;padding:6px 18px 6px 6px;box-shadow:inset 0 1px 0 rgba(255,255,255,calc(.1 + var(--glass-shine,.55)*.55)),inset 0 -1px 0 rgba(255,255,255,.10),0 10px 28px rgba(0,0,0,.24)}
+.brand-frame .brand-name{font-size:1.3125rem;font-weight:900;letter-spacing:-.02em;color:var(--glass-text);text-shadow:0 1px 3px rgba(var(--glass-shadow-rgb),.3)}
+.brand-frame .brand-name span{color:var(--accent-text)}
+.brand-frame .menu-btn{background:transparent;border:1px solid var(--glass-line2);border-radius:999px;box-shadow:none}
+.brand-frame .menu-btn span{background:var(--glass-text)}
+.hero{padding:18px 2px 6px}
+.hero h1{font-size:2.3125rem;font-weight:900;line-height:1.15;letter-spacing:-.01em}
+.hero h1 .grad{color:var(--accent-text)}
+.hero p{font-size:0.9375rem;color:var(--muted);margin-top:14px;line-height:1.65;max-width:540px}
+.modes{display:flex;gap:10px;margin-top:26px}
+.modes .kbtn{flex:1;padding:15px;font-size:1rem}
+.kbtn{display:inline-flex;align-items:center;justify-content:center;gap:8px;border-radius:12px;padding:12px 22px;font-size:0.9375rem;font-weight:700;font-family:inherit;cursor:pointer;text-decoration:none;border:1px solid transparent;min-height:44px}
+.kbtn-black{background:var(--accent-fill);color:#0d1005;border-color:transparent}
+.kbtn-white{background:var(--card);color:var(--text2);border:1px solid var(--line2)}
+.panel{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:20px;margin-top:16px}
+.panel h3{font-size:1.0625rem;font-weight:800}
+.panel .hint{font-size:0.875rem;color:var(--muted);margin-top:6px;line-height:1.6}
+.chip-label{font-size:0.8125rem;font-weight:700;color:var(--label);letter-spacing:.02em}
+.btn{display:inline-block;border:none;border-radius:14px;padding:15px 26px;font-size:1rem;font-weight:800;min-height:48px}
+.btn-green{background:var(--accent-fill);color:#0d1005}
+.btn-block{display:block;width:100%;text-align:center}
+.btn:disabled,.kbtn:disabled{opacity:.45;cursor:not-allowed}
+.input{width:100%;border:1px solid var(--line2);border-radius:12px;padding:14px;font-size:1rem;font-family:inherit;background:var(--field);color:var(--text);outline:none;min-height:48px}
+.input:focus{border-color:var(--accent-text)}
+.input::placeholder{color:var(--faint)}
+textarea.input{resize:vertical}
+.kiri-card{background:var(--card2);border:1px solid var(--line);border-radius:14px;padding:18px}
+.kiri-card h3{font-size:1rem;font-weight:800}
+.kiri-card p{font-size:0.875rem;color:var(--muted);margin-top:6px;line-height:1.6}
+.key-acc{background:var(--card2);border:1px solid var(--line);border-radius:14px;margin-top:10px;overflow:hidden}
+.key-acc-head{display:flex;width:100%;align-items:center;justify-content:space-between;gap:10px;background:transparent;border:none;color:var(--text);font-family:inherit;padding:15px 16px;cursor:pointer;text-align:left;min-height:52px}
+.key-acc-head .kn{font-size:1rem;font-weight:800}
+.key-acc-head .kr{display:flex;align-items:center;gap:8px;color:var(--muted);font-size:0.75rem;white-space:normal;text-align:right;min-width:0}
+.key-acc-head .kchev{font-size:0.8125rem;color:var(--accent-text)}
+.key-acc-body{display:none;padding:2px 16px 16px}
+.key-acc.open .key-acc-body{display:block}
+.key-acc-body p{font-size:0.875rem;color:var(--muted);line-height:1.6}
+#sec-create{scroll-margin-top:16px}
+.threed-grid{display:grid;gap:12px;margin-top:14px}
+@media(min-width:560px){.threed-grid{grid-template-columns:1fr 1fr}}
+.threed-card{background:var(--card2);border:1px solid var(--line);border-radius:14px;padding:18px}
+.threed-card h3{font-size:1.0625rem;font-weight:800}
+.threed-card .free{display:inline-block;margin-top:8px;font-size:0.75rem;font-weight:700;color:var(--accent-text);background:rgba(var(--accent-rgb),.12);border-radius:999px;padding:5px 10px}
+.threed-card p{font-size:0.875rem;color:var(--muted);margin-top:10px;line-height:1.6}
+.threed-card a{display:inline-block;margin-top:12px;color:var(--accent-text);font-weight:700;font-size:0.875rem;text-decoration:none;min-height:32px}
+.keys-head{margin-top:36px;padding-top:28px;border-top:1px solid rgba(255,255,255,.08)}
+.keys-head h2{font-size:1.3125rem;font-weight:900}
+.keys-head p{font-size:0.875rem;color:var(--muted);margin-top:8px;line-height:1.6}
+.menu-btn{display:flex;flex-direction:column;justify-content:center;gap:5px;width:44px;height:44px;padding:0 11px;background:var(--card);border:1px solid var(--line2);border-radius:12px;cursor:pointer;flex:0 0 auto}
+.menu-btn span{display:block;height:2px;background:var(--text);border-radius:2px}
+.drawer-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.6);opacity:0;pointer-events:none;transition:opacity .25s ease;z-index:40;display:none}
+.drawer-backdrop.open{display:block;pointer-events:auto}
+.drawer-backdrop.shown{opacity:1}
+.drawer{position:fixed;top:0;left:0;bottom:0;width:min(48vw,240px);background:linear-gradient(160deg,rgba(255,255,255,calc(.03 + var(--glass-shine,.55)*.32)),rgba(255,255,255,calc(var(--glass-shine,.55)*.08)) 36%,rgba(190,198,212,calc(var(--glass-frost,.65)*.22)) 74%,rgba(var(--glass-tint),.40));background-color:rgba(var(--glass-tint),var(--glass-alpha,.5));-webkit-backdrop-filter:blur(var(--glass-blur,18px)) saturate(170%);backdrop-filter:blur(var(--glass-blur,18px)) saturate(170%);border-right:1px solid rgba(var(--glass-text-rgb),calc(.14 + var(--glass-shine,.55)*.2));color:var(--glass-text);text-shadow:0 1px 2px rgba(var(--glass-shadow-rgb),.25);box-shadow:inset 1px 0 0 rgba(255,255,255,.10),inset 0 1px 0 rgba(255,255,255,calc(.08 + var(--glass-shine,.55)*.4)),12px 0 36px rgba(0,0,0,.22);z-index:50;transform:translateX(-105%);transition:transform .28s ease;overflow-y:auto;padding:18px 14px 32px;display:none}
+.drawer.open{display:block}
+.drawer.shown{transform:translateX(0)}
+.drawer-head{display:flex;align-items:center;justify-content:space-between}
+.drawer-head b{font-size:1.25rem;font-weight:900;letter-spacing:-.02em}
+.drawer-head b span{color:var(--accent-text)}
+.drawer-close{width:40px;height:40px;border-radius:10px;background:#1a1c21;border:1px solid rgba(255,255,255,.12);color:var(--text);font-size:1rem;cursor:pointer;flex:0 0 auto}
+.drawer nav{margin-top:14px}
+.drawer nav button{display:flex;width:100%;align-items:center;justify-content:space-between;gap:10px;background:var(--card);border:1px solid var(--line);border-radius:12px;color:var(--text);font-family:inherit;font-size:0.9375rem;font-weight:700;padding:14px;cursor:pointer;text-align:left;min-height:48px;margin-top:8px}
+.drawer nav button small{color:var(--muted);font-weight:400;font-size:0.75rem;white-space:normal;text-align:right;min-width:0}
+.drawer nav button:active{background:rgba(var(--accent-rgb),.12)}
+.drawer .keys-head{margin-top:26px;padding-top:22px}
+.drawer-head b{color:var(--glass-text)}
+.drawer-head b span{color:var(--accent-text)}
+.drawer-close{background:transparent;border:1px solid var(--glass-line2);color:var(--glass-text);box-shadow:none}
+.drawer nav button{background:transparent;border:1px solid var(--glass-line);color:var(--glass-text);box-shadow:none}
+.drawer nav button small{color:var(--glass-muted)}
+.drawer nav button:active{background:rgba(var(--accent-rgb),.12)}
+.drawer .keys-head{border-top-color:var(--glass-line)}
+.drawer .keys-head h2{color:var(--glass-text)}
+.drawer .keys-head p{color:var(--glass-muted)}
+.drawer .key-acc{background:transparent;border:1px solid var(--glass-line)}
+.drawer .key-acc-head{color:var(--glass-text)}
+.drawer .key-acc-head .kr{color:var(--glass-muted)}
+.drawer .key-acc-head .kchev{color:var(--accent-text)}
+.drawer .key-acc-body p{color:var(--glass-muted)}
+.drawer .input{background:transparent;color:var(--glass-text);border-color:var(--glass-line2)}
+.drawer .input::placeholder{color:var(--glass-muted)}
+.drawer .kbtn-white{background:transparent;color:var(--glass-text2);border-color:var(--glass-line2)}
+.drawer a{color:var(--accent-text) !important}
+@media (prefers-reduced-motion:reduce){.drawer,.drawer-backdrop{transition:none}.brand-frame,.drawer{animation:none}}
+.composer{background:var(--composer);border:1px solid var(--line3);border-radius:18px;padding:16px}
+.composer textarea.input{border:none;background:transparent;padding:8px 2px 4px;min-height:104px;font-size:1.0625rem;line-height:1.6}
+.composer textarea.input:focus{border:none}
+.composer-tools{border-top:1px solid var(--line);margin-top:12px;padding-top:12px;display:flex;flex-wrap:wrap;gap:10px 14px;align-items:center}
+.composer .modes{margin-top:0;gap:6px}
+.composer .modes .kbtn{flex:0 0 auto}
+.composer .kbtn{padding:8px 14px;font-size:0.8125rem;min-height:38px;border-radius:999px}
+.composer #genProviderWrap{position:relative;flex:1 1 210px;min-width:190px}
+.composer #genProviderField{background:var(--card);min-height:42px;padding:10px 14px;border-radius:999px}
+.tool-group{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.tool-group>div{display:flex;gap:6px;flex-wrap:wrap}
+.composer #genVideoOpts{flex-basis:100%;flex-wrap:wrap;gap:10px 18px;align-items:center}
+.d3-tabs{display:flex;gap:10px;margin-top:18px}
+.d3-tabs .kbtn{flex:1 1 0;min-width:0;padding:13px 6px;font-size:0.84375rem;white-space:normal;line-height:1.35;min-height:48px}
+@media(max-width:480px){.d3-tabs .kbtn{font-size:0.71875rem;padding:13px 2px}}
+.d3-drop{display:block;border:1.5px dashed rgba(255,255,255,.28);border-radius:14px;padding:30px 16px;text-align:center;cursor:pointer;color:var(--text2);font-size:0.9375rem;line-height:1.6;margin-top:14px;overflow-wrap:break-word}
+#genD3ProvSlot .kbtn{flex:1 1 0;min-width:0;white-space:normal;line-height:1.3;text-align:center;min-height:42px}
+.d3-drop:hover{border-color:var(--accent-text)}
+.d3-preview{width:100%;border-radius:14px;display:block;margin-top:12px}
+.d3-step{font-size:0.8125rem;font-weight:700;color:var(--accent-text);margin-top:16px}
+footer{text-align:center;color:var(--faint);font-size:0.8125rem;padding:32px 16px 104px;line-height:1.7}
+.set-box{margin-top:22px;padding-top:20px;border-top:1px solid var(--line2)}
+.set-label{font-size:0.8125rem;font-weight:700;color:var(--label);letter-spacing:.02em}
+.set-row{margin-top:18px}
+.lang-toggle{display:flex;gap:8px;margin-top:10px}
+.lang-toggle button{flex:1;padding:11px 8px;border-radius:999px;border:1px solid var(--glass-line2);background:transparent;color:var(--glass-text);font-family:inherit;font-size:0.875rem;font-weight:700;cursor:pointer;min-height:44px;min-width:0;overflow-wrap:break-word;line-height:1.3}
+.lang-toggle button.on{background:var(--accent-fill);color:#0d1005;border-color:transparent}
+.font-head{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+.font-head b{color:var(--accent-text);font-size:0.875rem}
+input[type=range].font-range,input[type=range].glass-range{width:100%;margin-top:10px;accent-color:var(--accent-text);height:34px;cursor:pointer;background:transparent}
+.set-ends{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;font-size:0.75rem;color:var(--muted)}
+.color-row{display:flex;gap:10px;margin-top:12px;flex-wrap:wrap}
+.swatch{width:40px;height:40px;border-radius:50%;border:2px solid rgba(var(--glass-text-rgb),.35);cursor:pointer;padding:0;flex:0 0 auto}
+.swatch.on{border-color:var(--glass-text);box-shadow:0 0 0 3px rgba(var(--glass-text-rgb),.35)}
+.lang-toggle.fx-wrap{flex-wrap:wrap}
+.lang-toggle.fx-wrap button{flex:1 1 28%}
+html[data-brandfx="glow"] .brand-frame .brand-name{text-shadow:0 0 6px rgba(var(--accent-rgb),.95),0 0 16px rgba(var(--accent-rgb),.65),0 0 30px rgba(var(--accent-rgb),.4)}
+html[data-brandfx="shadow"] .brand-frame .brand-name{text-shadow:2px 3px 0 rgba(0,0,0,.55),0 8px 18px rgba(0,0,0,.45)}
+html[data-brandfx="neon"] .brand-frame .brand-name{color:#ffffff !important;text-shadow:0 0 4px rgba(var(--accent-rgb),1),0 0 12px rgba(var(--accent-rgb),.9),0 0 24px rgba(var(--accent-rgb),.7),0 0 42px rgba(var(--accent-rgb),.5)}
+html[data-brandfx="neon"] .brand-frame .brand-name span{color:var(--accent);text-shadow:0 0 4px rgba(var(--accent-rgb),1),0 0 14px rgba(var(--accent-rgb),.9),0 0 30px rgba(var(--accent-rgb),.6)}
+html[data-brandfx="shine"] .brand-frame .brand-name{background:linear-gradient(100deg,#ffffff 10%,var(--accent) 45%,#ffffff 90%);-webkit-background-clip:text;background-clip:text;color:transparent !important;text-shadow:none}
+html[data-brandfx="shine"] .brand-frame .brand-name span{color:transparent !important}
+.glass-sub{margin-top:12px}
+.glass-sub .set-label{font-size:0.75rem;color:var(--muted)}
+.glass-sub input[type=range].glass-range{margin-top:2px}
+.tsw{width:40px;height:40px;border-radius:50%;border:2px solid rgba(var(--glass-text-rgb),.35);cursor:pointer;padding:0;flex:0 0 auto;font-family:inherit;font-size:0.875rem}
+.tsw.on{border-color:var(--glass-text);box-shadow:0 0 0 3px rgba(var(--glass-text-rgb),.35)}
+.tsw-none{background:transparent;color:var(--glass-muted);display:inline-flex;align-items:center;justify-content:center}
+/* ===== Text containment at any font size + no sideways scroll ===== */
+html,body{overflow-x:clip}
+button{min-width:0}
+.kbtn,.btn{overflow-wrap:break-word;line-height:1.35}
+.drawer nav button>span{min-width:0;overflow-wrap:break-word}
+.key-acc-head .kn{min-width:0;overflow-wrap:break-word}
+#genProviderFieldName{min-width:0;overflow-wrap:break-word}
+#genProviderField>span:last-child{flex:0 1 auto !important;min-width:0}
+#genProviderFieldLimit{white-space:normal !important;text-align:right;overflow-wrap:break-word}
+img,video{max-width:100%}
+/* ===== Floating quick-settings button (AssistiveTouch-style) ===== */
+.fab-wrap{position:fixed;right:16px;bottom:calc(16px + env(safe-area-inset-bottom,0px));z-index:60;display:flex;flex-direction:column;align-items:flex-end;gap:12px}
+.fab-btn{width:54px;height:54px;flex:0 0 auto;border-radius:50%;border:1px solid rgba(var(--glass-text-rgb),calc(.18 + var(--glass-shine,.55)*.22));background:rgba(var(--glass-tint),var(--glass-alpha,.5));-webkit-backdrop-filter:blur(var(--glass-blur,18px)) saturate(160%);backdrop-filter:blur(var(--glass-blur,18px)) saturate(160%);box-shadow:0 8px 24px rgba(0,0,0,.35),inset 0 1px 0 rgba(255,255,255,calc(.08 + var(--glass-shine,.55)*.5));display:flex;align-items:center;justify-content:center;cursor:pointer;padding:0}
+.fab-dot{width:23px;height:23px;border-radius:50%;background:rgba(var(--glass-text-rgb),.28);border:3px solid rgba(var(--glass-text-rgb),.92);box-sizing:border-box}
+.fab-panel{display:none;width:min(86vw,308px);max-height:min(72vh,580px);overflow-y:auto;border-radius:18px;padding:16px 14px 18px;color:var(--glass-text);text-shadow:0 1px 2px rgba(var(--glass-shadow-rgb),.25);background:linear-gradient(160deg,rgba(255,255,255,calc(.03 + var(--glass-shine,.55)*.32)),rgba(255,255,255,calc(var(--glass-shine,.55)*.08)) 36%,rgba(190,198,212,calc(var(--glass-frost,.65)*.22)) 74%,rgba(var(--glass-tint),.42));background-color:rgba(var(--glass-tint),var(--glass-alpha,.5));-webkit-backdrop-filter:blur(var(--glass-blur,18px)) saturate(170%);backdrop-filter:blur(var(--glass-blur,18px)) saturate(170%);border:1px solid rgba(var(--glass-text-rgb),calc(.14 + var(--glass-shine,.55)*.2));box-shadow:0 18px 44px rgba(0,0,0,.35)}
+.fab-panel.open{display:block}
+/* ===== Light mode surfaces ===== */
+html[data-mode="light"] .drawer-backdrop{background:rgba(20,22,40,.35)}
+html[data-mode="light"] .d3-drop{border-color:rgba(20,22,30,.3)}
+html[data-mode="light"] #genProviderDrop{background:#ffffff !important;border-color:rgba(20,22,30,.12) !important;box-shadow:0 16px 40px rgba(20,22,40,.16)}
+html[data-mode="light"] #genReplicaId{background:#ffffff !important}
+html[data-mode="light"] [style*="color:#9a9ea6"]{color:#5f646e !important}
+html[data-mode="light"] [style*="background:rgba(255,255,255,.1)"]{background:rgba(20,22,30,.12) !important}
+html[data-mode="light"] [style*="border-top:1px solid rgba(255,255,255,.08)"]{border-top-color:rgba(20,22,30,.1) !important}
+.fab-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.fab-tile{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:7px;padding:12px 4px;border-radius:14px;background:rgba(var(--glass-text-rgb),.08);border:1px solid var(--glass-line);color:inherit;font-family:inherit;font-size:0.75rem;font-weight:700;cursor:pointer;min-height:70px;line-height:1.3;text-align:center;overflow-wrap:break-word;min-width:0}
+.fab-tile svg{width:24px;height:24px;flex:0 0 auto}
+.fab-tile:active{background:rgba(var(--accent-rgb),.18)}
+/* Glass shine/frost are driven by --glass-shine / --glass-frost on every surface at once */
+/* ===== Text background blur (behind text panels) ===== */
+.panel,.composer,.kiri-card,.threed-card,.key-acc,.fab-tile,#genProviderDrop{-webkit-backdrop-filter:blur(var(--txtblur,0px));backdrop-filter:blur(var(--txtblur,0px))}
+</style>
+</head>
+<body>
+<div class="drawer-backdrop" id="drawerBackdrop" onclick="closeMenu()"></div>
+<aside class="drawer" id="drawer" aria-label="ម៉ឺនុយ">
+  <div class="drawer-head"><b>Mov<span>Ai</span></b><button class="drawer-close" onclick="closeMenu()" aria-label="បិទម៉ឺនុយ">✕</button></div>
+  <nav>
+    <button onclick="menuGo('sec-create','image')"><span data-i18n="navImage">បង្កើតរូបភាព</span> <small data-i18n="navImageSub">Image</small></button>
+    <button onclick="menuGo('sec-create','video')"><span data-i18n="navVideo">បង្កើតវីដេអូ</span> <small data-i18n="navVideoSub">Video</small></button>
+    <button onclick="menuGo('sec-create','3d')"><span data-i18n="nav3d">រូប 3D Design</span> <small>3D</small></button>
+  </nav>
+  <div class="set-box">
+    <div class="set-row" style="margin-top:0">
+      <span class="set-label" data-i18n="setLang">ភាសា</span>
+      <div class="lang-toggle">
+        <button type="button" id="langBtnKm" onclick="setLang('km')">ខ្មែរ (KH)</button>
+        <button type="button" id="langBtnEn" onclick="setLang('en')">English</button>
+      </div>
+    </div>
+    <div class="set-row">
+      <div class="font-head"><span class="set-label" data-i18n="setFont">ទំហំអក្សរ</span><b id="fontVal" class="fontVal">50%</b></div>
+      <input type="range" class="font-range" id="fontRange" min="0" max="100" step="1" value="50" oninput="setFontSize(this.value)" aria-label="Font size">
+      <div class="set-ends"><span data-i18n="fontSmall">0% · តូចខ្លាំង</span><span data-i18n="fontLarge">100% · ធំខ្លាំង</span></div>
+    </div>
+    <div class="set-row">
+      <span class="set-label" data-i18n="setColor">ពណ៌ App</span>
+      <div class="color-row" id="colorRow"></div>
+    </div>
+    <div class="set-row">
+      <span class="set-label" data-i18n="setBrandFx">អ៊ីហ្វិចឈ្មោះ MovAi</span>
+      <div class="lang-toggle fx-wrap">
+        <button type="button" id="fxBtnNone" data-i18n="fxNone" onclick="setBrandFx('none')">ធម្មតា</button>
+        <button type="button" id="fxBtnGlow" data-i18n="fxGlow" onclick="setBrandFx('glow')">ភ្លឺញាក់</button>
+        <button type="button" id="fxBtnShadow" data-i18n="fxShadow" onclick="setBrandFx('shadow')">ស្រមោល</button>
+        <button type="button" id="fxBtnNeon" data-i18n="fxNeon" onclick="setBrandFx('neon')">ណេអុង</button>
+        <button type="button" id="fxBtnShine" data-i18n="fxShine" onclick="setBrandFx('shine')">ចាំង</button>
+      </div>
+    </div>
+    <div class="set-row">
+      <span class="set-label" data-i18n="setMode">យប់ / ថ្ងៃ</span>
+      <div class="lang-toggle">
+        <button type="button" id="modeBtnDark" data-i18n="modeDark" onclick="setMode('dark')">យប់</button>
+        <button type="button" id="modeBtnLight" data-i18n="modeLight" onclick="setMode('light')">ថ្ងៃ</button>
+        <button type="button" id="modeBtnAuto" data-i18n="modeAuto" onclick="setMode('auto')">អូតូ</button>
+      </div>
+    </div>
+    <div class="set-row">
+      <span class="set-label" data-i18n="setGlass">កញ្ចក់ · ថ្លា / ព្រាល / ចាំង</span>
+      <div class="glass-sub">
+        <div class="font-head"><span class="set-label" data-i18n="glassClearP">ថ្លា · Clear</span><b class="glassVal" data-glass-pval="clear">45%</b></div>
+        <input type="range" class="glass-range" data-glass-prop="clear" min="0" max="100" step="1" value="45" oninput="setGlassProp('clear',this.value)" aria-label="Glass transparency">
+        <div class="set-ends"><span data-i18n="glassClearLo">0% · មិនថ្លា</span><span data-i18n="glassClearHi">100% · ថ្លាខ្លាំង</span></div>
+      </div>
+      <div class="glass-sub">
+        <div class="font-head"><span class="set-label" data-i18n="glassBlurP">ព្រាល · Frosted / Blur</span><b class="glassVal" data-glass-pval="blur">65%</b></div>
+        <input type="range" class="glass-range" data-glass-prop="blur" min="0" max="100" step="1" value="65" oninput="setGlassProp('blur',this.value)" aria-label="Glass blur">
+        <div class="set-ends"><span data-i18n="glassBlurLo">0% · មិនព្រាល</span><span data-i18n="glassBlurHi">100% · ព្រាលខ្លាំង</span></div>
+      </div>
+      <div class="glass-sub">
+        <div class="font-head"><span class="set-label" data-i18n="glassShineP">ចាំង · Shine</span><b class="glassVal" data-glass-pval="shine">55%</b></div>
+        <input type="range" class="glass-range" data-glass-prop="shine" min="0" max="100" step="1" value="55" oninput="setGlassProp('shine',this.value)" aria-label="Glass shine">
+        <div class="set-ends"><span data-i18n="glassShineLo">0% · មិនចាំង</span><span data-i18n="glassShineHi">100% · ចាំងខ្លាំង</span></div>
+      </div>
+    </div>
+    <div class="set-row">
+      <div class="font-head"><span class="set-label" data-i18n="setTxtBlur">ព្រាលផ្ទៃខាងក្រោយអក្សរ</span><b id="txtBlurVal">0%</b></div>
+      <input type="range" class="glass-range" id="txtBlurRange" min="0" max="100" step="1" value="0" oninput="setTxtBlur(this.value)" aria-label="Text background blur">
+      <div class="set-ends"><span data-i18n="txtBlurLo">0% · ច្បាស់</span><span data-i18n="txtBlurHi">100% · ព្រាលខ្លាំង</span></div>
+    </div>
+    <div class="set-row">
+      <div class="font-head"><span class="set-label" data-i18n="setBgBright">ពន្លឺផ្ទៃខាងក្រោយ</span><b id="bgBrightVal">50%</b></div>
+      <input type="range" class="glass-range" id="bgBrightRange" min="0" max="100" step="1" value="50" oninput="setBgBright(this.value)" aria-label="Background brightness">
+      <div class="set-ends"><span data-i18n="bgBrightLo">0% · ងងឹត</span><span data-i18n="bgBrightHi">100% · ភ្លឺខ្លាំង</span></div>
+    </div>
+    <div class="set-row">
+      <span class="set-label" data-i18n="setTShadow">ពណ៌ស្រមោលអក្សរ</span>
+      <div class="color-row" id="tshadowRow"></div>
+    </div>
+  </div>
+  <div class="keys-head">
+    <h2 id="genKeysTitle" data-i18n="keysTitle">API Keys · កន្លែងដាក់ Key</h2>
+  </div>
+  <div id="genKeys"></div>
+</aside>
+<main>
+<div class="menuwrap">
+  <div class="brand-frame">
+    <button class="menu-btn" id="menuBtn" onclick="toggleMenu()" aria-label="ម៉ឺនុយ"><span></span><span></span><span></span></button>
+    <span class="brand-name">Mov<span>Ai</span></span>
+  </div>
+</div>
+<section id="page-gen">
+  <div class="hero">
+    <h1 data-i18n="heroTitle">បង្កើតរូបភាព វីដេអូ<br><span class="grad">&amp; 3D Design</span></h1>
+  </div>
+  <div class="panel" id="sec-create">
+    <div class="composer">
+      <span class="chip-label" id="genPromptLabel">Prompt · អ្វីដែលចង់បង្កើត</span>
+      <textarea class="input" id="genPrompt" rows="4" placeholder="ឧ. ទេសភាពព្រៃឈើពេលល្ងាច មានផ្ទះឈើ..." style="width:100%"></textarea>
+      <div id="genTavusBox" style="display:none;margin-top:10px">
+        <p style="font-size:0.8125rem;color:#9a9ea6" data-i18n="tavusText">Tavus បង្កើតវីដេអូ avatar និយាយតាម script — ដាក់ Replica ID (Face ID) របស់អ្នក៖</p>
+        <input class="input" id="genReplicaId" placeholder="r... (Face ID ពី Tavus)" data-i18n-ph="tavusPh" style="width:100%;margin-top:8px;background:#14161a">
+      </div>
+      <div class="composer-tools">
+        <div class="modes">
+          <button class="kbtn kbtn-black" id="genTabImg" onclick="genSetMode('image')" data-i18n="tabImage">រូបភាព</button>
+          <button class="kbtn kbtn-white" id="genTabVid" onclick="genSetMode('video')" data-i18n="tabVideo">វីដេអូ</button>
+          <button class="kbtn kbtn-white" id="genTab3d" onclick="genSetMode('3d')">3D Design</button>
+        </div>
+        <div id="genProviderWrap">
+          <button type="button" class="input" id="genProviderField" onclick="genToggleProviders()" style="display:flex;justify-content:space-between;align-items:center;gap:10px;cursor:pointer;text-align:left;width:100%">
+            <span id="genProviderFieldName" style="font-weight:700">Pollinations</span>
+            <span style="display:flex;align-items:center;gap:8px;flex:0 0 auto"><span id="genProviderFieldLimit" style="font-size:0.75rem;color:#9a9ea6;white-space:nowrap"></span><span style="font-size:0.75rem;color:#9a9ea6">▼</span></span>
+          </button>
+          <div id="genProviderDrop" style="display:none;position:absolute;left:0;right:0;top:100%;z-index:30;background:#1a1c21;border:1px solid rgba(255,255,255,.12);border-radius:12px;margin-top:6px;overflow:hidden;box-shadow:0 16px 40px rgba(0,0,0,.5)"></div>
+          <div id="genD3ProvSlot" style="display:none;align-items:center;gap:8px;flex-wrap:nowrap;width:100%">
+            <button class="kbtn kbtn-black" id="genD3ProvHunyuan" onclick="d3SetProvider('hunyuan3d')">Hunyuan3D</button>
+            <button class="kbtn kbtn-white" id="genD3ProvMpx" onclick="d3SetProvider('masterpiecex')">Masterpiece X</button>
+          </div>
+        </div>
+        <div class="tool-group" id="genAspectGroup">
+          <span class="chip-label" data-i18n="lblSize">ទំហំ</span>
+          <div id="genAspect"></div>
+        </div>
+        <div id="genVideoOpts" style="display:none">
+          <div class="tool-group">
+            <span class="chip-label" data-i18n="lblDuration">រយៈពេល</span>
+            <div id="genDuration"></div>
+          </div>
+          <div class="tool-group">
+            <span class="chip-label" data-i18n="lblQuality">គុណភាព</span>
+            <div id="genRes"></div>
+          </div>
+        </div>
+      </div>
+      <div id="d3Inline" style="display:none;margin-top:4px">
+    <p class="hint" id="d3Hint" style="margin-top:18px">ត្រូវមាន Hunyuan3D Key ក្នុងម៉ឺនុយ ☰ → API Keys ជាមុនសិន។</p>
+    <div class="d3-tabs">
+      <button class="kbtn kbtn-black" id="d3TabImg" onclick="d3SetOpt('image')" data-i18n="d3TabImg">ជម្រើស ១ · ដាក់រូបភាព</button>
+      <button class="kbtn kbtn-white" id="d3TabTxt" onclick="d3SetOpt('text')" data-i18n="d3TabTxt">ជម្រើស ២ · អត្ថបទ → រូបភាព</button>
+    </div>
+    <div id="d3OptImage">
+      <label class="d3-drop" for="d3File" data-i18n="d3Drop">ដាក់រូបភាពរបស់អ្នកនៅទីនេះ — ចុចដើម្បីជ្រើសរូប (JPG / PNG / WebP)<br><span style="font-size:0.8125rem;color:#9a9ea6">រូបវត្ថុតែមួយ ផ្ទៃក្រោយសាមញ្ញ ល្អបំផុត</span></label>
+      <input type="file" id="d3File" accept="image/*" style="display:none" onchange="d3FileChange(this)">
+      <img class="d3-preview" id="d3ImgPreview" alt="រូបភាពដែលបានដាក់" data-i18n-alt="altUploaded" style="display:none">
+    </div>
+    <div id="d3OptText" style="display:none">
+      <p class="d3-step" data-i18n="d3Step1">ជំហាន ១ · ប្រើ Prompt នៅខាងលើ បង្កើតរូបភាពសិន</p>
+      <button class="btn btn-green btn-block" id="d3GenImgBtn" onclick="d3GenImage()" style="margin-top:10px" data-i18n="d3GenImg">បង្កើតរូបភាព</button>
+      <img class="d3-preview" id="d3TxtPreview" alt="រូបភាពដែលបានបង្កើតពីអត្ថបទ" data-i18n-alt="altFromText" style="display:none">
+      <p class="d3-step" id="d3Step2" style="display:none" data-i18n="d3Step2">ជំហាន ២ · រូបភាពរួចរាល់ — ចុចប៊ូតុងខាងក្រោមដើម្បីធ្វើជា 3D</p>
+    </div>
+    <button class="btn btn-green btn-block" id="d3MakeBtn" onclick="d3Make()" style="margin-top:20px" data-i18n="d3Make">ធ្វើជា 3D</button>
+    <p id="d3Msg" style="font-size:0.8125rem;margin-top:12px;min-height:18px"></p>
+    <div id="d3Prog" style="display:none;margin-top:10px">
+      <div style="display:flex;justify-content:space-between;font-size:0.8125rem"><span id="d3ProgTxt" data-i18n="d3Working">កំពុងធ្វើ…</span><b id="d3ProgSec">0s</b></div>
+      <div style="height:8px;background:rgba(255,255,255,.1);border-radius:999px;margin-top:8px;overflow:hidden"><div id="d3ProgBar" style="height:100%;width:0%;background:var(--accent-fill);border-radius:999px"></div></div>
+    </div>
+    <div id="d3Result" style="margin-top:14px"></div>
+    <p id="d3LinkHunyuan" style="margin-top:14px"><a href="https://cloud.tencent.com" target="_blank" rel="noopener" style="color:var(--accent-text);font-weight:700;font-size:0.875rem;text-decoration:none" data-i18n="d3LinkHunyuan">បើកវេបសាយ Hunyuan3D (Tencent Cloud) ដើម្បីយក API Key ↗</a></p>
+    <p id="d3LinkMpx" style="margin-top:14px;display:none"><button type="button" onclick="d3OpenMpxKey()" style="background:none;border:none;padding:0;color:var(--accent-text);font-weight:700;font-size:0.875rem;font-family:inherit;cursor:pointer;min-height:32px" data-i18n="d3MpxKeyBtn">ដាក់ Key Masterpiece X</button><span style="color:#62666e;margin:0 10px">·</span><a href="https://www.masterpiecex.com" target="_blank" rel="noopener" style="color:var(--accent-text);font-weight:700;font-size:0.875rem;text-decoration:none" data-i18n="d3LinkMpx">បើកវេបសាយ Masterpiece X ↗</a></p>
+      </div>
+      <div id="genNote" style="font-size:0.8125rem;color:#9a9ea6;line-height:1.6;margin-top:12px;min-height:18px"></div>
+      <div id="genProviderLink" style="margin-top:2px;min-height:20px"></div>
+      <button class="btn btn-green btn-block" id="genBtn" onclick="genGenerate()" style="margin-top:12px" data-i18n="btnGenerate">បង្កើត</button>
+    </div>
+    <p id="genMsg" style="font-size:0.8125rem;margin-top:12px;min-height:18px"></p>
+    <div id="genProg" style="display:none;margin-top:10px">
+      <div style="display:flex;justify-content:space-between;font-size:0.8125rem"><span id="genProgTxt" data-i18n="progCreating">កំពុងបង្កើត…</span><b id="genProgSec">0s</b></div>
+      <div style="height:8px;background:rgba(255,255,255,.1);border-radius:999px;margin-top:8px;overflow:hidden"><div id="genProgBar" style="height:100%;width:0%;background:var(--accent-fill);border-radius:999px"></div></div>
+    </div>
+    <div id="genResult" style="margin-top:14px"></div>
+  </div>
+</section>
+</main>
+<footer data-i18n="footerText">MovAi — បង្កើតរូបភាព &amp; វីដេអូ ដោយ API ហ្វ្រី<br>Key របស់អ្នករក្សាទុកតែក្នុង browser របស់អ្នកទេ — មិនផ្ញើទៅកន្លែងណាទេ លើកលែងតែពេលបង្កើតម្ដងៗ</footer>
+<div class="fab-wrap" id="fabWrap">
+  <div class="fab-panel" id="fabPanel">
+    <div class="fab-grid">
+      <button type="button" class="fab-tile" onclick="fabGo('keys')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="15" r="4.5"/><path d="M11.3 11.7 20 3"/><path d="M15.5 7.5l3 3"/></svg><span data-i18n="fabKeys">API Keys</span></button>
+      <button type="button" class="fab-tile" onclick="fabGo('image')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="1.6"/><path d="M21 16l-5-5-9 9"/></svg><span data-i18n="navImage">បង្កើតរូបភាព</span></button>
+      <button type="button" class="fab-tile" onclick="fabGo('video')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="3"/><path d="M10.2 9.3 15.5 12l-5.3 2.7z" fill="currentColor" stroke="none"/></svg><span data-i18n="navVideo">បង្កើតវីដេអូ</span></button>
+      <button type="button" class="fab-tile" onclick="fabGo('3d')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l8 4.5v9L12 21l-8-4.5v-9z"/><path d="M12 12l8-4.5M12 12L4 7.5M12 12v9"/></svg><span data-i18n="nav3d">រូប 3D Design</span></button>
+    </div>
+  </div>
+  <button class="fab-btn" id="fabBtn" onclick="toggleFab()" aria-label="ការកំណត់រហ័ស" aria-expanded="false"><span class="fab-dot"></span></button>
+</div>
+<script>
+/* ================= Generate Image & Video (free APIs) =================
+   Keys live in the visitor's own browser (localStorage 'aio-gen-keys-<id>')
+   and are sent only to the chosen provider, per generation. Nothing is
+   stored anywhere else. Pollinations needs no key; Puter.js uses the
+   visitor's own free Puter account (User-Pays). This page calls every
+   provider API directly from the browser (no proxy server). */
+/* ================= Language (KH/EN), Font Size, Color Theme =================
+   All three live in the ☰ drawer settings box and persist in localStorage
+   ('movai-lang', 'movai-font', 'movai-theme'). */
+var LANG='km';
+var I18N={
+km:{
+ docTitle:'MovAi — បង្កើតរូបភាព & វីដេអូ',menuLabel:'ម៉ឺនុយ',closeLabel:'បិទម៉ឺនុយ',
+ heroTitle:'បង្កើតរូបភាព វីដេអូ<br><span class="grad">&amp; 3D Design</span>',
+ navImage:'បង្កើតរូបភាព',navImageSub:'Image',navVideo:'បង្កើតវីដេអូ',navVideoSub:'Video',nav3d:'រូប 3D Design',
+ keysTitle:'API Keys · កន្លែងដាក់ Key',
+ setLang:'ភាសា',setFont:'ទំហំអក្សរ',fontSmall:'0% · តូចខ្លាំង',fontLarge:'100% · ធំខ្លាំង',setColor:'ពណ៌ App',
+ setMode:'យប់ / ថ្ងៃ',modeDark:'យប់',modeLight:'ថ្ងៃ',modeAuto:'អូតូ',fabLabel:'ការកំណត់រហ័ស',
+ setGlass:'កញ្ចក់ · ថ្លា / ព្រាល / ចាំង',glassClearP:'ថ្លា · Clear',glassClearLo:'0% · មិនថ្លា',glassClearHi:'100% · ថ្លាខ្លាំង',glassBlurP:'ព្រាល · Frosted / Blur',glassBlurLo:'0% · មិនព្រាល',glassBlurHi:'100% · ព្រាលខ្លាំង',glassShineP:'ចាំង · Shine',glassShineLo:'0% · មិនចាំង',glassShineHi:'100% · ចាំងខ្លាំង',setTxtBlur:'ព្រាលផ្ទៃខាងក្រោយអក្សរ',txtBlurLo:'0% · ច្បាស់',txtBlurHi:'100% · ព្រាលខ្លាំង',setBgBright:'ពន្លឺផ្ទៃខាងក្រោយ',bgBrightLo:'0% · ងងឹត',bgBrightHi:'100% · ភ្លឺខ្លាំង',setBrandFx:'អ៊ីហ្វិចឈ្មោះ MovAi',fxNone:'ធម្មតា',fxGlow:'ភ្លឺញាក់',fxShadow:'ស្រមោល',fxNeon:'ណេអុង',fxShine:'ចាំង',setTShadow:'ពណ៌ស្រមោលអក្សរ',fabKeys:'API Keys',fabSettings:'ការកំណត់',
+ tabImage:'រូបភាព',tabVideo:'វីដេអូ',
+ tavusText:'Tavus បង្កើតវីដេអូ avatar និយាយតាម script — ដាក់ Replica ID (Face ID) របស់អ្នក៖',tavusPh:'r... (Face ID ពី Tavus)',
+ lblSize:'ទំហំ',lblDuration:'រយៈពេល',lblQuality:'គុណភាព',
+ btnGenerate:'បង្កើត',progCreating:'កំពុងបង្កើត…',
+ promptLabel:'Prompt · អ្វីដែលចង់បង្កើត',promptLabel3d:'Prompt · អត្ថបទសម្រាប់ធ្វើ 3D',
+ promptPh:'ឧ. ទេសភាពព្រៃឈើពេលល្ងាច មានផ្ទះឈើ...',promptPh3d:'ឧ. កៅអីឈើពណ៌ត្នោត បែបទំនើប...',
+ d3HintHunyuan:'ត្រូវមាន Hunyuan3D Key ក្នុងម៉ឺនុយ ☰ → API Keys ជាមុនសិន។',d3HintMpx:'ត្រូវមាន Masterpiece X Key ក្នុងម៉ឺនុយ ☰ → API Keys ជាមុនសិន។',
+ d3TabImg:'ជម្រើស ១ · ដាក់រូបភាព',d3TabTxt:'ជម្រើស ២ · អត្ថបទ → រូបភាព',
+ d3Drop:'ដាក់រូបភាពរបស់អ្នកនៅទីនេះ — ចុចដើម្បីជ្រើសរូប (JPG / PNG / WebP)<br><span style="font-size:0.8125rem;color:#9a9ea6">រូបវត្ថុតែមួយ ផ្ទៃក្រោយសាមញ្ញ ល្អបំផុត</span>',
+ altUploaded:'រូបភាពដែលបានដាក់',altFromText:'រូបភាពដែលបានបង្កើតពីអត្ថបទ',
+ d3Step1:'ជំហាន ១ · ប្រើ Prompt នៅខាងលើ បង្កើតរូបភាពសិន',d3GenImg:'បង្កើតរូបភាព',
+ d3Step2:'ជំហាន ២ · រូបភាពរួចរាល់ — ចុចប៊ូតុងខាងក្រោមដើម្បីធ្វើជា 3D',
+ d3Make:'ធ្វើជា 3D',d3Working:'កំពុងធ្វើ…',
+ d3LinkHunyuan:'បើកវេបសាយ Hunyuan3D (Tencent Cloud) ដើម្បីយក API Key ↗',d3MpxKeyBtn:'ដាក់ Key Masterpiece X',d3LinkMpx:'បើកវេបសាយ Masterpiece X ↗',
+ footerText:'MovAi — បង្កើតរូបភាព &amp; វីដេអូ ដោយ API ហ្វ្រី<br>Key របស់អ្នករក្សាទុកតែក្នុង browser របស់អ្នកទេ — មិនផ្ញើទៅកន្លែងណាទេ លើកលែងតែពេលបង្កើតម្ដងៗ',
+ msgEnterPrompt:'សូមសរសេរ prompt ជាមុនសិន',
+ msgNoKey:'មិនទាន់មាន API Key សម្រាប់ {name} ទេ — សូមដាក់ Key ក្នុងម៉ឺនុយ ☰ (API Keys) ជាមុនសិន',
+ msgTavusId:'សូមដាក់ Tavus Replica ID (Face ID) ជាមុនសិន',msgDone:'បង្កើតរួចរាល់',
+ msgNetErr:'ហៅ API មិនបានទេ — provider នេះទំនងជាមិនអនុញ្ញាតឲ្យ browser ហៅត្រង់ (CORS) ឬអ៊ីនធឺណិតមានបញ្ហា។ Pollinations និង Puter.js ហៅត្រង់ពី browser បាន។',
+ progWaiting:'កំពុងរង់ចាំវីដេអូ… ',
+ errTimeoutVideo:'អស់ពេលរង់ចាំ (10 នាទី) — វីដេអូអាចនៅកំពុងបង្កើតក្នុងគណនីរបស់អ្នក',
+ errNoVideoUrl:'វីដេអូរួចរាល់ តែរក URL មិនឃើញ — សូមមើលក្នុងគណនីរបស់អ្នកផ្ទាល់',
+ genFailed:'បង្កើតមិនបានទេ',unknownProvider:'Provider មិនស្គាល់ទេ',
+ badImgUrl:'Provider បានផ្ដល់ URL រូបភាពមិនត្រឹមត្រូវទេ',badVidUrl:'Provider បានផ្ដល់ URL វីដេអូមិនត្រឹមត្រូវទេ',
+ puterRetry:'Puter.js មិនទាន់ផ្ទុកទេ — សូមព្យាយាមម្ដងទៀត',
+ puterNoImg:'Puter: មិនបានរូបភាពទេ',puterNoVid:'Puter: មិនបានវីដេអូទេ',
+ gemini429:' — Key ឥឡូវថ្មីអាចបាន 429',
+ dlImage:'ទាញយករូបភាព',dlVideo:'ទាញយកវីដេអូ',dlPrefix:'ទាញយក ',
+ imgAltCreated:'រូបភាពដែលបានបង្កើត',alt3dPreview:'រូបមើលមុនរបស់ 3D model',
+ noKeyNeeded:'មិនបាច់ Key',
+ pollinationsBody:'មិនត្រូវការ API key — បង្កើតបានភ្លាម។',
+ puterBody:'មិនត្រូវការ API key — អ្នកប្រើម្នាក់ៗចូលគណនី Puter ហ្វ្រីរបស់ខ្លួន។',
+ openSiteKey:'បើកវេបសាយ {name} ដើម្បីយក Key ↗',openSiteKeyApi:'បើកវេបសាយ {name} ដើម្បីយក API Key ↗',openPuterSite:'បើកវេបសាយ Puter.js ↗',
+ puterChecking:'កំពុងពិនិត្យ…',puterNotLoaded:'Puter.js មិនទាន់ផ្ទុកទេ — សូមពិនិត្យអ៊ីនធឺណិតហើយបើកទំព័រនេះម្ដងទៀត',
+ puterSignedIn:'បានចូលជា {name}',puterNotSigned:'មិនទាន់ចូលគណនី Puter ទេ',
+ puterSignInBtn:'ចូលគណនី Puter',puterSignOutBtn:'ចេញពី Puter',
+ keyFillFirst:'សូមបំពេញ {field} ជាមុនសិន',keyExists:'Key នេះមានរួចហើយ',keyAdded:'បានបន្ថែម Key ({n} Keys)',
+ noteMagichourAspect:' 4:6 មិនមានទេ — នឹងប្រើ 9:16 ជំនួស។',noteMagichour4k:' 4K អាចត្រូវការ plan បង់លុយ — Free ប្រើ 480p។',
+ notePuterVid:' រយៈពេល/គុណភាពតាម model — មិនអាចកំណត់ 5s/10s/4K បានទេ។',noteHfVid:' រយៈពេល/គុណភាពតាម model — $0.10/ខែ តិចណាស់។',
+ noteTavusVid:' ជម្រើសទំហំ/រយៈពេល/គុណភាពមិនអនុវត្តចំពោះ Tavus ទេ។',
+ note3d:'ដាក់រូបភាព ឬសរសេរអត្ថបទ រួចចុច «ធ្វើជា 3D»។',
+ d3MsgMpxNoKey:'មិនទាន់មាន Key Masterpiece X ទេ — សូមដាក់ Key ជាមុនសិន',
+ d3MsgMpxOpening:'កំពុងបើកវេបសាយ Masterpiece X ដើម្បីបង្កើត 3D នៅទីនោះ…',
+ d3MsgUploaded:'បានដាក់រូបភាពហើយ — ចុច «ធ្វើជា 3D»',
+ d3MsgNeedPrompt:'សូមសរសេរ Prompt នៅខាងលើជាមុនសិន',
+ d3ProgImg:'កំពុងបង្កើតរូបភាព…',d3MsgImgReady:'បានរូបភាពហើយ — ចុច «ធ្វើជា 3D» នៅខាងក្រោម',
+ errReadImg:'អានរូបភាពមិនបាន',errMakeImgPrefix:'បង្កើតរូបភាពមិនបានទេ: ',
+ d3MsgNeedImgText:'សូមបង្កើតរូបភាពជាមុនសិន (ជំហាន ១)',d3MsgNeedImg:'សូមដាក់រូបភាពជាមុនសិន',
+ d3MsgNoHunyuanKey:'មិនទាន់មាន Hunyuan3D Key ទេ — សូមដាក់ Secret ID + Secret Key ក្នុងម៉ឺនុយ ☰ → API Keys (ចុចលើឈ្មោះ Hunyuan3D នៅខាងលើបញ្ជី) ជាមុនសិន',
+ d3ProgSending:'កំពុងបញ្ជូនរូបភាពទៅ Hunyuan3D…',d3ProgMaking:'កំពុងបង្កើត 3D… ',
+ errNoJobId:'Hunyuan3D: មិនបាន JobId ទេ',
+ errTimeout3d:'អស់ពេលរង់ចាំ (10 នាទី) — ការងារអាចនៅកំពុងធ្វើក្នុងគណនី Hunyuan3D របស់អ្នក',
+ errNo3dFile:'Hunyuan3D: រួចរាល់ តែមិនមានឯកសារ 3D ទេ',d3MsgDone:'ធ្វើជា 3D រួចរាល់',
+ errHunyuanNet:'ហៅ Hunyuan3D API មិនបានទេ — អ៊ីនធឺណិតមានបញ្ហា ឬ Tencent Cloud មិនអនុញ្ញាតឲ្យ browser ហៅត្រង់ (CORS)។',
+ errImgRead2:'អានរូបភាពមិនបានទេ'
+},
+en:{
+ docTitle:'MovAi — Create Images & Videos',menuLabel:'Menu',closeLabel:'Close menu',
+ heroTitle:'Create Images &amp; Videos<br><span class="grad">&amp; 3D Design</span>',
+ navImage:'Create Image',navImageSub:'រូបភាព',navVideo:'Create Video',navVideoSub:'វីដេអូ',nav3d:'3D Design',
+ keysTitle:'API Keys · Add Your Keys',
+ setLang:'Language',setFont:'Font Size',fontSmall:'0% · Very small',fontLarge:'100% · Very large',setColor:'App Color',
+ setMode:'Day / Night',modeDark:'Dark',modeLight:'Light',modeAuto:'Auto',fabLabel:'Quick settings',
+ setGlass:'Glass · Clear / Frosted / Shine',glassClearP:'Clear · Transparency',glassClearLo:'0% · Solid',glassClearHi:'100% · Fully clear',glassBlurP:'Frosted · Blur',glassBlurLo:'0% · No blur',glassBlurHi:'100% · Very frosted',glassShineP:'Shine · Gloss',glassShineLo:'0% · No shine',glassShineHi:'100% · Very shiny',setTxtBlur:'Text Background Blur',txtBlurLo:'0% · Sharp',txtBlurHi:'100% · Very blurred',setBgBright:'Background Brightness',bgBrightLo:'0% · Dark',bgBrightHi:'100% · Very bright',setBrandFx:'MovAi Name Effect',fxNone:'None',fxGlow:'Glow',fxShadow:'Shadow',fxNeon:'Neon',fxShine:'Shine',setTShadow:'Text Shadow Color',fabKeys:'API Keys',fabSettings:'Settings',
+ tabImage:'Image',tabVideo:'Video',
+ tavusText:'Tavus creates a talking avatar video from a script — enter your Replica ID (Face ID):',tavusPh:'r... (Face ID from Tavus)',
+ lblSize:'Size',lblDuration:'Duration',lblQuality:'Quality',
+ btnGenerate:'Generate',progCreating:'Generating…',
+ promptLabel:'Prompt · What do you want to create',promptLabel3d:'Prompt · Text for making 3D',
+ promptPh:'e.g. A forest landscape at dusk with a wooden house...',promptPh3d:'e.g. A modern brown wooden chair...',
+ d3HintHunyuan:'You need a Hunyuan3D key in the ☰ menu → API Keys first.',d3HintMpx:'You need a Masterpiece X key in the ☰ menu → API Keys first.',
+ d3TabImg:'Option 1 · Upload Image',d3TabTxt:'Option 2 · Text → Image',
+ d3Drop:'Drop your image here — tap to choose a photo (JPG / PNG / WebP)<br><span style="font-size:0.8125rem;color:#9a9ea6">A single object on a simple background works best</span>',
+ altUploaded:'Uploaded image',altFromText:'Image created from text',
+ d3Step1:'Step 1 · Use the Prompt above to create an image first',d3GenImg:'Create Image',
+ d3Step2:'Step 2 · Image ready — tap the button below to make it 3D',
+ d3Make:'Make 3D',d3Working:'Working…',
+ d3LinkHunyuan:'Open the Hunyuan3D website (Tencent Cloud) to get an API Key ↗',d3MpxKeyBtn:'Add Masterpiece X Key',d3LinkMpx:'Open the Masterpiece X website ↗',
+ footerText:'MovAi — Create images &amp; videos with free APIs<br>Your keys are stored only in your browser — never sent anywhere except when you generate',
+ msgEnterPrompt:'Please write a prompt first',
+ msgNoKey:'No API key for {name} yet — add a key in the ☰ menu (API Keys) first',
+ msgTavusId:'Please enter your Tavus Replica ID (Face ID) first',msgDone:'Done',
+ msgNetErr:'Could not reach the API — this provider may not allow direct browser calls (CORS), or the connection failed. Pollinations and Puter.js work directly from the browser.',
+ progWaiting:'Waiting for the video… ',
+ errTimeoutVideo:'Timed out after 10 minutes — the video may still be generating in your account',
+ errNoVideoUrl:'Video finished but no URL was returned — please check your account',
+ genFailed:'Generation failed',unknownProvider:'Unknown provider',
+ badImgUrl:'The provider returned an invalid image URL',badVidUrl:'The provider returned an invalid video URL',
+ puterRetry:'Puter.js has not loaded yet — please try again',
+ puterNoImg:'Puter: no image returned',puterNoVid:'Puter: no video returned',
+ gemini429:' — new keys may return 429',
+ dlImage:'Download Image',dlVideo:'Download Video',dlPrefix:'Download ',
+ imgAltCreated:'Generated image',alt3dPreview:'3D model preview',
+ noKeyNeeded:'No key needed',
+ pollinationsBody:'No API key needed — generate right away.',
+ puterBody:'No API key needed — each user signs in with their own free Puter account.',
+ openSiteKey:'Open the {name} website to get a key ↗',openSiteKeyApi:'Open the {name} website to get an API key ↗',openPuterSite:'Open the Puter.js website ↗',
+ puterChecking:'Checking…',puterNotLoaded:'Puter.js has not loaded — check your connection and reload this page',
+ puterSignedIn:'Signed in as {name}',puterNotSigned:'Not signed in to Puter yet',
+ puterSignInBtn:'Sign in to Puter',puterSignOutBtn:'Sign out of Puter',
+ keyFillFirst:'Please fill in {field} first',keyExists:'This key is already added',keyAdded:'Key added ({n} keys)',
+ noteMagichourAspect:' 4:6 is not available — 9:16 will be used instead.',noteMagichour4k:' 4K may need a paid plan — Free uses 480p.',
+ notePuterVid:' Duration/quality depend on the model — 5s/10s/4K cannot be set.',noteHfVid:' Duration/quality depend on the model — $0.10/month is very little.',
+ noteTavusVid:' Size/duration/quality options do not apply to Tavus.',
+ note3d:'Upload an image or write text, then tap "Make 3D".',
+ d3MsgMpxNoKey:'No Masterpiece X key yet — please add a key first',
+ d3MsgMpxOpening:'Opening the Masterpiece X website to create your 3D there…',
+ d3MsgUploaded:'Image uploaded — tap "Make 3D"',
+ d3MsgNeedPrompt:'Please write a Prompt above first',
+ d3ProgImg:'Creating image…',d3MsgImgReady:'Image ready — tap "Make 3D" below',
+ errReadImg:'Could not read the image',errMakeImgPrefix:'Could not create the image: ',
+ d3MsgNeedImgText:'Please create an image first (Step 1)',d3MsgNeedImg:'Please upload an image first',
+ d3MsgNoHunyuanKey:'No Hunyuan3D key yet — add a Secret ID + Secret Key in the ☰ menu → API Keys (tap the Hunyuan3D name at the top of the list) first',
+ d3ProgSending:'Sending image to Hunyuan3D…',d3ProgMaking:'Making 3D… ',
+ errNoJobId:'Hunyuan3D: no JobId returned',
+ errTimeout3d:'Timed out after 10 minutes — the job may still be running in your Hunyuan3D account',
+ errNo3dFile:'Hunyuan3D: finished, but no 3D file was returned',d3MsgDone:'3D created',
+ errHunyuanNet:'Could not reach the Hunyuan3D API — connection problem, or Tencent Cloud does not allow direct browser calls (CORS).',
+ errImgRead2:'Could not read the image'
+}};
+function tx(k){var d=I18N[LANG]||I18N.km;return (k in d)?d[k]:(I18N.km[k]||k);}
+function loc(o){return (o&&typeof o==='object')?(o[LANG]||o.km||''):o;}
+var THEMES=[
+ {name:'Lime',c:'#addc29',rgb:'173,220,41',lt:'#63910c'},
+ {name:'Pink',c:'#ff2e88',rgb:'255,46,136',lt:'#d6006d'},
+ {name:'Orange',c:'#ff6a00',rgb:'255,106,0',lt:'#cf5200'},
+ {name:'Yellow',c:'#ffe600',rgb:'255,230,0',lt:'#857200'},
+ {name:'Cyan',c:'#00e5ff',rgb:'0,229,255',lt:'#007d99'},
+ {name:'Violet',c:'#b537f2',rgb:'181,55,242',lt:'#8f27c9'},
+ {name:'Rainbow',c:'#b537f2',rgb:'181,55,242',lt:'#8f27c9',grad:'linear-gradient(100deg,#ff2e88,#b537f2 52%,#00e5ff)'}
+];
+var THEME_IDX=0;
+function renderSwatches(){
+  var rows=[document.getElementById('colorRow'),document.getElementById('fabColorRow')];
+  rows.forEach(function(row){
+    if(!row)return;
+    row.innerHTML='';
+    THEMES.forEach(function(t,i){
+      var b=document.createElement('button');
+      b.type='button';b.className='swatch';b.setAttribute('data-i',String(i));b.style.background=t.grad||t.c;
+      b.title=t.name;b.setAttribute('aria-label',t.name);
+      b.onclick=function(){setTheme(i);};
+      row.appendChild(b);
+    });
+  });
+}
+function setTheme(i,save){
+  var t=THEMES[i];if(!t)return;
+  THEME_IDX=i;
+  var de=document.documentElement;
+  de.style.setProperty('--accent',t.c);
+  de.style.setProperty('--accent-rgb',t.rgb);
+  de.style.setProperty('--accent-fill',t.grad||t.c);
+  de.style.setProperty('--accent-text',de.getAttribute('data-mode')==='light'?t.lt:t.c);
+  var sw=document.querySelectorAll('.swatch');
+  for(var j=0;j<sw.length;j++)sw[j].classList.toggle('on',sw[j].getAttribute('data-i')===String(i));
+  if(save!==false){try{localStorage.setItem('movai-theme',String(i));}catch(e){}}
+}
+var MODE='dark';
+function modeEffective(m){
+  if(m==='light')return 'light';
+  if(m==='auto')return (window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches)?'dark':'light';
+  return 'dark';
+}
+function setMode(m,save){
+  MODE=(m==='light'||m==='auto')?m:'dark';
+  var eff=modeEffective(MODE);
+  document.documentElement.setAttribute('data-mode',eff);
+  var tc=document.querySelector('meta[name="theme-color"]');
+  if(tc)tc.setAttribute('content',eff==='light'?'#f3f4f6':'#0a0b0d');
+  var t=THEMES[THEME_IDX];
+  if(t)document.documentElement.style.setProperty('--accent-text',eff==='light'?t.lt:t.c);
+  setBgBright(BGBRIGHT,false);
+  syncModeBtns();
+  if(save!==false){try{localStorage.setItem('movai-mode',MODE);}catch(e){}}
+}
+function syncModeBtns(){
+  var map={dark:['modeBtnDark','fabModeDark'],light:['modeBtnLight','fabModeLight'],auto:['modeBtnAuto','fabModeAuto']};
+  for(var k in map){
+    var on=(MODE===k);
+    map[k].forEach(function(id){var b=document.getElementById(id);if(b)b.className=on?'on':'';});
+  }
+}
+function setFontSize(v){
+  v=parseInt(v,10);if(isNaN(v))v=50;
+  if(v<0)v=0;if(v>100)v=100;
+  var f=v<=50?0.6+(v/50)*0.4:1+((v-50)/50)*1.2;
+  document.documentElement.style.fontSize=(16*f)+'px';
+  var vals=document.querySelectorAll('.fontVal');
+  for(var i=0;i<vals.length;i++)vals[i].textContent=v+'%';
+  var rs=document.querySelectorAll('.font-range');
+  for(var j=0;j<rs.length;j++)if(String(rs[j].value)!==String(v))rs[j].value=String(v);
+  try{localStorage.setItem('movai-font',String(v));}catch(e){}
+}
+/* Glass: 3 PROPERTY sliders — Clear, Blur, Shine — each one drives ALL
+   glass surfaces (quick panel, ☰ drawer, MovAi frame, FAB button) at once
+   through the shared --glass-alpha / --glass-blur / --glass-shine /
+   --glass-frost variables. Persisted per property in localStorage. */
+var GLASS={clear:45,blur:65,shine:55};
+var GLASS_STORE={clear:'movai-glass-clear',blur:'movai-glass-blur',shine:'movai-glass-shine'};
+function glassLegacyVal(){
+  var keys=['movai-glass-fab','movai-glass-drawer','movai-glass-brand','movai-glass'];
+  for(var i=0;i<keys.length;i++){
+    try{var s=localStorage.getItem(keys[i]);if(s!==null&&s!==''){var v=parseInt(s,10);if(!isNaN(v))return Math.max(0,Math.min(100,v));}}catch(e){}
+  }
+  return null;
+}
+function glassPropStored(prop){
+  var v=NaN;
+  try{var s=localStorage.getItem(GLASS_STORE[prop]);if(s!==null&&s!=='')v=parseInt(s,10);}catch(e){}
+  if(isNaN(v)){
+    var leg=glassLegacyVal();
+    if(leg!==null)v=(prop==='clear')?(100-leg):(prop==='blur')?leg:55;
+    else v=(prop==='clear')?45:(prop==='blur')?65:55;
+  }
+  if(v<0)v=0;if(v>100)v=100;
+  return v;
+}
+function applyGlass(){
+  var de=document.documentElement;
+  de.style.setProperty('--glass-alpha',(0.75+((100-GLASS.clear)/100)*0.23).toFixed(3));
+  de.style.setProperty('--glass-blur',((GLASS.blur/100)*28).toFixed(1)+'px');
+  de.style.setProperty('--glass-shine',(GLASS.shine/100).toFixed(3));
+  de.style.setProperty('--glass-frost',(GLASS.blur/100).toFixed(3));
+  ['clear','blur','shine'].forEach(function(p){
+    var val=document.querySelector('[data-glass-pval="'+p+'"]');
+    if(val)val.textContent=GLASS[p]+'%';
+    var r=document.querySelector('[data-glass-prop="'+p+'"]');
+    if(r&&String(r.value)!==String(GLASS[p]))r.value=String(GLASS[p]);
+  });
+}
+function setGlassProp(prop,v){
+  v=parseInt(v,10);if(isNaN(v))v=GLASS[prop];
+  if(v<0)v=0;if(v>100)v=100;
+  GLASS[prop]=v;
+  applyGlass();
+  try{localStorage.setItem(GLASS_STORE[prop],String(v));}catch(e){}
+}
+var TXTBLUR=0;
+function setTxtBlur(v,save){
+  v=parseInt(v,10);if(isNaN(v))v=0;
+  if(v<0)v=0;if(v>100)v=100;
+  TXTBLUR=v;
+  document.documentElement.style.setProperty('--txtblur',((v/100)*16).toFixed(1)+'px');
+  var val=document.getElementById('txtBlurVal');if(val)val.textContent=v+'%';
+  var r=document.getElementById('txtBlurRange');if(r&&String(r.value)!==String(v))r.value=String(v);
+  if(save!==false){try{localStorage.setItem('movai-txtblur',String(v));}catch(e){}}
+}
+var BGBRIGHT=50;
+function bgColorCss(v){
+  var light=document.documentElement.getAttribute('data-mode')==='light';
+  var base=light?[243,244,246]:[10,11,13];
+  var out;
+  if(v<=50){var f=1-((50-v)/50)*0.9;out=base.map(function(c){return Math.round(c*f);});}
+  else{var f2=(v-50)/50;out=base.map(function(c){return Math.round(c+(255-c)*f2*0.95);});}
+  return 'rgb('+out.join(',')+')';
+}
+function setBgBright(v,save){
+  v=parseInt(v,10);if(isNaN(v))v=50;
+  if(v<0)v=0;if(v>100)v=100;
+  BGBRIGHT=v;
+  var c=bgColorCss(v);
+  var de=document.documentElement;
+  de.style.setProperty('--bg',c);de.style.setProperty('--bg1',c);de.style.setProperty('--bg2',c);
+  var val=document.getElementById('bgBrightVal');if(val)val.textContent=v+'%';
+  var r=document.getElementById('bgBrightRange');if(r&&String(r.value)!==String(v))r.value=String(v);
+  if(save!==false){try{localStorage.setItem('movai-bgb',String(v));}catch(e){}}
+}
+var BRANDFX='none';
+function setBrandFx(fx,save){
+  BRANDFX=['none','glow','shadow','neon','shine'].indexOf(fx)>=0?fx:'none';
+  document.documentElement.setAttribute('data-brandfx',BRANDFX);
+  var map={none:'fxBtnNone',glow:'fxBtnGlow',shadow:'fxBtnShadow',neon:'fxBtnNeon',shine:'fxBtnShine'};
+  for(var k in map){var b=document.getElementById(map[k]);if(b)b.className=(BRANDFX===k)?'on':'';}
+  if(save!==false){try{localStorage.setItem('movai-brandfx',BRANDFX);}catch(e){}}
+}
+var TSHADOWS=[
+ {id:'none',css:'none',sw:''},
+ {id:'black',css:'0 1px 3px rgba(0,0,0,.85),0 0 7px rgba(0,0,0,.45)',sw:'#111214'},
+ {id:'white',css:'0 1px 3px rgba(255,255,255,.9),0 0 7px rgba(255,255,255,.5)',sw:'#f5f6f2'},
+ {id:'lime',css:'0 1px 3px rgba(173,220,41,.9),0 0 7px rgba(173,220,41,.55)',sw:'#addc29'},
+ {id:'pink',css:'0 1px 3px rgba(255,46,136,.9),0 0 7px rgba(255,46,136,.55)',sw:'#ff2e88'},
+ {id:'orange',css:'0 1px 3px rgba(255,106,0,.9),0 0 7px rgba(255,106,0,.55)',sw:'#ff6a00'},
+ {id:'gold',css:'0 1px 3px rgba(255,214,0,.95),0 0 7px rgba(255,214,0,.55)',sw:'#ffd600'},
+ {id:'cyan',css:'0 1px 3px rgba(0,229,255,.9),0 0 7px rgba(0,229,255,.55)',sw:'#00e5ff'},
+ {id:'violet',css:'0 1px 3px rgba(181,55,242,.9),0 0 7px rgba(181,55,242,.55)',sw:'#b537f2'}
+];
+function renderTShadows(){
+  var row=document.getElementById('tshadowRow');
+  if(!row||row.children.length)return;
+  TSHADOWS.forEach(function(t){
+    var b=document.createElement('button');
+    b.type='button';b.className='tsw';b.setAttribute('data-ts',t.css);b.setAttribute('aria-label','Text shadow: '+t.id);
+    if(t.id==='none'){b.classList.add('tsw-none');b.textContent='✕';}
+    else b.style.background=t.sw;
+    b.onclick=function(){setTextShadow(t.css);};
+    row.appendChild(b);
+  });
+}
+function setTextShadow(css,save){
+  if(!css)css='none';
+  document.documentElement.style.setProperty('--tshadow',css);
+  var btns=document.querySelectorAll('#tshadowRow .tsw');
+  for(var i=0;i<btns.length;i++)btns[i].classList.toggle('on',btns[i].getAttribute('data-ts')===css);
+  if(save!==false){try{localStorage.setItem('movai-tshadow',css);}catch(e){}}
+}
+function setLang(l){
+  LANG=(l==='en')?'en':'km';
+  try{localStorage.setItem('movai-lang',LANG);}catch(e){}
+  applyLang();
+}
+function applyLang(){
+  document.documentElement.lang=(LANG==='en'?'en':'km');
+  document.title=tx('docTitle');
+  var els=document.querySelectorAll('[data-i18n]');
+  for(var i=0;i<els.length;i++)els[i].innerHTML=tx(els[i].getAttribute('data-i18n'));
+  var phs=document.querySelectorAll('[data-i18n-ph]');
+  for(var j=0;j<phs.length;j++)phs[j].placeholder=tx(phs[j].getAttribute('data-i18n-ph'));
+  var als=document.querySelectorAll('[data-i18n-alt]');
+  for(var k=0;k<als.length;k++)als[k].alt=tx(als[k].getAttribute('data-i18n-alt'));
+  var dr=document.getElementById('drawer');if(dr)dr.setAttribute('aria-label',tx('menuLabel'));
+  var cb=document.querySelector('#drawer .drawer-close');if(cb)cb.setAttribute('aria-label',tx('closeLabel'));
+  var mb=document.getElementById('menuBtn');if(mb)mb.setAttribute('aria-label',tx('menuLabel'));
+  var fb=document.getElementById('fabBtn');if(fb)fb.setAttribute('aria-label',tx('fabLabel'));
+  [['langBtnKm','fabLangKm','km'],['langBtnEn','fabLangEn','en']].forEach(function(g){
+    var on=(LANG===g[2]);
+    [g[0],g[1]].forEach(function(id){var b=document.getElementById(id);if(b)b.className=on?'on':'';});
+  });
+  var pm=gen.mode,pp=gen.provider;
+  genSetMode(pm);
+  var list=pm==='video'?GEN_VID_PROVIDERS:GEN_IMG_PROVIDERS;
+  var found=false;for(var m=0;m<list.length;m++)if(list[m].id===pp)found=true;
+  if(found)genSetProvider(pp);
+  genRenderKeys();
+  d3SetProvider(d3.provider);
+  d3SetOpt(d3.opt);
+}
+function uiInit(){
+  renderSwatches();
+  var ti=0;try{ti=parseInt(localStorage.getItem('movai-theme')||'0',10)||0;}catch(e){}
+  if(ti<0||ti>=THEMES.length)ti=0;
+  setTheme(ti,false);
+  var md='dark';try{md=localStorage.getItem('movai-mode')||'dark';}catch(e){}
+  setMode(md,false);
+  try{
+    var mq=window.matchMedia('(prefers-color-scheme: dark)');
+    var onMq=function(){if(MODE==='auto')setMode('auto',false);};
+    if(mq.addEventListener)mq.addEventListener('change',onMq);
+    else if(mq.addListener)mq.addListener(onMq);
+  }catch(e){}
+  var fv=50;try{var s=localStorage.getItem('movai-font');if(s!==null&&s!=='')fv=parseInt(s,10);}catch(e){}
+  if(isNaN(fv))fv=50;
+  setFontSize(fv);
+  ['clear','blur','shine'].forEach(function(p){GLASS[p]=glassPropStored(p);});
+  applyGlass();
+  var tbv=0;try{var ts2=localStorage.getItem('movai-txtblur');if(ts2!==null&&ts2!=='')tbv=parseInt(ts2,10);}catch(e){}
+  if(isNaN(tbv))tbv=0;
+  setTxtBlur(tbv,false);
+  var bgv=50;try{var bs=localStorage.getItem('movai-bgb');if(bs!==null&&bs!=='')bgv=parseInt(bs,10);}catch(e){}
+  if(isNaN(bgv))bgv=50;
+  setBgBright(bgv,false);
+  var bfx='none';try{bfx=localStorage.getItem('movai-brandfx')||'none';}catch(e){}
+  setBrandFx(bfx,false);
+  renderTShadows();
+  var tsv='none';try{tsv=localStorage.getItem('movai-tshadow')||'none';}catch(e){}
+  setTextShadow(tsv,false);
+  var lg='km';try{lg=localStorage.getItem('movai-lang')||'km';}catch(e){}
+  LANG=(lg==='en')?'en':'km';
+  applyLang();
+}
+function maskKey(k){return k.length>10?k.slice(0,4)+'…'+k.slice(-4):'••••'}
+function genErrText(j, fb){
+  if(j&&typeof j.error==='string'&&j.error)return j.error;
+  if(j&&j.error&&typeof j.error==='object')return j.error.message||JSON.stringify(j.error).slice(0,200);
+  if(j&&typeof j.message==='string'&&j.message)return j.message;
+  if(j&&j.detail)return typeof j.detail==='string'?j.detail:JSON.stringify(j.detail).slice(0,200);
+  return fb;
+}
+var GEN_IMG_PROVIDERS=[
+ {id:'pollinations',name:'Pollinations',limit:{km:'ហ្វ្រី · មិនបាច់ Key · ~1 រូប/15-45 វិនាទី',en:'Free · No key · ~1 image/15-45s'},note:{km:'មិនត្រូវការ API key — បង្កើតបានភ្លាម។ រូបមាន logo តូច។',en:'No API key needed — generate right away. Images carry a small logo.'}},
+ {id:'puter',name:'Puter.js',limit:{km:'ហ្វ្រី · ចូលគណនី Puter',en:'Free · Puter account'},puter:true,note:{km:'អ្នកប្រើម្នាក់ៗចូលគណនី Puter ហ្វ្រីរបស់ខ្លួន (User-Pays) — អ្នកបង្កើតមិនបង់អ្វីទេ។',en:'Each user signs in with their own free Puter account (User-Pays) — the creator pays nothing.'}},
+ {id:'cloudflare',name:'Cloudflare',limit:{km:'~230 រូប/ថ្ងៃ · FLUX',en:'~230 images/day · FLUX'},key:'cloudflare',note:{km:'ត្រូវការ Account ID + API Token (ចុះឈ្មោះ Cloudflare ហ្វ្រី មិនបាច់កាត)។',en:'Needs an Account ID + API Token (free Cloudflare signup, no card).'}},
+ {id:'gemini',name:'Gemini',limit:{km:'Key ហ្វ្រី · Nano Banana',en:'Free key · Nano Banana'},key:'gemini',note:{km:'ត្រូវការ API Key ហ្វ្រីពី AI Studio (មិនបាច់កាត)។ សាកល្បងខែ 9/2026 រូបភាពលើ Key ថ្មីអាចបាន 429 — អាចមិនដំណើរការ។',en:'Needs a free API key from AI Studio (no card). Tested 9/2026: image requests on new keys may return 429 — may not work.'}},
+ {id:'hf',name:'Hugging Face',limit:{km:'$0.10/ខែ · តិចណាស់',en:'$0.10/mo · very little'},key:'hf',note:{km:'ត្រូវការ Token ហ្វ្រី។ $0.10/ខែ បានតែប៉ុន្មានរូបទេ។',en:'Needs a free token. $0.10/month covers only a few images.'}}
+];
+var GEN_VID_PROVIDERS=[
+ {id:'novai',name:'NovAI',limit:{km:'ហ្វ្រី · 5 វីដេអូ/ថ្ងៃ',en:'Free · 5 videos/day'},key:'novai',note:''},
+ {id:'magichour',name:'Magic Hour',limit:{km:'Credits ហ្វ្រី · trial',en:'Free credits · trial'},key:'magichour',note:{km:'ត្រូវការ API Key (credits ហ្វ្រីពេលចុះឈ្មោះ មិនបាច់កាត)។',en:'Needs an API key (free credits on signup, no card).'}},
+ {id:'puter',name:'Puter.js',limit:{km:'ហ្វ្រី · ចូលគណនី Puter',en:'Free · Puter account'},puter:true,note:{km:'អ្នកប្រើម្នាក់ៗចូលគណនី Puter ហ្វ្រីរបស់ខ្លួន។ Model default Wan 2.7។',en:'Each user signs in with their own free Puter account. Default model: Wan 2.7.'}},
+ {id:'hf',name:'Hugging Face',limit:{km:'$0.10/ខែ · 5-50 clip/ខែ',en:'$0.10/mo · 5-50 clips/mo'},key:'hf',note:{km:'ត្រូវការ Token ហ្វ្រី។ វីដេអូខ្លី តិចណាស់។',en:'Needs a free token. Short videos, very few.'}},
+ {id:'tavus',name:'Tavus',limit:{km:'Avatar តែប៉ុណ្ណោះ · 5 នាទី/ខែ',en:'Avatar only · 5 min/mo'},key:'tavus',note:{km:'វីដេអូ avatar និយាយតាម script តែប៉ុណ្ណោះ — មិនមែន scene ទេ។ ត្រូវការ Replica ID (Face ID)។',en:'Talking avatar videos from a script only — not scenes. Needs a Replica ID (Face ID).'}}
+];
+var GEN_KEY_PROVIDERS=[
+ {id:'cloudflare',name:'Cloudflare',limit:{km:'~230 រូប/ថ្ងៃ',en:'~230 images/day'},url:'https://dash.cloudflare.com',fields:[{k:'accountId',ph:'Account ID'},{k:'token',ph:'API Token'}],hint:{km:'Account ID + API Token — យកពី Cloudflare Dashboard (My Profile → API Tokens)។',en:'Account ID + API Token — from the Cloudflare Dashboard (My Profile → API Tokens).'}},
+ {id:'gemini',name:'Gemini (AI Studio)',limit:{km:'Key ហ្វ្រី',en:'Free key'},url:'https://aistudio.google.com',fields:[{k:'key',ph:'API Key (AIza...)'}],hint:{km:'យក Key ហ្វ្រីពី Google AI Studio — មិនបាច់កាត។',en:'Get a free key from Google AI Studio — no card.'}},
+ {id:'hf',name:'Hugging Face',limit:{km:'$0.10/ខែ',en:'$0.10/mo'},url:'https://huggingface.co',fields:[{k:'key',ph:'HF Token (hf_...)'}],hint:{km:'យក Token ហ្វ្រីពី huggingface.co/settings/tokens។',en:'Get a free token at huggingface.co/settings/tokens.'}},
+ {id:'novai',name:'NovAI',limit:{km:'5 វីដេអូ/ថ្ងៃ',en:'5 videos/day'},url:'https://aiapi-pro.com',fields:[{k:'key',ph:'API Key'}],hint:{km:'ចុះឈ្មោះដោយ email នៅ aiapi-pro.com — មិនបាច់កាត។',en:'Sign up with email at aiapi-pro.com — no card.'}},
+ {id:'magichour',name:'Magic Hour',limit:{km:'Credits ហ្វ្រី',en:'Free credits'},url:'https://magichour.ai',fields:[{k:'key',ph:'API Key'}],hint:{km:'បង្កើត Key នៅ magichour.ai/developer — មិនបាច់កាត។',en:'Create a key at magichour.ai/developer — no card.'}},
+ {id:'tavus',name:'Tavus',limit:{km:'Avatar · 5 នាទី/ខែ',en:'Avatar · 5 min/mo'},url:'https://tavus.io',fields:[{k:'key',ph:'API Key'}],hint:{km:'បង្កើត Key នៅ Tavus — Basic plan ហ្វ្រី។',en:'Create a key at Tavus — free Basic plan.'}},
+ {id:'masterpiecex',name:'Masterpiece X',limit:{km:'3D តែប៉ុណ្ណោះ · ហ្វ្រី 250 credits',en:'3D only · Free 250 credits'},url:'https://www.masterpiecex.com',fields:[{k:'key',ph:'API Key'}],hint:{km:'សម្រាប់រូប 3D Design តែប៉ុណ្ណោះ — យក API Key ពី masterpiecex.com ក្រោយចុះឈ្មោះ (ហ្វ្រី 250 credits = 5 models)។',en:'For 3D Design only — get an API key from masterpiecex.com after signing up (free 250 credits = 5 models).'}},
+ {id:'hunyuan3d',name:'Hunyuan3D',limit:{km:'3D តែប៉ុណ្ណោះ · ហ្វ្រី 200 credits',en:'3D only · Free 200 credits'},url:'https://cloud.tencent.com',fields:[{k:'secretId',ph:'Secret ID'},{k:'secretKey',ph:'Secret Key'}],hint:{km:'សម្រាប់រូប 3D Design តែប៉ុណ្ណោះ — យក Secret ID + Secret Key ពី Tencent Cloud (ហ្វ្រី 200 credits)។',en:'For 3D Design only — get a Secret ID + Secret Key from Tencent Cloud (free 200 credits).'}}
+];
+var gen={mode:'image',provider:'pollinations',aspect:'16:9',duration:5,res:720,progTimer:null,progSec:0,keyIdx:{},lastImg:null,lastVideo:null};
+var genKeyOpen={};
+var GEN_ASPECTS={'16:9':{w:768,h:432},'9:16':{w:432,h:768},'4:6':{w:512,h:768}};
+function genMsg(t){var el=document.getElementById('genMsg');if(el)el.textContent=t;}
+function genProgTxt(t){var el=document.getElementById('genProgTxt');if(el)el.textContent=t;}
+function genStartProg(){
+  gen.progSec=0;
+  var w=document.getElementById('genProg');if(w)w.style.display='block';
+  var b=document.getElementById('genProgBar');if(b)b.style.width='0%';
+  genProgTxt(tx('progCreating'));
+  var s=document.getElementById('genProgSec');if(s)s.textContent='0s';
+  clearInterval(gen.progTimer);
+  gen.progTimer=setInterval(function(){
+    gen.progSec++;
+    var s2=document.getElementById('genProgSec');if(s2)s2.textContent=gen.progSec+'s';
+    var b2=document.getElementById('genProgBar');if(b2)b2.style.width=Math.min(95,gen.progSec*2)+'%';
+  },1000);
+}
+function genStopProg(){clearInterval(gen.progTimer);var w=document.getElementById('genProg');if(w)w.style.display='none';}
+function genSetMode(m){
+  gen.mode=m;genMsg('');
+  document.getElementById('genTabImg').className=m==='image'?'kbtn kbtn-black':'kbtn kbtn-white';
+  document.getElementById('genTabVid').className=m==='video'?'kbtn kbtn-black':'kbtn kbtn-white';
+  var t3=document.getElementById('genTab3d');if(t3)t3.className=m==='3d'?'kbtn kbtn-black':'kbtn kbtn-white';
+  var list=m==='video'?GEN_VID_PROVIDERS:GEN_IMG_PROVIDERS;
+  gen.provider=list[0].id;
+  document.getElementById('genVideoOpts').style.display=m==='video'?'flex':'none';
+  var pf=document.getElementById('genProviderField');if(pf)pf.style.display=m==='3d'?'none':'flex';
+  var d3s=document.getElementById('genD3ProvSlot');if(d3s)d3s.style.display=m==='3d'?'flex':'none';
+  var d3i=document.getElementById('d3Inline');if(d3i)d3i.style.display=m==='3d'?'block':'none';
+  var gb=document.getElementById('genBtn');if(gb)gb.style.display=m==='3d'?'none':'block';
+  var gp=document.getElementById('genPrompt');
+  if(gp){gp.style.display='block';gp.placeholder=m==='3d'?tx('promptPh3d'):tx('promptPh');}
+  var gl=document.getElementById('genPromptLabel');
+  if(gl){gl.style.display='block';gl.textContent=m==='3d'?tx('promptLabel3d'):tx('promptLabel');}
+  var ag=document.getElementById('genAspectGroup');if(ag)ag.style.display=m==='3d'?'none':'flex';
+  var tb=document.getElementById('genTavusBox');if(tb)tb.style.display='none';
+  genRenderProviders();genCloseProviders();genRenderOptions();genNote();
+}
+function genRenderProviders(){
+  var list=gen.mode==='video'?GEN_VID_PROVIDERS:GEN_IMG_PROVIDERS;
+  var p=null;for(var i=0;i<list.length;i++)if(list[i].id===gen.provider)p=list[i];
+  var fn=document.getElementById('genProviderFieldName');
+  var fl=document.getElementById('genProviderFieldLimit');
+  if(fn)fn.textContent=p?p.name:'';
+  if(fl)fl.textContent=p?loc(p.limit):'';
+  var drop=document.getElementById('genProviderDrop');
+  if(drop)drop.innerHTML=list.map(function(x){
+    var on=x.id===gen.provider;
+    return '<div onclick="genSetProvider(\''+x.id+'\')" style="padding:12px 14px;cursor:pointer;border-top:1px solid rgba(255,255,255,.08);min-height:44px;'+(on?'background:rgba(var(--accent-rgb),.13);color:var(--accent-text);font-weight:800;':'')+'"><div style="font-weight:700;font-size:0.9375rem">'+x.name+'</div><div style="font-size:0.75rem;color:#9a9ea6;margin-top:2px">'+loc(x.limit)+'</div></div>';
+  }).join('');
+}
+function genToggleProviders(){
+  var d=document.getElementById('genProviderDrop');
+  if(!d)return;
+  d.style.display=d.style.display==='block'?'none':'block';
+}
+function genCloseProviders(){
+  var d=document.getElementById('genProviderDrop');
+  if(d)d.style.display='none';
+}
+function genSetProvider(id){
+  gen.provider=id;genRenderProviders();genCloseProviders();genNote();
+  var tb=document.getElementById('genTavusBox');if(tb)tb.style.display=(gen.mode==='video'&&id==='tavus')?'block':'none';
+}
+function genRenderOptions(){
+  var aspects=['16:9','9:16','4:6'];
+  document.getElementById('genAspect').innerHTML=aspects.map(function(a){return '<button class="kbtn '+(gen.aspect===a?'kbtn-black':'kbtn-white')+'" onclick="genSetAspect(\''+a+'\')">'+a+'</button>';}).join('');
+  document.getElementById('genDuration').innerHTML=[5,10].map(function(d){return '<button class="kbtn '+(gen.duration===d?'kbtn-black':'kbtn-white')+'" onclick="genSetDuration('+d+')">'+d+'s</button>';}).join('');
+  document.getElementById('genRes').innerHTML=[480,720,1080,4000].map(function(r){return '<button class="kbtn '+(gen.res===r?'kbtn-black':'kbtn-white')+'" onclick="genSetRes('+r+')">'+(r===4000?'4K':r+'p')+'</button>';}).join('');
+}
+function genSetAspect(a){gen.aspect=a;genRenderOptions();genNote();}
+function genSetDuration(d){gen.duration=d;genRenderOptions();genNote();}
+function genSetRes(r){gen.res=r;genRenderOptions();genNote();}
+function genNote(){
+  var p=null;var list=gen.mode==='video'?GEN_VID_PROVIDERS:GEN_IMG_PROVIDERS;
+  for(var i=0;i<list.length;i++)if(list[i].id===gen.provider)p=list[i];
+  var t=p?loc(p.note):'';
+  if(gen.mode==='video'&&p){
+    if(p.id==='magichour'){if(gen.aspect==='4:6')t+=tx('noteMagichourAspect');if(gen.res===4000)t+=tx('noteMagichour4k');}
+    if(p.id==='puter')t+=tx('notePuterVid');
+    if(p.id==='hf')t+=tx('noteHfVid');
+    if(p.id==='tavus')t+=tx('noteTavusVid');
+  }
+  if(gen.mode==='3d')t=tx('note3d');
+  var el=document.getElementById('genNote');if(el)el.textContent=t;
+  var lk=document.getElementById('genProviderLink');
+  if(lk&&p){
+    var su=null,sn='',sl='';
+    if(p.key){GEN_KEY_PROVIDERS.forEach(function(x){if(x.id===p.key){su=x.url;sn=x.name;}});sl=tx('openSiteKeyApi').replace('{name}',sn);}
+    else if(p.puter){su='https://puter.com';sl=tx('openPuterSite');}
+    lk.innerHTML=su?'<a href="'+su+'" target="_blank" rel="noopener" style="display:inline-block;color:var(--accent-text);font-weight:700;font-size:0.8125rem;text-decoration:none;padding:6px 0;min-height:32px">'+sl+'</a>':'';
+  }
+}
+function genKeysGet(pid){try{return JSON.parse(localStorage.getItem('aio-gen-keys-'+pid)||'[]')}catch(e){return[]}}
+function genKeysSave(pid,a){try{localStorage.setItem('aio-gen-keys-'+pid,JSON.stringify(a))}catch(e){}}
+function genNextKey(pid){
+  var ks=genKeysGet(pid);if(!ks.length)return null;
+  var i=gen.keyIdx[pid]||0;var k=ks[i%ks.length];gen.keyIdx[pid]=(i+1)%ks.length;return k;
+}
+function genKeyCard(id,name,right,body){
+  var open=!!genKeyOpen[id];
+  return '<div class="key-acc'+(open?' open':'')+'" id="keyAcc-'+id+'"><button type="button" class="key-acc-head" onclick="genToggleKey(\''+id+'\',this)"><span class="kn">'+name+'</span><span class="kr"><span>'+right+'</span><span class="kchev">'+(open?'▴':'▾')+'</span></span></button><div class="key-acc-body">'+body+'</div></div>';
+}
+function genToggleKey(id,btn){
+  genKeyOpen[id]=!genKeyOpen[id];
+  var card=btn?btn.closest('.key-acc'):document.getElementById('keyAcc-'+id);
+  if(card){card.classList.toggle('open',genKeyOpen[id]);var ch=card.querySelector('.kchev');if(ch)ch.textContent=genKeyOpen[id]?'▴':'▾';}
+}
+function genKeyProviderCard(kp){
+  var ks=genKeysGet(kp.id);
+  var right=loc(kp.limit)+(ks.length?' · '+ks.length+' Keys':'');
+  var body='<p>'+loc(kp.hint)+'</p><p style="margin-top:8px"><a href="'+kp.url+'" target="_blank" rel="noopener" style="color:var(--accent-text);font-weight:700;text-decoration:none">'+tx('openSiteKey').replace('{name}',kp.name)+'</a></p>';
+  kp.fields.forEach(function(f){body+='<input class="input" id="genKey-'+kp.id+'-'+f.k+'" placeholder="'+f.ph+'" style="width:100%;margin-top:8px" autocomplete="off">';});
+  body+='<button class="kbtn kbtn-black" style="margin-top:8px" onclick="genAddKey(\''+kp.id+'\')">Add Key</button><p id="genKeyMsg-'+kp.id+'" style="font-size:0.8125rem;margin-top:6px;min-height:16px"></p><div id="genKeyList-'+kp.id+'">';
+  body+=ks.map(function(k,i){
+    var t;
+    if(k&&typeof k==='object'){
+      var parts=[];
+      kp.fields.forEach(function(f){var v=String(k[f.k]||'');parts.push(v.length>6?v.slice(0,3)+'…'+v.slice(-3):'•••');});
+      t=parts.join(' · ');
+    }else t=maskKey(String(k));
+    return '<div style="display:flex;align-items:center;gap:8px;background:var(--accent-soft);border-radius:10px;padding:10px 12px;margin-top:8px"><span style="flex:1;font-family:monospace;font-size:0.875rem;word-break:break-all">'+t+'</span><button onclick="genDelKey(\''+kp.id+'\','+i+')" style="border:none;background:transparent;color:#f87171;font-size:1rem;font-weight:900;cursor:pointer;min-width:36px;min-height:36px">✕</button></div>';
+  }).join('');
+  body+='</div>';
+  return genKeyCard(kp.id,kp.name,right,body);
+}
+function genRenderKeys(){
+  var box=document.getElementById('genKeys');if(!box)return;
+  var html='';
+  GEN_KEY_PROVIDERS.forEach(function(kp){if(kp.id==='masterpiecex'||kp.id==='hunyuan3d')html+=genKeyProviderCard(kp);});
+  html+=genKeyCard('pollinations','Pollinations',tx('noKeyNeeded'),'<p>'+tx('pollinationsBody')+'</p>');
+  html+=genKeyCard('puter','Puter.js',tx('noKeyNeeded'),'<p>'+tx('puterBody')+'</p><p style="margin-top:8px"><a href="https://puter.com" target="_blank" rel="noopener" style="color:var(--accent-text);font-weight:700;text-decoration:none">'+tx('openPuterSite')+'</a></p><p id="puterStatus" style="font-size:0.8125rem;margin-top:8px">'+tx('puterChecking')+'</p><div style="margin-top:8px"><button class="kbtn kbtn-black" id="puterSignInBtn" onclick="genPuterSignIn()">'+tx('puterSignInBtn')+'</button> <button class="kbtn kbtn-white" id="puterSignOutBtn" style="display:none" onclick="genPuterSignOut()">'+tx('puterSignOutBtn')+'</button></div>');
+  GEN_KEY_PROVIDERS.forEach(function(kp){
+    if(kp.id==='masterpiecex'||kp.id==='hunyuan3d')return;
+    html+=genKeyProviderCard(kp);
+  });
+  box.innerHTML=html;
+  genPuterStatus();
+}
+function genAddKey(pid){
+  var kp=null;GEN_KEY_PROVIDERS.forEach(function(x){if(x.id===pid)kp=x;});if(!kp)return;
+  var msg=document.getElementById('genKeyMsg-'+pid);
+  var vals={};
+  for(var i=0;i<kp.fields.length;i++){
+    var f=kp.fields[i];
+    var v=(document.getElementById('genKey-'+pid+'-'+f.k).value||'').trim();
+    if(!v){if(msg)msg.textContent=tx('keyFillFirst').replace('{field}',f.ph||'Key');return;}
+    vals[f.k]=v;
+  }
+  var ks=genKeysGet(pid);
+  var entry=kp.fields.length>1?vals:vals[kp.fields[0].k];
+  if(kp.fields.length===1&&ks.indexOf(entry)>=0){if(msg)msg.textContent=tx('keyExists');return;}
+  ks.push(entry);genKeysSave(pid,ks);
+  genKeyOpen[pid]=true;
+  genRenderKeys();
+  var msg2=document.getElementById('genKeyMsg-'+pid);
+  if(msg2)msg2.textContent=tx('keyAdded').replace('{n}',ks.length);
+}
+function genDelKey(pid,i){var ks=genKeysGet(pid);ks.splice(i,1);genKeysSave(pid,ks);genRenderKeys();}
+async function genPuterStatus(){
+  var el=document.getElementById('puterStatus');if(!el)return;
+  if(!window.puter||!puter.auth){el.textContent=tx('puterNotLoaded');return;}
+  try{
+    var u=await puter.auth.getUser();
+    var si=document.getElementById('puterSignInBtn'),so=document.getElementById('puterSignOutBtn');
+    if(u){el.textContent=tx('puterSignedIn').replace('{name}',u.username||u.email||'Puter user');if(si)si.style.display='none';if(so)so.style.display='inline-block';}
+    else{el.textContent=tx('puterNotSigned');if(si)si.style.display='inline-block';if(so)so.style.display='none';}
+  }catch(e){el.textContent=tx('puterNotSigned');}
+}
+function genPuterSignIn(){if(window.puter&&puter.auth){puter.auth.signIn().then(function(){genPuterStatus();}).catch(function(){});}}
+function genPuterSignOut(){if(window.puter&&puter.auth){puter.auth.signOut().then(function(){genPuterStatus();}).catch(function(){});}}
+async function genGenerate(){
+  var prompt=(document.getElementById('genPrompt').value||'').trim();
+  if(!prompt){genMsg(tx('msgEnterPrompt'));return;}
+  var list=gen.mode==='video'?GEN_VID_PROVIDERS:GEN_IMG_PROVIDERS;
+  var p=null;for(var i=0;i<list.length;i++)if(list[i].id===gen.provider)p=list[i];
+  if(!p)return;
+  var key=null,accountId='';
+  if(p.key){
+    key=genNextKey(p.key);
+    if(!key){genMsg(tx('msgNoKey').replace('{name}',p.name));genKeyOpen[p.key]=true;genRenderKeys();openMenu();setTimeout(function(){var c=document.getElementById('keyAcc-'+p.key);if(c)c.scrollIntoView({block:'center'});},350);return;}
+    if(p.key==='cloudflare'){accountId=key.accountId;key=key.token;}
+  }
+  if(p.id==='tavus'){
+    var rid=(document.getElementById('genReplicaId').value||'').trim();
+    if(!rid){genMsg(tx('msgTavusId'));return;}
+  }
+  var btn=document.getElementById('genBtn');btn.disabled=true;
+  document.getElementById('genResult').innerHTML='';
+  gen.lastImg=null;gen.lastVideo=null;
+  genMsg('');
+  genStartProg();
+  try{
+    if(gen.mode==='video')await genDoVideo(p,prompt,key);
+    else await genDoImage(p,gen.mode==='3d'?prompt+', 3D render, octane render, ultra detailed 3D design, studio lighting':prompt,key,accountId);
+    genMsg(tx('msgDone'));
+  }catch(e){
+    var m=(e&&e.message?e.message:String(e));
+    if(/failed to fetch|networkerror|load failed/i.test(m))m=tx('msgNetErr');
+    genMsg(m);
+  }
+  finally{genStopProg();btn.disabled=false;}
+}
+async function genDoImage(p,prompt,key,accountId){
+  var a=GEN_ASPECTS[gen.aspect];
+  if(p.id==='pollinations'){
+    var url='https://image.pollinations.ai/prompt/'+encodeURIComponent(prompt)+'?width='+a.w+'&height='+a.h+'&nologo=true&seed='+Math.floor(Math.random()*100000);
+    var r=await fetch(url);if(!r.ok)throw new Error('Pollinations: HTTP '+r.status);
+    var blob=await r.blob();
+    genShowImage(URL.createObjectURL(blob),blob,null);
+    return;
+  }
+  if(p.id==='puter'){
+    if(!window.puter||!puter.ai||!puter.ai.txt2img)throw new Error(tx('puterRetry'));
+    var img=await puter.ai.txt2img(prompt);
+    var src=img&&img.src?img.src:'';
+    if(!src)throw new Error(tx('puterNoImg'));
+    genShowImage(src,null,src);
+    return;
+  }
+  if(p.key==='cloudflare'){
+    var rc=await fetch('https://api.cloudflare.com/client/v4/accounts/'+encodeURIComponent(accountId)+'/ai/run/@cf/black-forest-labs/flux-1-schnell',{method:'POST',headers:{'Authorization':'Bearer '+key,'Content-Type':'application/json'},body:JSON.stringify({prompt:prompt,width:a.w,height:a.h})});
+    var ctc=rc.headers.get('content-type')||'';
+    if(ctc.indexOf('image/')===0){var bc=await rc.blob();genShowImage(URL.createObjectURL(bc),bc,null);return;}
+    var jc=await rc.json().catch(function(){return null;});
+    if(jc&&jc.result&&jc.result.image){genShowImage('data:image/jpeg;base64,'+jc.result.image,null,null);return;}
+    throw new Error('Cloudflare: '+((jc&&jc.errors&&jc.errors[0]&&jc.errors[0].message)||('HTTP '+rc.status)));
+  }
+  if(p.key==='gemini'){
+    var gp=prompt+' ('+(gen.aspect==='16:9'?'wide 16:9 landscape':gen.aspect==='9:16'?'tall 9:16 portrait':'portrait 4:6')+' aspect ratio)';
+    var rg=await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image:generateContent',{method:'POST',headers:{'x-goog-api-key':key,'Content-Type':'application/json'},body:JSON.stringify({contents:[{parts:[{text:gp}]}],generationConfig:{responseModalities:['TEXT','IMAGE']}})});
+    var jg=await rg.json().catch(function(){return null;});
+    var parts=jg&&jg.candidates&&jg.candidates[0]&&jg.candidates[0].content&&jg.candidates[0].content.parts;
+    var gimg=null;(parts||[]).forEach(function(pp){if(pp.inlineData&&pp.inlineData.data)gimg=pp;});
+    if(gimg){genShowImage('data:'+(gimg.inlineData.mimeType||'image/png')+';base64,'+gimg.inlineData.data,null,null);return;}
+    throw new Error('Gemini: '+genErrText(jg,'HTTP '+rg.status+tx('gemini429')));
+  }
+  if(p.key==='hf'){
+    var rh=await fetch('https://router.huggingface.co/hf-inference/models/black-forest-labs/FLUX.1-schnell',{method:'POST',headers:{'Authorization':'Bearer '+key,'Content-Type':'application/json'},body:JSON.stringify({inputs:prompt,parameters:{width:a.w,height:a.h}})});
+    var cth=rh.headers.get('content-type')||'';
+    if(cth.indexOf('image/')===0){var bh=await rh.blob();genShowImage(URL.createObjectURL(bh),bh,null);return;}
+    var jh=await rh.json().catch(function(){return null;});
+    throw new Error('Hugging Face: '+genErrText(jh,'HTTP '+rh.status));
+  }
+  throw new Error(tx('unknownProvider'));
+}
+function genShowImage(src,blob,remoteSrc){
+  if(!/^(https:|blob:|data:image\/)/i.test(src))throw new Error(tx('badImgUrl'));
+  var box=document.getElementById('genResult');
+  box.innerHTML='';
+  var img=document.createElement('img');
+  img.src=src;img.alt=tx('imgAltCreated');
+  img.style.cssText='width:100%;border-radius:14px;display:block';
+  box.appendChild(img);
+  var row=document.createElement('div');
+  row.style.cssText='display:flex;gap:8px;margin-top:10px';
+  var dl=document.createElement('button');
+  dl.className='kbtn kbtn-black';dl.style.flex='1';dl.textContent=tx('dlImage');dl.setAttribute('data-i18n','dlImage');
+  dl.addEventListener('click',function(){genDownload();});
+  row.appendChild(dl);
+  box.appendChild(row);
+  gen.lastImg={src:src,blob:blob,remote:remoteSrc};
+}
+async function genDownload(){
+  var it=gen.lastImg;if(!it)return;
+  var url=it.src;
+  if(it.blob){url=URL.createObjectURL(it.blob);}
+  else{
+    try{var r=await fetch(it.src);var b=await r.blob();url=URL.createObjectURL(b);}
+    catch(e){window.open(it.src,'_blank');return;}
+  }
+  var a=document.createElement('a');a.href=url;a.download='movai-image.jpg';document.body.appendChild(a);a.click();a.remove();
+}
+async function genDoVideo(p,prompt,key){
+  if(p.id==='puter'){
+    if(!window.puter||!puter.ai||!puter.ai.txt2vid)throw new Error(tx('puterRetry'));
+    var vid=await puter.ai.txt2vid(prompt,{model:'togetherai:wan-ai/wan2.7-t2v'});
+    var vsrc=vid&&vid.src?vid.src:'';
+    if(!vsrc)throw new Error(tx('puterNoVid'));
+    genShowVideo(vsrc);
+    return;
+  }
+  var a=GEN_ASPECTS[gen.aspect];
+  if(p.id==='hf'){
+    var rh=await fetch('https://router.huggingface.co/hf-inference/models/Wan-AI/Wan2.1-T2V-1.3B',{method:'POST',headers:{'Authorization':'Bearer '+key,'Content-Type':'application/json'},body:JSON.stringify({inputs:prompt})});
+    var cth=rh.headers.get('content-type')||'';
+    if(cth.indexOf('video/')===0){var bh=await rh.blob();genShowVideo(URL.createObjectURL(bh));return;}
+    var jh=await rh.json().catch(function(){return null;});
+    throw new Error('Hugging Face: '+genErrText(jh,'HTTP '+rh.status));
+  }
+  var jobId=null;
+  if(p.id==='novai'){
+    var rn=await fetch('https://aiapi-pro.com/v1/video/generations',{method:'POST',headers:{'Authorization':'Bearer '+key,'Content-Type':'application/json'},body:JSON.stringify({model:'cogvideox-flash',prompt:prompt})});
+    var jn=await rn.json().catch(function(){return null;});
+    if(jn&&jn.id)jobId=jn.id;else throw new Error('NovAI: '+genErrText(jn,'HTTP '+rn.status));
+  }
+  else if(p.id==='magichour'){
+    var aspect=a.w>=a.h?'16:9':'9:16';
+    var resName={480:'480p',720:'720p',1080:'1080p',4000:'4k'}[gen.res]||'720p';
+    var rm=await fetch('https://api.magichour.ai/v1/text-to-video',{method:'POST',headers:{'Authorization':'Bearer '+key,'Content-Type':'application/json'},body:JSON.stringify({name:'MovAi video',end_seconds:gen.duration,aspect_ratio:aspect,resolution:resName,model:'default',style:{prompt:prompt}})});
+    var jm=await rm.json().catch(function(){return null;});
+    if(jm&&jm.id)jobId=jm.id;else throw new Error('Magic Hour: '+genErrText(jm,'HTTP '+rm.status));
+  }
+  else if(p.id==='tavus'){
+    var rid=(document.getElementById('genReplicaId').value||'').trim();
+    var rt=await fetch('https://tavusapi.com/v2/videos',{method:'POST',headers:{'x-api-key':key,'Content-Type':'application/json'},body:JSON.stringify({replica_id:rid,script:prompt,video_name:'MovAi video'})});
+    var jt=await rt.json().catch(function(){return null;});
+    if(jt&&jt.video_id)jobId=jt.video_id;else throw new Error('Tavus: '+genErrText(jt,'HTTP '+rt.status));
+  }
+  if(!jobId)throw new Error(tx('unknownProvider'));
+  var t0=Date.now();
+  while(Date.now()-t0<10*60*1000){
+    await new Promise(function(res){setTimeout(res,5000);});
+    genProgTxt(tx('progWaiting')+'('+Math.floor((Date.now()-t0)/1000)+'s)');
+    var url=await genPollVideo(p,key,jobId);
+    if(url!==null){
+      if(!url)throw new Error(tx('errNoVideoUrl'));
+      genShowVideo(url);
+      return;
+    }
+  }
+  throw new Error(tx('errTimeoutVideo'));
+}
+/* returns: null = still working, '' = done but no URL, string = video URL */
+async function genPollVideo(p,key,jobId){
+  if(p.id==='novai'){
+    var r=await fetch('https://aiapi-pro.com/v1/video/generations/'+encodeURIComponent(jobId),{headers:{'Authorization':'Bearer '+key}});
+    var j=await r.json().catch(function(){return null;});
+    var st=j&&(j.status||(j.data&&j.data.status));
+    if(st==='succeeded'){
+      var u=j&&(j.url||j.video_url||(j.data&&(j.data.url||j.data.video_url))||(j.output&&j.output.url)||(j.result&&j.result.url));
+      return u||'';
+    }
+    if(st==='failed')throw new Error('NovAI: '+tx('genFailed'));
+    return null;
+  }
+  if(p.id==='magichour'){
+    var r2=await fetch('https://api.magichour.ai/v1/video-projects/'+encodeURIComponent(jobId),{headers:{'Authorization':'Bearer '+key}});
+    var j2=await r2.json().catch(function(){return null;});
+    var st2=j2&&j2.status;
+    if(st2==='complete'){
+      var dl=j2.downloads&&j2.downloads[0]&&j2.downloads[0].url;
+      return dl||'';
+    }
+    if(st2==='error')throw new Error('Magic Hour: '+((j2&&j2.error)||tx('genFailed')));
+    return null;
+  }
+  if(p.id==='tavus'){
+    var r3=await fetch('https://tavusapi.com/v2/videos/'+encodeURIComponent(jobId),{headers:{'x-api-key':key}});
+    var j3=await r3.json().catch(function(){return null;});
+    var st3=j3&&j3.status;
+    if(st3==='ready')return (j3.download_url)||'';
+    if(st3==='error')throw new Error('Tavus: '+tx('genFailed'));
+    return null;
+  }
+  return null;
+}
+function genShowVideo(src){
+  if(!/^(https:|blob:|data:video\/)/i.test(src))throw new Error(tx('badVidUrl'));
+  var box=document.getElementById('genResult');
+  box.innerHTML='';
+  var vid=document.createElement('video');
+  vid.src=src;vid.controls=true;vid.autoplay=true;vid.loop=true;vid.playsInline=true;
+  vid.style.cssText='width:100%;border-radius:14px;display:block;background:#000';
+  box.appendChild(vid);
+  var row=document.createElement('div');
+  row.style.cssText='display:flex;gap:8px;margin-top:10px';
+  var dl=document.createElement('button');
+  dl.className='kbtn kbtn-black';dl.style.flex='1';dl.textContent=tx('dlVideo');dl.setAttribute('data-i18n','dlVideo');
+  dl.addEventListener('click',function(){genDownloadVideo();});
+  row.appendChild(dl);
+  box.appendChild(row);
+  gen.lastVideo=src;
+}
+async function genDownloadVideo(){
+  var src=gen.lastVideo;if(!src)return;
+  if(src.indexOf('data:')===0||src.indexOf('blob:')===0){
+    var a=document.createElement('a');a.href=src;a.download='movai-video.mp4';document.body.appendChild(a);a.click();a.remove();return;
+  }
+  try{
+    var r=await fetch(src);var b=await r.blob();var u=URL.createObjectURL(b);
+    var a2=document.createElement('a');a2.href=u;a2.download='movai-video.mp4';document.body.appendChild(a2);a2.click();a2.remove();
+  }catch(e){window.open(src,'_blank');}
+}
+/* ================= 3D Design workspace =================
+   2 options: (1) upload an image, (2) text -> image (Pollinations) first.
+   Then the image is sent to the Hunyuan3D API (Tencent Cloud, TC3-HMAC-SHA256
+   signed in the browser with the visitor's own Secret ID + Secret Key from
+   the drawer's API Keys) as SubmitHunyuanTo3DProJob with ImageBase64, polled
+   via QueryHunyuanTo3DProJob until DONE, and the ResultFile3Ds are offered
+   as downloads. */
+var d3={opt:'image',imgData:null,progTimer:null,progSec:0,provider:'hunyuan3d'};
+function d3SetProvider(p){
+  d3.provider=p;
+  var ph=document.getElementById('genD3ProvHunyuan'),pm=document.getElementById('genD3ProvMpx');
+  if(ph)ph.className=p==='hunyuan3d'?'kbtn kbtn-black':'kbtn kbtn-white';
+  if(pm)pm.className=p==='masterpiecex'?'kbtn kbtn-black':'kbtn kbtn-white';
+  var lh=document.getElementById('d3LinkHunyuan'),lm=document.getElementById('d3LinkMpx');
+  if(lh)lh.style.display=p==='hunyuan3d'?'block':'none';
+  if(lm)lm.style.display=p==='masterpiecex'?'block':'none';
+  var hint=document.getElementById('d3Hint');
+  if(hint)hint.textContent=p==='hunyuan3d'?tx('d3HintHunyuan'):tx('d3HintMpx');
+}
+function d3OpenMpxKey(){
+  genKeyOpen['masterpiecex']=true;genRenderKeys();openMenu();
+  setTimeout(function(){var c=document.getElementById('keyAcc-masterpiecex');if(c)c.scrollIntoView({block:'center'});},350);
+}
+function d3MakeMpx(){
+  var ks=genKeysGet('masterpiecex');
+  if(!ks.length){
+    d3Msg(tx('d3MsgMpxNoKey'));
+    d3OpenMpxKey();
+    return;
+  }
+  d3Msg(tx('d3MsgMpxOpening'));
+  window.open('https://www.masterpiecex.com','_blank');
+}
+function d3Msg(t){var el=document.getElementById('d3Msg');if(el)el.textContent=t;}
+function d3ProgTxt(t){var el=document.getElementById('d3ProgTxt');if(el)el.textContent=t;}
+function d3StartProg(txt){
+  d3.progSec=0;
+  var w=document.getElementById('d3Prog');if(w)w.style.display='block';
+  var b=document.getElementById('d3ProgBar');if(b)b.style.width='0%';
+  d3ProgTxt(txt||tx('d3Working'));
+  var s=document.getElementById('d3ProgSec');if(s)s.textContent='0s';
+  clearInterval(d3.progTimer);
+  d3.progTimer=setInterval(function(){
+    d3.progSec++;
+    var s2=document.getElementById('d3ProgSec');if(s2)s2.textContent=d3.progSec+'s';
+    var b2=document.getElementById('d3ProgBar');if(b2)b2.style.width=Math.min(95,d3.progSec*1.5)+'%';
+  },1000);
+}
+function d3StopProg(){clearInterval(d3.progTimer);var w=document.getElementById('d3Prog');if(w)w.style.display='none';}
+function d3SetOpt(o){
+  d3.opt=o;
+  var ti=document.getElementById('d3TabImg'),tt=document.getElementById('d3TabTxt');
+  if(ti)ti.className=o==='image'?'kbtn kbtn-black':'kbtn kbtn-white';
+  if(tt)tt.className=o==='text'?'kbtn kbtn-black':'kbtn kbtn-white';
+  var oi=document.getElementById('d3OptImage'),ot=document.getElementById('d3OptText');
+  if(oi)oi.style.display=o==='image'?'block':'none';
+  if(ot)ot.style.display=o==='text'?'block':'none';
+}
+function d3FileChange(inp){
+  var f=inp.files&&inp.files[0];if(!f)return;
+  var r=new FileReader();
+  r.onload=function(){
+    d3.imgData=String(r.result);
+    var im=document.getElementById('d3ImgPreview');
+    if(im){im.src=d3.imgData;im.style.display='block';}
+    d3Msg(tx('d3MsgUploaded'));
+  };
+  r.readAsDataURL(f);
+}
+async function d3GenImage(){
+  var prompt=(document.getElementById('genPrompt').value||'').trim();
+  if(!prompt){d3Msg(tx('d3MsgNeedPrompt'));return;}
+  var btn=document.getElementById('d3GenImgBtn');btn.disabled=true;
+  d3Msg('');d3StartProg(tx('d3ProgImg'));
+  try{
+    var url='https://image.pollinations.ai/prompt/'+encodeURIComponent(prompt+', single object centered, plain solid background, studio product photo')+'?width=768&height=768&nologo=true&seed='+Math.floor(Math.random()*100000);
+    var r=await fetch(url);if(!r.ok)throw new Error('Pollinations: HTTP '+r.status);
+    var blob=await r.blob();
+    var dataUrl=await new Promise(function(res,rej){var fr=new FileReader();fr.onload=function(){res(String(fr.result));};fr.onerror=function(){rej(new Error(tx('errReadImg')));};fr.readAsDataURL(blob);});
+    d3.imgData=dataUrl;
+    var im=document.getElementById('d3TxtPreview');
+    if(im){im.src=dataUrl;im.style.display='block';}
+    var s2=document.getElementById('d3Step2');if(s2)s2.style.display='block';
+    d3Msg(tx('d3MsgImgReady'));
+  }catch(e){
+    d3Msg(tx('errMakeImgPrefix')+(e&&e.message?e.message:String(e)));
+  }
+  finally{d3StopProg();btn.disabled=false;}
+}
+function d3Downscale(dataUrl){
+  return new Promise(function(res){
+    var img=new Image();
+    img.onload=function(){
+      var max=1024,w=img.naturalWidth,h=img.naturalHeight;
+      var s=Math.min(1,max/Math.max(w,h));
+      if(s>=1){res(dataUrl);return;}
+      var c=document.createElement('canvas');
+      c.width=Math.round(w*s);c.height=Math.round(h*s);
+      var ctx=c.getContext('2d');
+      ctx.fillStyle='#ffffff';ctx.fillRect(0,0,c.width,c.height);
+      ctx.drawImage(img,0,0,c.width,c.height);
+      res(c.toDataURL('image/jpeg',0.9));
+    };
+    img.onerror=function(){res(dataUrl);};
+    img.src=dataUrl;
+  });
+}
+async function d3Sha256Hex(str){
+  var buf=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(str));
+  return Array.from(new Uint8Array(buf)).map(function(b){return b.toString(16).padStart(2,'0');}).join('');
+}
+async function d3HmacRaw(key,msg){
+  var k=await crypto.subtle.importKey('raw',key,{name:'HMAC',hash:'SHA-256'},false,['sign']);
+  return new Uint8Array(await crypto.subtle.sign('HMAC',k,new TextEncoder().encode(msg)));
+}
+function d3Hex(arr){return Array.from(arr).map(function(b){return b.toString(16).padStart(2,'0');}).join('');}
+async function d3TcCall(action,payload,cred){
+  var host='hunyuan.intl.tencentcloudapi.com',service='hunyuan',version='2023-09-01',region='ap-guangzhou';
+  var ts=Math.floor(Date.now()/1000);
+  var date=new Date(ts*1000).toISOString().slice(0,10);
+  var body=JSON.stringify(payload);
+  var ct='application/json; charset=utf-8';
+  var canonicalHeaders='content-type:'+ct+'\n'+'host:'+host+'\n'+'x-tc-action:'+action.toLowerCase()+'\n';
+  var signedHeaders='content-type;host;x-tc-action';
+  var canonicalRequest='POST\n/\n\n'+canonicalHeaders+'\n'+signedHeaders+'\n'+(await d3Sha256Hex(body));
+  var scope=date+'/'+service+'/tc3_request';
+  var stringToSign='TC3-HMAC-SHA256\n'+ts+'\n'+scope+'\n'+(await d3Sha256Hex(canonicalRequest));
+  var kDate=await d3HmacRaw(new TextEncoder().encode('TC3'+cred.secretKey),date);
+  var kService=await d3HmacRaw(kDate,service);
+  var kSigning=await d3HmacRaw(kService,'tc3_request');
+  var signature=d3Hex(await d3HmacRaw(kSigning,stringToSign));
+  var auth='TC3-HMAC-SHA256 Credential='+cred.secretId+'/'+scope+', SignedHeaders='+signedHeaders+', Signature='+signature;
+  var r=await fetch('https://'+host+'/',{method:'POST',headers:{'Authorization':auth,'Content-Type':ct,'X-TC-Action':action,'X-TC-Version':version,'X-TC-Timestamp':String(ts),'X-TC-Region':region},body:body});
+  var j=await r.json().catch(function(){return null;});
+  if(!j||!j.Response)throw new Error('Hunyuan3D: HTTP '+r.status);
+  if(j.Response.Error)throw new Error('Hunyuan3D: '+(j.Response.Error.Message||j.Response.Error.Code));
+  return j.Response;
+}
+async function d3Make(){
+  if(d3.provider==='masterpiecex'){d3MakeMpx();return;}
+  if(!d3.imgData){d3Msg(d3.opt==='text'?tx('d3MsgNeedImgText'):tx('d3MsgNeedImg'));return;}
+  var cred=genNextKey('hunyuan3d');
+  if(!cred||typeof cred!=='object'||!cred.secretId||!cred.secretKey){
+    d3Msg(tx('d3MsgNoHunyuanKey'));
+    genKeyOpen['hunyuan3d']=true;genRenderKeys();openMenu();
+    setTimeout(function(){var c=document.getElementById('keyAcc-hunyuan3d');if(c)c.scrollIntoView({block:'center'});},350);
+    return;
+  }
+  var btn=document.getElementById('d3MakeBtn');btn.disabled=true;
+  d3Msg('');
+  var rb=document.getElementById('d3Result');if(rb)rb.innerHTML='';
+  d3StartProg(tx('d3ProgSending'));
+  try{
+    var small=await d3Downscale(d3.imgData);
+    var b64=small.split(',')[1];
+    if(!b64)throw new Error(tx('errImgRead2'));
+    var sub=await d3TcCall('SubmitHunyuanTo3DProJob',{Model:'3.0',ImageBase64:b64},cred);
+    var jobId=sub.JobId;
+    if(!jobId)throw new Error(tx('errNoJobId'));
+    var t0=Date.now(),done=null;
+    while(Date.now()-t0<10*60*1000){
+      await new Promise(function(res){setTimeout(res,5000);});
+      d3ProgTxt(tx('d3ProgMaking')+'('+Math.floor((Date.now()-t0)/1000)+'s)');
+      var q=await d3TcCall('QueryHunyuanTo3DProJob',{JobId:jobId},cred);
+      if(q.Status==='DONE'){done=q;break;}
+      if(q.Status==='FAIL')throw new Error('Hunyuan3D: '+(q.ErrorMessage||q.ErrorCode||tx('genFailed')));
+    }
+    if(!done)throw new Error(tx('errTimeout3d'));
+    var files=done.ResultFile3Ds||[];
+    if(!files.length)throw new Error(tx('errNo3dFile'));
+    var prev=null;
+    files.forEach(function(f){if(f.PreviewImageUrl&&!prev)prev=f.PreviewImageUrl;});
+    if(rb){
+      rb.innerHTML='';
+      if(prev&&/^https:\/\//i.test(prev)){
+        var pimg=document.createElement('img');
+        pimg.src=prev;pimg.className='d3-preview';pimg.alt=tx('alt3dPreview');pimg.style.marginTop='0';
+        rb.appendChild(pimg);
+      }
+      var drow=document.createElement('div');
+      drow.style.cssText='display:flex;gap:8px;margin-top:10px;flex-wrap:wrap';
+      var anyLink=false;
+      files.forEach(function(f){
+        if(f.Url&&/^https:\/\//i.test(f.Url)){
+          var a=document.createElement('a');
+          a.className='kbtn kbtn-black';
+          a.style.cssText='flex:1;text-align:center;min-width:120px';
+          a.href=f.Url;a.target='_blank';a.rel='noopener';
+          a.textContent=tx('dlPrefix')+(f.Type||'3D');
+          drow.appendChild(a);anyLink=true;
+        }
+      });
+      if(anyLink)rb.appendChild(drow);
+    }
+    d3Msg(tx('d3MsgDone'));
+  }catch(e){
+    var m=(e&&e.message?e.message:String(e));
+    if(/failed to fetch|networkerror|load failed/i.test(m))m=tx('errHunyuanNet');
+    d3Msg(m);
+  }
+  finally{d3StopProg();btn.disabled=false;}
+}
+function toggleMenu(){
+  var d=document.getElementById('drawer');if(!d)return;
+  if(d.classList.contains('shown'))closeMenu();else openMenu();
+}
+function openMenu(){
+  var d=document.getElementById('drawer');if(!d)return;
+  var b=document.getElementById('drawerBackdrop');
+  d.classList.add('open');if(b)b.classList.add('open');
+  document.body.style.overflow='hidden';
+  requestAnimationFrame(function(){requestAnimationFrame(function(){
+    d.classList.add('shown');if(b)b.classList.add('shown');
+  });});
+}
+function closeMenu(){
+  var d=document.getElementById('drawer');if(!d)return;
+  var b=document.getElementById('drawerBackdrop');
+  d.classList.remove('shown');if(b)b.classList.remove('shown');
+  document.body.style.overflow='';
+  setTimeout(function(){
+    if(!d.classList.contains('shown')){d.classList.remove('open');if(b)b.classList.remove('open');}
+  },300);
+}
+function menuGo(id,mode){
+  closeMenu();
+  if(mode)genSetMode(mode);
+  var el=document.getElementById(id);if(el)el.scrollIntoView({behavior:'smooth',block:'start'});
+}
+function toggleFab(){
+  var p=document.getElementById('fabPanel');if(!p)return;
+  var b=document.getElementById('fabBtn');
+  var open=p.classList.toggle('open');
+  if(b)b.setAttribute('aria-expanded',open?'true':'false');
+}
+function fabGo(a){
+  closeFab();
+  if(a==='keys'){
+    openMenu();
+    setTimeout(function(){var t=document.getElementById('genKeysTitle');if(t)t.scrollIntoView({block:'start'});},350);
+    return;
+  }
+  genSetMode(a);
+  var el=document.getElementById('sec-create');
+  if(el)el.scrollIntoView({behavior:'smooth',block:'start'});
+}
+function closeFab(){
+  var p=document.getElementById('fabPanel');if(!p)return;
+  p.classList.remove('open');
+  var b=document.getElementById('fabBtn');if(b)b.setAttribute('aria-expanded','false');
+}
+function genInit(){
+  genSetMode('image');
+  genRenderKeys();
+  d3SetProvider('hunyuan3d');
+  uiInit();
+  if(window.puter){genPuterStatus();}
+  document.addEventListener('click',function(e){
+    var w=document.getElementById('genProviderWrap');
+    var d=document.getElementById('genProviderDrop');
+    if(w&&d&&!w.contains(e.target))d.style.display='none';
+    var fw=document.getElementById('fabWrap');
+    var fp=document.getElementById('fabPanel');
+    if(fw&&fp&&fp.classList.contains('open')&&!fw.contains(e.target))closeFab();
+  });
+  document.addEventListener('keydown',function(e){if(e.key==='Escape'){closeMenu();closeFab();}});
+}
+
+(function(){ try{genInit()}catch(e){} })();
+document.addEventListener('DOMContentLoaded',function(){ try{genPuterStatus()}catch(e){} });
+</script>
+</body>
+</html>

@@ -1,0 +1,7 @@
+# Render Blueprint — MovAi static site
+services:
+  - type: web
+    name: movai
+    env: static
+    buildCommand: ""
+    staticPublishPath: .
