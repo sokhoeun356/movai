@@ -2,8 +2,11 @@
 <html lang="km">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="theme-color" content="#0a0b0d">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0A0B0D">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="color-scheme" content="light dark">
 <link rel="icon" href="data:,">
 <title>MovAi — បង្កើតរូបភាព &amp; វីដេអូ</title>
@@ -16,10 +19,11 @@
 :root{color-scheme:dark;--accent:#addc29;--accent-rgb:173,220,41;--accent-fill:var(--accent);--accent-text:var(--accent);--accent2:var(--accent);--accent-soft:#1c1e22;--accent-light:#23252a;--bg:#0a0b0d;--bg1:#0a0b0d;--bg2:#0a0b0d;--card:#14161a;--card2:#16181d;--field:#0d0f11;--composer:#0d0f11;--text:#f4f5f0;--text2:#c9ccd1;--label:#d6d8dc;--muted:#9a9ea6;--faint:#62666e;--movai:var(--accent);--movai-light:var(--accent);--line:rgba(255,255,255,.08);--line2:rgba(255,255,255,.12);--line3:rgba(255,255,255,.16);--shadow:none;--tshadow:none;--glass-alpha:.877;--glass-blur:18.2px;--glass-shine:.55;--glass-frost:.65;--txtblur:0px;--glass-tint:20,22,26;--glass-text:#f4f5f0;--glass-text2:#e8eaee;--glass-muted:#9a9ea6;--glass-faint:rgba(255,255,255,.45);--glass-line:rgba(255,255,255,.16);--glass-line2:rgba(255,255,255,.26);--glass-text-rgb:244,245,240;--glass-shadow-rgb:0,0,0}
 html[data-mode="light"]{color-scheme:light;--accent-soft:rgba(20,22,30,.07);--bg:#f3f4f6;--card:#ffffff;--card2:#ffffff;--field:#ffffff;--composer:#ffffff;--text:#17181c;--text2:#33363d;--label:#2c2f36;--muted:#5f646e;--faint:#8b9099;--line:rgba(20,22,30,.1);--line2:rgba(20,22,30,.16);--line3:rgba(20,22,30,.22);--glass-tint:255,255,255;--glass-text:#17181c;--glass-text2:#33363d;--glass-muted:#5f646e;--glass-faint:rgba(20,22,30,.5);--glass-line:rgba(20,22,30,.15);--glass-line2:rgba(20,22,30,.24);--glass-text-rgb:23,24,28;--glass-shadow-rgb:255,255,255}
 *{margin:0;padding:0;box-sizing:border-box}
-body{font-family:"Kantumruy Pro","Nunito",sans-serif;background:var(--bg);color:var(--text);min-height:100vh;text-shadow:var(--tshadow,none);-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+html{background:#0A0B0D;background:var(--bg);min-height:100vh;min-height:100dvh}
+body{font-family:"Kantumruy Pro","Nunito",sans-serif;background:#0A0B0D;background:var(--bg);color:var(--text);min-height:100vh;min-height:100dvh;text-shadow:var(--tshadow,none);-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
 button{font-family:inherit;cursor:pointer}
-main{max-width:720px;margin:0 auto;padding:4.75rem 18px 48px}
-.menuwrap{position:fixed;top:12px;left:max(18px,calc(50% - 342px));z-index:30;display:flex}
+main{max-width:720px;margin:0 auto;padding:calc(4.75rem + env(safe-area-inset-top,0px)) 18px calc(48px + env(safe-area-inset-bottom,0px))}
+.menuwrap{position:fixed;top:calc(12px + env(safe-area-inset-top,0px));left:max(18px,calc(50% - 342px));z-index:30;display:flex}
 /* ===== Header: NO backing strip =====
    The header has no solid strip behind it — the ☰ + MovAi brand
    frame (top-left) and the top-right account cluster float directly
@@ -44,7 +48,7 @@ main{max-width:720px;margin:0 auto;padding:4.75rem 18px 48px}
    them there as clear balance rows. After log in, the Log in
    button is replaced by a glossy 3D profile avatar in the same
    corner. */
-.topbar-right{position:fixed;top:12px;right:max(18px,calc(50% - 342px));z-index:30;display:flex;flex-direction:row;align-items:center;gap:10px}
+.topbar-right{position:fixed;top:calc(12px + env(safe-area-inset-top,0px));right:max(18px,calc(50% - 342px));z-index:30;display:flex;flex-direction:row;align-items:center;gap:10px}
 /* The header row is one short row for guests and signed-in users
    alike (bell left + Log in / avatar right), so the page top
    padding is one value for everyone — see the main rule and the
@@ -107,7 +111,7 @@ main{max-width:720px;margin:0 auto;padding:4.75rem 18px 48px}
     frame and never sits on top of the MovAi wordmark. The page top
     padding clears the single (short) row. */
  .topbar-right{flex-direction:row;align-items:center;gap:8px}
- main{padding-top:4.75rem}
+ main{padding-top:calc(4.75rem + env(safe-area-inset-top,0px))}
 }
 .hero{padding:18px 2px 6px}
 .hero h1{font-size:2.3125rem;font-weight:900;line-height:1.15;letter-spacing:-.01em}
@@ -157,7 +161,7 @@ textarea.input{resize:vertical}
 .drawer-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.6);opacity:0;pointer-events:none;transition:opacity .25s ease;z-index:40;display:none}
 .drawer-backdrop.open{display:block;pointer-events:auto}
 .drawer-backdrop.shown{opacity:1}
-.drawer{position:fixed;top:0;left:0;bottom:0;width:min(48vw,240px);background:linear-gradient(160deg,rgba(255,255,255,calc(.03 + var(--glass-shine,.55)*.32)),rgba(255,255,255,calc(var(--glass-shine,.55)*.08)) 36%,rgba(190,198,212,calc(var(--glass-frost,.65)*.22)) 74%,rgba(var(--glass-tint),.40));background-color:rgba(var(--glass-tint),var(--glass-alpha,.5));-webkit-backdrop-filter:blur(var(--glass-blur,18px)) saturate(170%);backdrop-filter:blur(var(--glass-blur,18px)) saturate(170%);border-right:1px solid rgba(var(--glass-text-rgb),calc(.14 + var(--glass-shine,.55)*.2));color:var(--glass-text);text-shadow:0 1px 2px rgba(var(--glass-shadow-rgb),.25);box-shadow:inset 1px 0 0 rgba(255,255,255,.10),inset 0 1px 0 rgba(255,255,255,calc(.08 + var(--glass-shine,.55)*.4)),12px 0 36px rgba(0,0,0,.22);z-index:50;transform:translateX(-105%);transition:transform .28s ease;overflow-y:auto;padding:18px 14px 32px;display:none}
+.drawer{position:fixed;top:0;left:0;bottom:0;width:min(48vw,240px);background:linear-gradient(160deg,rgba(255,255,255,calc(.03 + var(--glass-shine,.55)*.32)),rgba(255,255,255,calc(var(--glass-shine,.55)*.08)) 36%,rgba(190,198,212,calc(var(--glass-frost,.65)*.22)) 74%,rgba(var(--glass-tint),.40));background-color:rgba(var(--glass-tint),var(--glass-alpha,.5));-webkit-backdrop-filter:blur(var(--glass-blur,18px)) saturate(170%);backdrop-filter:blur(var(--glass-blur,18px)) saturate(170%);border-right:1px solid rgba(var(--glass-text-rgb),calc(.14 + var(--glass-shine,.55)*.2));color:var(--glass-text);text-shadow:0 1px 2px rgba(var(--glass-shadow-rgb),.25);box-shadow:inset 1px 0 0 rgba(255,255,255,.10),inset 0 1px 0 rgba(255,255,255,calc(.08 + var(--glass-shine,.55)*.4)),12px 0 36px rgba(0,0,0,.22);z-index:50;transform:translateX(-105%);transition:transform .28s ease;overflow-y:auto;padding:calc(18px + env(safe-area-inset-top,0px)) 14px calc(32px + env(safe-area-inset-bottom,0px));display:none}
 .drawer.open{display:block}
 .drawer.shown{transform:translateX(0)}
 .drawer-head{display:flex;align-items:center;justify-content:space-between}
@@ -1621,7 +1625,7 @@ function setMode(m,save){
   var eff=modeEffective(MODE);
   document.documentElement.setAttribute('data-mode',eff);
   var tc=document.querySelector('meta[name="theme-color"]');
-  if(tc)tc.setAttribute('content',eff==='light'?'#f3f4f6':'#0a0b0d');
+  if(tc)tc.setAttribute('content',eff==='light'?'#f3f4f6':'#0A0B0D');
   var t=THEMES[THEME_IDX];
   if(t)document.documentElement.style.setProperty('--accent-text',eff==='light'?t.lt:t.c);
   setBgBright(BGBRIGHT,false);
@@ -2600,7 +2604,6 @@ var GEN_SONG_PROVIDERS=[
 ];
 var GEN_KEY_PROVIDERS=[
  {id:'novai',name:'NovAI',limit:{km:'5 វីដេអូ/ថ្ងៃ',en:'5 videos/day'},url:'https://aiapi-pro.com',fields:[{k:'key',ph:'API Key'}],hint:{km:'ចុះឈ្មោះដោយ email នៅ aiapi-pro.com — មិនបាច់កាត។',en:'Sign up with email at aiapi-pro.com — no card.'}},
- {id:'magichour',name:'Magic Hour',limit:{km:'Credits ហ្វ្រី',en:'Free credits'},url:'https://magichour.ai',fields:[{k:'key',ph:'API Key'}],hint:{km:'បង្កើត Key នៅ magichour.ai/developer — មិនបាច់កាត។',en:'Create a key at magichour.ai/developer — no card.'}},
  {id:'suno',name:'MovAi',limit:{km:'បទចម្រៀង · 12 Credit/ដង',en:'Songs · 12 credits/generation'},url:'https://suno.com',fields:[{k:'key',ph:'API Key'},{k:'endpoint',ph:'API Endpoint (https://...)'}],hint:{km:'សម្រាប់បទចម្រៀងតែប៉ុណ្ណោះ។ MovAi មិនមាន API ផ្លូវការសាធារណៈទេ — ដាក់ API Key និង Endpoint របស់សេវា MovAi API ដែលអ្នកប្រើ។ មួយដងបាន 2 បទ · Model v6។',en:'For songs only. MovAi has no official public API — enter the API key and endpoint of the MovAi API service you use. One generation returns 2 songs · Model v6.'}},
  {id:'acemusic',name:'ACE Music',limit:{km:'បទចម្រៀង · ហ្វ្រីរហូត',en:'Songs · Free forever'},url:'https://acemusic.ai/playground/api-key',fields:[{k:'key',ph:'API Key'}],hint:{km:'សម្រាប់បទចម្រៀងតែប៉ុណ្ណោះ។ ចុះឈ្មោះហ្វ្រីនៅ acemusic.ai រួចយក API Key របស់អ្នកផ្ទាល់មកដាក់ទីនេះ — ហ្វ្រីរហូត អត់កាត់ quota អត់ត្រូវកាត។ MovAi មិនយក Key ឲ្យអ្នកដោយអូតូទេ។',en:'For songs only. Sign up free at acemusic.ai and paste your own API key here — free forever, no quota, no card needed. MovAi never fetches a key for you automatically.'}},
  {id:'musicapi',name:'MusicAPI',limit:{km:'បទចម្រៀង · ហ្វ្រី 75 Credit',en:'Songs · 75 free credits'},url:'https://musicapi.ai',fields:[{k:'key',ph:'API Key'}],hint:{km:'សម្រាប់បទចម្រៀងតែប៉ុណ្ណោះ។ ចុះឈ្មោះហ្វ្រីនៅ musicapi.ai (អត់ត្រូវកាត) បាន 75 Credit — បានប្រហែល 6 បទម្ដងគត់ប៉ុណ្ណោះ បន្ទាប់មកបង់លុយ។ យក API Key របស់អ្នកផ្ទាល់មកដាក់ទីនេះ — MovAi មិនយក Key ឲ្យអ្នកដោយអូតូទេ។',en:'For songs only. Sign up free at musicapi.ai (no card) for 75 credits — about 6 songs, one-time only, then paid. Paste your own API key here — MovAi never fetches a key for you automatically.'}},
@@ -6939,16 +6942,10 @@ function acctRenderUser(u){
   h+='<div style="margin-top:12px"><span style="font-size:0.8125rem;font-weight:700">'+escHtml(tx('profileBalance'))+'</span>'+profileBalRow('song',tx('acctSongCredit'),u.songCredits)+profileBalRow('media',tx('acctMediaCredit'),u.credits)+'</div>';
   var _plan=pkgGet();
   if(_plan){var _pp=pkgPlanById(_plan.id);h+='<p style="font-size:0.8125rem;margin-top:10px;font-weight:700;color:var(--accent-text);line-height:1.6">'+escHtml(tx('pkgYourPlan'))+': '+escHtml(_pp?loc(_pp.name):String(_plan.id))+' · '+escHtml(tx('pkgActiveUntil').replace('{d}',new Date(_plan.until).toLocaleDateString()))+'</p>';}
-  h+='<div style="margin-top:14px;border-top:1px solid var(--glass-line);padding-top:12px">';
-  h+='<p style="font-weight:800;font-size:0.9375rem">'+escHtml(tx('mhTitle'))+'</p>';
-  h+='<p style="font-size:0.8125rem;margin-top:6px;font-weight:700;color:'+(mhOn?'var(--accent-text)':'#fbbf24')+'">'+escHtml(mhOn?tx('mhDone'):tx('mhNotYet'))+'</p>';
-  if(!mhOn){
-    h+='<button type="button" class="kbtn kbtn-black" style="margin-top:10px;width:100%" onclick="acctOpenMh()">'+escHtml(tx('mhOpenBtn'))+'</button>';
-    h+='<input class="input" id="acctMhKey" placeholder="'+escHtml(tx('mhKeyPh'))+'" style="width:100%;margin-top:8px" autocomplete="off" oninput="acctMhKeyInput(this)">';
-    h+='<button type="button" class="kbtn kbtn-white" style="margin-top:8px;width:100%" onclick="acctConnectMh()">'+escHtml(tx('mhConnectBtn'))+'</button>';
-  }
-  h+='<p style="font-size:0.75rem;color:var(--glass-muted);margin-top:8px;line-height:1.6">'+escHtml(tx('mhNote'))+'</p>';
-  h+='</div>';
+  /* No Magic Hour API key place in the ☰ drawer (owner order):
+     API keys are admin-only, managed in the separate Admin app.
+     The drawer account box shows identity, balances and plan only.
+     The Magic Hour provider in the Create panel is untouched. */
   h+='<button type="button" class="kbtn kbtn-white" style="margin-top:14px;width:100%" onclick="acctLogout()">'+escHtml(tx('acctLogout'))+'</button>';
   box.innerHTML=h;
 }
