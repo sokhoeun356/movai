@@ -1042,6 +1042,108 @@ function apiRoute(req, res, urlPath) {
       return sendJSON(res, 200, { ok: true, stats: { usersToday: 0, usersWeek: 0, usersMonth: 0, songsToday: 0, videosToday: 0, imagesToday: 0, failuresToday: 0, recentErrors: [] } });
     }
   }
+  // ---- Public feed (Public tab) ----
+  // Anyone can post their creations as public (visible to everyone, ranked
+  // by likes + views) or private (the feed never lists private posts). No
+  // admin key, no passwords, no API keys stored.
+  // Storage: ./data/public.json, capped at 5000 posts (oldest dropped).
+  const PUBLIC_FILE = path.join(DATA_DIR, 'public.json');
+  const PUBLIC_MAX = 5000;
+  const PUBLIC_MODES = ['song', 'image', 'video', '3d'];
+  function loadPublicPosts() {
+    try { const j = JSON.parse(fs.readFileSync(PUBLIC_FILE, 'utf8')); if (Array.isArray(j)) return j; } catch (e) {}
+    return [];
+  }
+  function savePublicPosts(arr) {
+    try { fs.mkdirSync(DATA_DIR, { recursive: true }); } catch (e) {}
+    fs.writeFileSync(PUBLIC_FILE, JSON.stringify(arr, null, 2));
+  }
+  function newPublicId() {
+    return 'pub_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+  }
+  // Public view of a post. likedBy (liker emails) is never exposed.
+  function pubPost(p) {
+    return { id: p.id, email: p.email, name: p.name || '', userId: p.userId || '', mode: p.mode, title: p.title, url: p.url, cover: p.cover || '', visibility: p.visibility, likes: p.likes || 0, views: p.views || 0, createdAt: p.createdAt };
+  }
+  // POST /api/public/post — PUBLIC. {email, name, userId?, mode, title, url, cover?, visibility?}
+  if (req.method === 'POST' && urlPath === '/api/public/post') {
+    readJSONBody(req, 64 * 1024).then((body) => {
+      const email = normEmail(body && body.email);
+      if (!email) return sendJSON(res, 200, { ok: false, error: 'សូមដាក់ Gmail ត្រឹមត្រូវ' });
+      const mode = typeof body.mode === 'string' ? body.mode.trim().toLowerCase() : '';
+      if (!PUBLIC_MODES.includes(mode)) return sendJSON(res, 200, { ok: false, error: 'Mode មិនត្រឹមត្រូវទេ' });
+      const title = typeof body.title === 'string' ? body.title.trim().slice(0, 200) : '';
+      if (!title) return sendJSON(res, 200, { ok: false, error: 'សូមដាក់ចំណងជើង' });
+      const url = typeof body.url === 'string' ? body.url.trim().slice(0, 2000) : '';
+      if (!url) return sendJSON(res, 200, { ok: false, error: 'សូមដាក់ link' });
+      const visibility = body.visibility === 'private' ? 'private' : 'public';
+      const now = new Date().toISOString();
+      const posts = loadPublicPosts();
+      const p = {
+        id: newPublicId(), email,
+        name: typeof body.name === 'string' ? body.name.trim().slice(0, 100) : '',
+        userId: typeof body.userId === 'string' ? body.userId.trim().slice(0, 50) : '',
+        mode, title, url,
+        cover: typeof body.cover === 'string' ? body.cover.trim().slice(0, 2000) : '',
+        visibility, likes: 0, views: 0, likedBy: [], createdAt: now,
+      };
+      posts.push(p);
+      if (posts.length > PUBLIC_MAX) posts.splice(0, posts.length - PUBLIC_MAX);
+      savePublicPosts(posts);
+      return sendJSON(res, 200, { ok: true, post: pubPost(p) });
+    }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
+    return;
+  }
+  // GET /api/public/feed — PUBLIC. Only public posts, ranked by
+  // score = likes*10 + views (highest first). rank is 1-based; tier 1 =
+  // rank 1–50, tier 2 = 51–200, tier 3 = the rest.
+  if (req.method === 'GET' && urlPath === '/api/public/feed') {
+    const posts = loadPublicPosts().filter((p) => p && p.visibility === 'public');
+    posts.sort((a, b) => (((b.likes || 0) * 10 + (b.views || 0)) - ((a.likes || 0) * 10 + (a.views || 0))) || String(a.createdAt || '').localeCompare(String(b.createdAt || '')));
+    const out = posts.map((p, i) => {
+      const rank = i + 1;
+      const d = pubPost(p);
+      d.rank = rank;
+      d.tier = rank <= 50 ? 1 : rank <= 200 ? 2 : 3;
+      return d;
+    });
+    return sendJSON(res, 200, { ok: true, posts: out });
+  }
+  // POST /api/public/like — PUBLIC. {postId, email}. One like per email;
+  // a repeat like from the same email returns the current count unchanged.
+  if (req.method === 'POST' && urlPath === '/api/public/like') {
+    readJSONBody(req, 64 * 1024).then((body) => {
+      const postId = typeof body.postId === 'string' ? body.postId.trim() : '';
+      const email = normEmail(body && body.email) || (typeof body.email === 'string' ? body.email.trim().toLowerCase().slice(0, 200) : '');
+      if (!postId) return sendJSON(res, 200, { ok: false, error: 'សូមដាក់ postId' });
+      if (!email) return sendJSON(res, 200, { ok: false, error: 'សូមដាក់ Gmail ត្រឹមត្រូវ' });
+      const posts = loadPublicPosts();
+      const p = posts.find((x) => x.id === postId);
+      if (!p) return sendJSON(res, 404, { ok: false, error: 'រក post នេះមិនឃើញទេ' });
+      if (!Array.isArray(p.likedBy)) p.likedBy = [];
+      if (!p.likedBy.includes(email)) {
+        p.likedBy.push(email);
+        p.likes = p.likedBy.length;
+        savePublicPosts(posts);
+      }
+      return sendJSON(res, 200, { ok: true, likes: p.likes || 0 });
+    }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
+    return;
+  }
+  // POST /api/public/view — PUBLIC. {postId}. Counts one view.
+  if (req.method === 'POST' && urlPath === '/api/public/view') {
+    readJSONBody(req, 64 * 1024).then((body) => {
+      const postId = typeof body.postId === 'string' ? body.postId.trim() : '';
+      if (!postId) return sendJSON(res, 200, { ok: false, error: 'សូមដាក់ postId' });
+      const posts = loadPublicPosts();
+      const p = posts.find((x) => x.id === postId);
+      if (!p) return sendJSON(res, 404, { ok: false, error: 'រក post នេះមិនឃើញទេ' });
+      p.views = (p.views || 0) + 1;
+      savePublicPosts(posts);
+      return sendJSON(res, 200, { ok: true, views: p.views });
+    }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
+    return;
+  }
   return sendJSON(res, 404, errBody('not_found', 'រកមិនឃើញទេ', 'Not found'));
 }
 
