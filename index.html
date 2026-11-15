@@ -640,6 +640,30 @@ html[data-mode="light"] .btn-free{color:#8a6100}
 #loginSheet .login-brand-credit{text-align:right;line-height:1.3;min-width:0}
 #loginSheet .login-brand-credit b{display:block;font-size:0.75rem;font-weight:800;letter-spacing:.04em;color:var(--text);white-space:nowrap}
 #loginSheet .login-brand-credit i{display:block;font-style:normal;font-size:0.6875rem;font-weight:600;color:var(--muted);white-space:nowrap}
+/* ===== Mandatory name gate =====
+   Shown right after a Google sign-in whose account has NO first /
+   last name yet (and on app open while the name is still missing).
+   It sits ABOVE the other sheets (z-index 120, below only the
+   offline popup at 300) with the same full-background blur as the
+   log-in sheet, and it has NO close button and NO backdrop dismiss:
+   both name fields must be filled and saved before the app can be
+   used. An account that already has a name never sees it — the
+   name arrives automatically from Google / the saved record. */
+#nameSheet{z-index:120;-webkit-backdrop-filter:blur(16px) saturate(130%);backdrop-filter:blur(16px) saturate(130%)}
+#nameSheet .name-gate-fields{display:flex;gap:8px;margin-top:12px}
+#nameSheet .name-gate-fields .input{flex:1;min-width:0}
+@media(max-width:420px){#nameSheet .name-gate-fields{flex-direction:column}}
+/* ===== Profile picture upload (Profile sheet) =====
+   The Google profile photo shows automatically when the account
+   has one. When it does not (or the user wants their own), the
+   Profile sheet avatar carries a small camera badge and the
+   buttons under the header open the phone's photo picker; the
+   picked photo is stored on the account as its avatar. */
+.prof-pic-wrap{position:relative;flex:0 0 auto}
+.prof-pic-cam{position:absolute;right:-2px;bottom:-2px;width:26px;height:26px;border-radius:50%;border:2px solid var(--card);background:var(--accent-fill);color:#0d1005;display:flex;align-items:center;justify-content:center;cursor:pointer;padding:0}
+.prof-pic-cam svg{width:14px;height:14px;display:block}
+.prof-pic-btns{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}
+.prof-pic-btns .kbtn{flex:1 1 auto;padding:10px 12px;font-size:0.8125rem;min-height:42px}
 .pkg-sheet-card{background:var(--card);border:1px solid var(--line2);border-radius:18px;padding:20px;width:100%;max-width:420px;max-height:88vh;overflow-y:auto;color:var(--text)}
 /* ===== Offline / server-unreachable popup =====
    Sits ABOVE every other sheet (z-index 300) and cannot be
@@ -1213,6 +1237,20 @@ html[data-smooth="1"] .brand-frame,html[data-smooth="1"] .acct-chip,html[data-sm
     <button type="button" class="kbtn kbtn-white" style="margin-top:10px;width:100%" onclick="loginSheetClose()" data-i18n="pkgCancel">បោះបង់</button>
   </div>
 </div>
+<div id="nameSheet" class="pkg-sheet" style="display:none" role="dialog" aria-modal="true" aria-labelledby="nameGateTitle">
+  <div class="pkg-sheet-card">
+    <h3 id="nameGateTitle" style="font-size:1.125rem;font-weight:900" data-i18n="nameGateTitle">បំពេញឈ្មោះរបស់អ្នក</h3>
+    <p style="font-size:0.875rem;color:var(--muted);line-height:1.7;margin-top:8px" data-i18n="nameGateNote">គណនី Google នេះមិនទាន់មានឈ្មោះទេ។ សូមបំពេញនាម និងគោត្តនាមជាមុនសិន — ត្រូវបំពេញឲ្យរួចរាល់ទើបអាចចូលប្រើ MovAi បាន។ បើគណនីធ្លាប់មានឈ្មោះហើយ ឈ្មោះនឹងបង្ហាញដោយស្វ័យប្រវត្តិ មិនបាច់បំពេញទេ។</p>
+    <p id="nameGateEmail" style="font-size:0.8125rem;font-weight:700;margin-top:10px;overflow-wrap:break-word"></p>
+    <div class="name-gate-fields">
+      <input class="input" id="nameGateFirst" autocomplete="given-name" data-i18n-ph="acctFirstName" placeholder="នាម · First name">
+      <input class="input" id="nameGateLast" autocomplete="family-name" data-i18n-ph="acctLastName" placeholder="គោត្តនាម · Last name">
+    </div>
+    <button type="button" class="kbtn kbtn-black" style="margin-top:14px;width:100%" onclick="nameGateSave()" data-i18n="acctNameSave">រក្សាទុកឈ្មោះ</button>
+    <p id="nameGateMsg" style="font-size:0.8125rem;margin-top:8px;min-height:16px;line-height:1.5"></p>
+  </div>
+</div>
+<input type="file" id="profPicInput" accept="image/*" style="display:none" onchange="profPicPicked(this)">
 <div id="giftSheet" class="pkg-sheet" style="display:none" role="dialog" aria-modal="true">
   <div class="pkg-sheet-card" style="text-align:center">
     <div style="font-size:3rem;line-height:1.1" aria-hidden="true">🎁</div>
@@ -1298,6 +1336,8 @@ km:{
  loginGoogleNoEmail:'Google មិនបានផ្ដល់ Gmail មកទេ — សូមព្យាយាមម្ដងទៀត',
  acctNameTitle:'ដាក់ឈ្មោះរបស់អ្នក',acctNameNote:'អ្នកបានចូលគណនីហើយ — សូមដាក់នាម និងគោត្តនាមរបស់អ្នក (ខ្មែរ ឬអង់គ្លេសក៏បាន)',
  acctNameSave:'រក្សាទុកឈ្មោះ',acctNameErr:'សូមដាក់ទាំងនាម និងគោត្តនាម',
+ nameGateTitle:'បំពេញឈ្មោះរបស់អ្នក',nameGateNote:'គណនី Google នេះមិនទាន់មានឈ្មោះទេ។ សូមបំពេញនាម និងគោត្តនាមជាមុនសិន — ត្រូវបំពេញឲ្យរួចរាល់ទើបអាចចូលប្រើ MovAi បាន។ បើគណនីធ្លាប់មានឈ្មោះហើយ ឈ្មោះនឹងបង្ហាញដោយស្វ័យប្រវត្តិ មិនបាច់បំពេញទេ។',
+ profPicUpload:'តាំងរូបប្រូហ្វាល់',profPicChange:'ប្ដូររូបប្រូហ្វាល់',profPicRemove:'លុបរូបដែលតាំង',profPicNote:'បើគណនី Google របស់អ្នកមានរូបប្រូហ្វាល់ វានឹងបង្ហាញមកដោយស្វ័យប្រវត្តិ។ បើអត់មានទេ អ្នកអាចជ្រើសរូបពីទូរសព្ទរបស់អ្នកដើម្បីតាំងជារូបប្រូហ្វាល់បាន។',profPicErr:'ជ្រើសរូបមិនបានទេ — សូមជ្រើសរូបភាព (JPG / PNG / WebP) ម្ដងទៀត',profPicSaved:'បានតាំងរូបប្រូហ្វាល់ហើយ ✓',
  acctName:'ឈ្មោះរបស់អ្នក',acctEmail:'អ៊ីមែល',acctPass:'ពាក្យសម្ងាត់',
  acctNewBonus:'អ្នកប្រើថ្មីទទួលបាន Credit ហ្វ្រីភ្លាម ពេលចូលគណនី Google ដំបូង — Image.Video Credit 250 និង Song Credit 24 ក្នុងគណនីរបស់អ្នកផ្ទាល់',
  acctCredit:'Credit របស់អ្នក',acctLogout:'ចេញពីគណនី',
@@ -1480,6 +1520,8 @@ en:{
  loginGoogleNoEmail:'Google did not return a Gmail — please try again',
  acctNameTitle:'Add your name',acctNameNote:'You are signed in — please add your first name and last name (Khmer or English is fine)',
  acctNameSave:'Save name',acctNameErr:'Please enter both a first name and a last name',
+ nameGateTitle:'Complete your name',nameGateNote:'This Google account has no name yet. Please enter your first name and last name first — you must complete this before you can use MovAi. If the account already has a name, it appears automatically and there is nothing to fill in.',
+ profPicUpload:'Set profile photo',profPicChange:'Change profile photo',profPicRemove:'Remove custom photo',profPicNote:'If your Google account has a profile photo, it shows automatically. If not, you can pick a photo from your phone to use as your profile picture.',profPicErr:'Could not use that photo — please pick an image (JPG / PNG / WebP) and try again',profPicSaved:'Profile photo set ✓',
  acctName:'Your name',acctEmail:'Email',acctPass:'Password',
  acctNewBonus:'New users instantly get free credits on their first Google sign-in — 250 Image.Video Credit and 24 Song Credit, in your own account',
  acctCredit:'Your credits',acctLogout:'Log out',
@@ -6660,7 +6702,7 @@ function acctAdminPayload(u){
   var payload={
     email:u.email,
     name:u.name||'',
-    picture:u.picture||'',
+    picture:(typeof acctPicture==='function'?acctPicture(u):(u.picture||'')),
     id:acctValidUserId(u.id)?u.id:'',
     firstName:u.firstName||'',
     lastName:u.lastName||'',
@@ -6797,7 +6839,12 @@ function loginSheetClose(){var s=document.getElementById('loginSheet');sheetHide
    browsing, and the next creation tap pops the sheet again. */
 function requireLogin(){
   var u=null;try{u=acctCurrent();}catch(e){}
-  if(u)return true;
+  if(u){
+    /* Signed in but the mandatory name step is not done yet —
+       creating stays blocked until both name fields are saved. */
+    if(typeof acctNeedsName==='function'&&acctNeedsName(u)){nameGateShow();return false;}
+    return true;
+  }
   loginSheetOpen();
   return false;
 }
@@ -6933,13 +6980,18 @@ function gisFinishLogin(prof){
   try{histOnAccountChange();}catch(e){}
   acctAdminSync();
   try{notifLoad();}catch(e){}
+  /* Mandatory name step (owner rule): if this Gmail has NO first /
+     last name — neither saved before nor supplied by Google — the
+     name gate opens NOW and the app cannot be used until both
+     fields are saved (the welcome gift waits behind the gate and
+     is offered by nameGateSave once the name lands). If the Gmail
+     already has a name, it arrived automatically above and no
+     gate ever appears. */
+  var u2=acctCurrent();
+  if(u2&&acctNeedsName(u2)){nameGateShow();return;}
   if(isNew)giftSchedule();
   try{pushMaybeAsk();}catch(e){}
   try{pushEnsureSubscribed();}catch(e){}
-  /* Just signed in with no name on the account → open the account
-     box, where the First name / Last name step is waiting. */
-  var u2=acctCurrent();
-  if(u2&&(!u2.firstName||!u2.lastName))acctOpen();
 }
 /* ===== New-user welcome gift (owner rule) =====
    A brand-new account starts with NO credits (0 / 0). About
@@ -6964,6 +7016,10 @@ function giftSchedule(){
 function giftShow(){
   var u=null;try{u=acctCurrent();}catch(e){}
   if(!u||!u.giftPending)return;
+  /* The mandatory name gate always comes first — the gift popup
+     never stacks on top of it; it is offered again after the
+     name is saved (nameGateSave calls giftSchedule). */
+  if(typeof acctNeedsName==='function'&&acctNeedsName(u)){nameGateShow();return;}
   var s=document.getElementById('giftSheet');if(s)sheetShowAnim(s);
 }
 function giftClaim(){
@@ -7406,6 +7462,123 @@ function notifInit(){
   if(notifTimer)clearInterval(notifTimer);
   notifTimer=setInterval(function(){notifLoad();},60000);
 }
+/* ===== Name + profile picture (owner rule) =====
+   NAME: an account "has a name" only when BOTH firstName and
+   lastName are filled. Google supplies them automatically at
+   sign-in when the Google account carries them (gisFinishLogin
+   fills the blanks from given_name / family_name / name), and a
+   name saved before is kept — in both cases nothing is asked.
+   Only a Gmail with no name at all gets the mandatory gate.
+   PICTURE: the account's Google photo (rec.picture, refreshed on
+   every sign-in) shows automatically. A photo the user picks
+   themselves is stored separately (rec.customPicture, downscaled
+   to 256px JPEG so it fits the account record) and takes display
+   precedence; removing it falls back to the Google photo. */
+function acctNeedsName(u){
+  if(!u)return false;
+  return !String(u.firstName||'').trim()||!String(u.lastName||'').trim();
+}
+function acctPicture(u){
+  if(!u)return '';
+  return u.customPicture||u.picture||'';
+}
+/* The mandatory name gate: no close button, no backdrop dismiss,
+   Escape does not close it (it is not in the Escape handler) —
+   it only goes away when both fields are filled and saved. */
+function nameGateShow(){
+  var u=null;try{u=acctCurrent();}catch(e){}
+  if(!u||!acctNeedsName(u))return;
+  var em=document.getElementById('nameGateEmail');if(em)em.textContent=u.email||'';
+  var f=document.getElementById('nameGateFirst');if(f&&!f.value)f.value=u.firstName||'';
+  var l=document.getElementById('nameGateLast');if(l&&!l.value)l.value=u.lastName||'';
+  var m=document.getElementById('nameGateMsg');if(m)m.textContent='';
+  var s=document.getElementById('nameSheet');if(s)sheetShowAnim(s);
+  setTimeout(function(){
+    var t=(f&&!String(f.value||'').trim())?f:l;
+    if(t&&t.focus)try{t.focus();}catch(e){}
+  },360);
+}
+function nameGateSave(){
+  var u=acctCurrent();if(!u)return;
+  var first=((document.getElementById('nameGateFirst')||{}).value||'').trim();
+  var last=((document.getElementById('nameGateLast')||{}).value||'').trim();
+  var msg=document.getElementById('nameGateMsg');
+  if(!first||!last){if(msg){msg.textContent=tx('acctNameErr');msg.style.color='#f87171';}return;}
+  var us=acctUsersGet();var rec=us[u.email];if(!rec)return;
+  rec.firstName=first;rec.lastName=last;rec.name=(first+' '+last).trim();
+  acctUsersSave(us);
+  var s=document.getElementById('nameSheet');if(s)sheetHideAnim(s);
+  acctRender();
+  acctAdminSync();
+  /* Name done — anything that waited behind the gate may proceed:
+     the new-user welcome gift and the push ask. */
+  try{giftSchedule();}catch(e){}
+  try{pushMaybeAsk();}catch(e){}
+  try{pushEnsureSubscribed();}catch(e){}
+}
+/* On app open, a signed-in account that still has no name gets
+   the gate again — the step stays mandatory until it is done. */
+function nameGateCheck(){
+  var u=null;try{u=acctCurrent();}catch(e){}
+  if(u&&acctNeedsName(u))nameGateShow();
+}
+/* ===== Profile picture upload =====
+   The hidden file input (#profPicInput) opens the phone's photo
+   picker. The chosen image is drawn onto a 256×256 canvas
+   (centre-cropped square, like an avatar) and saved as a JPEG
+   data URL on the account record, so the avatar follows the
+   account on this device exactly like the name does. */
+function profPicPick(){
+  var inp=document.getElementById('profPicInput');
+  if(!inp)return;
+  inp.value='';
+  inp.click();
+}
+function profPicMsgSet(t,ok){
+  var m=document.getElementById('profPicMsg');
+  if(m){m.textContent=t;m.style.color=ok?'var(--accent-text)':'#f87171';}
+}
+function profPicPicked(inp){
+  var u=acctCurrent();if(!u)return;
+  var file=inp&&inp.files&&inp.files[0];
+  if(!file)return;
+  if(!/^image\//i.test(file.type||'')){profileRender();profPicMsgSet(tx('profPicErr'),false);return;}
+  var rd=new FileReader();
+  rd.onerror=function(){profileRender();profPicMsgSet(tx('profPicErr'),false);};
+  rd.onload=function(){
+    var img=new Image();
+    img.onerror=function(){profileRender();profPicMsgSet(tx('profPicErr'),false);};
+    img.onload=function(){
+      try{
+        var S=256;
+        var cv=document.createElement('canvas');cv.width=S;cv.height=S;
+        var cx=cv.getContext('2d');
+        var side=Math.min(img.naturalWidth||img.width,img.naturalHeight||img.height);
+        var sx=((img.naturalWidth||img.width)-side)/2,sy=((img.naturalHeight||img.height)-side)/2;
+        cx.drawImage(img,sx,sy,side,side,0,0,S,S);
+        var url=cv.toDataURL('image/jpeg',0.85);
+        var us=acctUsersGet();var rec=us[u.email];if(!rec)return;
+        rec.customPicture=url;
+        acctUsersSave(us);
+        acctRender();
+        profileRender();
+        profPicMsgSet(tx('profPicSaved'),true);
+        acctAdminSync();
+      }catch(e){profileRender();profPicMsgSet(tx('profPicErr'),false);}
+    };
+    img.src=String(rd.result||'');
+  };
+  rd.readAsDataURL(file);
+}
+function profPicRemove(){
+  var u=acctCurrent();if(!u)return;
+  var us=acctUsersGet();var rec=us[u.email];if(!rec)return;
+  delete rec.customPicture;
+  acctUsersSave(us);
+  acctRender();
+  profileRender();
+  acctAdminSync();
+}
 /* Save the First / Last name asked for AFTER log in. Two separate
    fields; Khmer or English (or any script) is fine, no pattern
    restriction. The display name stays first + ' ' + last so every
@@ -7419,8 +7592,10 @@ function acctSaveName(){
   var us=acctUsersGet();var rec=us[u.email];if(!rec)return;
   rec.firstName=first;rec.lastName=last;rec.name=(first+' '+last).trim();
   acctUsersSave(us);
+  var gs=document.getElementById('nameSheet');if(gs)sheetHideAnim(gs);
   acctRender();
   acctAdminSync();
+  try{giftSchedule();}catch(e){}
 }
 /* ===== Top-right header: Log in / 3D avatar + notification bell =====
    The header shows NO credit chips (owner order 2026-11-15): the
@@ -7454,7 +7629,8 @@ function acctRenderTopbar(u){
     if(av){av.style.display='flex';av.setAttribute('aria-label',tx('profileLabel')+': '+u.name);}
     var orb=document.getElementById('acctAvatarOrb');
     if(orb){
-      if(u.picture)orb.innerHTML='<img src="'+escHtml(u.picture)+'" alt="" referrerpolicy="no-referrer" style="width:100%;height:100%;border-radius:50%;object-fit:cover;display:block">';
+      var pic=acctPicture(u);
+      if(pic)orb.innerHTML='<img src="'+escHtml(pic)+'" alt="" referrerpolicy="no-referrer" style="width:100%;height:100%;border-radius:50%;object-fit:cover;display:block">';
       else orb.textContent=acctInitial(u);
     }
     var ps=document.getElementById('profileSheet');
@@ -7480,10 +7656,20 @@ function profileInfoRowHtml(label,valHtml){
 function profileRender(){
   var u=acctCurrent();var body=document.getElementById('profileBody');if(!u||!body)return;
   var h='';
+  var pic=acctPicture(u);
   h+='<div style="display:flex;align-items:center;gap:14px">';
-  h+='<span class="avatar-orb avatar-lg">'+(u.picture?'<img src="'+escHtml(u.picture)+'" alt="" referrerpolicy="no-referrer" style="width:100%;height:100%;border-radius:50%;object-fit:cover;display:block">':escHtml(acctInitial(u)))+'</span>';
+  h+='<span class="prof-pic-wrap"><span class="avatar-orb avatar-lg">'+(pic?'<img src="'+escHtml(pic)+'" alt="" referrerpolicy="no-referrer" style="width:100%;height:100%;border-radius:50%;object-fit:cover;display:block">':escHtml(acctInitial(u)))+'</span><button type="button" class="prof-pic-cam" onclick="profPicPick()" aria-label="'+escHtml(tx(pic?'profPicChange':'profPicUpload'))+'"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg></button></span>';
   h+='<div style="min-width:0"><div style="font-size:1.125rem;font-weight:900;overflow-wrap:break-word">'+acctNameHtml(u)+'</div>';
   h+='<div style="font-size:0.8125rem;color:var(--muted);overflow-wrap:break-word;margin-top:2px">'+escHtml(u.email)+'</div></div></div>';
+  /* Profile picture: the Google photo arrives automatically; with
+     no Google photo the user picks one from their phone here. A
+     self-picked photo can be changed any time, and removed to go
+     back to the Google photo / initial. */
+  h+='<div class="prof-pic-btns"><button type="button" class="kbtn kbtn-white" onclick="profPicPick()">'+escHtml(tx(pic?'profPicChange':'profPicUpload'))+'</button>';
+  if(u.customPicture)h+='<button type="button" class="kbtn kbtn-white" onclick="profPicRemove()">'+escHtml(tx('profPicRemove'))+'</button>';
+  h+='</div>';
+  h+='<p style="font-size:0.75rem;color:var(--muted);line-height:1.6;margin-top:8px">'+escHtml(tx('profPicNote'))+'</p>';
+  h+='<p id="profPicMsg" style="font-size:0.8125rem;margin-top:6px;min-height:16px;line-height:1.5"></p>';
   h+=profileIdRow(u);
   h+='<div style="margin-top:16px;border-top:1px solid var(--line);padding-top:12px">';
   h+='<div style="font-size:0.8125rem;font-weight:800;color:var(--muted)">'+escHtml(tx('profileBalance'))+'</div>';
@@ -8158,6 +8344,7 @@ function genInit(){
   d3SetProvider('hunyuan3d');
   uiInit();
   try{acctAdminSync();}catch(e){}
+  try{nameGateCheck();}catch(e){}
   try{giftSchedule();}catch(e){}
   try{notifInit();}catch(e){}
   try{pushInit();}catch(e){}

@@ -74,7 +74,7 @@ const FREE_SONG_CREDITS = 24;
 
 /* ---------------- GitHub-backed persistent storage ----------------- */
 // Render free disk is ephemeral — ./data/*.json is wiped on restart, so
-// posts, credits and users vanish. When MOVAI_GITHUB_TOKEN is set, the 13
+// posts, credits and users vanish. When MOVAI_GITHUB_TOKEN is set, the 15
 // JSON data files are ALSO stored in a private GitHub repo (branch main,
 // repo root, same filenames). On startup the server pulls each file from
 // GitHub into the local ./data/ cache (overwriting local); on every local
@@ -92,7 +92,8 @@ const GH_DATA_FILES = [
   'users.json', 'grants.json', 'settings.json', 'admin-keys.json',
   'activity.json', 'followers.json', 'notifications.json', 'vapid.json',
   'push-subs.json', 'packages.json', 'purchase-requests.json',
-  'public.json', 'package-events.json',
+  'public.json', 'package-events.json', 'blocked-models.json',
+  'model-logins.json',
 ];
 const ghShaCache = {}; // filename -> GitHub blob sha (for PUT updates)
 function ghEnabled() { return !!GH_TOKEN; }
@@ -277,8 +278,55 @@ function deviceFromUA(ua) {
   if (/Linux/i.test(s)) return 'Linux';
   return s ? 'Unknown' : '';
 }
-function pubUser(u) {
-  return { id: u.id || '', email: u.email, name: u.name || '', firstName: u.firstName || '', lastName: u.lastName || '', credits: u.credits, songCredits: u.songCredits, plan: u.plan || '', songPlan: u.songPlan || '', createdAt: u.createdAt, updatedAt: u.updatedAt, lastIp: u.lastIp || '', device: u.device || '', lastSeen: u.lastSeen || '' };
+// Device MODEL CODE from the User-Agent, stored on the user record next to
+// device/lastIp/lastSeen. Android carries the model in parentheses, e.g.
+// "Linux; Android 13; CPH2325" -> "CPH2325" (the token right after the
+// Android version, up to the first space/;/)). iPhone/iPad/desktop return
+// the device family (those browsers send no per-model code).
+function modelFromUA(ua) {
+  const s = typeof ua === 'string' ? ua : '';
+  if (!s) return '';
+  const m = /Android\s+[\d.]+;\s*([^\s;)]+)/i.exec(s);
+  if (m && m[1]) return m[1].trim().slice(0, 64);
+  if (/iPhone/i.test(s)) return 'iPhone';
+  if (/iPad/i.test(s)) return 'iPad';
+  if (/Windows/i.test(s)) return 'Windows PC';
+  if (/Macintosh|Mac OS X/i.test(s)) return 'Mac';
+  if (/CrOS/i.test(s)) return 'Chromebook';
+  if (/Linux/i.test(s)) return 'Linux';
+  return 'Unknown';
+}
+// Blocked device models (./data/blocked-models.json) — an array of model
+// codes. A blocked model cannot sync (no user created/updated, no credits
+// granted). GitHub-backed like the other data files.
+const BLOCKED_MODELS_FILE = path.join(DATA_DIR, 'blocked-models.json');
+function loadBlockedModels() {
+  try { const j = JSON.parse(fs.readFileSync(BLOCKED_MODELS_FILE, 'utf8')); if (Array.isArray(j)) return j.filter((x) => typeof x === 'string'); } catch (e) {}
+  return [];
+}
+function saveBlockedModels(arr) {
+  try { fs.mkdirSync(DATA_DIR, { recursive: true }); } catch (e) {}
+  fs.writeFileSync(BLOCKED_MODELS_FILE, JSON.stringify(arr, null, 2));
+  ghPersistFile(BLOCKED_MODELS_FILE);
+}
+// Login count per device model (./data/model-logins.json) — a map
+// model code -> number of syncs (logins) from that model. Incremented on
+// every /api/admin/sync that carries a model. GitHub-backed.
+const MODEL_LOGINS_FILE = path.join(DATA_DIR, 'model-logins.json');
+function loadModelLogins() {
+  try { const j = JSON.parse(fs.readFileSync(MODEL_LOGINS_FILE, 'utf8')); if (j && typeof j === 'object' && !Array.isArray(j)) return j; } catch (e) {}
+  return {};
+}
+function saveModelLogins(m) {
+  try { fs.mkdirSync(DATA_DIR, { recursive: true }); } catch (e) {}
+  fs.writeFileSync(MODEL_LOGINS_FILE, JSON.stringify(m, null, 2));
+  ghPersistFile(MODEL_LOGINS_FILE);
+}
+function pubUser(u, modelLogins) {
+  const map = modelLogins || loadModelLogins();
+  const model = u.model || '';
+  const count = model && map && typeof map === 'object' ? (Number(map[model]) || 0) : 0;
+  return { id: u.id || '', email: u.email, name: u.name || '', firstName: u.firstName || '', lastName: u.lastName || '', credits: u.credits, songCredits: u.songCredits, plan: u.plan || '', songPlan: u.songPlan || '', createdAt: u.createdAt, updatedAt: u.updatedAt, lastIp: u.lastIp || '', device: u.device || '', model, modelLogins: count, lastSeen: u.lastSeen || '' };
 }
 function logGrant(entry) {
   try {
@@ -1128,6 +1176,12 @@ function apiRoute(req, res, urlPath) {
     readJSONBody(req, 64 * 1024).then(async (body) => {
       const email = normEmail(body && body.email);
       if (!email) return sendJSON(res, 200, { ok: false, error: 'សូមដាក់ Gmail ត្រឹមត្រូវ' });
+      // Blocked device model: refuse the sync entirely — no user is
+      // created/updated and no credits are granted.
+      const _model = modelFromUA(req.headers && req.headers['user-agent']);
+      if (_model && loadBlockedModels().some((b) => b.toUpperCase() === _model.toUpperCase())) {
+        return sendJSON(res, 200, { ok: false, error: 'ម៉ូដែលនេះត្រូវបានប្លុក · This device model is blocked' });
+      }
       const now = new Date().toISOString();
       logActivity({ at: now, mode: 'sync', email });
       const users = loadUsers();
@@ -1167,7 +1221,15 @@ function apiRoute(req, res, urlPath) {
       if (_cip) u.lastIp = _cip;
       const _dev = deviceFromUA(req.headers && req.headers['user-agent']);
       if (_dev) u.device = _dev;
+      if (_model) u.model = _model;
       u.lastSeen = now;
+      // Count this login against the device model.
+      let _modelLogins = null;
+      if (_model) {
+        _modelLogins = loadModelLogins();
+        _modelLogins[_model] = (Number(_modelLogins[_model]) || 0) + 1;
+        saveModelLogins(_modelLogins);
+      }
       u.credits = Math.max(0, Math.floor(numOr(u.credits, 0)));
       u.songCredits = Math.max(0, Math.floor(numOr(u.songCredits, 0)));
       saveUsers(users);
@@ -1181,7 +1243,7 @@ function apiRoute(req, res, urlPath) {
       if (body && body.giftClaimed === true) {
         addNotification('gift-claimed', email, '🎁 កាដូបានទទួល · Gift claimed', (u.name || email) + ' (' + email + ') បានទទួលកាដូ Free 250 Image.Video + 24 Song Credit');
       }
-      return sendJSON(res, 200, { ok: true, user: pubUser(u) });
+      return sendJSON(res, 200, { ok: true, user: pubUser(u, _modelLogins) });
     }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
     return;
   }
@@ -1190,7 +1252,8 @@ function apiRoute(req, res, urlPath) {
     const a = adminKeyOk(req);
     if (!a.ok) return sendJSON(res, 200, { ok: false, error: a.error });
     const users = loadUsers();
-    const list = Object.values(users).sort((x, y) => String(y.createdAt || '').localeCompare(String(x.createdAt || ''))).map(pubUser);
+    const modelLogins = loadModelLogins();
+    const list = Object.values(users).sort((x, y) => String(y.createdAt || '').localeCompare(String(x.createdAt || ''))).map((x) => pubUser(x, modelLogins));
     return sendJSON(res, 200, { ok: true, users: list });
   }
   // GET /api/admin/user?email=... — admin key required.
@@ -1249,6 +1312,48 @@ function apiRoute(req, res, urlPath) {
     delete users[email];
     saveUsers(users);
     return sendJSON(res, 200, { ok: true, deleted: email });
+  }
+  // POST /api/admin/block-model — {model} — admin key required. Adds a
+  // device model code to the blocked list; that model can no longer sync
+  // (no user created/updated, no credits granted). Comparison is
+  // case-insensitive; the code is stored as sent.
+  if (req.method === 'POST' && urlPath === '/api/admin/block-model') {
+    const a = adminKeyOk(req);
+    if (!a.ok) return sendJSON(res, 200, { ok: false, error: a.error });
+    readJSONBody(req, 64 * 1024).then(async (body) => {
+      const model = typeof body && typeof body.model === 'string' ? body.model.trim().slice(0, 64) : '';
+      if (!model) return sendJSON(res, 200, { ok: false, error: 'សូមដាក់កូដម៉ូដែល' });
+      const blocked = loadBlockedModels();
+      if (!blocked.some((b) => b.toUpperCase() === model.toUpperCase())) blocked.push(model);
+      saveBlockedModels(blocked);
+      // Critical write: confirm the block list is on GitHub BEFORE
+      // returning success, so a restart cannot lose the block.
+      await ghFlushFile(BLOCKED_MODELS_FILE);
+      return sendJSON(res, 200, { ok: true, blocked });
+    }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
+    return;
+  }
+  // POST /api/admin/unblock-model — {model} — admin key required. Removes
+  // a device model code from the blocked list so it can sync again.
+  if (req.method === 'POST' && urlPath === '/api/admin/unblock-model') {
+    const a = adminKeyOk(req);
+    if (!a.ok) return sendJSON(res, 200, { ok: false, error: a.error });
+    readJSONBody(req, 64 * 1024).then(async (body) => {
+      const model = typeof body && typeof body.model === 'string' ? body.model.trim().slice(0, 64) : '';
+      if (!model) return sendJSON(res, 200, { ok: false, error: 'សូមដាក់កូដម៉ូដែល' });
+      const blocked = loadBlockedModels().filter((b) => b.toUpperCase() !== model.toUpperCase());
+      saveBlockedModels(blocked);
+      await ghFlushFile(BLOCKED_MODELS_FILE);
+      return sendJSON(res, 200, { ok: true, blocked });
+    }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
+    return;
+  }
+  // GET /api/admin/blocked-models — admin key required. Lists the blocked
+  // device model codes.
+  if (req.method === 'GET' && urlPath === '/api/admin/blocked-models') {
+    const a = adminKeyOk(req);
+    if (!a.ok) return sendJSON(res, 200, { ok: false, error: a.error });
+    return sendJSON(res, 200, { ok: true, blocked: loadBlockedModels() });
   }
   // GET /api/admin/settings — PUBLIC (no admin key). The MovAi website reads
   // it on load to know whether the admin turned Smooth mode Auto on.
