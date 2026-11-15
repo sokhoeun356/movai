@@ -210,15 +210,31 @@ function apiRoute(req, res, urlPath) {
         if (!title && !lyrics && !style && !prompt) return sendJSON(res, 200, { ok: false, error: 'សូមសរសេរ prompt ជាមុនសិន' });
         if (!key) return sendJSON(res, 200, { ok: false, error: 'មិនទាន់មាន API Key ទេ' });
         if (provider === 'musicapi') {
-          const parts = [];
-          if (style) parts.push(style);
-          if (voice === 'male') parts.push('male vocals');
-          else if (voice === 'female') parts.push('female vocals');
-          if (title) parts.push('titled "' + title + '"');
-          if (prompt) parts.push(prompt);
-          if (lyrics) parts.push('Lyrics: ' + lyrics);
-          const desc = parts.join('. ').slice(0, 4000) || prompt;
-          const r = await fetch('https://api.musicapi.ai/api/v1/sonic/create', { method: 'POST', headers: { 'Authorization': 'Bearer ' + key, 'Content-Type': 'application/json' }, body: JSON.stringify({ custom_mode: false, mv: 'sonic-v6', gpt_description_prompt: desc }), signal: AbortSignal.timeout(60000) });
+          let reqBody;
+          if (lyrics) {
+            // Custom mode: the user wrote their own lyrics, so MusicAPI must sing
+            // THOSE words. prompt = lyrics, tags = style. With custom_mode:false
+            // MusicAPI ignores the lyrics and auto-generates its own English ones.
+            const tagsParts = [];
+            if (style) tagsParts.push(style);
+            if (voice === 'male') tagsParts.push('male vocals');
+            else if (voice === 'female') tagsParts.push('female vocals');
+            reqBody = { custom_mode: true, mv: 'sonic-v6', prompt: lyrics.slice(0, 5000), tags: tagsParts.join(', ').slice(0, 1000) };
+            if (title) reqBody.title = title.slice(0, 80);
+            if (voice === 'male') reqBody.vocal_gender = 'm';
+            else if (voice === 'female') reqBody.vocal_gender = 'f';
+          } else {
+            // AI description mode: no lyrics given, MusicAPI writes its own.
+            const parts = [];
+            if (style) parts.push(style);
+            if (voice === 'male') parts.push('male vocals');
+            else if (voice === 'female') parts.push('female vocals');
+            if (title) parts.push('titled "' + title + '"');
+            if (prompt) parts.push(prompt);
+            const desc = parts.join('. ').slice(0, 4000) || prompt;
+            reqBody = { custom_mode: false, mv: 'sonic-v6', gpt_description_prompt: desc };
+          }
+          const r = await fetch('https://api.musicapi.ai/api/v1/sonic/create', { method: 'POST', headers: { 'Authorization': 'Bearer ' + key, 'Content-Type': 'application/json' }, body: JSON.stringify(reqBody), signal: AbortSignal.timeout(60000) });
           const j = await r.json().catch(() => null);
           const taskId = j && (j.task_id || (j.data && j.data.task_id));
           if (taskId) return sendJSON(res, 200, { ok: true, jobId: taskId });
