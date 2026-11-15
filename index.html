@@ -522,6 +522,13 @@ html[data-mode="light"] .btn-free{color:#8a6100}
 .pub-card{background:var(--card2);border:1px solid var(--line);border-radius:14px;padding:14px;margin-top:12px}
 .pub-rank{display:inline-flex;align-items:center;justify-content:center;min-width:34px;height:26px;padding:0 8px;border-radius:999px;background:rgba(140,150,170,.14);border:1px solid var(--line);font-size:0.8125rem;font-weight:900;font-variant-numeric:tabular-nums}
 .pub-name{font-size:0.875rem;font-weight:800;color:var(--accent-text);overflow-wrap:break-word;min-width:0}
+/* Admin poster name (owner rule): «Mov.Yem Sokhoeun» in gold —
+   a gold gradient with a soft glow, the most powerful name colour
+   in the feed, standing out above every normal poster name. */
+.pub-admin-name{font-size:0.875rem;font-weight:900;color:#f2b705;overflow-wrap:break-word;min-width:0;text-shadow:0 0 8px rgba(255,190,40,.55)}
+@supports ((-webkit-background-clip:text) or (background-clip:text)){
+.pub-admin-name{background:linear-gradient(90deg,#b97e06,#f7c948 30%,#ffec9e 50%,#f7c948 70%,#b97e06);-webkit-background-clip:text;background-clip:text;color:transparent;text-shadow:none;filter:drop-shadow(0 0 5px rgba(255,190,40,.45))}
+}
 .pub-media{width:100%;border-radius:12px;display:block;margin-top:10px;background:#000}
 .pub-audio{width:100%;margin-top:10px;display:block}
 .pub-foot{display:flex;align-items:center;gap:10px;margin-top:12px;flex-wrap:wrap}
@@ -5604,6 +5611,7 @@ function pubNormItem(x){
   return {
     id:String(x.id||x.postId||x._id||url),
     name:String(x.name||x.author||x.userName||x.owner||''),
+    email:String(x.email||x.userEmail||x.authorEmail||x.ownerEmail||''),
     premium:!!(x.premium||x.hasPlan||x.plan),
     title:String(x.title||''),
     type:type,url:url,
@@ -5690,7 +5698,7 @@ function pubLoadFeed(force){
 function pubFeedSig(items){
   try{
     return (items||[]).map(function(it){
-      return [it.id,it.type,it.url,it.title||'',it.views,it.likes,it.dislikes,it.tier,it.rank,it.image||'',it.aspect||'',it.youtube||'',it.youtubeChannel||''].join('|');
+      return [it.id,it.type,it.url,it.title||'',it.name||'',it.email||'',it.views,it.likes,it.dislikes,it.tier,it.rank,it.image||'',it.aspect||'',it.youtube||'',it.youtubeChannel||''].join('|');
     }).join(';;');
   }catch(e){return '';}
 }
@@ -5856,6 +5864,29 @@ function pubAspectCss(a){
   if(a==='4x6')return 'aspect-ratio:4 / 6;object-fit:cover;background:transparent;max-width:280px';
   return '';
 }
+/* Admin poster treatment (owner rule): a Public post whose poster
+   is the Admin — the poster email is one of the admin Gmails, or
+   the poster name is «Admin» — shows the poster name as
+   «Mov.Yem Sokhoeun» in gold (.pub-admin-name) on EVERY card in
+   the feed (song, image, video, 3D alike). Normal posters keep
+   their own name and the normal name treatment. */
+var PUB_ADMIN_EMAILS=['sokhoeun7788@gmail.com','yemsokhoeun98@gmail.com','sokhoeun350@gmail.com'];
+var PUB_ADMIN_DISPLAY='Mov.Yem Sokhoeun';
+function pubIsAdmin(it){
+  if(!it)return false;
+  var em=String(it.email||'').trim().toLowerCase();
+  if(em&&PUB_ADMIN_EMAILS.indexOf(em)>=0)return true;
+  var nm=String(it.name||'').trim().toLowerCase();
+  return nm==='admin'||nm==='mov.yem sokhoeun';
+}
+function pubDisplayName(it){
+  if(!it)return '';
+  return pubIsAdmin(it)?PUB_ADMIN_DISPLAY:String(it.name||'');
+}
+function pubNameHtml(it){
+  var dn=pubDisplayName(it);if(!dn)return '';
+  return pubIsAdmin(it)?'<span class="pub-admin-name">'+escHtml(dn)+'</span>':escHtml(dn);
+}
 function pubCardEl(it){
   var card=document.createElement('div');
   card.className='pub-card';
@@ -5866,11 +5897,13 @@ function pubCardEl(it){
   rk.className='pub-rank';
   rk.textContent='#'+(it.rank!==null?it.rank:it._pos);
   head.appendChild(rk);
-  if(it.name){
+  var dispName=pubDisplayName(it);
+  if(dispName){
     var nm=document.createElement('span');
-    if(it.premium){nm.className='premium-name';nm.style.fontSize='0.875rem';nm.style.fontWeight='800';}
+    if(pubIsAdmin(it)){nm.className='pub-admin-name';}
+    else if(it.premium){nm.className='premium-name';nm.style.fontSize='0.875rem';nm.style.fontWeight='800';}
     else nm.className='pub-name';
-    nm.textContent=it.name;
+    nm.textContent=dispName;
     head.appendChild(nm);
   }
   var tch=document.createElement('span');
@@ -6013,7 +6046,7 @@ function pubCardEl(it){
     var mh='';
     mh+='<div><b>'+escHtml(tx('pubSongId'))+'</b><span class="pm-id">'+escHtml(it.id)+'</span></div>';
     if(it.title)mh+='<div><b>'+escHtml(tx('pubTypeSong'))+'</b>'+escHtml(it.title)+'</div>';
-    if(it.name)mh+='<div><b>'+escHtml(tx('pubPostedBy')||'')+'</b>'+escHtml(it.name)+'</div>';
+    if(pubDisplayName(it))mh+='<div><b>'+escHtml(tx('pubPostedBy')||'')+'</b>'+pubNameHtml(it)+'</div>';
     if(it.duration!==null&&it.duration>0)mh+='<div><b>'+escHtml(tx('pubDuration'))+'</b>'+escHtml(histFmtTime(it.duration))+'</div>';
     if(it.model)mh+='<div><b>'+escHtml(tx('pubModel'))+'</b>'+escHtml(it.model)+'</div>';
     if(it.genre)mh+='<div><b>'+escHtml(tx('pubGenre')||'')+'</b>'+escHtml(it.genre)+'</div>';
