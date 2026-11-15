@@ -1510,6 +1510,62 @@ function apiRoute(req, res, urlPath) {
   function pubPost(p) {
     return { id: p.id, email: p.email, name: p.name || '', userId: p.userId || '', mode: p.mode, title: p.title, url: p.url, cover: p.cover || '', visibility: p.visibility, likes: p.likes || 0, views: p.views || 0, createdAt: p.createdAt };
   }
+  // ---- File uploads for the Admin app Post form (MP3 + cover image) ----
+  // POST /api/public/upload — ADMIN KEY required. JSON {kind: 'audio'|'image',
+  // filename, data: base64}. Saves under ./data/uploads/ and returns the
+  // public URL. Audio max 15 MB, image max 5 MB. The Admin app reads the
+  // chosen file as base64 and POSTs it here, then fills the Post Link/Cover
+  // field with the returned URL. Render free disk is ephemeral (same as
+  // ./data/*.json) — uploaded files can be lost on restart/redeploy.
+  const UPLOADS_DIR = path.join(DATA_DIR, 'uploads');
+  const UPLOAD_MIME = { '.mp3': 'audio/mpeg', '.wav': 'audio/wav', '.ogg': 'audio/ogg', '.m4a': 'audio/mp4', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png', '.webp': 'image/webp', '.gif': 'image/gif' };
+  function uploadSafeExt(kind, filename) {
+    const ext = String(filename || '').toLowerCase().split('.').pop();
+    const dot = '.' + (ext || '');
+    if (kind === 'audio') return ['.mp3', '.wav', '.ogg', '.m4a'].includes(dot) ? dot : '';
+    if (kind === 'image') return ['.jpg', '.jpeg', '.png', '.webp', '.gif'].includes(dot) ? dot : '';
+    return '';
+  }
+  if (req.method === 'POST' && urlPath === '/api/public/upload') {
+    const a = adminKeyOk(req);
+    if (!a.ok) return sendJSON(res, 200, { ok: false, error: a.error });
+    readJSONBody(req, 20 * 1024 * 1024).then((body) => {
+      const kind = typeof body.kind === 'string' ? body.kind.trim().toLowerCase() : '';
+      if (kind !== 'audio' && kind !== 'image') return sendJSON(res, 200, { ok: false, error: 'kind ត្រូវជា audio ឬ image' });
+      const ext = uploadSafeExt(kind, body.filename);
+      if (!ext) return sendJSON(res, 200, { ok: false, error: 'ប្រភេទឯកសារមិនត្រឹមត្រូវទេ' });
+      const b64 = typeof body.data === 'string' ? body.data.replace(/\s/g, '') : '';
+      if (!b64 || !/^[A-Za-z0-9+/=]+$/.test(b64)) return sendJSON(res, 200, { ok: false, error: 'ទិន្នន័យឯកសារមិនត្រឹមត្រូវទេ' });
+      const buf = Buffer.from(b64, 'base64');
+      const maxBytes = kind === 'audio' ? 15 * 1024 * 1024 : 5 * 1024 * 1024;
+      if (!buf.length || buf.length > maxBytes) return sendJSON(res, 200, { ok: false, error: kind === 'audio' ? 'MP3 ធំពេក (អតិបរមា 15 MB)' : 'រូបភាពធំពេក (អតិបរមា 5 MB)' });
+      try {
+        fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+        const name = Date.now().toString(36) + '-' + crypto.randomInt(100000, 999999) + ext;
+        fs.writeFileSync(path.join(UPLOADS_DIR, name), buf);
+        const proto = req.headers && req.headers['x-forwarded-proto'] === 'http' ? 'http' : 'https';
+        const host = (req.headers && req.headers.host) || 'movai-proxy.onrender.com';
+        return sendJSON(res, 200, { ok: true, url: proto + '://' + host + '/uploads/' + name, name, kind, size: buf.length });
+      } catch (e) {
+        return sendJSON(res, 200, { ok: false, error: 'រក្សាទុកឯកសារបរាជ័យ' });
+      }
+    }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
+    return;
+  }
+  // GET /uploads/<name> — serve an uploaded MP3/cover. Name is basename-only
+  // (no path traversal); unknown extension or missing file -> 404.
+  if (req.method === 'GET' && urlPath.startsWith('/uploads/')) {
+    const name = path.basename(urlPath.slice('/uploads/'.length)).split('?')[0];
+    const ext = '.' + String(name).toLowerCase().split('.').pop();
+    const mime = UPLOAD_MIME[ext];
+    if (!mime || !/^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(name)) { res.writeHead(404); res.end('Not found'); return; }
+    try {
+      const buf = fs.readFileSync(path.join(UPLOADS_DIR, name));
+      res.writeHead(200, { 'Content-Type': mime, 'Content-Length': buf.length, 'Cache-Control': 'public, max-age=86400' });
+      res.end(buf);
+    } catch (e) { res.writeHead(404); res.end('Not found'); }
+    return;
+  }
   // POST /api/public/post — PUBLIC. {email, name, userId?, mode, title, url, cover?, visibility?}
   if (req.method === 'POST' && urlPath === '/api/public/post') {
     readJSONBody(req, 64 * 1024).then((body) => {
@@ -1661,7 +1717,7 @@ const server = http.createServer((req, res) => {
     });
     return res.end();
   }
-  if (urlPath.startsWith('/api/')) return apiRoute(req, res, urlPath);
+  if (urlPath.startsWith('/api/') || urlPath.startsWith('/uploads/')) return apiRoute(req, res, urlPath);
   if (urlPath === '/' || urlPath === '') urlPath = '/index.html';
   const file = path.join(ROOT, urlPath);
   if (!file.startsWith(ROOT)) { res.writeHead(403); return res.end('Forbidden'); }
