@@ -1556,7 +1556,7 @@ function apiRoute(req, res, urlPath) {
   }
   // Public view of a post. likedBy (liker emails) is never exposed.
   function pubPost(p) {
-    return { id: p.id, email: p.email, name: p.name || '', userId: p.userId || '', mode: p.mode, title: p.title, url: p.url, cover: p.cover || '', aspect: p.aspect || '', youtube: p.youtube || '', visibility: p.visibility, likes: p.likes || 0, views: p.views || 0, createdAt: p.createdAt };
+    return { id: p.id, email: p.email, name: p.name || '', userId: p.userId || '', mode: p.mode, title: p.title, url: p.url, cover: p.cover || '', aspect: p.aspect || '', youtube: p.youtube || '', youtubeChannel: p.youtubeChannel || '', visibility: p.visibility, likes: p.likes || 0, views: p.views || 0, createdAt: p.createdAt };
   }
   // ---- File uploads for the Admin app Post form (MP3 + cover image) ----
   // POST /api/public/upload — ADMIN KEY required. JSON {kind: 'audio'|'image',
@@ -1629,6 +1629,7 @@ function apiRoute(req, res, urlPath) {
       const aspectRaw = typeof body.aspect === 'string' ? body.aspect.trim() : '';
       const aspect = (aspectRaw === '1x1' || aspectRaw === '4x6') ? aspectRaw : '';
       const youtube = typeof body.youtube === 'string' ? body.youtube.trim().slice(0, 2000) : '';
+      const youtubeChannel = typeof body.youtubeChannel === 'string' ? body.youtubeChannel.trim().slice(0, 2000) : '';
       const now = new Date().toISOString();
       const posts = loadPublicPosts();
       const p = {
@@ -1637,7 +1638,7 @@ function apiRoute(req, res, urlPath) {
         userId: typeof body.userId === 'string' ? body.userId.trim().slice(0, 50) : '',
         mode, title, url,
         cover: typeof body.cover === 'string' ? body.cover.trim().slice(0, 2000) : '',
-        aspect, youtube, visibility, likes: 0, views: 0, likedBy: [], createdAt: now,
+        aspect, youtube, youtubeChannel, visibility, likes: 0, views: 0, likedBy: [], createdAt: now,
       };
       posts.push(p);
       if (posts.length > PUBLIC_MAX) posts.splice(0, posts.length - PUBLIC_MAX);
