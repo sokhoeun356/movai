@@ -32,58 +32,82 @@ main{max-width:720px;margin:0 auto;padding:4.75rem 18px 48px}
 .brand-frame .menu-btn span{background:var(--glass-text)}
 .acct-chip{display:inline-flex;align-items:center;gap:6px;margin-left:10px;align-self:center;background:linear-gradient(135deg,rgba(255,255,255,calc(.04 + var(--glass-shine,.55)*.4)),rgba(255,255,255,calc(var(--glass-shine,.55)*.1)) 42%,rgba(190,198,212,calc(var(--glass-frost,.65)*.24)) 80%,rgba(var(--glass-tint),.22));background-color:rgba(var(--glass-tint),var(--glass-alpha,.5));-webkit-backdrop-filter:blur(var(--glass-blur,18px)) saturate(170%);backdrop-filter:blur(var(--glass-blur,18px)) saturate(170%);border:1px solid rgba(var(--glass-text-rgb),calc(.16 + var(--glass-shine,.55)*.22));border-radius:999px;padding:10px 16px;font-family:inherit;font-size:0.8125rem;font-weight:800;color:var(--glass-text);cursor:pointer;min-height:44px;box-shadow:0 10px 28px rgba(0,0,0,.24);white-space:nowrap}
 .acct-chip b{color:var(--accent-text);font-size:0.9375rem}
-/* ===== Top-right cluster: credit chips + Log in / avatar =====
+/* ===== Top-right cluster: notification bell + Log in / avatar =====
    Sits in the TOP-RIGHT corner, clear of the ☰ + MovAi brand frame
-   (top-left) and of everything below it — nothing overlaps. Two
-   credit chips, colour-coded and labelled: Song credits are YELLOW,
-   Image & Video credits are PURPLE. The chips show ONLY after sign-in
-   (with the real balances); guests see just the Log in button. After
-   log in, the Log in button is replaced by a glossy 3D profile avatar
-   in the same corner. */
-.topbar-right{position:fixed;top:12px;right:max(18px,calc(50% - 342px));z-index:30;display:flex;align-items:center;gap:8px}
+   (top-left) and of everything below it — nothing overlaps. The
+   cluster is ONE horizontal row (owner order 2026-11-15): the
+   notification bell sits on the LEFT, and the profile avatar (or,
+   for guests, the Log in button) sits on the RIGHT beside it. The
+   credit chips are GONE from the header entirely (owner order
+   2026-11-15): both balances (Song YELLOW, Image & Video PURPLE)
+   live ONLY in the Profile sheet now — tapping the avatar shows
+   them there as clear balance rows. After log in, the Log in
+   button is replaced by a glossy 3D profile avatar in the same
+   corner. */
+.topbar-right{position:fixed;top:12px;right:max(18px,calc(50% - 342px));z-index:30;display:flex;flex-direction:row;align-items:center;gap:10px}
+/* The header row is one short row for guests and signed-in users
+   alike (bell left + Log in / avatar right), so the page top
+   padding is one value for everyone — see the main rule and the
+   narrow-screen rule below. */
 .topbar-right .acct-chip{margin-left:0}
 /* The header carries NO brand/creator credit — «MovAi» + «YEM
    SOKHOEUN / Create by Owner» lives only on the free-video watermark
-   cover. For guests the top-right corner shows ONLY the Log in
-   button; the two credit chips appear only after sign-in. */
-.credit-chips{display:flex;flex-direction:column;gap:5px;align-items:stretch}
-.credit-chip{display:flex;align-items:center;gap:6px;height:28px;border-radius:999px;padding:3px 10px 3px 4px;min-width:132px;font-size:0.6875rem;font-weight:700;line-height:1.2;white-space:nowrap;border:1px solid;-webkit-backdrop-filter:blur(var(--glass-blur,18px)) saturate(170%);backdrop-filter:blur(var(--glass-blur,18px)) saturate(170%);box-shadow:0 6px 18px rgba(0,0,0,.22),inset 0 1px 0 rgba(255,255,255,.16)}
-.credit-chip .coin{width:19px;height:19px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto}
-.credit-chip .coin svg{width:12px;height:12px;display:block}
-.credit-chip .clabel{letter-spacing:.01em}
-.credit-chip b{font-size:0.8125rem;font-weight:900;font-variant-numeric:tabular-nums;margin-left:auto;padding-left:6px}
-.chip-song{color:#ffe27a;border-color:rgba(255,196,0,.55);background:linear-gradient(120deg,rgba(255,196,0,.22),rgba(255,196,0,.06))}
-.chip-song .coin{background:radial-gradient(circle at 32% 28%,#ffec9e,#ffc400 58%,#dd9a00);color:#7a5200;box-shadow:0 0 10px rgba(255,196,0,.55),inset 0 -2px 3px rgba(122,82,0,.35)}
-.chip-song b{color:#ffd83d}
-.chip-media{color:#e7baff;border-color:rgba(181,55,242,.55);background:linear-gradient(120deg,rgba(181,55,242,.24),rgba(181,55,242,.07))}
-.chip-media .coin{background:radial-gradient(circle at 32% 28%,#eecfff,#b537f2 58%,#8f27c9);color:#ffffff;box-shadow:0 0 10px rgba(181,55,242,.55),inset 0 -2px 3px rgba(56,8,92,.45)}
-.chip-media b{color:#e3aaff}
-html[data-mode="light"] .chip-song{color:#7a5200;background:linear-gradient(120deg,rgba(255,196,0,.32),rgba(255,196,0,.12))}
-html[data-mode="light"] .chip-song b{color:#7a5200}
-html[data-mode="light"] .chip-media{color:#7c1fa2;background:linear-gradient(120deg,rgba(181,55,242,.20),rgba(181,55,242,.08))}
-html[data-mode="light"] .chip-media b{color:#7c1fa2}
+   cover. For guests the top-right corner shows the Log in button
+   with the bell to its LEFT (the bell opens the log-in sheet). */
 .avatar-btn{width:46px;height:46px;border-radius:50%;padding:0;border:none;background:transparent;cursor:pointer;flex:0 0 auto;align-items:center;justify-content:center}
 .avatar-orb{width:46px;height:46px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-weight:900;font-size:1.25rem;color:#fff;background:radial-gradient(circle at 30% 24%,rgba(255,255,255,.9),rgba(255,255,255,0) 42%),linear-gradient(145deg,#38bdf8,#6366f1 45%,#b537f2 80%,#ff2e88);border:2px solid rgba(255,255,255,.4);box-shadow:inset 0 -7px 13px rgba(0,0,0,.38),inset 0 5px 9px rgba(255,255,255,.35),0 9px 22px rgba(0,0,0,.42);text-shadow:0 1px 3px rgba(0,0,0,.5);line-height:1}
 .avatar-orb.avatar-lg{width:64px;height:64px;font-size:1.75rem;flex:0 0 auto}
 @media(max-width:420px){
- .credit-chip{font-size:0.625rem;min-width:106px;height:26px;padding:2px 9px 2px 3px;gap:5px}
- .credit-chip .coin{width:17px;height:17px}
- .credit-chip .coin svg{width:11px;height:11px}
- .credit-chip b{font-size:0.75rem}
  .topbar-right .acct-chip{padding:8px 12px}
  .avatar-btn,.avatar-orb{width:42px;height:42px}
  .avatar-orb{font-size:1.125rem}
  .avatar-orb.avatar-lg{width:64px;height:64px;font-size:1.75rem}
  .brand-frame .brand-name{font-size:1.125rem}
 }
+/* ===== Notifications · ដំណឹង =====
+   Bell in the top-right header, to the LEFT of the avatar / Log in
+   button in the same row, with a red
+   unread-count badge, a «ដំណឹង» section in the ☰ drawer, and a
+   sheet listing the signed-in account's real notifications from
+   the server. For guests the bell opens the log-in sheet. */
+.notif-bell{position:relative;width:44px;height:44px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;background:linear-gradient(135deg,rgba(255,255,255,calc(.04 + var(--glass-shine,.55)*.4)),rgba(255,255,255,calc(var(--glass-shine,.55)*.1)) 42%,rgba(190,198,212,calc(var(--glass-frost,.65)*.24)) 80%,rgba(var(--glass-tint),.22));background-color:rgba(var(--glass-tint),var(--glass-alpha,.5));-webkit-backdrop-filter:blur(var(--glass-blur,18px)) saturate(170%);backdrop-filter:blur(var(--glass-blur,18px)) saturate(170%);border:1px solid rgba(var(--glass-text-rgb),calc(.16 + var(--glass-shine,.55)*.22));color:var(--glass-text);cursor:pointer;box-shadow:0 10px 28px rgba(0,0,0,.24)}
+.notif-bell svg{width:21px;height:21px;display:block}
+.notif-badge{position:absolute;top:-5px;right:-5px;min-width:20px;height:20px;padding:0 5px;border-radius:999px;background:#e02424;color:#fff;font-size:0.625rem;font-weight:900;line-height:20px;text-align:center;box-shadow:0 2px 8px rgba(0,0,0,.4)}
+.notif-count{display:inline-flex;align-items:center;justify-content:center;min-width:20px;height:20px;padding:0 6px;border-radius:999px;background:#e02424;color:#fff;font-size:0.625rem;font-weight:900;vertical-align:2px;margin-left:6px}
+.notif-note{font-size:0.8125rem;color:var(--muted);line-height:1.6;margin-top:10px}
+.drawer .notif-note{color:var(--glass-muted)}
+.notif-item{display:flex;gap:11px;width:100%;align-items:flex-start;background:transparent;border:1px solid var(--line);border-radius:14px;padding:12px 13px;margin-top:8px;cursor:pointer;font-family:inherit;color:var(--text);text-align:left}
+.notif-item.unread{border-color:rgba(var(--accent-rgb),.5);background:rgba(var(--accent-rgb),.06)}
+.notif-item:not(.unread) .nt{font-weight:600}
+.notif-ico{width:36px;height:36px;border-radius:50%;flex:0 0 auto;display:inline-flex;align-items:center;justify-content:center}
+.notif-ico svg{width:19px;height:19px;display:block}
+.notif-main{flex:1 1 auto;min-width:0;display:block}
+.notif-main .nt{display:block;font-size:0.875rem;font-weight:800;line-height:1.45;overflow-wrap:break-word}
+.notif-main .nb{display:block;font-size:0.8125rem;color:var(--muted);line-height:1.55;margin-top:2px;overflow-wrap:break-word}
+.notif-main .notif-amt{font-weight:700;color:var(--text2)}
+.notif-main .ntime{display:block;font-size:0.6875rem;color:var(--muted);margin-top:4px}
+.notif-dot{width:8px;height:8px;border-radius:50%;background:var(--accent);flex:0 0 auto;margin-top:7px}
+/* ===== Web Push · ដំណឹងចេញពីទូរស័ព្ទ =====
+   Pill switch in the ☰ drawer settings box. Its state always
+   reflects this device's REAL push subscription: knob right +
+   accent fill = subscribed, knob left = not subscribed. */
+.push-switch{position:relative;width:52px;height:30px;border-radius:999px;border:1px solid var(--glass-line);background:rgba(127,134,148,.28);cursor:pointer;flex:0 0 auto;padding:0;-webkit-tap-highlight-color:transparent}
+.push-knob{position:absolute;top:3px;left:3px;width:22px;height:22px;border-radius:50%;background:#d6d9e0;transition:left .18s ease,background .18s ease}
+.push-switch.on{background:var(--accent);border-color:transparent}
+.push-switch.on .push-knob{left:25px;background:#fff}
+.push-switch:disabled{opacity:.5;cursor:wait}
+.drawer .notif-item{border-color:var(--glass-line);color:var(--glass-text)}
+.drawer .notif-item.unread{border-color:rgba(var(--accent-rgb),.55)}
+.drawer .notif-main .nb,.drawer .notif-main .ntime{color:var(--glass-muted)}
+.drawer .notif-main .notif-amt{color:var(--glass-text2)}
 @media(max-width:680px){
- /* Narrow screens: the top-right cluster stacks vertically in its own
-    corner — credit chips on top (signed-in only), Log in / avatar at
-    the bottom — right-aligned, so it never spills left over the
-    ☰ + MovAi brand frame and the chips never sit on top of the MovAi
-    wordmark. The page top padding clears the whole stack. */
- .topbar-right{flex-direction:column;align-items:flex-end;gap:5px}
- main{padding-top:11.75rem}
+ /* Narrow screens: the top-right cluster stays ONE horizontal row in
+    its own corner — notification bell on the left, Log in / avatar
+    on the right — so it never spills left over the ☰ + MovAi brand
+    frame and never sits on top of the MovAi wordmark. The page top
+    padding clears the single (short) row. */
+ .topbar-right{flex-direction:row;align-items:center;gap:8px}
+ main{padding-top:4.75rem}
 }
 .hero{padding:18px 2px 6px}
 .hero h1{font-size:2.3125rem;font-weight:900;line-height:1.15;letter-spacing:-.01em}
@@ -283,15 +307,37 @@ img.hist-media,.d3-preview{cursor:zoom-in}
 .song-wheel-btn:active{opacity:.75}
 .song-wheel-count{font-size:0.8125rem;color:var(--muted);font-weight:700;font-variant-numeric:tabular-nums;min-width:52px;text-align:center}
 @media (prefers-reduced-motion:reduce){.hist-carousel>.hist-card,.song-wheel-stage .hist-card,.song-wheel-stage{transition:none}}
-/* ===== Song results — two cards side by side (ACE Music style) =====
-   The songs of one generation sit in ONE row, two per row, never
-   stacked vertically. While a song is being created its card shows a
-   SOLID colour cover (song 1 green, song 2 blue) with a "Creating..."
-   label; when the song lands, the solid cover is replaced by the
-   song's real cover image from the provider. */
-.song-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+/* ===== Song cards — one small horizontal row per song =====
+   Song cards (generation results AND History, same layout) stack
+   vertically with a tight ~5px gap. Each card is ONE compact row:
+   small square cover on the left, a small round Play button beside
+   it, the title next to that, and on the right the song's duration
+   (m:ss) plus small Like / Download / Share icon buttons — nothing
+   big, everything small: cover, text, buttons, padding, corners.
+   A slim seek strip under the row shows playback progress. While a
+   song is being created its row shows a SOLID colour cover (song 1
+   green, song 2 blue) with a "Creating..." label; when the song
+   lands, the solid cover is replaced by the song's real cover. */
+.song-grid{display:flex;flex-direction:column;gap:5px}
 .song-grid>.hist-card{margin-top:0;min-width:0}
-.song-grid .hist-actions .kbtn{flex:1 1 40%}
+#histList-song>.song-card{margin-top:5px}
+#histList-song>.song-card:first-child{margin-top:0}
+.song-card{padding:7px 8px;border-radius:8px}
+.song-row{display:flex;align-items:center;gap:7px}
+.song-row .song-cover{width:40px;height:40px;flex:0 0 auto;border-radius:6px}
+.song-play{width:30px;height:30px;flex:0 0 auto;border-radius:50%;border:1px solid var(--line2);background:var(--accent);color:#101216;font-size:0.6875rem;cursor:pointer;font-family:inherit;display:inline-flex;align-items:center;justify-content:center;padding:0;line-height:1}
+.song-play:active{opacity:.8}
+.song-meta{flex:1 1 auto;min-width:0}
+.song-title{font-size:0.75rem;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.35}
+.song-sub{font-size:0.625rem;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:1px;line-height:1.4;font-variant-numeric:tabular-nums}
+.song-dur{flex:0 0 auto;font-size:0.6875rem;font-weight:700;color:var(--muted);font-variant-numeric:tabular-nums}
+.song-ico-btn{width:26px;height:26px;flex:0 0 auto;display:inline-flex;align-items:center;justify-content:center;border:1px solid var(--line2);background:var(--card);color:var(--text);border-radius:7px;cursor:pointer;padding:0;font-family:inherit}
+.song-ico-btn svg{width:13px;height:13px;display:block}
+.song-ico-btn:active{opacity:.75}
+.song-ico-btn.liked{color:#ff2e88;border-color:rgba(255,46,136,.55)}
+.song-seek{display:block;width:100%;height:12px;margin:5px 0 0;accent-color:var(--accent);cursor:pointer}
+.song-stream-badge{font-weight:700;color:var(--accent-text);animation:songPulse 1.8s ease-in-out infinite}
+@media (prefers-reduced-motion:reduce){.song-stream-badge{animation:none}}
 .song-cover{display:block;width:100%;aspect-ratio:1/1;object-fit:cover;border-radius:10px;background:#22262c}
 .song-cover-solid{border:1px solid rgba(255,255,255,.14)}
 .song-cover-solid.creating{animation:songPulse 1.8s ease-in-out infinite}
@@ -525,6 +571,77 @@ html[data-mode="light"] .btn-free{color:#8a6100}
 #loginSheet .login-brand-credit b{display:block;font-size:0.75rem;font-weight:800;letter-spacing:.04em;color:var(--text);white-space:nowrap}
 #loginSheet .login-brand-credit i{display:block;font-style:normal;font-size:0.6875rem;font-weight:600;color:var(--muted);white-space:nowrap}
 .pkg-sheet-card{background:var(--card);border:1px solid var(--line2);border-radius:18px;padding:20px;width:100%;max-width:420px;max-height:88vh;overflow-y:auto;color:var(--text)}
+/* ===== Offline / server-unreachable popup =====
+   Sits ABOVE every other sheet (z-index 300) and cannot be
+   dismissed by tapping outside or with a close button — it only
+   goes away on its own when the connection check passes again,
+   or the user taps «ព្យាយាមម្ដងទៀត · Retry» and the re-check
+   succeeds. Two wordings share the one card: no internet at all
+   (browser offline) and internet present but the movai-proxy
+   server not answering (asleep / unreachable). */
+.offline-sheet{z-index:300}
+.offline-ico{width:64px;height:64px;margin:0 auto;border-radius:50%;background:rgba(248,113,113,.14);color:#f87171;display:flex;align-items:center;justify-content:center}
+.offline-ico svg{width:30px;height:30px;display:block}
+html[data-mode="light"] .offline-ico{color:#dc2626;background:rgba(220,38,38,.1)}
+.offline-msg{font-size:0.8125rem;color:var(--muted);margin-top:10px;min-height:16px;line-height:1.6}
+.offline-art{display:block;width:100%;padding:0;border:0;background:#0A0B0D;border-radius:14px;overflow:hidden;cursor:pointer;font-family:inherit}
+.offline-art img{display:block;width:100%;height:auto}
+.offline-art:active{opacity:.85}
+/* Blur-to-clear entrance / clear-to-blur exit for the offline popup:
+   showing fades in while the card un-blurs (~300 ms); closing fades
+   out while the card blurs again (~250 ms) before it is removed.
+   The classes are added/removed by offlineShow / offlineCancel /
+   offlineHide in the offline script — display timing lives there. */
+#offlineSheet.blur-in{animation:sheetFadeIn .3s ease-out both}
+#offlineSheet.blur-out{animation:sheetFadeOut .25s ease-in both}
+#offlineSheet.blur-in .pkg-sheet-card{animation:blurClearIn .3s ease-out both}
+#offlineSheet.blur-out .pkg-sheet-card{animation:clearBlurOut .25s ease-in both}
+@keyframes sheetFadeIn{from{opacity:0}to{opacity:1}}
+@keyframes sheetFadeOut{from{opacity:1}to{opacity:0}}
+@keyframes blurClearIn{from{opacity:0;filter:blur(16px);transform:scale(.98)}to{opacity:1;filter:blur(0);transform:scale(1)}}
+@keyframes clearBlurOut{from{opacity:1;filter:blur(0);transform:scale(1)}to{opacity:0;filter:blur(16px);transform:scale(.98)}}
+@media (prefers-reduced-motion: reduce){#offlineSheet.blur-in,#offlineSheet.blur-out,#offlineSheet.blur-in .pkg-sheet-card,#offlineSheet.blur-out .pkg-sheet-card{animation:none}}
+/* Blur-to-clear entrance / clear-to-blur exit for EVERY sheet and
+   popup — the same language as the offline popup above, applied
+   consistently to whatever the user taps open: showing fades in
+   while the card un-blurs (~300 ms); closing fades out while the
+   card blurs again (~250 ms) before it is removed. The .blur-in /
+   .blur-out classes are driven by sheetShowAnim / sheetHideAnim in
+   the main script (the packages panel, the ☰ drawer and the FAB
+   panel run the same classes from their own show/hide code). */
+.pkg-sheet.blur-in{animation:sheetFadeIn .3s ease-out both}
+.pkg-sheet.blur-out{animation:sheetFadeOut .25s ease-in both}
+.pkg-sheet.blur-in .pkg-sheet-card{animation:blurClearIn .3s ease-out both}
+.pkg-sheet.blur-out .pkg-sheet-card{animation:clearBlurOut .25s ease-in both}
+#page-packages.blur-in .panel{animation:blurClearIn .3s ease-out both}
+#page-packages.blur-out .panel{animation:clearBlurOut .25s ease-in both}
+#pkgBackdrop.blur-in{animation:sheetFadeIn .3s ease-out both}
+#pkgBackdrop.blur-out{animation:sheetFadeOut .25s ease-in both}
+.fab-panel.blur-in{animation:blurClearIn .3s ease-out both}
+.fab-panel.blur-out{animation:clearBlurOut .25s ease-in both}
+.fs-viewer.blur-in{animation:sheetFadeIn .3s ease-out both}
+.fs-viewer.blur-out{animation:sheetFadeOut .25s ease-in both}
+.fs-viewer.blur-in .fs-body{animation:blurClearIn .3s ease-out both}
+.fs-viewer.blur-out .fs-body{animation:clearBlurOut .25s ease-in both}
+.drawer{transition:transform .28s ease,opacity .3s ease,filter .3s ease}
+.drawer.open{opacity:0;filter:blur(14px)}
+.drawer.shown{opacity:1;filter:blur(0)}
+@media (prefers-reduced-motion: reduce){.pkg-sheet.blur-in,.pkg-sheet.blur-out,.pkg-sheet.blur-in .pkg-sheet-card,.pkg-sheet.blur-out .pkg-sheet-card,#page-packages.blur-in .panel,#page-packages.blur-out .panel,#pkgBackdrop.blur-in,#pkgBackdrop.blur-out,.fab-panel.blur-in,.fab-panel.blur-out,.fs-viewer.blur-in,.fs-viewer.blur-out,.fs-viewer.blur-in .fs-body,.fs-viewer.blur-out .fs-body{animation:none}.drawer{transition:none}}
+/* «Network ready» toast — appears ONLY when the connection comes
+   back after the offline popup was shown; auto-hides after ~3 s. */
+.net-ready-toast{position:fixed;top:calc(env(safe-area-inset-top,0px) + 14px);left:50%;transform:translateX(-50%);z-index:320;display:flex;align-items:center;gap:10px;max-width:calc(100vw - 32px);background:#101f06;border:1.5px solid var(--lime,#ADDC29);color:#fff;border-radius:999px;padding:10px 18px 10px 12px;box-shadow:0 10px 30px rgba(0,0,0,.45);font-size:0.9375rem;font-weight:800;line-height:1.35}
+.net-ready-ico{position:relative;flex:0 0 auto;width:34px;height:34px;border-radius:50%;background:var(--lime,#ADDC29);color:#0A0B0D;display:flex;align-items:center;justify-content:center}
+.net-ready-ico svg{width:19px;height:19px;display:block}
+.net-ready-check{position:absolute;right:-3px;bottom:-3px;width:15px;height:15px;border-radius:50%;background:#22c55e;color:#fff;border:2px solid #101f06;display:flex;align-items:center;justify-content:center}
+.net-ready-check svg{width:9px;height:9px;display:block}
+/* Same blur-to-clear language as the offline popup: the toast
+   arrives blurred and sharpens (~300 ms), and leaves by blurring
+   back out (~250 ms) before netReadyShow's timer removes it. */
+.net-ready-toast.blur-in{animation:netReadyBlurIn .3s ease-out both}
+.net-ready-toast.blur-out{animation:netReadyBlurOut .25s ease-in both}
+@keyframes netReadyBlurIn{from{opacity:0;filter:blur(12px);transform:translateX(-50%) translateY(-8px) scale(.97)}to{opacity:1;filter:blur(0);transform:translateX(-50%) translateY(0) scale(1)}}
+@keyframes netReadyBlurOut{from{opacity:1;filter:blur(0);transform:translateX(-50%) translateY(0) scale(1)}to{opacity:0;filter:blur(12px);transform:translateX(-50%) translateY(-8px) scale(.97)}}
+@media (prefers-reduced-motion: reduce){.net-ready-toast.blur-in,.net-ready-toast.blur-out{animation:none}}
 footer{text-align:center;color:var(--faint);font-size:0.8125rem;padding:32px 16px 104px;line-height:1.7}
 .set-box{margin-top:22px;padding-top:20px;border-top:1px solid var(--line2)}
 .set-label{font-size:0.8125rem;font-weight:700;color:var(--label);letter-spacing:.02em}
@@ -654,8 +771,7 @@ html[data-mode="light"] .mv-a{color:var(--accent-text)}
 html[data-smooth="1"] *,html[data-smooth="1"] *::before,html[data-smooth="1"] *::after{-webkit-backdrop-filter:none !important;backdrop-filter:none !important;text-shadow:none !important}
 html[data-smooth="1"] .blur-fill,html[data-smooth="1"] .song-cover-solid.creating,html[data-smooth="1"] .pglow,html[data-smooth="1"] .media-reveal{animation:none !important}
 html[data-smooth="1"] .wm-cover{background:rgba(12,13,16,.92)}
-html[data-smooth="1"] .brand-frame,html[data-smooth="1"] .acct-chip,html[data-smooth="1"] .drawer,html[data-smooth="1"] .fab-panel,html[data-smooth="1"] .fab-btn{background-color:rgba(var(--glass-tint),.96)}
-html[data-smooth="1"] .credit-chip{background-color:rgba(var(--glass-tint),.9)}
+html[data-smooth="1"] .brand-frame,html[data-smooth="1"] .acct-chip,html[data-smooth="1"] .notif-bell,html[data-smooth="1"] .drawer,html[data-smooth="1"] .fab-panel,html[data-smooth="1"] .fab-btn{background-color:rgba(var(--glass-tint),.96)}
 /* Reduced motion: calm every animation, not just a few named ones. */
 @media (prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms !important;animation-iteration-count:1 !important;scroll-behavior:auto !important}}
 </style>
@@ -672,13 +788,11 @@ html[data-smooth="1"] .credit-chip{background-color:rgba(var(--glass-tint),.9)}
     <button onclick="menuGo('sec-history')"><span data-i18n="navHistory">ប្រវត្តិ</span> <small>History</small></button>
     <button onclick="menuGo('sec-packages')"><span data-i18n="navPackages">កញ្ចប់សេវាកម្ម</span> <small data-i18n="navPackagesSub">Packages</small></button>
   </nav>
+  <div class="set-box" id="notifBox" style="margin-top:22px">
+    <span class="set-label"><span data-i18n="navNotif">ដំណឹង</span> · Notifications<span class="notif-count" id="notifDrawerBadge" style="display:none">0</span></span>
+    <div id="notifDrawerList"></div>
+  </div>
   <div class="set-box" id="acctBox" style="margin-top:22px">
-    <span class="set-label" data-i18n="acctTitle">គណនីរបស់ខ្ញុំ</span>
-    <div id="acctGuest">
-      <p style="font-size:0.8125rem;color:var(--glass-muted);line-height:1.6;margin-top:8px" data-i18n="loginGoogleNote">MovAi ចូលប្រើតែជាមួយគណនី Google ប៉ុណ្ណោះ — ចុចប៊ូតុងខាងក្រោមដើម្បីភ្ជាប់គណនី Google របស់អ្នក</p>
-      <button type="button" class="google-btn" style="margin-top:10px" onclick="closeMenu();loginSheetOpen()"><svg viewBox="0 0 48 48" width="20" height="20" aria-hidden="true" style="flex:0 0 auto"><path fill="#FFC107" d="M43.6 20.1H42V20H24v8h11.3C33.7 32.7 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.9 1.2 8 3l5.7-5.7C34.3 6.1 29.3 4 24 4 13 4 4 13 4 24s9 20 20 20 20-9 20-20c0-1.3-.1-2.6-.4-3.9z"/><path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.9 1.2 8 3l5.7-5.7C34.3 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.1 26.7 36 24 36c-5.2 0-9.6-3.3-11.3-8l-6.5 5C9.5 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.1H42V20H24v8h11.3c-.8 2.3-2.3 4.3-4.1 5.6l6.2 5.2C36.9 39.2 44 34 44 24c0-1.3-.1-2.6-.4-3.9z"/></svg><span data-i18n="loginGoogleBtn">Connect account Google</span></button>
-      <p style="font-size:0.75rem;color:var(--glass-muted);line-height:1.6;margin-top:10px" data-i18n="acctNewBonus">អ្នកប្រើថ្មីទទួលបាន Credit ហ្វ្រីភ្លាម ពេលចូលគណនី Google ដំបូង — Image.Video Credit 250 និង Song Credit 24 ក្នុងគណនីរបស់អ្នកផ្ទាល់</p>
-    </div>
     <div id="acctUser" style="display:none"></div>
   </div>
   <div class="set-box">
@@ -697,6 +811,13 @@ html[data-smooth="1"] .credit-chip{background-color:rgba(var(--glass-tint),.9)}
       </div>
       <p id="smoothLockNote" data-i18n="smoothLocked" style="display:none">🔒 ចាក់សោរដោយ Admin · ទូរសព្ទនេះត្រូវការ Smooth — បិទមិនបាន</p>
     </div>
+    <div class="set-row">
+      <span class="set-label" data-i18n="pushSetLabel">ដំណឹងពីទូរស័ព្ទ · Push notifications</span>
+      <div style="display:flex;align-items:center;gap:10px;margin-top:10px">
+        <button type="button" class="push-switch" id="pushSwitch" role="switch" aria-checked="false" onclick="pushToggleClick()" aria-label="Push notifications"><span class="push-knob"></span></button>
+        <span id="pushStateNote" style="font-size:0.75rem;color:var(--glass-muted);line-height:1.5"></span>
+      </div>
+    </div>
 
   </div>
 </aside>
@@ -708,12 +829,9 @@ html[data-smooth="1"] .credit-chip{background-color:rgba(var(--glass-tint),.9)}
   </div>
 </div>
 <div class="topbar-right">
-  <div class="credit-chips" id="creditChips" style="display:none">
-    <span class="credit-chip chip-song"><span class="coin"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="8.6"/><path d="M12 7.2v9.6M15 9.3c-.7-.9-1.8-1.3-3-1.3-1.7 0-3 .8-3 1.9 0 2.6 6 1.4 6 3.9 0 1.1-1.3 1.9-3 1.9-1.2 0-2.3-.4-3-1.3"/></svg></span><span class="clabel" data-i18n="chipSong">Song Credit</span><b id="chipSongVal">0</b></span>
-    <span class="credit-chip chip-media"><span class="coin"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="8.6"/><path d="M12 7.2v9.6M15 9.3c-.7-.9-1.8-1.3-3-1.3-1.7 0-3 .8-3 1.9 0 2.6 6 1.4 6 3.9 0 1.1-1.3 1.9-3 1.9-1.2 0-2.3-.4-3-1.3"/></svg></span><span class="clabel" data-i18n="chipMedia">Image.Video Credit</span><b id="chipMediaVal">0</b></span>
-  </div>
-  <button type="button" class="acct-chip" id="acctChip" onclick="loginSheetOpen()">ចូលគណនី</button>
+  <button type="button" class="notif-bell" id="notifBell" onclick="notifBellClick()" aria-label="ដំណឹង · Notifications"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg><span class="notif-badge" id="notifBadge" style="display:none">0</span></button>
   <button type="button" class="avatar-btn" id="acctAvatar" style="display:none" onclick="profileOpen()" aria-label="Profile"><span class="avatar-orb" id="acctAvatarOrb">?</span></button>
+  <button type="button" class="acct-chip" id="acctChip" onclick="loginSheetOpen()">ចូលគណនី</button>
 </div>
 <div class="view-tabs" role="tablist" aria-label="View">
   <button type="button" class="view-tab on" id="viewTabPublic" role="tab" aria-selected="true" onclick="appSetView('public')"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.6 3.9 5.7 3.9 9S14.5 18.4 12 21c-2.5-2.6-3.9-5.7-3.9-9S9.5 5.6 12 3z"/></svg><span data-i18n="pubTabPublic">Public</span></button>
@@ -897,6 +1015,10 @@ html[data-smooth="1"] .credit-chip{background-color:rgba(var(--glass-tint),.9)}
         <div class="blur-pct" id="genBlurPct">0%</div>
       </div>
       <div style="display:flex;justify-content:space-between;font-size:0.8125rem;margin-top:8px"><span id="genProgTxt" data-i18n="progCreating">កំពុងបង្កើត…</span><b id="genProgSec">0s</b></div>
+      <div style="display:flex;gap:8px;margin-top:10px">
+        <button type="button" class="kbtn kbtn-white gen-pause-btn" style="flex:1" onclick="genPauseToggle()">ផ្អាក · Pause</button>
+        <button type="button" class="kbtn kbtn-white gen-cancel-btn" style="flex:1;color:#f87171" onclick="genCancel()">បោះបង់ · Cancel</button>
+      </div>
     </div>
     <div id="genResult" style="margin-top:14px"></div>
   </div>
@@ -1014,7 +1136,51 @@ html[data-smooth="1"] .credit-chip{background-color:rgba(var(--glass-tint),.9)}
     <button type="button" class="google-btn" id="loginGoogleBtn" onclick="loginGoogleConnect()"><svg viewBox="0 0 48 48" width="20" height="20" aria-hidden="true" style="flex:0 0 auto"><path fill="#FFC107" d="M43.6 20.1H42V20H24v8h11.3C33.7 32.7 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.9 1.2 8 3l5.7-5.7C34.3 6.1 29.3 4 24 4 13 4 4 13 4 24s9 20 20 20 20-9 20-20c0-1.3-.1-2.6-.4-3.9z"/><path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.9 1.2 8 3l5.7-5.7C34.3 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.1 26.7 36 24 36c-5.2 0-9.6-3.3-11.3-8l-6.5 5C9.5 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.1H42V20H24v8h11.3c-.8 2.3-2.3 4.3-4.1 5.6l6.2 5.2C36.9 39.2 44 34 44 24c0-1.3-.1-2.6-.4-3.9z"/></svg><span data-i18n="loginGoogleBtn">Connect account Google</span></button>
     <div id="loginGsiSlot" style="display:none;margin-top:14px;justify-content:center"></div>
     <p id="loginMsg" style="font-size:0.8125rem;margin-top:10px;min-height:16px;line-height:1.6"></p>
+    <button type="button" class="kbtn kbtn-white" style="margin-top:10px;width:100%" onclick="loginSheetClose()" data-i18n="pkgCancel">បោះបង់</button>
   </div>
+</div>
+<div id="giftSheet" class="pkg-sheet" style="display:none" role="dialog" aria-modal="true">
+  <div class="pkg-sheet-card" style="text-align:center">
+    <div style="font-size:3rem;line-height:1.1" aria-hidden="true">🎁</div>
+    <h3 style="font-size:1.25rem;font-weight:900;margin-top:12px" data-i18n="giftTitle">កាដូពី Admin</h3>
+    <p style="font-size:0.9375rem;line-height:1.75;margin-top:10px" data-i18n="giftBody">Free 250 Image.Video Credit + 24 Song Credit សម្រាប់អ្នកប្រើថ្មី</p>
+    <button type="button" class="kbtn kbtn-black" style="margin-top:20px;width:100%" onclick="giftClaim()" data-i18n="giftClaim">ទទួលយក · Claim</button>
+  </div>
+</div>
+<div id="pushSheet" class="pkg-sheet" style="display:none" role="dialog" aria-modal="true" onclick="if(event.target===this)pushAskDismiss()">
+  <div class="pkg-sheet-card" style="text-align:center">
+    <div style="width:64px;height:64px;margin:0 auto;border-radius:50%;background:rgba(var(--accent-rgb),.14);color:var(--accent-text);display:flex;align-items:center;justify-content:center"><svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg></div>
+    <h3 style="font-size:1.25rem;font-weight:900;margin-top:14px" data-i18n="pushAskTitle">បើកដំណឹងពីទូរស័ព្ទ?</h3>
+    <p style="font-size:0.9375rem;line-height:1.75;margin-top:10px;color:var(--muted)" data-i18n="pushAskBody">ទទួលដំណឹងពិតៗចេញពីទូរស័ព្ទរបស់អ្នកផ្ទាល់ — ពេលកញ្ចប់ត្រូវបានអនុម័ត ពេល Admin បន្ថែម ឬកាត់ Credit និងពេលមានកាដូ — ទោះបីអ្នកមិនបានបើក website ក៏ដោយ</p>
+    <button type="button" class="kbtn kbtn-black" style="margin-top:20px;width:100%" onclick="pushAskEnable()" data-i18n="pushAllow">បើកដំណឹង · Enable</button>
+    <button type="button" class="kbtn kbtn-white" style="margin-top:10px;width:100%" onclick="pushAskDismiss()" data-i18n="pushNotNow">មិនបាច់ទេ · Not now</button>
+  </div>
+</div>
+<div id="notifSheet" class="pkg-sheet" style="display:none" role="dialog" aria-modal="true" onclick="if(event.target===this)notifSheetClose()">
+  <div class="pkg-sheet-card">
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:10px">
+      <h3 style="font-size:1.0625rem;font-weight:800" data-i18n="notifTitle">ដំណឹង · Notifications</h3>
+      <span style="display:flex;gap:8px;align-items:center;flex:0 0 auto">
+        <button type="button" class="kbtn kbtn-white" style="min-height:40px;padding:8px 14px" onclick="notifLoad()" data-i18n="pubRefresh">ផ្ទុកថ្មី</button>
+        <button type="button" class="drawer-close" style="background:var(--card2);color:var(--text);border-color:var(--line2)" onclick="notifSheetClose()" aria-label="Close">✕</button>
+      </span>
+    </div>
+    <div id="notifList" style="margin-top:6px"></div>
+  </div>
+</div>
+<div id="offlineSheet" class="pkg-sheet offline-sheet" style="display:none" role="alertdialog" aria-modal="true" aria-labelledby="offlineTitle">
+  <div class="pkg-sheet-card" style="text-align:center">
+    <button type="button" class="offline-art" onclick="offlineRetry()" aria-label="ព្យាយាមម្ដងទៀត · Try again"><img src="data:image/webp;base64,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" alt="WiFi និង 4G/5G ដាច់ — No network" width="960" height="640"></button>
+    <h3 id="offlineTitle" style="font-size:1.25rem;font-weight:900;margin-top:14px">អត់មានអ៊ីនធឺណិត · No internet</h3>
+    <p id="offlineBody" style="font-size:0.9375rem;line-height:1.75;margin-top:10px;color:var(--muted)">សូមពិនិត្យអ៊ីនធឺណិតរបស់អ្នក រួចព្យាយាមម្ដងទៀត</p>
+    <button type="button" class="kbtn kbtn-black" id="offlineRetryBtn" style="margin-top:20px;width:100%" onclick="offlineRetry()">ព្យាយាមម្ដងទៀត · Retry</button>
+    <button type="button" class="kbtn kbtn-white" id="offlineCancelBtn" style="margin-top:10px;width:100%" onclick="offlineCancel()">បោះបង់ · Cancel</button>
+    <p class="offline-msg" id="offlineMsg"></p>
+  </div>
+</div>
+<div id="netReadyToast" class="net-ready-toast" style="display:none" role="status" aria-live="polite">
+  <span class="net-ready-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.55a11 11 0 0 1 14.08 0"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><line x1="12" y1="20" x2="12.01" y2="20"/></svg><span class="net-ready-check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></span></span>
+  <span>Network ready · អ៊ីនធឺណិតមកវិញហើយ</span>
 </div>
 <div class="fab-wrap" id="fabWrap">
   <div class="fab-panel" id="fabPanel">
@@ -1085,6 +1251,9 @@ km:{
  pubDlFreeLeft:'ទាញយកបទចម្រៀងហ្វ្រីនៅសល់ {n} ដង',
  pubDlLimit:'អ្នកបានប្រើអស់ការទាញយកបទចម្រៀងហ្វ្រី 2 ដងហើយ — សូមទិញកញ្ចប់សេវាកម្មបទចម្រៀង ដើម្បីទាញយកបន្ត',
  acctGotFree:'អបអរសាទរ! អ្នកទទួលបាន Credit ហ្វ្រី — Image.Video Credit 250 និង Song Credit 24 ក្នុងគណនីរបស់អ្នកហើយ',
+ giftTitle:'កាដូពី Admin',giftBody:'Free 250 Image.Video Credit + 24 Song Credit សម្រាប់អ្នកប្រើថ្មី',giftClaim:'ទទួលយក · Claim',
+ navNotif:'ដំណឹង',notifTitle:'ដំណឹង · Notifications',notifEmpty:'មិនទាន់មានដំណឹងទេ',notifGuest:'សូម Log in ដើម្បីមើលដំណឹងរបស់អ្នក',notifLoading:'កំពុងផ្ទុក…',notifJustNow:'ទើបតែឥឡូវនេះ',notifMinAgo:'{n} នាទីមុន',notifHourAgo:'{n} ម៉ោងមុន',notifDayAgo:'{n} ថ្ងៃមុន',notifApproved:'កញ្ចប់របស់អ្នកត្រូវបានអនុម័ត ✓',notifRejected:'កញ្ចប់របស់អ្នកត្រូវបានបដិសេធ',notifGrant:'Admin បានបន្ថែម Credit ឲ្យអ្នក',notifDeduct:'Admin បានកាត់ Credit របស់អ្នក',notifInfo:'ដំណឹងពី MovAi',
+ pushAskTitle:'បើកដំណឹងពីទូរស័ព្ទ?',pushAskBody:'ទទួលដំណឹងពិតៗចេញពីទូរស័ព្ទរបស់អ្នកផ្ទាល់ — ពេលកញ្ចប់ត្រូវបានអនុម័ត ពេល Admin បន្ថែម ឬកាត់ Credit និងពេលមានកាដូ — ទោះបីអ្នកមិនបានបើក website ក៏ដោយ',pushAllow:'បើកដំណឹង · Enable',pushNotNow:'មិនបាច់ទេ · Not now',pushSetLabel:'ដំណឹងពីទូរស័ព្ទ · Push notifications',pushStateOn:'បើកហើយ — ដំណឹងនឹងលោតលើទូរស័ព្ទរបស់អ្នក',pushStateOff:'បិទ — បើកដើម្បីទទួលដំណឹងលើទូរស័ព្ទ',pushStateBlocked:'Browser បានបិទដំណឹងឲ្យ website នេះ — សូមបើក Notification ក្នុង Settings របស់ browser',pushStateUnsupported:'Browser នេះមិនគាំទ្រ Web Push ទេ',pushStateGuest:'សូម Log in ជាមុនសិន',
  acctErrFill:'សូមបំពេញឲ្យគ្រប់ — អ៊ីមែលត្រូវមាន @ ហើយពាក្យសម្ងាត់យ៉ាងតិច 4 តួ',
  acctErrExists:'អ៊ីមែលនេះបានចុះឈ្មោះរួចហើយ — បានប្ដូរទៅ ចូលគណនី',
  acctErrNoUser:'រកគណនីអ៊ីមែលនេះមិនឃើញទេ — សូមចុះឈ្មោះជាមុនសិន',
@@ -1166,6 +1335,10 @@ km:{
  pkgLockedDur:'រយៈពេល 15 វិនាទីឡើងទៅជា Premium 🔐 — ត្រូវទិញកញ្ចប់សេវាកម្ម MovAi ជាមុនសិន',
  noteNovaiFree:'NovAI ហ្វ្រីធ្វើបានតែ 5s · 720p ប៉ុណ្ណោះ',
  progBusyWait:'ម៉ូដែលកំពុងរវល់ — កំពុងរង់ចាំដល់វេនរបស់អ្នក… សាកម្ដងទៀតក្នុង {s} វិនាទី',
+ progPaused:'បានផ្អាក · Paused — ចុច «បន្ត · Resume» ដើម្បីបន្តបង្កើត',
+ progNetWait:'អ៊ីនធឺណិតដាច់ — កំពុងរង់ចាំការតភ្ជាប់… ការបង្កើតមិនឈប់ទេ ពេលអ៊ីនធឺណិតមកវិញវានឹងបន្តដោយស្វ័យប្រវត្តិ',
+ msgGenCancelled:'បានបោះបង់ការបង្កើត · Cancelled — មិនបានកាត់ Credit ទេ',
+ btnPauseGen:'ផ្អាក · Pause',btnResumeGen:'បន្ត · Resume',btnCancelGen:'បោះបង់ · Cancel',
  keyRotate:'Key នេះអស់ Credit — ប្ដូរទៅ Key បន្ទាប់…',
  msgAutoFallback:'{name} បង្កើតមិនបានទេ — បានប្តូរទៅ Pollinations ឲ្យដោយស្វ័យប្រវត្តិ ហើយបង្កើតរូបឲ្យនៅទីនេះហើយ',progFallback:'កំពុងប្តូរទៅ Pollinations…',
  dlImage:'ទាញយករូបភាព',dlVideo:'ទាញយកវីដេអូ',dlPrefix:'ទាញយក ',
@@ -1258,6 +1431,9 @@ en:{
  pubDlFreeLeft:'{n} free song downloads left',
  pubDlLimit:'You have used your 2 free song downloads — please buy a Song package to keep downloading',
  acctGotFree:'Welcome! You received free credits — 250 Image.Video Credit and 24 Song Credit in your account',
+ giftTitle:'A Gift from Admin',giftBody:'Free 250 Image.Video Credit + 24 Song Credit for new users',giftClaim:'Claim · ទទួលយក',
+ navNotif:'Notifications',notifTitle:'Notifications · ដំណឹង',notifEmpty:'No notifications yet',notifGuest:'Log in to see your notifications',notifLoading:'Loading…',notifJustNow:'Just now',notifMinAgo:'{n} min ago',notifHourAgo:'{n} hr ago',notifDayAgo:'{n} days ago',notifApproved:'Your package was approved ✓',notifRejected:'Your package was rejected',notifGrant:'Admin added credits to your account',notifDeduct:'Admin deducted credits from your account',notifInfo:'MovAi notification',
+ pushAskTitle:'Turn on phone notifications?',pushAskBody:'Get real alerts on your phone — when a package is approved, when Admin adds or deducts credits, and when a gift arrives — even when the website is closed',pushAllow:'Enable · បើកដំណឹង',pushNotNow:'Not now · មិនបាច់ទេ',pushSetLabel:'Push notifications · ដំណឹងពីទូរស័ព្ទ',pushStateOn:'On — alerts will pop up on your phone',pushStateOff:'Off — turn on to get alerts on your phone',pushStateBlocked:'This browser has blocked notifications for this site — allow Notifications in the browser settings',pushStateUnsupported:'This browser does not support Web Push',pushStateGuest:'Log in first',
  acctErrFill:'Please fill everything — email must contain @ and password at least 4 characters',
  acctErrExists:'This email is already registered — switched to Log in',
  acctErrNoUser:'No account for this email — please sign up first',
@@ -1339,6 +1515,10 @@ en:{
  pkgLockedDur:'Durations of 15 seconds and longer are Premium 🔐 — buy a MovAi package first',
  noteNovaiFree:'Free NovAI can only do 5s · 720p',
  progBusyWait:'Model is busy — waiting for your turn… retrying in {s}s',
+ progPaused:'Paused — tap Resume to continue generating',
+ progNetWait:'Connection lost — waiting… generation has not stopped; it continues automatically when the internet returns',
+ msgGenCancelled:'Generation cancelled — no Credit was charged',
+ btnPauseGen:'Pause',btnResumeGen:'Resume',btnCancelGen:'Cancel',
  keyRotate:'This key is out of credits — switching to the next key…',
  msgAutoFallback:'{name} could not generate — automatically switched to Pollinations and created your image right here',progFallback:'Switching to Pollinations…',
  dlImage:'Download Image',dlVideo:'Download Video',dlPrefix:'Download ',
@@ -2276,10 +2456,51 @@ function pkgBuyAsk(id){
   }
   h+='<button type="button" class="kbtn kbtn-white" style="margin-top:10px;width:100%" onclick="pkgSheetClose()">'+escHtml(tx('pkgCancel'))+'</button>';
   if(body)body.innerHTML=h;
-  sheet.style.display='flex';
+  sheetShowAnim(sheet);
   if(u)pkgPayRender('pkgBuyConfirm');
 }
-function pkgSheetClose(){var s=document.getElementById('pkgSheet');if(s)s.style.display='none';PKG_PENDING=null;SONG_PKG_PENDING=null;}
+/* ===== Blur-to-clear show / clear-to-blur hide for EVERY sheet =====
+   The same entrance/exit language as the offline popup, applied to
+   every sheet and popup (log in, gift, push ask, notifications,
+   profile, post-to-Public, buy, full-screen viewer): showing fades
+   in while the card un-blurs (~300 ms); closing (✕ / Cancel /
+   backdrop tap) fades out while the card blurs again (~250 ms),
+   then display flips off. Reduced-motion users get instant
+   show/hide. One timer per element, so re-opening during the exit
+   (or closing during the entrance) never strands a sheet
+   half-hidden. */
+var SHEET_ANIM_TIMERS={};
+function sheetAnimReduced(){try{return !!(window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches);}catch(e){return false;}}
+function sheetShowAnim(el){
+  if(!el)return;
+  var k=el.id||'';
+  if(SHEET_ANIM_TIMERS[k]){clearTimeout(SHEET_ANIM_TIMERS[k]);delete SHEET_ANIM_TIMERS[k];}
+  el.classList.remove('blur-out');
+  el.style.display='flex';
+  el.classList.remove('blur-in');
+  void el.offsetWidth; /* restart the animation from the blurred state */
+  el.classList.add('blur-in');
+  var t=setTimeout(function(){el.classList.remove('blur-in');if(SHEET_ANIM_TIMERS[k]===t)delete SHEET_ANIM_TIMERS[k];},sheetAnimReduced()?0:320);
+  SHEET_ANIM_TIMERS[k]=t;
+}
+function sheetHideAnim(el,done){
+  if(!el){if(done)done();return;}
+  var k=el.id||'';
+  if(SHEET_ANIM_TIMERS[k]){clearTimeout(SHEET_ANIM_TIMERS[k]);delete SHEET_ANIM_TIMERS[k];}
+  if(el.style.display==='none'){if(done)done();return;}
+  el.classList.remove('blur-in');
+  el.classList.remove('blur-out');
+  void el.offsetWidth;
+  el.classList.add('blur-out');
+  var t=setTimeout(function(){
+    if(SHEET_ANIM_TIMERS[k]===t)delete SHEET_ANIM_TIMERS[k];
+    el.style.display='none';
+    el.classList.remove('blur-out');
+    if(done)done();
+  },sheetAnimReduced()?0:250);
+  SHEET_ANIM_TIMERS[k]=t;
+}
+function pkgSheetClose(){var s=document.getElementById('pkgSheet');sheetHideAnim(s);PKG_PENDING=null;SONG_PKG_PENDING=null;}
 function pkgGoLogin(){pkgSheetClose();loginSheetOpen();}
 function pkgBuyConfirm(){
   var pl=pkgPlanById(PKG_PENDING);if(!pl)return;
@@ -2352,7 +2573,7 @@ function songPkgBuyAsk(id){
   }
   h+='<button type="button" class="kbtn kbtn-white" style="margin-top:10px;width:100%" onclick="pkgSheetClose()">'+escHtml(tx('pkgCancel'))+'</button>';
   if(body)body.innerHTML=h;
-  sheet.style.display='flex';
+  sheetShowAnim(sheet);
   if(u)pkgPayRender('songPkgBuyConfirm');
 }
 function songPkgBuyConfirm(){
@@ -2394,7 +2615,7 @@ function updateErrBox(boxId,textId,msgId,t,contextLabel){
   var box=document.getElementById(boxId);if(!box)return;
   var ta=document.getElementById(textId);
   var cm=document.getElementById(msgId);if(cm)cm.textContent='';
-  var infoVals=[tx('msgDone'),tx('d3MsgDone'),tx('d3MsgUploaded'),tx('d3MsgImgReady'),tx('d3MsgMpxOpening'),tx('novaiFreeDone')];
+  var infoVals=[tx('msgDone'),tx('msgGenCancelled'),tx('d3MsgDone'),tx('d3MsgUploaded'),tx('d3MsgImgReady'),tx('d3MsgMpxOpening'),tx('novaiFreeDone')];
   if(!t||infoVals.indexOf(t)>=0){box.style.display='none';if(ta)ta.value='';return;}
   box.style.display='block';
   if(ta){
@@ -2440,7 +2661,56 @@ function genProgEls(){
    real problem message is shown instead (busy budget below, poll
    failure surfacing in the poll loops). */
 function honestWaitPct(sec){return Math.min(90,Math.round(90*(1-Math.exp(-sec/60))));}
+/* ---- Generation controls: Pause / Cancel + offline-resilient waits ----
+   One shared control state for every generation that shows progress
+   (main Generate and Story episodes alike):
+   - Pause suspends polling where it stands (the waits below simply
+     stop consuming their remaining time); Resume continues the SAME
+     job — nothing restarts. The progress clock freezes too.
+   - Cancel aborts the wait at once: the generation stops, progress
+     is cleared by the caller's finally block, and no result is
+     rendered or saved — so no Credit is charged for it.
+   - A network error while polling is NOT a failure: the job keeps
+     running on the server, the spinner keeps turning, and polling
+     resumes by itself when the connection returns (see adminPollJob). */
+var genCtl={paused:false,cancelled:false};
+function genCtlErr(){var e=new Error('Generation cancelled');e.genCancelled=true;return e;}
+function genIsNetErr(e){
+  var m=(e&&e.message)?e.message:String(e||'');
+  return (typeof TypeError!=='undefined'&&e instanceof TypeError)||/failed to fetch|networkerror|network error|load failed|err_internet|err_network|err_connection|err_name_not_resolved/i.test(m);
+}
+function genCtlSleep(ms){return new Promise(function(res){setTimeout(res,ms);});}
+async function genCtlWait(ms){
+  var remain=ms;
+  while(remain>0){
+    if(genCtl.cancelled)throw genCtlErr();
+    if(genCtl.paused){await genCtlSleep(200);continue;}
+    var step=Math.min(remain,200);
+    await genCtlSleep(step);
+    remain-=step;
+  }
+  if(genCtl.cancelled)throw genCtlErr();
+}
+function genCtlSyncBtns(){
+  var ps=document.querySelectorAll('.gen-pause-btn');
+  for(var i=0;i<ps.length;i++)ps[i].textContent=genCtl.paused?tx('btnResumeGen'):tx('btnPauseGen');
+  var cs=document.querySelectorAll('.gen-cancel-btn');
+  for(var j=0;j<cs.length;j++)cs[j].textContent=tx('btnCancelGen');
+}
+function genCtlReset(){genCtl.paused=false;genCtl.cancelled=false;genCtlSyncBtns();}
+function genPauseToggle(){
+  if(!genAnyBusy)return;
+  genCtl.paused=!genCtl.paused;
+  genCtlSyncBtns();
+  if(genCtl.paused)genProgTxt(tx('progPaused'));
+}
+function genCancel(){
+  if(!genAnyBusy)return;
+  genCtl.cancelled=true;genCtl.paused=false;
+  genCtlSyncBtns();
+}
 function genStartProg(){
+  genCtlReset();
   gen.progSec=0;gen.progPct=0;
   var e=genProgEls();
   if(e.wrap)e.wrap.style.display='block';
@@ -2450,6 +2720,7 @@ function genStartProg(){
   genStageSetup();
   clearInterval(gen.progTimer);
   gen.progTimer=setInterval(function(){
+    if(genCtl.paused)return;
     gen.progSec++;
     var pct=honestWaitPct(gen.progSec);
     gen.progPct=pct;
@@ -2495,7 +2766,7 @@ function genStageSetImage(url){
   im.onerror=function(){im.style.display='none';};
   im.src=url;
 }
-function genStopProg(){clearInterval(gen.progTimer);var e=genProgEls();if(e.wrap)e.wrap.style.display='none';}
+function genStopProg(){clearInterval(gen.progTimer);genCtlReset();var e=genProgEls();if(e.wrap)e.wrap.style.display='none';}
 /* Busy providers (e.g. the NovAI free video model at peak time) are NOT
    shown as an error right away: MovAi waits on screen — seconds counting
    + the honest waiting percent — and retries on its own every 30-60s.
@@ -2509,7 +2780,7 @@ async function genBusyWait(){
   var wait=30+Math.floor(Math.random()*31);
   for(var s=wait;s>0;s--){
     genProgTxt(tx('progBusyWait').replace('{s}',s));
-    await new Promise(function(res){setTimeout(res,1000);});
+    await genCtlWait(1000);
   }
   genProgTxt(tx('progCreating'));
 }
@@ -2832,6 +3103,7 @@ async function genPuterStatus(){
 function genPuterSignIn(){if(window.puter&&puter.auth){puter.auth.signIn().then(function(){genPuterStatus();}).catch(function(){});}}
 function genPuterSignOut(){if(window.puter&&puter.auth){puter.auth.signOut().then(function(){genPuterStatus();}).catch(function(){});}}
 async function genGenerate(){
+  if(!requireLogin())return;
   if(genAnyBusy)return;
   if(gen.mode==='3d')return;
   var prompt;
@@ -2881,7 +3153,8 @@ async function genGenerate(){
     }
   }catch(e){
     var sp=document.getElementById('genSongPending');if(sp)sp.remove();
-    if(e&&e.adminServerDown){genMsg(tx('serverOffline'));}
+    if(e&&e.genCancelled){genMsg(tx('msgGenCancelled'));}
+    else if(e&&e.adminServerDown){genMsg(tx('serverOffline'));}
     else{
       var m=(e&&e.message?e.message:String(e));
       if(/failed to fetch|networkerror|load failed/i.test(m))m=tx('serverOffline');
@@ -2895,6 +3168,7 @@ async function genGenerate(){
    only when the user taps it does it switch the provider to Pollinations
    and generate the image with the current prompt. */
 async function genAutoGenerate(){
+  if(!requireLogin())return;
   if(genAnyBusy)return;
   if(gen.mode!=='image')genSetMode('image');
   var prompt=(document.getElementById('genPrompt').value||'').trim();
@@ -2908,12 +3182,16 @@ async function genAutoGenerate(){
   genStartProg();
   try{
     await genDoImage({id:'pollinations',name:'Pollinations'},prompt,null);
+    if(genCtl.cancelled)throw genCtlErr();
     genStageBlur(100);
     genMsg(tx('msgDone'));
   }catch(e){
-    var m=(e&&e.message?e.message:String(e));
-    if(/failed to fetch|networkerror|load failed/i.test(m))m=tx('msgNetErr');
-    genMsg(m);
+    if(e&&e.genCancelled){genMsg(tx('msgGenCancelled'));}
+    else{
+      var m=(e&&e.message?e.message:String(e));
+      if(/failed to fetch|networkerror|load failed/i.test(m))m=tx('msgNetErr');
+      genMsg(m);
+    }
   }
   finally{genStopProg();btn.disabled=false;if(abtn)abtn.disabled=false;genAnyBusy=false;epSyncButtons();}
 }
@@ -3202,12 +3480,19 @@ async function genDownloadVideo(src){
      MusicAPI (length is model-driven).
    Progress reuses the main seconds + % bar, like video. */
 /* Song generation can be slow (MusicAPI took ~23 minutes for one song),
-   so every song provider is given up to 25 minutes before MovAi gives up.
-   If nothing has arrived by then, the wait ends with the clear
-   "system problem" message (errTimeoutSong) — never a silent timeout
-   and never an endless wait. The seconds + % progress keeps ticking
-   for the whole wait. */
+   so MusicAPI (and the other slow providers) are given up to 25 minutes
+   before MovAi gives up. If nothing has arrived by then, the wait ends
+   with the clear "system problem" message (errTimeoutSong) — never a
+   silent timeout and never an endless wait. The seconds + % progress
+   keeps ticking for the whole wait.
+   Suno (the MovAi provider) is FAST by comparison: a playable streaming
+   audio URL arrives after only ~20-30 seconds, long before the song is
+   fully rendered. Suno songs are therefore shown as playable cards the
+   moment a streaming URL appears (with a «Creating...» badge), then
+   updated to the final URL on completion — and Suno's own wait budget
+   is 5 minutes, NOT the 25 minutes that belong to MusicAPI. */
 var SONG_WAIT_MAX=25*60*1000;
+var SUNO_WAIT_MAX=5*60*1000;
 var SONG_DURS=[1,2,3,3.5,5];
 function songRenderOpts(){
   var isSuno=gen.provider==='suno';
@@ -3364,19 +3649,46 @@ async function genDoSong(p,prompt,keyEntry){
     else if(js&&js.id)clips=[js];
     var ids=clips.map(function(c){return c&&c.id;}).filter(function(x){return !!x;});
     if(!ids.length)throw new Error('MovAi: '+genErrText(js,'HTTP '+rs.status));
+    /* Suno is fast: a clip's audio_url is a playable streaming URL
+       long before the clip is complete (~20-30s). The moment any
+       clip has one, its card is shown PLAYABLE with a «Creating...»
+       badge (genShowSongs streaming preview); polling continues
+       until every clip is complete, then the final render swaps in
+       the finished URLs (playback position carries over). Suno's
+       budget is SUNO_WAIT_MAX — the 25-minute wait is MusicAPI's. */
     var t0s=Date.now();
-    while(Date.now()-t0s<SONG_WAIT_MAX){
+    var streamKey='',lastReady=[];
+    while(Date.now()-t0s<SUNO_WAIT_MAX){
       var ready=clips.filter(function(c){return c&&c.audio_url;}).map(function(c){return {url:c.audio_url,image:c.image_url||c.image_large_url||null,title:c.title||''};});
-      var allDone=clips.length>0&&clips.every(function(c){return c&&(c.audio_url||c.status==='complete'||c.status==='completed');});
+      lastReady=ready;
+      /* A clip is DONE only at status complete/completed — a clip
+         that merely has an audio_url while its status is still a
+         running one (streaming / queued / …) is the early preview,
+         not the finished song. A clip with a URL and no running
+         status at all counts as done (older gateways omit status). */
+      var RUN_ST=['submitted','queued','streaming','processing','generating','pending','in_progress','in-progress','running','waiting'];
+      var allDone=clips.length>0&&clips.every(function(c){
+        if(!c)return false;
+        var s=String(c.status||'').toLowerCase();
+        if(s==='complete'||s==='completed')return true;
+        return !!c.audio_url&&RUN_ST.indexOf(s)<0;
+      });
       if(allDone&&ready.length){genShowSongs(ready.slice(0,2));return;}
       if(clips.length&&clips.every(function(c){return c&&(c.status==='error'||c.status==='failed');}))throw new Error('MovAi: '+tx('genFailed'));
-      await new Promise(function(res){setTimeout(res,5000);});
+      if(ready.length){
+        var rkey=ready.map(function(r){return r.url;}).join('|');
+        if(rkey!==streamKey){streamKey=rkey;genShowSongs(ready.slice(0,2),true);}
+      }
+      await genCtlWait(5000);
       genProgTxt(tx('progWaitingSong')+'('+Math.floor((Date.now()-t0s)/1000)+'s)');
       var rg=await fetch(base+'/api/get?ids='+encodeURIComponent(ids.join(',')),{headers:{'Authorization':'Bearer '+skey}});
       var jg=await rg.json().catch(function(){return null;});
       if(Array.isArray(jg))clips=jg;
       else if(jg&&Array.isArray(jg.data))clips=jg.data;
     }
+    /* Budget over but a playable preview is already on screen: keep
+       it as the result rather than failing the whole generation. */
+    if(lastReady.length){genShowSongs(lastReady.slice(0,2));return;}
     throw new Error(tx('errTimeoutSong'));
   }
   if(p.id==='acemusic'){
@@ -3485,12 +3797,12 @@ async function genDoSong(p,prompt,keyEntry){
   }
   throw new Error(tx('unknownProvider'));
 }
-/* Song cards — ACE Music style. While a generation runs, its songs
-   are already on screen as cards in a 2-per-row grid, each with a
-   SOLID colour cover (song 1 green, song 2 blue) and a "Creating..."
-   label. When the songs land, the same grid shows the finished
-   cards side by side and each solid cover is replaced by the song's
-   real cover image from the provider (when it sent one). Each card
+/* Song cards. While a generation runs, its songs are already on
+   screen as compact cards stacked vertically, each with a SOLID
+   colour cover (song 1 green, song 2 blue) and a "Creating..."
+   label. When the songs land, the same stack shows the finished
+   cards and each solid cover is replaced by the song's real cover
+   image from the provider (when it sent one). Each card
    carries the song title, its own player (Play/Pause, Stop, seek,
    time — both songs can play, each with its own controls), and
    Download / Like / Share buttons, and every song is also saved into
@@ -3513,9 +3825,23 @@ function songCoverEl(song,n){
   }
   return songSolidCover(n,false);
 }
+/* Small icon buttons used on the compact song rows (results and
+   History share them): Download / Share / Post / Delete glyphs.
+   Like reuses histHeartSvg. */
+var SONG_SVG_DL='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v11"/><path d="M7 10l5 5 5-5"/><path d="M4 21h16"/></svg>';
+var SONG_SVG_SHARE='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="6" cy="12" r="2.5"/><circle cx="18" cy="6" r="2.5"/><circle cx="18" cy="18" r="2.5"/><path d="M8.2 10.9l7.6-3.7M8.2 13.1l7.6 3.7"/></svg>';
+var SONG_SVG_POST='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3c2.7 2.6 4 5.6 4 9s-1.3 6.4-4 9c-2.7-2.6-4-5.6-4-9s1.3-6.4 4-9z"/></svg>';
+var SONG_SVG_DEL='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16"/><path d="M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/><path d="M6.5 7l.9 12.1A1 1 0 0 0 8.4 20h7.2a1 1 0 0 0 1-.9L17.5 7"/><path d="M10 11v5M14 11v5"/></svg>';
+function songIcoBtn(label,svg,red){
+  var b=document.createElement('button');
+  b.type='button';b.className='song-ico-btn';
+  if(red)b.style.color='#f87171';
+  b.innerHTML=svg;b.setAttribute('aria-label',label);b.title=label;
+  return b;
+}
 /* The "Creating..." placeholder cards shown while a song generation
    runs — one per expected song (Suno / MusicAPI return 2, Magic Hour
-   / ACE Music return 1), in the same side-by-side grid the finished
+   / ACE Music return 1), in the same vertical stack the finished
    cards will take over. Removed again if the generation fails. */
 function genSongPending(p){
   var box=document.getElementById('genResult');if(!box)return;
@@ -3526,29 +3852,22 @@ function genSongPending(p){
   for(var i=0;i<count;i++){
     var n=i+1;
     var card=document.createElement('div');
-    card.className='hist-card';
-    card.appendChild(songSolidCover(n,true));
-    var head=document.createElement('div');
-    head.style.cssText='display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:10px';
-    var num=document.createElement('span');
-    num.style.cssText='font-size:0.9375rem;font-weight:800;color:var(--accent-text)';
-    num.textContent=tx('songLabelFmt').replace('{n}',n);
-    head.appendChild(num);
-    var pv=document.createElement('span');
-    pv.style.cssText='font-size:0.8125rem;font-weight:700;color:var(--muted)';
-    pv.innerHTML=provNameHtml(p.name);
-    head.appendChild(pv);
-    var cr=document.createElement('span');
-    cr.className='song-creating-txt';
-    cr.textContent=tx('songCreating');
-    head.appendChild(cr);
-    card.appendChild(head);
-    if(title){
-      var tp=document.createElement('p');
-      tp.style.cssText='font-weight:800;font-size:0.9375rem;margin-top:8px;line-height:1.5';
-      tp.textContent=title;
-      card.appendChild(tp);
-    }
+    card.className='hist-card song-card';
+    var prow=document.createElement('div');
+    prow.className='song-row';
+    prow.appendChild(songSolidCover(n,true));
+    var pmeta=document.createElement('div');
+    pmeta.className='song-meta';
+    var ptt=document.createElement('div');
+    ptt.className='song-title';
+    ptt.textContent=title||tx('songLabelFmt').replace('{n}',n);
+    pmeta.appendChild(ptt);
+    var psub=document.createElement('div');
+    psub.className='song-sub';
+    psub.textContent=tx('songLabelFmt').replace('{n}',n)+(p.name?(' · '+p.name):'')+' · '+tx('songCreating');
+    pmeta.appendChild(psub);
+    prow.appendChild(pmeta);
+    card.appendChild(prow);
     grid.appendChild(card);
   }
   box.innerHTML='';
@@ -3556,10 +3875,17 @@ function genSongPending(p){
   animWatchScan(box);
 }
 var genSongAudios=[];
-function genShowSongs(items){
+/* Renders the song rows. With `streaming` set (Suno's early preview),
+   the cards are playable right away but carry a «Creating...» badge
+   and are NOT saved to History yet — only the final render saves.
+   Playback state (position + playing) is carried over to the new
+   cards when the same URLs are re-rendered, so the final update does
+   not restart a preview the user is already listening to. */
+function genShowSongs(items,streaming){
   var songs=(items||[]).map(function(x){return typeof x==='string'?{url:x,image:null,title:''}:(x||{});}).filter(function(s){return !!s.url;});
   songs.forEach(function(s){if(!/^(https:|blob:|data:audio\/)/i.test(s.url))throw new Error(tx('badSongUrl'));});
   var box=document.getElementById('genResult');
+  var prevState=genSongAudios.map(function(a){return {src:a.src,t:a.currentTime||0,playing:!a.paused&&!a.ended};});
   genSongAudios.forEach(function(a){try{a.pause();}catch(e){}});
   genSongAudios=[];
   box.innerHTML='';
@@ -3567,74 +3893,102 @@ function genShowSongs(items){
   var sTitle=(histCtx&&histCtx.title)||'';
   var sProv=histCtx?histCtx.provider:histProviderName();
   var sPrompt=histCtx?histCtx.prompt:'';
-  songs.forEach(function(s){
-    var su=/^https:/i.test(s.url)?s.url:((/^data:audio\//i.test(s.url)&&s.url.length<1200000)?s.url:null);
-    if(su)histAdd({type:'song',url:su,title:s.title||sTitle,prompt:sPrompt,provider:sProv,image:(s.image&&/^https:/i.test(s.image))?s.image:undefined});
-  });
-  var saved=histGet();
+  if(!streaming){
+    songs.forEach(function(s){
+      var su=/^https:/i.test(s.url)?s.url:((/^data:audio\//i.test(s.url)&&s.url.length<1200000)?s.url:null);
+      if(su)histAdd({type:'song',url:su,title:s.title||sTitle,prompt:sPrompt,provider:sProv,image:(s.image&&/^https:/i.test(s.image))?s.image:undefined});
+    });
+  }
+  var saved=streaming?[]:histGet();
   var grid=document.createElement('div');
   grid.className='song-grid';
   songs.forEach(function(s,i){
     var it=null;
     for(var j=0;j<saved.length;j++){if(saved[j].type==='song'&&saved[j].url===s.url){it=saved[j];break;}}
-    grid.appendChild(genSongCard(s,i+1,it,s.title||sTitle,sProv,sPrompt));
+    grid.appendChild(genSongCard(s,i+1,it,s.title||sTitle,sProv,sPrompt,streaming));
   });
   box.appendChild(grid);
+  genSongAudios.forEach(function(a,idx){
+    var ps=prevState[idx];
+    if(ps&&ps.src===a.src){
+      try{a.currentTime=ps.t;}catch(e){}
+      if(ps.playing){var pr=a.play();if(pr&&pr.catch)pr.catch(function(){});}
+    }
+  });
 }
-function genSongCard(song,n,it,title,prov,prompt){
+function genSongCard(song,n,it,title,prov,prompt,streaming){
   var u=song.url;
   var card=document.createElement('div');
-  card.className='hist-card';
-  card.appendChild(songCoverEl(song,n));
-  var head=document.createElement('div');
-  head.style.cssText='display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:10px';
-  var num=document.createElement('span');
-  num.style.cssText='font-size:0.9375rem;font-weight:800;color:var(--accent-text)';
-  num.textContent=tx('songLabelFmt').replace('{n}',n);
-  head.appendChild(num);
-  if(prov){
-    var pv=document.createElement('span');
-    pv.style.cssText='font-size:0.8125rem;font-weight:700;color:var(--muted)';
-    pv.textContent=prov;
-    head.appendChild(pv);
-  }
-  card.appendChild(head);
-  if(title){
-    var tp=document.createElement('p');
-    tp.style.cssText='font-weight:800;font-size:0.9375rem;margin-top:8px;line-height:1.5';
-    tp.textContent=title;
-    card.appendChild(tp);
-  }
-  /* Player: this card's own Audio element, so each song plays on its
+  card.className='hist-card song-card';
+  /* ONE compact row: small cover · Play · title · duration · icons.
+     Player: this card's own Audio element, so each song plays on its
      own Play button; starting one card pauses the other result cards. */
   var au=new Audio();
   au.src=u;au.preload='metadata';
   genSongAudios.push(au);
-  var top=document.createElement('div');
-  top.style.cssText='display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:12px';
+  var rowEl=document.createElement('div');
+  rowEl.className='song-row';
+  rowEl.appendChild(songCoverEl(song,n));
   var play=document.createElement('button');
-  play.type='button';play.className='kbtn kbtn-black';
-  play.style.cssText='min-width:54px;padding:9px 10px;font-size:1rem';
+  play.type='button';play.className='song-play';
   play.textContent='▶';play.setAttribute('aria-label',tx('histPlay'));
-  var stop=document.createElement('button');
-  stop.type='button';stop.className='kbtn kbtn-white';
-  stop.style.cssText='min-width:54px;padding:9px 10px;font-size:1rem';
-  stop.textContent='■';stop.setAttribute('aria-label',tx('histStop'));
+  rowEl.appendChild(play);
+  var meta=document.createElement('div');
+  meta.className='song-meta';
+  var tt=document.createElement('div');
+  tt.className='song-title';
+  tt.textContent=title||tx('songLabelFmt').replace('{n}',n);
+  meta.appendChild(tt);
+  var sub=document.createElement('div');
+  sub.className='song-sub';
   var time=document.createElement('span');
-  time.style.cssText='font-size:0.8125rem;color:var(--muted);font-variant-numeric:tabular-nums';
-  time.textContent='0:00 / 0:00';
-  top.appendChild(play);top.appendChild(stop);top.appendChild(time);
-  card.appendChild(top);
+  time.textContent='0:00';
+  sub.textContent=tx('songLabelFmt').replace('{n}',n)+(prov?(' · '+prov):'')+' · ';
+  sub.appendChild(time);
+  if(streaming){
+    /* Suno preview: the song can be played already, but it is still
+       being generated — say so on the card until the final render. */
+    sub.appendChild(document.createTextNode(' · '));
+    var bd=document.createElement('span');
+    bd.className='song-stream-badge';
+    bd.textContent=tx('songCreating');
+    sub.appendChild(bd);
+  }
+  meta.appendChild(sub);
+  rowEl.appendChild(meta);
+  var dur=document.createElement('span');
+  dur.className='song-dur';
+  dur.textContent='0:00';
+  rowEl.appendChild(dur);
+  var lk=songIcoBtn(tx('histLike'),histHeartSvg(!!(it&&it.liked)));
+  lk.classList.add('hist-like');
+  if(it&&it.liked)lk.classList.add('liked');
+  lk.addEventListener('click',function(){
+    if(it){histToggleLike(it.id,lk);return;}
+    var on=lk.classList.toggle('liked');
+    var svg=lk.querySelector('svg');
+    if(svg)svg.setAttribute('fill',on?'#ff2e88':'none');
+  });
+  rowEl.appendChild(lk);
+  var dl=songIcoBtn(tx('histDownload'),SONG_SVG_DL);
+  dl.addEventListener('click',function(){genDownloadSong(u,n);});
+  rowEl.appendChild(dl);
+  var sh=songIcoBtn(tx('histShare'),SONG_SVG_SHARE);
+  sh.addEventListener('click',function(){histShare(it||{type:'song',url:u,title:title,prompt:prompt},sh);});
+  rowEl.appendChild(sh);
+  var pb=songIcoBtn(tx('pubPostBtn'),SONG_SVG_POST);
+  pb.addEventListener('click',function(){pubOpenSheet(it||{type:'song',url:u,title:title,prompt:prompt});});
+  rowEl.appendChild(pb);
+  card.appendChild(rowEl);
   var seek=document.createElement('input');
-  seek.type='range';seek.min='0';seek.max='1000';seek.value='0';
-  seek.style.cssText='width:100%;margin-top:10px;accent-color:var(--accent)';
+  seek.type='range';seek.className='song-seek';seek.min='0';seek.max='1000';seek.value='0';
   seek.setAttribute('aria-label','Seek');
   card.appendChild(seek);
   function sync(){
     play.textContent=au.paused?'▶':'❚❚';
     var d=isFinite(au.duration)?au.duration:0,c=au.currentTime||0;
-    time.textContent=histFmtTime(c)+' / '+histFmtTime(d);
-    if(d>0)seek.value=Math.round(c/d*1000);
+    time.textContent=histFmtTime(c);
+    if(d>0){dur.textContent=histFmtTime(d);seek.value=Math.round(c/d*1000);}
   }
   au.addEventListener('timeupdate',sync);
   au.addEventListener('loadedmetadata',sync);
@@ -3649,36 +4003,10 @@ function genSongCard(song,n,it,title,prov,prompt){
     }else au.pause();
     sync();
   });
-  stop.addEventListener('click',function(){au.pause();try{au.currentTime=0;}catch(e){}sync();});
   seek.addEventListener('input',function(){
     var d=isFinite(au.duration)?au.duration:0;
     if(d>0){try{au.currentTime=d*(parseInt(seek.value,10)||0)/1000;}catch(e){}}
   });
-  var row=document.createElement('div');
-  row.className='hist-actions';
-  var dl=document.createElement('button');
-  dl.type='button';dl.className='kbtn kbtn-black';dl.textContent=tx('histDownload');
-  dl.addEventListener('click',function(){genDownloadSong(u,n);});
-  row.appendChild(dl);
-  var lk=document.createElement('button');
-  lk.type='button';lk.className='kbtn kbtn-white hist-like'+(it&&it.liked?' liked':'');
-  lk.innerHTML=histHeartSvg(!!(it&&it.liked))+'<span>'+tx('histLike')+'</span>';
-  lk.addEventListener('click',function(){
-    if(it){histToggleLike(it.id,lk);return;}
-    var on=lk.classList.toggle('liked');
-    var svg=lk.querySelector('svg');
-    if(svg)svg.setAttribute('fill',on?'#ff2e88':'none');
-  });
-  row.appendChild(lk);
-  var sh=document.createElement('button');
-  sh.type='button';sh.className='kbtn kbtn-white';sh.textContent=tx('histShare');
-  sh.addEventListener('click',function(){histShare(it||{type:'song',url:u,title:title,prompt:prompt},sh);});
-  row.appendChild(sh);
-  var pb=document.createElement('button');
-  pb.type='button';pb.className='kbtn kbtn-white';pb.textContent=tx('pubPostBtn');
-  pb.addEventListener('click',function(){pubOpenSheet(it||{type:'song',url:u,title:title,prompt:prompt});});
-  row.appendChild(pb);
-  card.appendChild(row);
   return card;
 }
 async function genDownloadSong(src,n){
@@ -3694,9 +4022,21 @@ async function genDownloadSong(src,n){
 }
 /* ================= History — every creation, kept forever =================
    Every finished creation is saved the moment it appears, into this
-   browser's localStorage ('movai-history'), newest first, and stays
+   browser's localStorage, newest first, and stays
    there permanently — nothing is ever removed except when the user
-   taps Delete on that item (or Delete-all). History is shown in FOUR
+   taps Delete on that item (or Delete-all).
+   PER-ACCOUNT STORAGE (owner rule): History is kept SEPARATELY for
+   every Gmail — the storage key is 'movai-history-<email>' (email
+   lowercased) while signed in, and 'movai-history-guest' for
+   guests. A new sign-in therefore sees an EMPTY History — nobody
+   else's creations, not even the owner's, ever appear in it — and
+   everything a user creates saves into their own Gmail's store
+   only. Logging out switches History back to the (empty) guest
+   store at once, so the next person to sign in never sees the
+   previous user's data. A store left behind under the OLD shared
+   key 'movai-history' is migrated ONCE into the account that is
+   signed in when it is found, and the old key is then deleted.
+   History is shown in FOUR
    separate sections, one per type — Image / Video / Song / 3D — never
    mixed together. Image / Video / 3D sections are horizontal swipe
    carousels (newest centred, older items to the right); Song History
@@ -3707,17 +4047,58 @@ async function genDownloadSong(src,n){
    with the item. Song items get a full in-card player (Play / Pause /
    Stop / seek / time / volume / speed) driven by one shared Audio
    element. Every item has Download, Like, Share and Delete. */
-var HIST_KEY='movai-history';
+var HIST_KEY_LEGACY='movai-history';
 var HIST_TYPES=['image','video','song','3d'];
 var histCtx=null;
 var histAudio=null,histAudioId=null;
-function histGet(){try{var a=JSON.parse(localStorage.getItem(HIST_KEY)||'[]');return Array.isArray(a)?a:[];}catch(e){return[];}}
+/* The History store for whoever is using the app RIGHT NOW: the
+   signed-in Gmail's own key, or the guest key when signed out.
+   Read fresh on every access, so a log in / log out switches the
+   visible History the moment it happens. */
+function histKey(){
+  var em='';
+  try{em=(localStorage.getItem('movai-session')||'').trim().toLowerCase();}catch(e){}
+  return 'movai-history-'+(em?em:'guest');
+}
+/* One-time migration: a History left under the OLD shared key
+   ('movai-history', no email) moves into the account that is
+   signed in when it is found — appended after that account's own
+   items, de-duplicated by item id — and the old key is deleted,
+   so it can never migrate twice or leak into another account.
+   Guests never trigger it: the legacy store waits for a sign-in. */
+function histMigrateLegacy(){
+  var em='';
+  try{em=(localStorage.getItem('movai-session')||'').trim().toLowerCase();}catch(e){}
+  if(!em)return;
+  var raw=null;
+  try{raw=localStorage.getItem(HIST_KEY_LEGACY);}catch(e){}
+  if(raw===null)return;
+  try{localStorage.removeItem(HIST_KEY_LEGACY);}catch(e){}
+  var old=[];try{var p=JSON.parse(raw);if(Array.isArray(p))old=p;}catch(e){}
+  if(!old.length)return;
+  var cur=histGet();
+  var seen={};cur.forEach(function(it){if(it&&it.id)seen[it.id]=1;});
+  var add=old.filter(function(it){return it&&it.type&&!(it.id&&seen[it.id]);});
+  if(add.length)histSave(cur.concat(add).slice(0,300));
+}
+/* Called the moment the signed-in account changes (log in, log
+   out): stop any song the previous account's History was playing,
+   run the one-time legacy migration, and re-render so the History
+   on screen is the new account's own — empty for a fresh sign-in,
+   the guest store after log out. */
+function histOnAccountChange(){
+  if(histAudio){try{histAudio.pause();}catch(e){}histAudioId=null;}
+  histMigrateLegacy();
+  histRender();
+}
+function histGet(){try{var a=JSON.parse(localStorage.getItem(histKey())||'[]');return Array.isArray(a)?a:[];}catch(e){return[];}}
 function histSave(a){
+  var key=histKey();
   var variants=[a,a.map(function(it){var c={};for(var k in it){if(k!=='thumb')c[k]=it[k];}return c;})];
   for(var v=0;v<variants.length;v++){
     var arr=variants[v];
     while(arr.length){
-      try{localStorage.setItem(HIST_KEY,JSON.stringify(arr));return true;}
+      try{localStorage.setItem(key,JSON.stringify(arr));return true;}
       catch(e){arr=arr.slice(0,arr.length-1);}
     }
   }
@@ -3802,7 +4183,13 @@ function histRender(){
       box.appendChild(p);
       return;
     }
-    if(t==='song'){songWheelBuild(box,items);return;}
+    if(t==='song'){
+      /* Song History cards stack vertically, one full-width card
+         under the other — the same layout as the generation results:
+         cover on top, title under it, then the player and actions. */
+      items.forEach(function(it){box.appendChild(histCard(it));});
+      return;
+    }
     box.classList.add('hist-carousel');
     items.forEach(function(it){box.appendChild(histCard(it));});
     histCarouselSetup(box);
@@ -3985,15 +4372,17 @@ function fsOpen(src,type,wm){
     im.src=src;im.alt='';
     b.appendChild(im);
   }
-  v.style.display='flex';
+  sheetShowAnim(v);
   document.body.style.overflow='hidden';
 }
 function fsClose(){
   var v=document.getElementById('fsViewer'),b=document.getElementById('fsBody');
   if(FS_WM_RESIZE){window.removeEventListener('resize',FS_WM_RESIZE);FS_WM_RESIZE=null;}
-  if(b)b.innerHTML='';
-  if(v)v.style.display='none';
   document.body.style.overflow='';
+  /* Clear-to-blur exit first (~250 ms); the media is only dropped
+     once the viewer has fully faded (sheetShowAnim cancels this if
+     the viewer is re-opened in the meantime). */
+  sheetHideAnim(v,function(){if(b)b.innerHTML='';});
 }
 function fsExpandBtn(src,type,wm){
   var btn=document.createElement('button');
@@ -4003,7 +4392,96 @@ function fsExpandBtn(src,type,wm){
   return btn;
 }
 document.addEventListener('keydown',function(e){if(e.key==='Escape')fsClose();});
+/* Song History card — the same compact row as the generation
+   results: small cover · Play · title · duration · Like / Download /
+   Share / Post / Delete icon buttons, with a slim seek strip under
+   the row. Playback uses the one shared History audio element
+   (histPlayToggle / histPlayerSync, via the .hist-* classes). The
+   duration is read from the file's metadata once, lightly. */
+function histSongCard(it){
+  var card=document.createElement('div');
+  card.className='hist-card song-card';
+  card.setAttribute('data-hist-id',it.id);
+  card.setAttribute('data-hist-type','song');
+  var ownerName='';
+  try{var cu=acctCurrent();if(cu&&cu.name)ownerName=String(cu.name);}catch(e){}
+  var rowEl=document.createElement('div');
+  rowEl.className='song-row';
+  var coverEl;
+  if(it.image&&/^https:/i.test(it.image)){
+    coverEl=document.createElement('img');
+    coverEl.src=it.image;coverEl.alt=it.title||'';coverEl.className='song-cover';
+    coverEl.addEventListener('error',function(){if(coverEl.parentNode)coverEl.parentNode.replaceChild(songSolidCover(1,false),coverEl);});
+  }else{
+    coverEl=songSolidCover(1,false);
+  }
+  rowEl.appendChild(coverEl);
+  var meta=document.createElement('div');
+  meta.className='song-meta';
+  var tt=document.createElement('div');
+  tt.className='song-title';
+  tt.textContent=it.title||'MovAi';
+  meta.appendChild(tt);
+  var sub=document.createElement('div');
+  sub.className='song-sub';
+  var time=document.createElement('span');
+  time.className='hist-time';
+  time.textContent='0:00';
+  sub.textContent=(ownerName?(ownerName+' · '):'')+histFmtDate(it.ts)+' · ';
+  sub.appendChild(time);
+  meta.appendChild(sub);
+  if(it.url){
+    var play=document.createElement('button');
+    play.type='button';play.className='song-play hist-play';
+    play.textContent='▶';play.setAttribute('aria-label',tx('histPlay'));
+    play.addEventListener('click',function(){histPlayToggle(it);});
+    rowEl.appendChild(play);
+    rowEl.appendChild(meta);
+    var dur=document.createElement('span');
+    dur.className='song-dur hist-dur';
+    dur.textContent='0:00';
+    rowEl.appendChild(dur);
+    var mAu=new Audio();
+    mAu.preload='metadata';mAu.src=it.url;
+    mAu.addEventListener('loadedmetadata',function(){
+      if(isFinite(mAu.duration)&&mAu.duration>0)dur.textContent=histFmtTime(mAu.duration);
+      try{mAu.removeAttribute('src');mAu.load();}catch(e){}
+    });
+    var lk=songIcoBtn(tx('histLike'),histHeartSvg(!!it.liked));
+    lk.classList.add('hist-like');
+    if(it.liked)lk.classList.add('liked');
+    lk.addEventListener('click',function(){histToggleLike(it.id,lk);});
+    rowEl.appendChild(lk);
+    var dl=songIcoBtn(tx('histDownload'),SONG_SVG_DL);
+    dl.addEventListener('click',function(){histDownload(it);});
+    rowEl.appendChild(dl);
+    var sh=songIcoBtn(tx('histShare'),SONG_SVG_SHARE);
+    sh.addEventListener('click',function(){histShare(it,sh);});
+    rowEl.appendChild(sh);
+    var pb=songIcoBtn((it.pubPost==='public')?tx('pubPostedAlready'):tx('pubPostBtn'),SONG_SVG_POST);
+    pb.addEventListener('click',function(){pubOpenSheet(it);});
+    rowEl.appendChild(pb);
+    var del=songIcoBtn(tx('histDelete'),SONG_SVG_DEL,true);
+    del.addEventListener('click',function(){histDelete(it.id,del);});
+    rowEl.appendChild(del);
+    card.appendChild(rowEl);
+    var seek=document.createElement('input');
+    seek.type='range';seek.className='song-seek hist-seek';seek.min='0';seek.max='1000';seek.value='0';
+    seek.setAttribute('aria-label','Seek');
+    seek.addEventListener('input',function(){histSeek(it,seek);});
+    card.appendChild(seek);
+  }else{
+    rowEl.appendChild(meta);
+    var del2=songIcoBtn(tx('histDelete'),SONG_SVG_DEL,true);
+    del2.addEventListener('click',function(){histDelete(it.id,del2);});
+    rowEl.appendChild(del2);
+    card.appendChild(rowEl);
+    card.appendChild(histGoneEl());
+  }
+  return card;
+}
 function histCard(it){
+  if(it.type==='song')return histSongCard(it);
   var card=document.createElement('div');
   card.className='hist-card';
   card.setAttribute('data-hist-id',it.id);
@@ -4026,11 +4504,13 @@ function histCard(it){
   dt.textContent=histFmtDate(it.ts);
   head.appendChild(dt);
   card.appendChild(head);
+  var titleEl=null;
   if(it.title){
     var tp=document.createElement('p');
     tp.style.cssText='font-weight:800;font-size:0.9375rem;margin-top:10px;line-height:1.5';
     tp.textContent=it.title;
     card.appendChild(tp);
+    titleEl=tp;
   }
   if(it.type==='image'){
     var isrc=it.thumb||it.url;
@@ -4073,10 +4553,13 @@ function histCard(it){
     if(fl.children.length)card.appendChild(fl);
   }else if(it.type==='song'){
     if(it.image&&/^https:/i.test(it.image)){
+      /* Cover sits ABOVE the title — the same card layout as the
+         generation results (cover, then title, then the player). */
       var cv=document.createElement('img');
-      cv.src=it.image;cv.alt=it.title||'';cv.className='hist-media';cv.style.cssText='margin-top:10px;aspect-ratio:1/1;object-fit:cover';
+      cv.src=it.image;cv.alt=it.title||'';cv.className='song-cover';cv.style.marginTop='10px';
       cv.addEventListener('error',function(){cv.remove();});
-      card.appendChild(cv);
+      if(titleEl)card.insertBefore(cv,titleEl);
+      else card.appendChild(cv);
     }
     card.appendChild(histPlayerEl(it));
   }
@@ -4125,12 +4608,12 @@ function histPlayerEl(it){
   top.style.cssText='display:flex;align-items:center;gap:8px;flex-wrap:wrap';
   var play=document.createElement('button');
   play.type='button';play.className='kbtn kbtn-black hist-play';
-  play.style.cssText='min-width:54px;padding:9px 10px;font-size:1rem';
+  play.style.cssText='min-width:46px;padding:7px 9px;font-size:0.9375rem';
   play.textContent='▶';play.setAttribute('aria-label',tx('histPlay'));
   play.addEventListener('click',function(){histPlayToggle(it);});
   var stop=document.createElement('button');
   stop.type='button';stop.className='kbtn kbtn-white hist-stop';
-  stop.style.cssText='min-width:54px;padding:9px 10px;font-size:1rem';
+  stop.style.cssText='min-width:46px;padding:7px 9px;font-size:0.9375rem';
   stop.textContent='■';stop.setAttribute('aria-label',tx('histStop'));
   stop.addEventListener('click',function(){histStop(it.id);});
   var time=document.createElement('span');
@@ -4224,7 +4707,9 @@ function histPlayerSync(){
     var active=(id===histAudioId&&!!histAudio);
     var playing=active&&!histAudio.paused&&!histAudio.ended;
     if(play)play.textContent=playing?'❚❚':'▶';
-    if(time)time.textContent=histFmtTime(active?histAudio.currentTime:0)+' / '+histFmtTime(active?histAudio.duration:0);
+    if(time)time.textContent=histFmtTime(active?histAudio.currentTime:0);
+    var durEl=card.querySelector('.hist-dur');
+    if(durEl&&active&&histAudio.duration&&isFinite(histAudio.duration))durEl.textContent=histFmtTime(histAudio.duration);
     if(seek){
       if(active&&histAudio.duration&&isFinite(histAudio.duration))seek.value=String(Math.round((histAudio.currentTime/histAudio.duration)*1000));
       else if(!active)seek.value='0';
@@ -4269,9 +4754,9 @@ function histShare(it,btn){
 function histCopyText(t,btn){
   function done(ok){
     if(!btn)return;
-    var old=btn.textContent;
+    var old=btn.innerHTML;
     btn.textContent=ok?tx('histLinkCopied'):tx('copyFail');
-    setTimeout(function(){if(btn.isConnected)btn.textContent=old;},2200);
+    setTimeout(function(){if(btn.isConnected)btn.innerHTML=old;},2200);
   }
   function fallback(){
     try{
@@ -4411,7 +4896,7 @@ function storyRenderList(){
     card.innerHTML='<div class="ep-head"><b><span data-i18n="epLabel">'+tx('epLabel')+'</span> '+(i+1)+'</b><span class="ep-dur">'+gen.duration+'s</span></div>'
       +'<p class="ep-text"></p>'
       +'<button class="btn btn-green btn-block ep-gen-btn" style="margin-top:12px" data-i18n="epGen" onclick="epGenerate('+i+')">'+tx('epGen')+'</button>'
-      +'<div class="ep-prog" style="display:none;margin-top:10px"><div style="display:flex;justify-content:space-between;font-size:0.8125rem"><span class="ep-prog-txt">'+tx('progCreating')+'</span><b class="ep-prog-sec">0s · 0%</b></div><div style="height:8px;background:rgba(255,255,255,.1);border-radius:999px;margin-top:8px;overflow:hidden"><div class="ep-prog-bar" style="height:100%;width:0%;background:var(--accent-fill);border-radius:999px"></div></div></div>'
+      +'<div class="ep-prog" style="display:none;margin-top:10px"><div style="display:flex;justify-content:space-between;font-size:0.8125rem"><span class="ep-prog-txt">'+tx('progCreating')+'</span><b class="ep-prog-sec">0s · 0%</b></div><div style="height:8px;background:rgba(255,255,255,.1);border-radius:999px;margin-top:8px;overflow:hidden"><div class="ep-prog-bar" style="height:100%;width:0%;background:var(--accent-fill);border-radius:999px"></div></div><div style="display:flex;gap:8px;margin-top:10px"><button type="button" class="kbtn kbtn-white gen-pause-btn" style="flex:1" onclick="genPauseToggle()">'+tx('btnPauseGen')+'</button><button type="button" class="kbtn kbtn-white gen-cancel-btn" style="flex:1;color:#f87171" onclick="genCancel()">'+tx('btnCancelGen')+'</button></div></div>'
       +'<p class="ep-msg"></p>'
       +'<div class="ep-result" style="margin-top:12px"></div>';
     card.querySelector('.ep-text').textContent=ep.text;
@@ -4432,6 +4917,7 @@ function epSetMsg(i,t,isErr){
   updateErrBox('genErrBox','genErrText','genCopyMsg',isErr?t:'','video'+(provName?(' · '+provName):'')+' · '+tx('epLabel')+' '+(i+1));
 }
 async function epGenerate(i){
+  if(!requireLogin())return;
   var ep=story.episodes[i];if(!ep)return;
   if(genAnyBusy)return;
   var card=epCardEl(i);if(!card)return;
@@ -4459,7 +4945,8 @@ async function epGenerate(i){
       epSetMsg(i,tx('msgDone'),false);
     }
   }catch(e){
-    if(e&&e.adminServerDown){epSetMsg(i,tx('serverOffline'),true);}
+    if(e&&e.genCancelled){epSetMsg(i,tx('msgGenCancelled'),false);}
+    else if(e&&e.adminServerDown){epSetMsg(i,tx('serverOffline'),true);}
     else{
       var m=(e&&e.message?e.message:String(e));
       if(/failed to fetch|networkerror|load failed/i.test(m))m=tx('serverOffline');
@@ -4567,6 +5054,7 @@ function d3FileChange(inp){
   r.readAsDataURL(f);
 }
 async function d3GenImage(){
+  if(!requireLogin())return;
   var prompt=(document.getElementById('genPrompt').value||'').trim();
   if(!prompt){d3Msg(tx('d3MsgNeedPrompt'));return;}
   var btn=document.getElementById('d3GenImgBtn');btn.disabled=true;
@@ -4638,6 +5126,7 @@ async function d3TcCall(action,payload,cred){
   return j.Response;
 }
 async function d3Make(){
+  if(!requireLogin())return;
   if(d3.provider==='masterpiecex'){d3MakeMpx();return;}
   if(!d3.imgData){d3Msg(d3.opt==='text'?tx('d3MsgNeedImgText'):tx('d3MsgNeedImg'));return;}
   var hkeys=genKeysGet('hunyuan3d').filter(function(k){return k&&typeof k==='object'&&k.secretId&&k.secretKey;});
@@ -4723,6 +5212,8 @@ function toggleMenu(){
 function openMenu(){
   var d=document.getElementById('drawer');if(!d)return;
   var b=document.getElementById('drawerBackdrop');
+  try{notifLoad();}catch(e){}
+  try{pushRefreshToggle();}catch(e){}
   d.classList.add('open');if(b)b.classList.add('open');
   document.body.style.overflow='hidden';
   requestAnimationFrame(function(){requestAnimationFrame(function(){
@@ -4742,8 +5233,46 @@ function closeMenu(){
    (drawer «Packages» / Profile Packages button / a locked-model
    notice); packagesHide() removes it from the page again whenever
    the user navigates anywhere else. */
-function packagesShow(){var p=document.getElementById('page-packages');var wasOpen=!!(p&&p.classList.contains('open'));if(p)p.classList.add('open');var b=document.getElementById('pkgBackdrop');if(b)b.classList.add('open');document.body.style.overflow='hidden';if(!wasOpen){PKG_EVT_OPEN=true;PKG_EVT_REQUESTED=false;pkgEvent('view','');}}
-function packagesHide(){var wasOpen=PKG_EVT_OPEN;var lastId=PKG_EVT_LAST;var requested=PKG_EVT_REQUESTED;var p=document.getElementById('page-packages');if(p){p.classList.remove('open');p.style.transform='';}var b=document.getElementById('pkgBackdrop');if(b)b.classList.remove('open');if(document.body.style.overflow==='hidden'&&!document.getElementById('drawer').classList.contains('shown'))document.body.style.overflow='';if(wasOpen){PKG_EVT_OPEN=false;if(!requested)pkgEvent('cancel',lastId);}}
+/* The Packages sheet uses the same blur-to-clear language as every
+   other sheet: on show the panel un-blurs as it slides up (~300 ms);
+   on hide it blurs/fades back out (~250 ms) before the .open
+   classes come off (pkgAnimTimer guards a re-show mid-exit). */
+var pkgAnimTimer=null;
+function packagesShow(){
+  var p=document.getElementById('page-packages');
+  var wasOpen=!!(p&&p.classList.contains('open'));
+  if(pkgAnimTimer){clearTimeout(pkgAnimTimer);pkgAnimTimer=null;}
+  if(p){
+    p.classList.remove('blur-out');
+    p.classList.add('open');
+    p.classList.remove('blur-in');void p.offsetWidth;p.classList.add('blur-in');
+  }
+  var b=document.getElementById('pkgBackdrop');
+  if(b){
+    b.classList.remove('blur-out');
+    b.classList.add('open');
+    b.classList.remove('blur-in');void b.offsetWidth;b.classList.add('blur-in');
+  }
+  document.body.style.overflow='hidden';
+  if(!wasOpen){PKG_EVT_OPEN=true;PKG_EVT_REQUESTED=false;pkgEvent('view','');}
+}
+function packagesHide(){
+  var wasOpen=PKG_EVT_OPEN;var lastId=PKG_EVT_LAST;var requested=PKG_EVT_REQUESTED;
+  var p=document.getElementById('page-packages');var b=document.getElementById('pkgBackdrop');
+  var finish=function(){
+    pkgAnimTimer=null;
+    if(p){p.classList.remove('open');p.classList.remove('blur-in');p.classList.remove('blur-out');p.style.transform='';}
+    if(b){b.classList.remove('open');b.classList.remove('blur-in');b.classList.remove('blur-out');}
+    if(document.body.style.overflow==='hidden'&&!document.getElementById('drawer').classList.contains('shown'))document.body.style.overflow='';
+  };
+  if(p&&p.classList.contains('open')&&!sheetAnimReduced()){
+    p.classList.remove('blur-in');p.classList.remove('blur-out');void p.offsetWidth;p.classList.add('blur-out');
+    if(b){b.classList.remove('blur-in');b.classList.remove('blur-out');void b.offsetWidth;b.classList.add('blur-out');}
+    if(pkgAnimTimer)clearTimeout(pkgAnimTimer);
+    pkgAnimTimer=setTimeout(finish,250);
+  }else finish();
+  if(wasOpen){PKG_EVT_OPEN=false;if(!requested)pkgEvent('cancel',lastId);}
+}
 function menuGo(id,mode){
   closeMenu();
   if(mode)genSetMode(mode);
@@ -4752,11 +5281,16 @@ function menuGo(id,mode){
   appSetView('create');
   var el=document.getElementById(id);if(el)el.scrollIntoView({behavior:'smooth',block:'start'});
 }
+var fabAnimTimer=null;
 function toggleFab(){
   var p=document.getElementById('fabPanel');if(!p)return;
   var b=document.getElementById('fabBtn');
-  var open=p.classList.toggle('open');
-  if(b)b.setAttribute('aria-expanded',open?'true':'false');
+  if(p.classList.contains('open')){closeFab();return;}
+  if(fabAnimTimer){clearTimeout(fabAnimTimer);fabAnimTimer=null;}
+  p.classList.remove('blur-out');
+  p.classList.add('open');
+  p.classList.remove('blur-in');void p.offsetWidth;p.classList.add('blur-in');
+  if(b)b.setAttribute('aria-expanded','true');
 }
 function fabGo(a){
   closeFab();
@@ -4774,8 +5308,12 @@ function fabGo(a){
 }
 function closeFab(){
   var p=document.getElementById('fabPanel');if(!p)return;
-  p.classList.remove('open');
   var b=document.getElementById('fabBtn');if(b)b.setAttribute('aria-expanded','false');
+  if(!p.classList.contains('open'))return;
+  if(sheetAnimReduced()){p.classList.remove('open');p.classList.remove('blur-in');p.classList.remove('blur-out');return;}
+  p.classList.remove('blur-in');p.classList.remove('blur-out');void p.offsetWidth;p.classList.add('blur-out');
+  if(fabAnimTimer)clearTimeout(fabAnimTimer);
+  fabAnimTimer=setTimeout(function(){fabAnimTimer=null;p.classList.remove('open');p.classList.remove('blur-out');},250);
 }
 /* ================= Public feed + Post to Public =================
    The «Public» tab is the DEFAULT view: the site opens on the
@@ -5308,7 +5846,7 @@ function pubCountView(id){
   try{fetch(PUB_API+'/view',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:id})}).catch(function(){});}catch(e){}
 }
 /* ----- Post to Public sheet ----- */
-function pubSheetClose(){var s=document.getElementById('pubSheet');if(s)s.style.display='none';}
+function pubSheetClose(){var s=document.getElementById('pubSheet');sheetHideAnim(s);}
 function pubOptBtnsHtml(){
   return '<button type="button" class="kbtn kbtn-black" style="width:100%" onclick="pubDoPost(\'public\')">'+escHtml(tx('pubOptPublic'))+'</button>'
     +'<button type="button" class="kbtn kbtn-white" style="width:100%;margin-top:8px" onclick="pubDoPost(\'private\')">'+escHtml(tx('pubOptPrivate'))+'</button>';
@@ -5332,12 +5870,12 @@ function pubOpenSheet(item){
   }
   h+='<p id="pubSheetMsg" style="font-size:0.8125rem;margin-top:10px;min-height:16px;line-height:1.6"></p>';
   body.innerHTML=h;
-  var s=document.getElementById('pubSheet');if(s)s.style.display='flex';
+  var s=document.getElementById('pubSheet');if(s)sheetShowAnim(s);
 }
 function pubDoPost(vis){
   var item=pubSheetItem;if(!item)return;
   var u=null;try{u=acctCurrent();}catch(e){}
-  if(!u)return;
+  if(!u){pubSheetClose();loginSheetOpen();return;}
   var msg=document.getElementById('pubSheetMsg');
   if(msg){msg.textContent=tx('pubPosting');msg.style.color='var(--muted)';}
   var payload={
@@ -5504,6 +6042,12 @@ function acctCurrent(){
      simply tries again quietly on the next app open. */
 var ACCT_SYNC_URL='https://movai-proxy.onrender.com/api/admin/sync';
 var acctSyncBusy=false;
+/* One-shot flag: set by giftClaim() so the sync that follows the
+   Claim tap carries giftClaimed:true — the server then creates the
+   account's «gift-claimed» notification and Telegram-alerts the
+   Admin. acctAdminPayload consumes (clears) it, so ordinary syncs
+   never send it. */
+var acctSyncGiftFlag=false;
 function acctSyncPlanCopy(p){
   if(!p||!p.id)return null;
   return {id:p.id,until:p.until||0};
@@ -5512,7 +6056,7 @@ function acctAdminPayload(u){
   var plan=null,songPlan=null;
   try{plan=acctSyncPlanCopy((typeof pkgGet==='function')?pkgGet():u.plan);}catch(e){plan=acctSyncPlanCopy(u.plan);}
   try{songPlan=acctSyncPlanCopy((typeof songPkgGet==='function')?songPkgGet():u.songPlan);}catch(e){songPlan=acctSyncPlanCopy(u.songPlan);}
-  return {
+  var payload={
     email:u.email,
     name:u.name||'',
     picture:u.picture||'',
@@ -5524,6 +6068,8 @@ function acctAdminPayload(u){
     plan:plan,
     songPlan:songPlan
   };
+  if(acctSyncGiftFlag){payload.giftClaimed=true;acctSyncGiftFlag=false;}
+  return payload;
 }
 function acctSrvNum(v){
   if(typeof v==='number'&&isFinite(v))return v;
@@ -5552,10 +6098,15 @@ function acctApplyServerData(data){
   var sfn=(typeof srv.firstName==='string')?srv.firstName.trim():'';
   var sln=(typeof srv.lastName==='string')?srv.lastName.trim():'';
   if((sfn||sln)&&(rec.firstName!==sfn||rec.lastName!==sln)){rec.firstName=sfn;rec.lastName=sln;rec.name=(sfn+' '+sln).trim()||rec.name;changed=true;}
+  /* Gift hold: while a new user's welcome gift is still unclaimed
+     (giftPending), the server sync must NOT land the free credits
+     early — the balances stay 0 until the user taps
+     «ទទួលយក · Claim» in the gift popup. */
+  var giftHold=!!rec.giftPending;
   var c=acctSrvNum(srv.credits);
-  if(c!==null){var cv=Math.max(0,Math.floor(c));if(rec.credits!==cv){rec.credits=cv;changed=true;}}
+  if(c!==null&&!giftHold){var cv=Math.max(0,Math.floor(c));if(rec.credits!==cv){rec.credits=cv;changed=true;}}
   var sc=acctSrvNum(srv.songCredits);
-  if(sc!==null){var sv=Math.max(0,Math.floor(sc));if(rec.songCredits!==sv){rec.songCredits=sv;changed=true;}}
+  if(sc!==null&&!giftHold){var sv=Math.max(0,Math.floor(sc));if(rec.songCredits!==sv){rec.songCredits=sv;changed=true;}}
   var sp=acctSyncPlanCopy(srv.plan);
   if(sp&&(sp.until>Date.now())){rec.plan=sp;try{localStorage.setItem('movai-plan',JSON.stringify({id:sp.id,until:sp.until,email:rec.email}));}catch(e){}changed=true;}
   var ssp=acctSyncPlanCopy(srv.songPlan);
@@ -5605,8 +6156,9 @@ function acctOpen(){
    MovAi has exactly ONE log-in entry: «Connect account Google» —
    there is NO create-account form anywhere (owner rule: the old
    register / email + password form in the ☰ drawer is removed
-   completely; the drawer guest box carries the same single Google
-   button). Sign-in is REAL Google: the button runs Google Identity
+   completely, and the drawer carries NO account / log-in section
+   at all — the only entry is the top-right «Log in» button, which
+   opens this sheet). Sign-in is REAL Google: the button runs Google Identity
    Services (library loaded in <head>, initialized with the MovAi
    OAuth Client ID below — project "MovAi", Production, scopes
    openid / email / profile). Google shows its own account popup;
@@ -5628,12 +6180,26 @@ var GIS_CLIENT_ID='809358546010-dspkik0o4ahg7km15dspro5cj3qjk384.apps.googleuser
 var gisInitDone=false;
 var gisWaitTries=0;
 function loginSheetOpen(){
-  var s=document.getElementById('loginSheet');if(s)s.style.display='flex';
+  var s=document.getElementById('loginSheet');if(s)sheetShowAnim(s);
   var slot=document.getElementById('loginGsiSlot');if(slot){slot.style.display='none';slot.innerHTML='';}
   var b=document.getElementById('loginGoogleBtn');if(b)b.style.display='';
   var m=document.getElementById('loginMsg');if(m)m.textContent='';
 }
-function loginSheetClose(){var s=document.getElementById('loginSheet');if(s)s.style.display='none';}
+function loginSheetClose(){var s=document.getElementById('loginSheet');sheetHideAnim(s);}
+/* ===== Login gate for CREATION =====
+   Guests may browse everything (Public feed, view media, empty
+   History) with no account. But CREATING anything — image, video,
+   song, 3D, Story episode, «អូតូ», Post to Public — requires being
+   logged in. Every creation entry point calls requireLogin() FIRST:
+   a guest gets the login sheet (Connect account Google) immediately
+   and nothing is created; the sheet's Cancel/✕ just returns them to
+   browsing, and the next creation tap pops the sheet again. */
+function requireLogin(){
+  var u=null;try{u=acctCurrent();}catch(e){}
+  if(u)return true;
+  loginSheetOpen();
+  return false;
+}
 function loginMsg(t,ok){
   var m=document.getElementById('loginMsg');
   if(m){m.textContent=t;m.style.color=ok?'var(--accent-text)':'#f87171';}
@@ -5737,10 +6303,13 @@ function gisFinishLogin(prof){
   var isNew=false;
   if(!rec){
     /* First Google sign-in: the account is created by the sign-in
-       itself — FREE credits land in the user's OWN account right
-       here (250 Image & Video + 24 Song), plus the permanent
-       10-character User ID. */
-    rec={name:'',firstName:'',lastName:'',id:acctGenUserId(us),email:email,pass:'',credits:250,songCredits:24,mhConnected:false,mhKey:'',created:Date.now()};
+       itself, plus the permanent 10-character User ID — but the
+       FREE credits do NOT land yet: the account starts at 0 / 0
+       with a pending welcome gift (giftPending). A few seconds
+       after log in a gift popup appears in the centre of the
+       screen, and only tapping «ទទួលយក · Claim» grants the
+       250 Image & Video + 24 Song credits (see giftClaim). */
+    rec={name:'',firstName:'',lastName:'',id:acctGenUserId(us),email:email,pass:'',credits:0,songCredits:0,giftPending:true,mhConnected:false,mhKey:'',created:Date.now()};
     us[email]=rec;isNew=true;
   }
   /* Google profile fills the blanks only — a name the user typed
@@ -5757,15 +6326,425 @@ function gisFinishLogin(prof){
   if(!rec.name)rec.name=((rec.firstName+' '+rec.lastName).trim())||prof.name||'';
   us[email]=rec;acctUsersSave(us);
   try{localStorage.setItem('movai-session',email);}catch(e){}
-  if(isNew)ACCT_FLASH=tx('acctGotFree');
   acctRestoreMh(rec);
   loginSheetClose();
   acctRender();
+  try{histOnAccountChange();}catch(e){}
   acctAdminSync();
+  try{notifLoad();}catch(e){}
+  if(isNew)giftSchedule();
+  try{pushMaybeAsk();}catch(e){}
+  try{pushEnsureSubscribed();}catch(e){}
   /* Just signed in with no name on the account → open the account
      box, where the First name / Last name step is waiting. */
   var u2=acctCurrent();
   if(u2&&(!u2.firstName||!u2.lastName))acctOpen();
+}
+/* ===== New-user welcome gift (owner rule) =====
+   A brand-new account starts with NO credits (0 / 0). About
+   5–10 seconds after log in, a gift popup appears in the centre
+   of the screen: «🎁 កាដូពី Admin — Free 250 Image.Video Credit
+   + 24 Song Credit សម្រាប់អ្នកប្រើថ្មី» with ONE button,
+   «ទទួលយក · Claim». Only tapping Claim grants the credits
+   (250 / 24, then the usual server sync runs — acctAdminSync);
+   without the tap the account keeps 0. Returning users who
+   already have their credits never see the popup: it is driven
+   by the account's giftPending flag, which only a fresh sign-up
+   carries and which Claim clears for good. If the app is closed
+   before claiming, the gift stays pending and the popup is
+   offered again (after the same delay) on the next app open. */
+var giftTimer=null;
+function giftSchedule(){
+  if(giftTimer)return;
+  var u=null;try{u=acctCurrent();}catch(e){}
+  if(!u||!u.giftPending)return;
+  giftTimer=setTimeout(function(){giftTimer=null;giftShow();},7000);
+}
+function giftShow(){
+  var u=null;try{u=acctCurrent();}catch(e){}
+  if(!u||!u.giftPending)return;
+  var s=document.getElementById('giftSheet');if(s)sheetShowAnim(s);
+}
+function giftClaim(){
+  var u=acctCurrent();if(!u||!u.giftPending)return;
+  var us=acctUsersGet();var rec=us[u.email];if(!rec||!rec.giftPending)return;
+  rec.credits=250;rec.songCredits=24;rec.giftPending=false;
+  acctUsersSave(us);
+  var s=document.getElementById('giftSheet');if(s)sheetHideAnim(s);
+  acctRender();
+  acctSyncGiftFlag=true;
+  acctAdminSync();
+}
+/* ===== Web Push · ដំណឹងចេញពីទូរស័ព្ទ (the phone's own notifications) =====
+   Separate from Telegram: these alerts arrive through Web Push and
+   pop up on the phone itself, even when the website is closed.
+   - The service worker (sw.js — the copy under assets/ is what this
+     page registers when no root sw.js is served) shows every push
+     that arrives (title + body) and opens the website when tapped.
+   - ONCE after log in a sheet asks «បើកដំណឹងពីទូរស័ព្ទ?» — the
+     ask is remembered in localStorage 'movai-push-asked', and a
+     refusal (in the sheet or in the browser prompt) is never asked
+     again. Agreeing registers the service worker, reads the VAPID
+     public key from GET …/api/public/vapid-key, subscribes through
+     PushManager and POSTs {email, subscription} to
+     …/api/public/push-subscribe.
+   - The ☰ drawer settings box carries an on/off switch whose state
+     mirrors this device's REAL subscription. Turning it off POSTs
+     …/api/public/push-unsubscribe and unsubscribes the device;
+     turning it on re-subscribes.
+   Everything is best-effort: no PushManager, a denied permission
+   or an unreachable server simply leaves the switch off — nothing
+   is faked and nothing else on the page is touched. */
+var PUSH_API='https://movai-proxy.onrender.com/api/public';
+var pushBusy=false;
+function pushSupported(){return ('serviceWorker' in navigator)&&('PushManager' in window)&&('Notification' in window);}
+function pushAskedGet(){try{return localStorage.getItem('movai-push-asked')==='1';}catch(e){return false;}}
+function pushAskedSet(){try{localStorage.setItem('movai-push-asked','1');}catch(e){}}
+function pushB64ToBytes(s){
+  var pad='='.repeat((4-(s.length%4))%4);
+  var b64=(s+pad).replace(/-/g,'+').replace(/_/g,'/');
+  var raw=window.atob(b64);
+  var out=new Uint8Array(raw.length);
+  for(var i=0;i<raw.length;i++)out[i]=raw.charCodeAt(i);
+  return out;
+}
+function pushGetReg(){
+  return navigator.serviceWorker.register('sw.js').catch(function(){
+    return navigator.serviceWorker.register('data:application/javascript;base64,LyogTW92QWkgV2ViIFB1c2ggc2VydmljZSB3b3JrZXIuCiAgIFJlY2VpdmVzIFdlYiBQdXNoIG1lc3NhZ2VzIGZyb20gdGhlIE1vdkFpIHNlcnZlciBhbmQgc2hvd3MgdGhlbQogICBhcyB0aGUgcGhvbmUncyBvd24gbm90aWZpY2F0aW9ucyAodGl0bGUgKyBib2R5KS4gVGFwcGluZyBhCiAgIG5vdGlmaWNhdGlvbiBmb2N1c2VzIHRoZSBNb3ZBaSB3ZWJzaXRlIGlmIGl0IGlzIGFscmVhZHkgb3BlbiwKICAgb3Igb3BlbnMgaXQuIFBheWxvYWQgc2hhcGUgKEpTT04pOiB7IHRpdGxlLCBib2R5LCB1cmw/LCBpY29uPyB9IOKAlAogICBhIHBsYWluLXRleHQgcGF5bG9hZCBpcyBzaG93biBhcyB0aGUgYm9keSB3aXRoIHRpdGxlIMKrTW92QWnCuy4gKi8Kc2VsZi5hZGRFdmVudExpc3RlbmVyKCdpbnN0YWxsJywgZnVuY3Rpb24gKGV2ZW50KSB7CiAgc2VsZi5za2lwV2FpdGluZygpOwp9KTsKc2VsZi5hZGRFdmVudExpc3RlbmVyKCdhY3RpdmF0ZScsIGZ1bmN0aW9uIChldmVudCkgewogIGV2ZW50LndhaXRVbnRpbChzZWxmLmNsaWVudHMuY2xhaW0oKSk7Cn0pOwpzZWxmLmFkZEV2ZW50TGlzdGVuZXIoJ3B1c2gnLCBmdW5jdGlvbiAoZXZlbnQpIHsKICB2YXIgZGF0YSA9IHt9OwogIGlmIChldmVudC5kYXRhKSB7CiAgICB0cnkgeyBkYXRhID0gZXZlbnQuZGF0YS5qc29uKCkgfHwge307IH0KICAgIGNhdGNoIChlKSB7CiAgICAgIHRyeSB7IGRhdGEgPSB7IGJvZHk6IGV2ZW50LmRhdGEudGV4dCgpIH07IH0gY2F0Y2ggKGUyKSB7IGRhdGEgPSB7fTsgfQogICAgfQogIH0KICB2YXIgdGl0bGUgPSBkYXRhLnRpdGxlIHx8ICdNb3ZBaSc7CiAgdmFyIG9wdGlvbnMgPSB7CiAgICBib2R5OiBkYXRhLmJvZHkgfHwgZGF0YS5tZXNzYWdlIHx8IGRhdGEudGV4dCB8fCAnJywKICAgIHRhZzogZGF0YS50YWcgfHwgdW5kZWZpbmVkLAogICAgZGF0YTogeyB1cmw6IGRhdGEudXJsIHx8ICcvJyB9CiAgfTsKICBpZiAoZGF0YS5pY29uKSBvcHRpb25zLmljb24gPSBkYXRhLmljb247CiAgaWYgKGRhdGEuYmFkZ2UpIG9wdGlvbnMuYmFkZ2UgPSBkYXRhLmJhZGdlOwogIGV2ZW50LndhaXRVbnRpbChzZWxmLnJlZ2lzdHJhdGlvbi5zaG93Tm90aWZpY2F0aW9uKHRpdGxlLCBvcHRpb25zKSk7Cn0pOwpzZWxmLmFkZEV2ZW50TGlzdGVuZXIoJ25vdGlmaWNhdGlvbmNsaWNrJywgZnVuY3Rpb24gKGV2ZW50KSB7CiAgZXZlbnQubm90aWZpY2F0aW9uLmNsb3NlKCk7CiAgdmFyIHVybCA9IChldmVudC5ub3RpZmljYXRpb24uZGF0YSAmJiBldmVudC5ub3RpZmljYXRpb24uZGF0YS51cmwpIHx8ICcvJzsKICBldmVudC53YWl0VW50aWwoCiAgICBzZWxmLmNsaWVudHMubWF0Y2hBbGwoeyB0eXBlOiAnd2luZG93JywgaW5jbHVkZVVuY29udHJvbGxlZDogdHJ1ZSB9KS50aGVuKGZ1bmN0aW9uIChsaXN0KSB7CiAgICAgIGZvciAodmFyIGkgPSAwOyBpIDwgbGlzdC5sZW5ndGg7IGkrKykgewogICAgICAgIHZhciBjID0gbGlzdFtpXTsKICAgICAgICBpZiAoJ2ZvY3VzJyBpbiBjKSB7CiAgICAgICAgICB0cnkgeyBpZiAoYy51cmwgIT09IHVybCAmJiAnbmF2aWdhdGUnIGluIGMpIGMubmF2aWdhdGUodXJsKTsgfSBjYXRjaCAoZSkge30KICAgICAgICAgIHJldHVybiBjLmZvY3VzKCk7CiAgICAgICAgfQogICAgICB9CiAgICAgIGlmIChzZWxmLmNsaWVudHMub3BlbldpbmRvdykgcmV0dXJuIHNlbGYuY2xpZW50cy5vcGVuV2luZG93KHVybCk7CiAgICB9KQogICk7Cn0pOwo=');
+  });
+}
+function pushVapidKey(){
+  return fetch(PUSH_API+'/vapid-key').then(function(r){
+    if(!r||!r.ok)throw new Error('vapid');
+    return r.json().catch(function(){return null;});
+  }).then(function(d){
+    var k='';
+    if(typeof d==='string')k=d;
+    else if(d)k=d.publicKey||d.key||d.vapidPublicKey||d.vapid_key||(d.data&&(d.data.publicKey||d.data.key))||'';
+    if(!k)throw new Error('vapid');
+    return String(k);
+  });
+}
+function pushPostSub(sub,email){
+  var marker='movai-push-ep-'+email;
+  var last='';try{last=localStorage.getItem(marker)||'';}catch(e){}
+  if(last===sub.endpoint)return Promise.resolve(true);
+  return fetch(PUSH_API+'/push-subscribe',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:email,subscription:sub.toJSON()})}).then(function(r){
+    if(r&&r.ok){try{localStorage.setItem(marker,sub.endpoint);}catch(e){}}
+    return !!(r&&r.ok);
+  }).catch(function(){return false;});
+}
+function pushSubscribe(){
+  var u=null;try{u=acctCurrent();}catch(e){}
+  if(!u||!u.email)return Promise.resolve(false);
+  var email=u.email;
+  return pushGetReg().then(function(reg){
+    return reg.pushManager.getSubscription().then(function(existing){
+      if(existing)return existing;
+      return pushVapidKey().then(function(key){
+        return reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:pushB64ToBytes(key)});
+      });
+    });
+  }).then(function(sub){
+    if(!sub)return false;
+    return pushPostSub(sub,email);
+  });
+}
+function pushUnsubscribe(){
+  var u=null;try{u=acctCurrent();}catch(e){}
+  if(!('serviceWorker' in navigator))return Promise.resolve();
+  return navigator.serviceWorker.getRegistration().then(function(reg){
+    if(!reg)return;
+    return reg.pushManager.getSubscription().then(function(sub){
+      if(!sub)return;
+      var ep=sub.endpoint;
+      var post=Promise.resolve();
+      if(u&&u.email&&typeof fetch==='function'){
+        post=fetch(PUSH_API+'/push-unsubscribe',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:u.email,endpoint:ep})}).catch(function(){});
+      }
+      return post.then(function(){return sub.unsubscribe();}).then(function(){
+        try{localStorage.removeItem('movai-push-ep-'+(u?u.email:''));}catch(e){}
+      });
+    });
+  }).catch(function(){});
+}
+function pushRefreshToggle(){
+  var sw=document.getElementById('pushSwitch');if(!sw)return;
+  var note=document.getElementById('pushStateNote');
+  var set=function(on,txt){sw.classList.toggle('on',!!on);sw.setAttribute('aria-checked',on?'true':'false');sw.disabled=!!pushBusy;if(note)note.textContent=txt||'';};
+  var u=null;try{u=acctCurrent();}catch(e){}
+  if(!u){set(false,tx('pushStateGuest'));return;}
+  if(!pushSupported()){set(false,tx('pushStateUnsupported'));return;}
+  if(Notification.permission==='denied'){set(false,tx('pushStateBlocked'));return;}
+  navigator.serviceWorker.getRegistration().then(function(reg){
+    if(!reg){set(false,tx('pushStateOff'));return null;}
+    return reg.pushManager.getSubscription();
+  }).then(function(sub){
+    if(sub)set(true,tx('pushStateOn'));else set(false,tx('pushStateOff'));
+  }).catch(function(){set(false,tx('pushStateOff'));});
+}
+function pushToggleClick(){
+  var sw=document.getElementById('pushSwitch');
+  pushSetEnabled(!(sw&&sw.classList.contains('on')));
+}
+function pushSetEnabled(on){
+  if(pushBusy)return;
+  var u=null;try{u=acctCurrent();}catch(e){}
+  if(!u||!u.email){closeMenu();loginSheetOpen();return;}
+  if(!pushSupported()){pushRefreshToggle();return;}
+  pushBusy=true;pushRefreshToggle();
+  var done=function(){pushBusy=false;pushRefreshToggle();};
+  if(on){
+    pushAskedSet();
+    var perm=Notification.permission;
+    var askP=(perm==='default')?Notification.requestPermission():Promise.resolve(perm);
+    Promise.resolve(askP).then(function(p){
+      if(p!=='granted'){done();return;}
+      pushSubscribe().then(done).catch(done);
+    }).catch(done);
+  }else{
+    pushUnsubscribe().then(done).catch(done);
+  }
+}
+function pushMaybeAsk(){
+  if(!pushSupported()||pushAskedGet())return;
+  if(Notification.permission!=='default')return;
+  var u=null;try{u=acctCurrent();}catch(e){}
+  if(!u||!u.email)return;
+  setTimeout(pushShowAsk,2600);
+}
+function pushShowAsk(){
+  if(pushAskedGet()||Notification.permission!=='default')return;
+  var u=null;try{u=acctCurrent();}catch(e){}
+  if(!u||!u.email)return;
+  var g=document.getElementById('giftSheet');
+  if(g&&g.style.display==='flex'){setTimeout(pushShowAsk,4000);return;}
+  var s=document.getElementById('pushSheet');if(s)sheetShowAnim(s);
+}
+function pushAskEnable(){
+  pushAskedSet();
+  var s=document.getElementById('pushSheet');if(s)sheetHideAnim(s);
+  pushSetEnabled(true);
+}
+function pushAskDismiss(){
+  /* A refusal is final — the ask is never shown again. */
+  pushAskedSet();
+  var s=document.getElementById('pushSheet');if(s)sheetHideAnim(s);
+}
+function pushEnsureSubscribed(){
+  if(!pushSupported())return;
+  if(Notification.permission!=='granted')return;
+  var u=null;try{u=acctCurrent();}catch(e){}
+  if(!u||!u.email)return;
+  pushSubscribe().then(function(){pushRefreshToggle();}).catch(function(){});
+}
+function pushInit(){
+  pushRefreshToggle();
+  pushMaybeAsk();
+  pushEnsureSubscribed();
+}
+/* ===== Notifications · ដំណឹង (real, from the MovAi server) =====
+   The bell in the top-right corner (left of the avatar / Log in
+   button) and the «ដំណឹង» section in the ☰ drawer show the signed-in account's
+   REAL notifications, read from the MovAi proxy server:
+     GET https://movai-proxy.onrender.com/api/public/notifications?email=<gmail>
+   Newest first, each with its time. Types: gift /
+   package-approved / package-rejected / grant / deduct (anything
+   else renders as a plain notice). Tapping an unread item marks it
+   read — locally at once, and on the server via POST
+   …/notifications/read (a few common endpoint shapes are tried in
+   turn; if the server does not answer, the local read state still
+   holds for this session — nothing is faked). The list loads when
+   the app opens and refreshes every 60 seconds while signed in.
+   Guests see the bell too, but tapping it asks them to log in —
+   no list is ever fetched for a guest. A gift notification tapped
+   while the welcome gift is still unclaimed claims it (giftClaim).
+   Nothing here invents notifications: an unreachable server simply
+   leaves the current list untouched. */
+var NOTIF_API='https://movai-proxy.onrender.com/api/public/notifications';
+var notifItems=[];
+var notifLoaded=false;
+var notifBusy=false;
+var notifReadIds={};
+var notifTimer=null;
+function notifIsArr(v){return Object.prototype.toString.call(v)==='[object Array]';}
+function notifArr(data){
+  if(!data)return [];
+  if(notifIsArr(data))return data;
+  var keys=['notifications','items','data','list','results'];
+  for(var i=0;i<keys.length;i++){var v=data[keys[i]];if(notifIsArr(v))return v;}
+  return [];
+}
+function notifNum(v){if(v==null||v==='')return null;var n=parseFloat(v);return isFinite(n)?n:null;}
+function notifTs(v){
+  if(v==null||v==='')return 0;
+  if(typeof v==='number'&&isFinite(v))return v<1e12?v*1000:v;
+  var s=String(v).trim(),n=Number(s);
+  if(s!==''&&isFinite(n))return n<1e12?n*1000:n;
+  var d=Date.parse(s);return isNaN(d)?0:d;
+}
+function notifType(t){
+  t=String(t||'').toLowerCase();
+  if(t.indexOf('gift')>=0)return 'gift';
+  if(t.indexOf('approv')>=0)return 'approved';
+  if(t.indexOf('reject')>=0)return 'rejected';
+  if(t.indexOf('deduct')>=0||t.indexOf('remove')>=0||t.indexOf('revoke')>=0)return 'deduct';
+  if(t.indexOf('grant')>=0||t.indexOf('add')>=0||t.indexOf('topup')>=0||t.indexOf('top-up')>=0||t.indexOf('credit')>=0)return 'grant';
+  return 'info';
+}
+function notifNorm(raw,idx){
+  if(!raw||typeof raw!=='object')return null;
+  var id=raw.id||raw._id||raw.notifId||raw.notificationId||('srv'+idx);
+  var type=notifType(raw.type||raw.kind||raw.event||'');
+  var media=notifNum(raw.credits!=null?raw.credits:(raw.mediaCredits!=null?raw.mediaCredits:raw.imageVideoCredits));
+  var song=notifNum(raw.songCredits);
+  var amount=notifNum(raw.amount);
+  var pool=String(raw.creditType||raw.pool||raw.balance||'').toLowerCase();
+  if(amount!=null&&media==null&&song==null){
+    if(pool.indexOf('song')>=0)song=amount;else media=amount;
+  }
+  var pkg=raw.packageName||raw.package||raw.planName||raw.plan||'';
+  if(pkg&&typeof pkg==='object')pkg=pkg.name||pkg.id||'';
+  var tsRaw=raw.createdAt!=null?raw.createdAt:(raw.created_at!=null?raw.created_at:(raw.ts!=null?raw.ts:(raw.time!=null?raw.time:(raw.date!=null?raw.date:raw.at))));
+  return {
+    id:String(id),type:type,
+    title:(typeof raw.title==='string'?raw.title:'')||(typeof raw.subject==='string'?raw.subject:''),
+    body:(typeof raw.body==='string'?raw.body:'')||(typeof raw.message==='string'?raw.message:'')||(typeof raw.text==='string'?raw.text:'')||(typeof raw.note==='string'?raw.note:''),
+    ts:notifTs(tsRaw),
+    read:!!(raw.read||raw.seen||raw.isRead)||!!notifReadIds[String(id)],
+    media:media,song:song,pkg:String(pkg||'')
+  };
+}
+function notifDefTitle(n){
+  if(n.type==='gift')return tx('giftTitle');
+  if(n.type==='approved')return tx('notifApproved');
+  if(n.type==='rejected')return tx('notifRejected');
+  if(n.type==='grant')return tx('notifGrant');
+  if(n.type==='deduct')return tx('notifDeduct');
+  return tx('notifInfo');
+}
+function notifAmountLine(n){
+  var parts=[];
+  var sign=(n.type==='deduct')?'−':'+';
+  if(n.media!=null&&n.media!==0)parts.push(sign+acctFmtBal(Math.abs(n.media))+' '+tx('acctMediaCredit'));
+  if(n.song!=null&&n.song!==0)parts.push(sign+acctFmtBal(Math.abs(n.song))+' '+tx('acctSongCredit'));
+  if(n.pkg)parts.push(n.pkg);
+  return parts.join(' · ');
+}
+function notifIcon(n){
+  var c,bg,path;
+  if(n.type==='gift'){c='#addc29';bg='rgba(173,220,41,.14)';path='<rect x="3" y="8" width="18" height="4" rx="1"/><path d="M12 8v13"/><path d="M19 12v7a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-7"/><path d="M7.5 8a2.5 2.5 0 0 1 0-5C11 3 12 8 12 8s1-5 4.5-5a2.5 2.5 0 0 1 0 5"/>';}
+  else if(n.type==='approved'){c='#4ade80';bg='rgba(74,222,128,.13)';path='<circle cx="12" cy="12" r="9"/><path d="M8.5 12.5l2.4 2.4 4.6-5"/>';}
+  else if(n.type==='rejected'){c='#f87171';bg='rgba(248,113,113,.13)';path='<circle cx="12" cy="12" r="9"/><path d="M9 9l6 6M15 9l-6 6"/>';}
+  else if(n.type==='grant'){c='#c084fc';bg='rgba(181,55,242,.15)';path='<circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/>';}
+  else if(n.type==='deduct'){c='#fb923c';bg='rgba(251,146,60,.14)';path='<circle cx="12" cy="12" r="9"/><path d="M8 12h8"/>';}
+  else{c='#9a9ea6';bg='rgba(154,158,166,.14)';path='<path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/>';}
+  return '<span class="notif-ico" style="background:'+bg+';color:'+c+'"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+path+'</svg></span>';
+}
+function notifTimeStr(ts){
+  if(!ts)return '';
+  var diff=Date.now()-ts;
+  if(diff<60000)return tx('notifJustNow');
+  if(diff<3600000)return tx('notifMinAgo').replace('{n}',String(Math.max(1,Math.floor(diff/60000))));
+  if(diff<86400000)return tx('notifHourAgo').replace('{n}',String(Math.floor(diff/3600000)));
+  if(diff<7*86400000)return tx('notifDayAgo').replace('{n}',String(Math.floor(diff/86400000)));
+  try{return new Date(ts).toLocaleDateString();}catch(e){return '';}
+}
+function notifItemHtml(n,i){
+  var h='<button type="button" class="notif-item'+(n.read?'':' unread')+'" onclick="notifItemClick('+i+')">';
+  h+=notifIcon(n);
+  h+='<span class="notif-main"><span class="nt">'+escHtml(n.title||notifDefTitle(n))+'</span>';
+  if(n.body)h+='<span class="nb">'+escHtml(n.body)+'</span>';
+  var amt=notifAmountLine(n);
+  if(amt)h+='<span class="nb notif-amt">'+escHtml(amt)+'</span>';
+  var t=notifTimeStr(n.ts);
+  if(t)h+='<span class="ntime">'+escHtml(t)+'</span>';
+  h+='</span>';
+  if(!n.read)h+='<span class="notif-dot" aria-hidden="true"></span>';
+  h+='</button>';
+  return h;
+}
+function notifUnreadCount(){var c=0;for(var i=0;i<notifItems.length;i++)if(!notifItems[i].read)c++;return c;}
+function notifRenderAll(){
+  var u=null;try{u=acctCurrent();}catch(e){}
+  var c=notifUnreadCount();
+  var label=c>99?'99+':String(c);
+  var b=document.getElementById('notifBadge');
+  if(b){if(u&&c>0){b.style.display='';b.textContent=label;}else b.style.display='none';}
+  var db=document.getElementById('notifDrawerBadge');
+  if(db){if(u&&c>0){db.style.display='';db.textContent=label;}else db.style.display='none';}
+  var html;
+  if(!u)html='<p class="notif-note">'+escHtml(tx('notifGuest'))+'</p>';
+  else if(!notifItems.length)html='<p class="notif-note">'+escHtml(tx(notifLoaded?'notifEmpty':'notifLoading'))+'</p>';
+  else{html='';for(var i=0;i<notifItems.length;i++)html+=notifItemHtml(notifItems[i],i);}
+  var l1=document.getElementById('notifList');if(l1)l1.innerHTML=html;
+  var l2=document.getElementById('notifDrawerList');if(l2)l2.innerHTML=html;
+}
+function notifLoad(){
+  var u=null;try{u=acctCurrent();}catch(e){}
+  if(!u||!u.email){notifRenderAll();return;}
+  if(notifBusy)return;
+  if(typeof fetch!=='function')return;
+  notifBusy=true;
+  var ctrl=null,timer=null;
+  try{if(window.AbortController){ctrl=new AbortController();timer=setTimeout(function(){try{ctrl.abort();}catch(e){}},20000);}}catch(e){ctrl=null;}
+  var opts={method:'GET'};if(ctrl)opts.signal=ctrl.signal;
+  fetch(NOTIF_API+'?email='+encodeURIComponent(u.email),opts).then(function(r){
+    if(timer)clearTimeout(timer);
+    if(!r||!r.ok)return null;
+    return r.json().catch(function(){return null;});
+  }).then(function(data){
+    notifBusy=false;
+    if(data==null)return;
+    var arr=notifArr(data),out=[];
+    for(var i=0;i<arr.length;i++){var n=notifNorm(arr[i],i);if(n)out.push(n);}
+    out.sort(function(a,b){return b.ts-a.ts;});
+    notifItems=out;notifLoaded=true;
+    notifRenderAll();
+  }).catch(function(){if(timer)clearTimeout(timer);notifBusy=false;});
+}
+function notifMarkReadSrv(id){
+  var u=null;try{u=acctCurrent();}catch(e){}
+  if(!u||!u.email||typeof fetch!=='function')return;
+  var tries=[
+    {url:NOTIF_API+'/read',body:JSON.stringify({email:u.email,id:id})},
+    {url:NOTIF_API+'/mark-read',body:JSON.stringify({email:u.email,id:id})},
+    {url:NOTIF_API,body:JSON.stringify({email:u.email,id:id,read:true})}
+  ];
+  var step=function(i){
+    if(i>=tries.length)return;
+    fetch(tries[i].url,{method:'POST',headers:{'Content-Type':'application/json'},body:tries[i].body}).then(function(r){
+      if(!r||!r.ok)step(i+1);
+    }).catch(function(){step(i+1);});
+  };
+  step(0);
+}
+function notifItemClick(i){
+  var n=notifItems[i];if(!n)return;
+  var u=null;try{u=acctCurrent();}catch(e){}
+  if(n.type==='gift'&&u&&u.giftPending){try{giftClaim();}catch(e){}}
+  if(!n.read){n.read=true;notifReadIds[n.id]=true;notifRenderAll();notifMarkReadSrv(n.id);}
+}
+function notifBellClick(){
+  var u=null;try{u=acctCurrent();}catch(e){}
+  if(!u){loginSheetOpen();return;}
+  notifSheetOpen();
+}
+function notifSheetOpen(){
+  var s=document.getElementById('notifSheet');if(s)sheetShowAnim(s);
+  notifRenderAll();
+  notifLoad();
+}
+function notifSheetClose(){var s=document.getElementById('notifSheet');sheetHideAnim(s);}
+function notifReset(){
+  notifItems=[];notifLoaded=false;notifReadIds={};
+  notifRenderAll();
+}
+function notifInit(){
+  notifRenderAll();
+  notifLoad();
+  if(notifTimer)clearInterval(notifTimer);
+  notifTimer=setInterval(function(){notifLoad();},60000);
 }
 /* Save the First / Last name asked for AFTER log in. Two separate
    fields; Khmer or English (or any script) is fine, no pattern
@@ -5783,21 +6762,22 @@ function acctSaveName(){
   acctRender();
   acctAdminSync();
 }
-/* ===== Top-right header: credit chips + Log in / 3D avatar + profile =====
-   The account carries TWO separate balances, shown as two colour-coded
-   chips in the top-right corner (never overlapping anything):
-   - songCredits → YELLOW chip «បទចម្រៀង · Song»
-   - credits     → PURPLE chip «រូប និង វីដេអូ · Image & Video»
+/* ===== Top-right header: Log in / 3D avatar + notification bell =====
+   The header shows NO credit chips (owner order 2026-11-15): the
+   account's TWO separate balances live ONLY in the Profile sheet,
+   as clear colour-coded balance rows:
+   - songCredits → YELLOW row «បទចម្រៀង · Song»
+   - credits     → PURPLE row «រូប និង វីដេអូ · Image & Video»
      (the purple MovAi packages top up THIS balance — they are image
      & video packages — and the 250-credit free sign-up grant lands
      here too; the yellow song packages top up songCredits instead.)
-   The two chips are visible ONLY when signed in, showing the real
-   balances; guests see NO chips at all (no 0/0) — the top-right
-   corner shows just the Log in button. Logged in, a glossy 3D avatar
-   orb (the user's initial) replaces the Log in button;
-   tapping the avatar opens the profile sheet (account, Gmail,
+   The top-right corner is ONE horizontal row: the notification
+   bell on the LEFT, and the Log in button (guest) or a glossy 3D
+   avatar orb (signed in, the user's initial) on the RIGHT.
+   Tapping the avatar opens the profile sheet (account, Gmail,
    both balances, package, Magic Hour status, member since, and a
-   Log out button at the bottom). */
+   Log out button at the bottom); the bell opens the notifications
+   sheet (or the log-in sheet for guests). */
 function acctFmtBal(n){return pkgFmtNum(Math.max(0,parseInt(n,10)||0));}
 function acctInitial(u){
   var s=(u&&u.name?String(u.name):'')||(u&&u.email?String(u.email):'')||'?';
@@ -5806,14 +6786,11 @@ function acctInitial(u){
   return ch.toUpperCase();
 }
 function acctRenderTopbar(u){
+  try{document.body.classList.toggle('signed-in',!!u);}catch(e){}
   var chip=document.getElementById('acctChip');
-  var chips=document.getElementById('creditChips');
   var av=document.getElementById('acctAvatar');
   if(u){
     if(chip)chip.style.display='none';
-    if(chips)chips.style.display='flex';
-    var sv=document.getElementById('chipSongVal');if(sv)sv.textContent=acctFmtBal(u.songCredits);
-    var mv=document.getElementById('chipMediaVal');if(mv)mv.textContent=acctFmtBal(u.credits);
     if(av){av.style.display='flex';av.setAttribute('aria-label',tx('profileLabel')+': '+u.name);}
     var orb=document.getElementById('acctAvatarOrb');
     if(orb){
@@ -5824,9 +6801,6 @@ function acctRenderTopbar(u){
     if(ps&&ps.style.display!=='none')profileRender();
   }else{
     if(chip){chip.style.display='';chip.textContent=tx('acctChipLogin');}
-    if(chips)chips.style.display='none';
-    var gsv=document.getElementById('chipSongVal');if(gsv)gsv.textContent=acctFmtBal(0);
-    var gmv=document.getElementById('chipMediaVal');if(gmv)gmv.textContent=acctFmtBal(0);
     if(av)av.style.display='none';
     profileClose();
   }
@@ -5878,23 +6852,30 @@ function profileGoPackages(){profileClose();menuGo('sec-packages');}
 function profileOpen(){
   var u=acctCurrent();if(!u){loginSheetOpen();return;}
   profileRender();
-  var s=document.getElementById('profileSheet');if(s)s.style.display='flex';
+  var s=document.getElementById('profileSheet');if(s)sheetShowAnim(s);
 }
-function profileClose(){var s=document.getElementById('profileSheet');if(s)s.style.display='none';}
+function profileClose(){var s=document.getElementById('profileSheet');sheetHideAnim(s);}
 function acctRender(){
   var u=acctCurrent();
   acctRenderTopbar(u);
   acctApplyAdminGate();
-  var guest=document.getElementById('acctGuest'),userBox=document.getElementById('acctUser');
-  if(!guest||!userBox)return;
-  if(u){
-    guest.style.display='none';userBox.style.display='block';
-    acctRenderUser(u);
-  }else{
-    /* Guest: the drawer account box shows ONLY the single
-       «Connect account Google» button (static markup) — there is
-       no create-account / sign-in form here any more. */
-    guest.style.display='block';userBox.style.display='none';
+  var userBox=document.getElementById('acctUser');
+  var acctBox=document.getElementById('acctBox');
+  if(userBox){
+    if(u){
+      if(acctBox)acctBox.style.display='';
+      userBox.style.display='block';
+      acctRenderUser(u);
+    }else{
+      /* The ☰ drawer carries NO account / log-in section for
+         guests (owner order): no «My Account» heading, no Google
+         note, no «Connect account Google» button and no free-credit
+         note. Log in lives only on the top-right «Log in» button,
+         which opens the login sheet. The drawer account box exists
+         solely as the signed-in account view. */
+      userBox.style.display='none';
+      if(acctBox)acctBox.style.display='none';
+    }
   }
   try{pkgRender();}catch(e){}
 }
@@ -5943,6 +6924,8 @@ function acctLogout(){
   profileClose();
   try{localStorage.removeItem('movai-session');}catch(e){}
   acctRender();
+  try{histOnAccountChange();}catch(e){}
+  try{notifReset();}catch(e){}
 }
 /* If the account has a connected Magic Hour key but the shared key slot
    lost it (e.g. browser data cleared for keys only), put it back —
@@ -6309,20 +7292,49 @@ function adminJobId(j){
   if(!j||typeof j!=='object')return null;
   return j.jobId||j.job_id||j.task_id||j.taskId||j.id||(j.data&&(j.data.jobId||j.data.job_id||j.data.task_id||j.data.taskId||j.data.id))||null;
 }
-async function adminPollJob(kind,provider,jobId,timeoutMs,onTick){
-  var t0=Date.now(),fails=0;
-  while(Date.now()-t0<timeoutMs){
-    await new Promise(function(res){setTimeout(res,kind==='song'?8000:5000);});
+async function adminPollJob(kind,provider,jobId,timeoutMs,onTick,onEarlySongs){
+  var t0=Date.now(),fails=0,extraMs=0;
+  while(Date.now()-t0-extraMs<timeoutMs){
+    await genCtlWait(kind==='song'?8000:5000);
     if(onTick)onTick(t0);
     var j=null;
     try{j=await adminGenPost('/api/gen/'+kind+'/status',{provider:provider,jobId:jobId},30000);fails=0;}
-    catch(e){fails++;if(fails>=4)throw e;continue;}
+    catch(e){
+      if(e&&e.genCancelled)throw e;
+      if(genIsNetErr(e)||!navigator.onLine){
+        /* Internet dropped mid-generation: the job keeps running on
+           the server, so this is NOT a failure and the job is NOT
+           restarted. Keep waiting — the spinner keeps turning and
+           the time offline does not eat the timeout budget — then
+           poll the SAME job again; when the connection is back the
+           generation simply continues where it left off. */
+        genProgTxt(tx('progNetWait'));
+        var w0=Date.now();
+        await genCtlWait(4000);
+        extraMs+=Date.now()-w0;
+        continue;
+      }
+      fails++;if(fails>=4)throw e;continue;
+    }
     var st=String((j&&(j.status||j.state))||'').toLowerCase();
     if(st==='failed'||st==='error')throw new Error(genErrText(j,tx('genFailed')));
     if(st==='done'||st==='complete'||st==='completed'||st==='succeeded'||st==='success'||st==='finished'||(j&&j.done===true))return j;
     if(kind==='image'&&j&&(j.imageUrl||j.image_url||j.url))return j;
     if(kind==='video'&&j&&(j.videoUrl||j.video_url||j.url))return j;
-    if(kind==='song'&&j&&adminSongsFrom(j).length)return j;
+    if(kind==='song'&&j){
+      var sg=adminSongsFrom(j);
+      if(sg.length){
+        /* Suno early preview: the status reply already carries a
+           playable streaming URL while the job status is still a
+           running one — hand the songs to onEarlySongs (the caller
+           shows them as playable «Creating...» cards) and KEEP
+           polling for the finished result. Songs arriving with a
+           done or absent status are the final result, as before. */
+        var stRun=['pending','queued','processing','running','generating','streaming','submitted','in_progress','in-progress','waiting','created','starting'].indexOf(st)>=0;
+        if(onEarlySongs&&stRun){try{onEarlySongs(sg);}catch(e){}}
+        else return j;
+      }
+    }
   }
   return null;
 }
@@ -6339,6 +7351,7 @@ async function genDoImageServer(cfg,prompt){
     url=done.imageUrl||done.image_url||done.url||null;
     if(!url)throw new Error(tx('badImgUrl'));
   }
+  if(genCtl.cancelled)throw genCtlErr();
   genShowImage(url,null,url);
 }
 async function genDoVideoServer(cfg,prompt){
@@ -6354,12 +7367,13 @@ async function genDoVideoServer(cfg,prompt){
     url=done.videoUrl||done.video_url||done.url||null;
     if(!url)throw new Error(tx('errNoVideoUrl'));
   }
+  if(genCtl.cancelled)throw genCtlErr();
   genShowVideo(url);
 }
 /* Pull the finished songs out of a server-proxy song reply, keeping
    each song's URL together with its cover image and title — the same
-   {url, image, title} shape genShowSongs already renders (two cards
-   side by side, real cover replacing the solid one). */
+   {url, image, title} shape genShowSongs already renders (cards
+   stacked vertically, real cover replacing the solid one). */
 function adminSongsFrom(j){
   if(!j||typeof j!=='object')return [];
   var arr=null;
@@ -6386,12 +7400,29 @@ async function genDoSongServer(cfg,prompt){
   if(!songs.length){
     var jobId=adminJobId(j);
     if(!jobId)throw new Error(tx('errNoSongUrl'));
-    /* Song waits keep the full 25-minute budget, exactly as before. */
-    var done=await adminPollJob('song',cfg.provider,jobId,SONG_WAIT_MAX,function(t0){genProgTxt(tx('progWaitingSong')+'('+Math.floor((Date.now()-t0)/1000)+'s)');});
-    if(!done)throw new Error(tx('errTimeoutSong'));
-    songs=adminSongsFrom(done);
-    if(!songs.length)throw new Error(tx('errNoSongUrl'));
+    /* Suno (the MovAi provider) is fast: as soon as a poll reply
+       carries a streaming audio URL (~20-30s) the songs are shown
+       PLAYABLE with a «Creating...» badge, and polling continues
+       until the finished songs land — with Suno's own 5-minute
+       budget. MusicAPI keeps the full 25-minute budget, exactly as
+       before, and gets no early preview. */
+    var isSuno=/suno/i.test(cfg.provider||'');
+    var earlySongs=null,earlyKey='';
+    var done=await adminPollJob('song',cfg.provider,jobId,isSuno?SUNO_WAIT_MAX:SONG_WAIT_MAX,function(t0){genProgTxt(tx('progWaitingSong')+'('+Math.floor((Date.now()-t0)/1000)+'s)');},isSuno?function(sg){
+      var key=sg.map(function(x){return x.url;}).join('|');
+      if(key&&key!==earlyKey){earlyKey=key;earlySongs=sg;try{genShowSongs(sg.slice(0,2),true);}catch(e){}}
+    }:null);
+    if(!done){
+      /* Budget over: a playable Suno preview already on screen is
+         kept as the result instead of failing the generation. */
+      if(earlySongs&&earlySongs.length){songs=earlySongs;}
+      else throw new Error(tx('errTimeoutSong'));
+    }else{
+      songs=adminSongsFrom(done);
+      if(!songs.length)throw new Error(tx('errNoSongUrl'));
+    }
   }
+  if(genCtl.cancelled)throw genCtlErr();
   genShowSongs(songs.slice(0,2));
 }
 /* ---- 3D through the server proxy (Admin holds the 3D keys) ---- */
@@ -6468,10 +7499,14 @@ function genInit(){
   genRenderKeys();
   storyRenderChips();
   storyUpdateTotal();
+  try{histMigrateLegacy();}catch(e){}
   histRender();
   d3SetProvider('hunyuan3d');
   uiInit();
   try{acctAdminSync();}catch(e){}
+  try{giftSchedule();}catch(e){}
+  try{notifInit();}catch(e){}
+  try{pushInit();}catch(e){}
   try{adminLoadSettings();}catch(e){}
   try{pkgPricesLoad();}catch(e){}
   histWatchInit();
@@ -6494,11 +7529,208 @@ function genInit(){
     var fp=document.getElementById('fabPanel');
     if(fw&&fp&&fp.classList.contains('open')&&!fw.contains(e.target))closeFab();
   });
-  document.addEventListener('keydown',function(e){if(e.key==='Escape'){closeMenu();closeFab();profileClose();loginSheetClose();pubSheetClose();packagesHide();}});
+  document.addEventListener('keydown',function(e){if(e.key==='Escape'){closeMenu();closeFab();profileClose();loginSheetClose();pubSheetClose();notifSheetClose();packagesHide();}});
 }
 
 (function(){ try{genInit()}catch(e){} })();
 document.addEventListener('DOMContentLoaded',function(){ try{genPuterStatus()}catch(e){} });
+</script>
+<script>
+/* ===== Offline / server-unreachable popup · ដាច់អ៊ីនធឺណិត =====
+   Everything MovAi creates runs through the Admin's server
+   (movai-proxy) — with no connection nothing can be generated,
+   so a clear centred popup appears instead of silent failures:
+   - Browser offline (navigator.onLine === false or the 'offline'
+     event): the popup shows at once — «អត់មានអ៊ីនធឺណិត · No
+     internet» + «សូមពិនិត្យអ៊ីនធឺណិតរបស់អ្នក រួចព្យាយាមម្ដងទៀត».
+   - Internet present but the server does not answer: a heartbeat
+     GET https://movai-proxy.onrender.com/api/public/vapid-key
+     runs on load, every 15 s, and every 8 s while the popup is
+     up. Two failed heartbeats in a row show the same popup with
+     the server wording («server កំពុងដេក/មិនឆ្លើយ · Server
+     unreachable — សូមរង់ចាំបន្តិច»).
+   - The popup hides BY ITSELF as soon as a check passes again
+     (the 'online' event also triggers an immediate check).
+   - «ព្យាយាមម្ដងទៀត · Retry» re-checks on the spot: success
+     hides the popup, failure keeps it up with a short note.
+   The same page runs as the website and inside the APK wrapper,
+   so the popup covers both. Nothing else is touched. */
+var OFFLINE_HB_URL='https://movai-proxy.onrender.com/api/public/vapid-key';
+var offlineKind=''; /* '' = hidden · 'offline' · 'server' */
+var offlineDismissed=false; /* user tapped Cancel: stay hidden until the connection really returns */
+var offlineBusy=false;
+var offlineFailCount=0;
+var offlineFastTimer=null;
+/* Blur-to-clear show / clear-to-blur hide (see the .blur-in /
+   .blur-out CSS): entrance ~300 ms, exit ~250 ms, then display
+   flips. Reduced-motion users get instant show/hide. */
+var offlineHideTimer=null;
+var offlineInTimer=null;
+function blurReducedMotion(){try{return !!(window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches);}catch(e){return false;}}
+function blurInMs(){return blurReducedMotion()?0:300;}
+function blurOutMs(){return blurReducedMotion()?0:250;}
+function offlineAnimIn(sheet){
+  if(offlineHideTimer){clearTimeout(offlineHideTimer);offlineHideTimer=null;}
+  sheet.classList.remove('blur-out');
+  sheet.style.display='flex';
+  sheet.classList.remove('blur-in');
+  void sheet.offsetWidth; /* restart the animation from the blurred state */
+  sheet.classList.add('blur-in');
+  if(offlineInTimer)clearTimeout(offlineInTimer);
+  offlineInTimer=setTimeout(function(){sheet.classList.remove('blur-in');offlineInTimer=null;},blurInMs()+20);
+}
+function offlineAnimOut(sheet,done){
+  if(offlineInTimer){clearTimeout(offlineInTimer);offlineInTimer=null;}
+  sheet.classList.remove('blur-in');
+  sheet.classList.remove('blur-out');
+  void sheet.offsetWidth;
+  sheet.classList.add('blur-out');
+  if(offlineHideTimer)clearTimeout(offlineHideTimer);
+  offlineHideTimer=setTimeout(function(){
+    offlineHideTimer=null;
+    sheet.style.display='none';
+    sheet.classList.remove('blur-out');
+    if(done)done();
+  },blurOutMs());
+}
+function offlineEls(){return{sheet:document.getElementById('offlineSheet'),title:document.getElementById('offlineTitle'),body:document.getElementById('offlineBody'),btn:document.getElementById('offlineRetryBtn'),msg:document.getElementById('offlineMsg')};}
+function offlineShow(kind){
+  var e=offlineEls();if(!e.sheet)return;
+  offlineKind=kind;
+  if(kind==='offline'){
+    e.title.textContent='អត់មានអ៊ីនធឺណិត · No internet';
+    e.body.textContent='សូមពិនិត្យអ៊ីនធឺណិតរបស់អ្នក រួចព្យាយាមម្ដងទៀត';
+  }else{
+    e.title.textContent='Server មិនឆ្លើយ · Server unreachable';
+    e.body.textContent='server កំពុងដេក/មិនឆ្លើយ · Server unreachable — សូមរង់ចាំបន្តិច';
+  }
+  if(!offlineDismissed){
+    /* Animate in (blur → clear) only on the hidden → shown
+       transition; repeat checks while it is already up must not
+       restart the animation. A hide still animating out is
+       cancelled and the popup sharpens back in. */
+    if(e.sheet.style.display!=='flex'||offlineHideTimer)offlineAnimIn(e.sheet);
+  }
+  if(!offlineFastTimer){offlineFastTimer=setInterval(function(){offlineCheck();},8000);}
+}
+/* «បោះបង់ · Cancel»: close the popup and go back to browsing the
+   site. Everything already created (songs, videos, images in
+   History) is untouched and still opens / plays as normal — only
+   NEW generation needs the connection. The popup stays dismissed
+   until a check passes again (offlineHide resets the flag), so it
+   will show once more if the connection drops again later. */
+function offlineCancel(){
+  offlineDismissed=true;
+  var e=offlineEls();
+  if(e.sheet&&e.sheet.style.display==='flex'&&!offlineHideTimer)offlineAnimOut(e.sheet,null);
+  else if(e.sheet)e.sheet.style.display='none';
+  if(e.msg)e.msg.textContent='';
+}
+var netReadyTimer=null;
+var netReadyOutTimer=null;
+function netReadyShow(){
+  var t=document.getElementById('netReadyToast');if(!t)return;
+  if(netReadyTimer){clearTimeout(netReadyTimer);netReadyTimer=null;}
+  if(netReadyOutTimer){clearTimeout(netReadyOutTimer);netReadyOutTimer=null;}
+  t.classList.remove('blur-out');
+  t.style.display='flex';
+  t.classList.remove('blur-in');
+  void t.offsetWidth; /* restart from the blurred state */
+  t.classList.add('blur-in');
+  /* After ~3 s it leaves the same way it came: clear → blur +
+     fade-out (~250 ms), then display flips off. */
+  netReadyTimer=setTimeout(function(){
+    netReadyTimer=null;
+    var el=document.getElementById('netReadyToast');if(!el)return;
+    el.classList.remove('blur-in');
+    el.classList.remove('blur-out');
+    void el.offsetWidth;
+    el.classList.add('blur-out');
+    netReadyOutTimer=setTimeout(function(){
+      netReadyOutTimer=null;
+      var el2=document.getElementById('netReadyToast');
+      if(el2){el2.style.display='none';el2.classList.remove('blur-out');}
+    },blurOutMs());
+  },3000);
+}
+function offlineHide(){
+  var e=offlineEls();
+  var wasShown=!!offlineKind;
+  offlineKind='';offlineFailCount=0;offlineDismissed=false;
+  if(e.msg)e.msg.textContent='';
+  if(offlineFastTimer){clearInterval(offlineFastTimer);offlineFastTimer=null;}
+  /* Connection is back: only celebrate it if the popup had actually
+     been up — a normal page load with internet never shows this.
+     When the popup is on screen it first blurs/fades out
+     (~250 ms); the «Network ready» toast follows right after. */
+  var celebrate=function(){if(wasShown)netReadyShow();};
+  if(e.sheet&&e.sheet.style.display==='flex'&&!offlineHideTimer)offlineAnimOut(e.sheet,celebrate);
+  else if(e.sheet&&e.sheet.style.display==='flex'){/* exit already running (Cancel): the toast can start while the popup finishes blurring out */
+    celebrate();
+  }
+  else{
+    if(e.sheet)e.sheet.style.display='none';
+    celebrate();
+  }
+}
+function offlineFetch(){
+  return new Promise(function(resolve){
+    var ctrl=null,timer=null;
+    var opts={method:'GET',cache:'no-store'};
+    try{
+      if(window.AbortController){
+        ctrl=new AbortController();opts.signal=ctrl.signal;
+        timer=setTimeout(function(){try{ctrl.abort();}catch(e){}},12000);
+      }
+    }catch(e){}
+    fetch(OFFLINE_HB_URL,opts).then(function(r){
+      if(timer)clearTimeout(timer);
+      resolve(!!(r&&r.ok));
+    }).catch(function(){
+      if(timer)clearTimeout(timer);
+      resolve(false);
+    });
+  });
+}
+function offlineCheck(){
+  if(offlineBusy)return;
+  if(!navigator.onLine){offlineShow('offline');return;}
+  offlineBusy=true;
+  offlineFetch().then(function(ok){
+    offlineBusy=false;
+    if(ok){offlineFailCount=0;if(offlineKind)offlineHide();}
+    else if(!navigator.onLine){offlineShow('offline');}
+    else{offlineFailCount++;if(offlineFailCount>=2)offlineShow('server');}
+  });
+}
+function offlineRetry(){
+  var e=offlineEls();
+  var restore=function(){if(e.btn){e.btn.disabled=false;e.btn.textContent='ព្យាយាមម្ដងទៀត · Retry';}};
+  if(e.btn){e.btn.disabled=true;e.btn.textContent='កំពុងពិនិត្យ… · Checking…';}
+  if(e.msg)e.msg.textContent='';
+  if(!navigator.onLine){
+    restore();
+    offlineShow('offline');
+    if(e.msg)e.msg.textContent='នៅមិនទាន់មានអ៊ីនធឺណិតទេ · Still no connection';
+    return;
+  }
+  if(offlineBusy){restore();return;}
+  offlineBusy=true;
+  offlineFetch().then(function(ok){
+    offlineBusy=false;
+    restore();
+    if(ok){offlineHide();}
+    else{
+      offlineFailCount=2;
+      offlineShow(navigator.onLine?'server':'offline');
+      if(e.msg)e.msg.textContent='នៅមិនទាន់ភ្ជាប់បានទេ · Still not connected';
+    }
+  });
+}
+window.addEventListener('offline',function(){offlineShow('offline');});
+window.addEventListener('online',function(){offlineCheck();});
+if(!navigator.onLine){offlineShow('offline');}else{offlineCheck();}
+setInterval(function(){offlineCheck();},15000);
 </script>
 </body>
 </html>
