@@ -24,7 +24,15 @@ const TYPES = {
 /* ------------------------------- http helpers ------------------------------ */
 function sendJSON(res, code, obj) {
   const body = JSON.stringify(obj);
-  res.writeHead(code, { 'Content-Type': 'application/json; charset=utf-8', 'Content-Length': Buffer.byteLength(body) });
+  res.writeHead(code, {
+    'Content-Type': 'application/json; charset=utf-8',
+    'Content-Length': Buffer.byteLength(body),
+    // CORS: the MovAi website and the MovAi Admin app are separate origins.
+    // Without these headers the browser blocks every API call (preflight).
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+    'Access-Control-Allow-Methods': 'GET, POST, DELETE, OPTIONS',
+  });
   res.end(body);
 }
 function errBody(code, km, en) { return { error: code, message: { km, en } }; }
@@ -44,6 +52,58 @@ function readBody(req, limitBytes) {
 async function readJSONBody(req, limitBytes) {
   const buf = await readBody(req, limitBytes);
   try { return JSON.parse(buf.toString('utf8') || '{}'); } catch { return null; }
+}
+
+/* ------------------------- MovAi Admin API (/api/admin/*) ------------------ */
+// The MovAi website and the separate MovAi Admin app both talk to THIS server.
+// Accounts + credits live here (file ./data/users.json) so the admin can see
+// every user and grant credits. The website's localStorage is only a cache;
+// the server is the truth for credits.
+// Admin-only endpoints need:  Authorization: Bearer <MOVAI_ADMIN_KEY>
+// (env var on the Render service; never in code, never in git).
+// /api/admin/sync is called by the website itself (no admin key) so a user
+// can register and read their server balance.
+// NOTE: Render free disk is ephemeral — ./data can be lost on restart/redeploy.
+const DATA_DIR = path.join(ROOT, 'data');
+const USERS_FILE = path.join(DATA_DIR, 'users.json');
+const GRANTS_FILE = path.join(DATA_DIR, 'grants.json');
+const FREE_MEDIA_CREDITS = 250;
+const FREE_SONG_CREDITS = 24;
+
+function adminKeyOk(req) {
+  const k = process.env.MOVAI_ADMIN_KEY;
+  if (!k) return { ok: false, error: 'Admin key not configured on server' };
+  const h = String(req.headers['authorization'] || '');
+  const m = /^Bearer\s+(.+)$/.exec(h);
+  if (!m || m[1] !== k) return { ok: false, error: 'Admin key មិនត្រឹមត្រូវទេ' };
+  return { ok: true };
+}
+function normEmail(v) {
+  if (typeof v !== 'string') return '';
+  const e = v.trim().toLowerCase();
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e) ? e : '';
+}
+function numOr(v, dflt) { const n = Number(v); return Number.isFinite(n) ? n : dflt; }
+function loadUsers() {
+  try { const j = JSON.parse(fs.readFileSync(USERS_FILE, 'utf8')); if (j && typeof j === 'object' && !Array.isArray(j)) return j; } catch (e) {}
+  return {};
+}
+function saveUsers(u) {
+  try { fs.mkdirSync(DATA_DIR, { recursive: true }); } catch (e) {}
+  fs.writeFileSync(USERS_FILE, JSON.stringify(u, null, 2));
+}
+function pubUser(u) {
+  return { email: u.email, name: u.name || '', credits: u.credits, songCredits: u.songCredits, plan: u.plan || '', songPlan: u.songPlan || '', createdAt: u.createdAt, updatedAt: u.updatedAt };
+}
+function logGrant(entry) {
+  try {
+    fs.mkdirSync(DATA_DIR, { recursive: true });
+    let arr = [];
+    try { const j = JSON.parse(fs.readFileSync(GRANTS_FILE, 'utf8')); if (Array.isArray(j)) arr = j; } catch (e) {}
+    arr.push(entry);
+    if (arr.length > 1000) arr = arr.slice(-1000);
+    fs.writeFileSync(GRANTS_FILE, JSON.stringify(arr, null, 2));
+  } catch (e) {}
 }
 
 /* --------------------------------- api ------------------------------------- */
@@ -310,12 +370,114 @@ function apiRoute(req, res, urlPath) {
     }).catch(() => { try { res.writeHead(502); res.end('Fetch failed'); } catch {} });
     return;
   }
+  // ---- MovAi Admin API ----
+  // POST /api/admin/sync — {email, name, credits, songCredits, plan, songPlan}
+  // Called by the MovAi website (no admin key). Creates the user on first
+  // sync (free grant 250 media + 24 song credits when credits are absent);
+  // on later syncs the SERVER credits are the truth — the client's credits
+  // are ignored and the server values are returned.
+  if (req.method === 'POST' && urlPath === '/api/admin/sync') {
+    readJSONBody(req, 64 * 1024).then((body) => {
+      const email = normEmail(body && body.email);
+      if (!email) return sendJSON(res, 200, { ok: false, error: 'សូមដាក់ Gmail ត្រឹមត្រូវ' });
+      const now = new Date().toISOString();
+      const users = loadUsers();
+      let u = users[email];
+      if (!u) {
+        u = {
+          email,
+          name: typeof body.name === 'string' ? body.name.trim().slice(0, 100) : '',
+          credits: numOr(body.credits, FREE_MEDIA_CREDITS),
+          songCredits: numOr(body.songCredits, FREE_SONG_CREDITS),
+          plan: typeof body.plan === 'string' ? body.plan.slice(0, 50) : '',
+          songPlan: typeof body.songPlan === 'string' ? body.songPlan.slice(0, 50) : '',
+          createdAt: now, updatedAt: now,
+        };
+        users[email] = u;
+      } else {
+        if (typeof body.name === 'string' && body.name.trim()) u.name = body.name.trim().slice(0, 100);
+        if (typeof body.plan === 'string') u.plan = body.plan.slice(0, 50);
+        if (typeof body.songPlan === 'string') u.songPlan = body.songPlan.slice(0, 50);
+        u.updatedAt = now;
+      }
+      u.credits = Math.max(0, Math.floor(numOr(u.credits, 0)));
+      u.songCredits = Math.max(0, Math.floor(numOr(u.songCredits, 0)));
+      saveUsers(users);
+      return sendJSON(res, 200, { ok: true, user: pubUser(u) });
+    }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
+    return;
+  }
+  // GET /api/admin/users — admin key required. Newest first.
+  if (req.method === 'GET' && urlPath === '/api/admin/users') {
+    const a = adminKeyOk(req);
+    if (!a.ok) return sendJSON(res, 200, { ok: false, error: a.error });
+    const users = loadUsers();
+    const list = Object.values(users).sort((x, y) => String(y.createdAt || '').localeCompare(String(x.createdAt || ''))).map(pubUser);
+    return sendJSON(res, 200, { ok: true, users: list });
+  }
+  // GET /api/admin/user?email=... — admin key required.
+  if (req.method === 'GET' && urlPath === '/api/admin/user') {
+    const a = adminKeyOk(req);
+    if (!a.ok) return sendJSON(res, 200, { ok: false, error: a.error });
+    const email = normEmail(new URL(req.url, 'http://localhost').searchParams.get('email') || '');
+    if (!email) return sendJSON(res, 200, { ok: false, error: 'សូមដាក់ Gmail ត្រឹមត្រូវ' });
+    const u = loadUsers()[email];
+    if (!u) return sendJSON(res, 200, { ok: false, error: 'រកអ្នកប្រើនេះមិនឃើញទេ' });
+    return sendJSON(res, 200, { ok: true, user: pubUser(u) });
+  }
+  // POST /api/admin/grant — {email, credits, songCredits, note?} — admin key required.
+  // credits/songCredits are DELTAS (can be negative to deduct, balance never below 0).
+  if (req.method === 'POST' && urlPath === '/api/admin/grant') {
+    const a = adminKeyOk(req);
+    if (!a.ok) return sendJSON(res, 200, { ok: false, error: a.error });
+    readJSONBody(req, 64 * 1024).then((body) => {
+      const email = normEmail(body && body.email);
+      if (!email) return sendJSON(res, 200, { ok: false, error: 'សូមដាក់ Gmail ត្រឹមត្រូវ' });
+      const users = loadUsers();
+      const u = users[email];
+      if (!u) return sendJSON(res, 200, { ok: false, error: 'រកអ្នកប្រើនេះមិនឃើញទេ' });
+      const dMedia = Math.floor(numOr(body.credits, 0));
+      const dSong = Math.floor(numOr(body.songCredits, 0));
+      if (!dMedia && !dSong) return sendJSON(res, 200, { ok: false, error: 'សូមដាក់ចំនួន Credit' });
+      u.credits = Math.max(0, Math.floor(numOr(u.credits, 0)) + dMedia);
+      u.songCredits = Math.max(0, Math.floor(numOr(u.songCredits, 0)) + dSong);
+      u.updatedAt = new Date().toISOString();
+      saveUsers(users);
+      logGrant({ email, credits: dMedia, songCredits: dSong, note: typeof body.note === 'string' ? body.note.slice(0, 200) : '', at: u.updatedAt });
+      return sendJSON(res, 200, { ok: true, user: pubUser(u) });
+    }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
+    return;
+  }
+  // DELETE /api/admin/user?email=... — admin key required. Removes a user
+  // (used to clean up a test user; the Admin app can also use it).
+  if (req.method === 'DELETE' && urlPath === '/api/admin/user') {
+    const a = adminKeyOk(req);
+    if (!a.ok) return sendJSON(res, 200, { ok: false, error: a.error });
+    const email = normEmail(new URL(req.url, 'http://localhost').searchParams.get('email') || '');
+    if (!email) return sendJSON(res, 200, { ok: false, error: 'សូមដាក់ Gmail ត្រឹមត្រូវ' });
+    const users = loadUsers();
+    if (!users[email]) return sendJSON(res, 200, { ok: false, error: 'រកអ្នកប្រើនេះមិនឃើញទេ' });
+    delete users[email];
+    saveUsers(users);
+    return sendJSON(res, 200, { ok: true, deleted: email });
+  }
   return sendJSON(res, 404, errBody('not_found', 'រកមិនឃើញទេ', 'Not found'));
 }
 
 /* ------------------------------- static files ------------------------------ */
 const server = http.createServer((req, res) => {
   let urlPath = decodeURIComponent(req.url.split('?')[0]);
+  // CORS preflight for /api/* (the website and Admin app are other origins;
+  // the Admin app also sends an Authorization header, which always preflights).
+  if (req.method === 'OPTIONS' && urlPath.startsWith('/api/')) {
+    res.writeHead(204, {
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+      'Access-Control-Allow-Methods': 'GET, POST, DELETE, OPTIONS',
+      'Access-Control-Max-Age': '86400',
+    });
+    return res.end();
+  }
   if (urlPath.startsWith('/api/')) return apiRoute(req, res, urlPath);
   if (urlPath === '/' || urlPath === '') urlPath = '/index.html';
   const file = path.join(ROOT, urlPath);
