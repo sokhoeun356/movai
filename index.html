@@ -415,22 +415,22 @@ html[data-mode="light"] .pkg-tab.media.on{color:#8f27c9}
    right-to-left / left-to-right through the packages instead of
    scrolling the list top-to-bottom. Each card takes most of the
    row so the next package peeks in as the swipe affordance. */
-.pkg-grid{display:flex;gap:12px;margin-top:14px;overflow-x:auto;overflow-y:hidden;scroll-snap-type:x mandatory;padding:14px 6px 18px;-webkit-overflow-scrolling:touch;overscroll-behavior-x:contain;scrollbar-width:none}
+.pkg-grid{display:flex;gap:10px;margin-top:10px;overflow-x:auto;overflow-y:hidden;scroll-snap-type:x mandatory;padding:10px 4px 12px;-webkit-overflow-scrolling:touch;overscroll-behavior-x:contain;scrollbar-width:none}
 .pkg-grid::-webkit-scrollbar{display:none}
-.pkg-grid>.pkg-card{flex:0 0 82%;scroll-snap-align:start}
+.pkg-grid>.pkg-card{flex:0 0 74%;scroll-snap-align:start}
 #page-packages .pkg-card{content-visibility:visible}
-@media(min-width:560px){.pkg-grid>.pkg-card{flex-basis:47%}}
-.pkg-card{background:var(--card2);border:1px solid var(--line);border-radius:14px;padding:18px;display:flex;flex-direction:column;-webkit-backdrop-filter:blur(var(--txtblur,0px));backdrop-filter:blur(var(--txtblur,0px))}
+@media(min-width:560px){.pkg-grid>.pkg-card{flex-basis:42%}}
+.pkg-card{background:var(--card2);border:1px solid var(--line);border-radius:12px;padding:12px 13px;display:flex;flex-direction:column;-webkit-backdrop-filter:blur(var(--txtblur,0px));backdrop-filter:blur(var(--txtblur,0px))}
 .pkg-card.hot{border-color:rgba(var(--accent-rgb),.55)}
-.pkg-name{font-size:1rem;font-weight:800}
-.pkg-price{font-size:2rem;font-weight:900;margin-top:8px;line-height:1.1}
-.pkg-price small{font-size:0.9375rem;font-weight:700;color:var(--muted)}
+.pkg-name{font-size:0.875rem;font-weight:800}
+.pkg-price{font-size:1.375rem;font-weight:900;margin-top:4px;line-height:1.1}
+.pkg-price small{font-size:0.75rem;font-weight:700;color:var(--muted)}
 /* Live sale price (from the server): when the current price is
    below the package's original price, the original shows struck
    through beside it with a discount badge (e.g. -20%). A price
    increase just shows the new price, no badge. */
-.pkg-was{font-size:1.25rem;font-weight:800;text-decoration:line-through;opacity:.72}
-.pkg-off{display:inline-block;vertical-align:middle;font-size:0.8125rem;font-weight:900;background:rgba(0,0,0,.32);color:#fff;border:1px solid rgba(255,255,255,.4);border-radius:999px;padding:3px 9px;margin-left:4px;white-space:nowrap}
+.pkg-was{font-size:0.9375rem;font-weight:800;text-decoration:line-through;opacity:.72}
+.pkg-off{display:inline-block;vertical-align:middle;font-size:0.6875rem;font-weight:900;background:rgba(0,0,0,.32);color:#fff;border:1px solid rgba(255,255,255,.4);border-radius:999px;padding:2px 7px;margin-left:4px;white-space:nowrap}
 /* ===== Buy-sheet payment step (2 options, from server settings) =====
    Local: a KHQR button that opens the Canadia payment link — ONLY
    the button/link is shown, never an account holder name and never
@@ -446,9 +446,9 @@ html[data-mode="light"] .pkg-tab.media.on{color:#8f27c9}
 .pay-copy{flex:0 0 auto;border:none;border-radius:999px;padding:9px 14px;font-size:0.8125rem;font-weight:800;font-family:inherit;cursor:pointer;background:var(--accent-fill);color:#0d1005;min-height:38px}
 .pay-copy:active{filter:brightness(.93)}
 .pay-loading{font-size:0.8125rem;color:var(--muted);margin-top:12px;line-height:1.6}
-.pkg-credits{margin-top:6px;font-weight:800;color:var(--accent-text)}
-.pkg-feats{margin-top:12px;font-size:0.8125rem;color:var(--muted);line-height:1.9;flex:1}
-.pkg-card .btn{margin-top:14px;width:100%}
+.pkg-credits{margin-top:3px;font-size:0.8125rem;font-weight:800;color:var(--accent-text)}
+.pkg-feats{margin-top:8px;font-size:0.75rem;color:var(--muted);line-height:1.55;flex:1}
+.pkg-card .btn{margin-top:10px;width:100%;padding:10px 16px;font-size:0.875rem;min-height:40px}
 /* Package cards carry NO brand/creator credit — «MovAi» + «YEM
    SOKHOEUN / Create by Owner» lives only on the free-video watermark
    cover, nowhere in the header and on no package card. */
@@ -475,10 +475,10 @@ html[data-mode="light"] .pkg-tab.media.on{color:#8f27c9}
    colour (orange on song cards, purple on media cards). Colour
    only — prices, plan names, tabs, the carousel and the Buy
    flow are untouched. */
-.pkg-card.song{background:linear-gradient(155deg,#ffb300 0%,#ff9100 55%,#f57c00 100%);color:#fff;border-radius:20px}
-.pkg-card.media{background:linear-gradient(155deg,#b537f2 0%,#9b30e8 55%,#7e1fd1 100%);color:#fff;border-radius:20px}
-.pkg-card.song,.pkg-card.media{border-color:transparent;box-shadow:0 10px 28px rgba(0,0,0,.35)}
-.pkg-card.media.hot{border-color:transparent;box-shadow:0 10px 28px rgba(0,0,0,.35)}
+.pkg-card.song{background:linear-gradient(155deg,#ffb300 0%,#ff9100 55%,#f57c00 100%);color:#fff;border-radius:14px}
+.pkg-card.media{background:linear-gradient(155deg,#b537f2 0%,#9b30e8 55%,#7e1fd1 100%);color:#fff;border-radius:14px}
+.pkg-card.song,.pkg-card.media{border-color:transparent;box-shadow:0 6px 18px rgba(0,0,0,.35)}
+.pkg-card.media.hot{border-color:transparent;box-shadow:0 6px 18px rgba(0,0,0,.35)}
 .pkg-card .pkg-name,.pkg-card .pkg-price{color:#fff}
 .pkg-card .pkg-price small{color:rgba(255,255,255,.85)}
 .pkg-card.song .pkg-credits,.pkg-card.media .pkg-credits{color:#fff}
@@ -742,7 +742,7 @@ html[data-mode="light"] .mv-a{color:var(--accent-text)}
    History at once and rendering only what is actually on screen. */
 .hist-card{content-visibility:auto;contain-intrinsic-size:auto 320px}
 .ep-card{content-visibility:auto;contain-intrinsic-size:auto 200px}
-.pkg-card{content-visibility:auto;contain-intrinsic-size:auto 300px}
+.pkg-card{content-visibility:auto;contain-intrinsic-size:auto 210px}
 #page-history .panel{content-visibility:auto;contain-intrinsic-size:auto 460px}
 .song-wheel-stage .hist-card{content-visibility:visible}
 /* ===== Performance: GPU layers for the scrolling surfaces =====
@@ -759,6 +759,13 @@ html[data-mode="light"] .mv-a{color:var(--accent-text)}
 .anim-off{animation-play-state:paused !important}
 /* History section off-screen: every animation inside it freezes. */
 #page-history.hist-off *{animation-play-state:paused !important}
+/* History scroll edge-fade (owner order): the top and bottom ~40px
+   of the History area fade to ~70% clarity (mask alpha .7 at the
+   very edge, fully clear 40px in and through the middle) so the
+   stacked History panels read as scrollable up/down. A gradient
+   mask on the container only — History data, cards and layout are
+   untouched. */
+#page-history{-webkit-mask-image:linear-gradient(to bottom,rgba(0,0,0,.7) 0,#000 40px,#000 calc(100% - 40px),rgba(0,0,0,.7) 100%);mask-image:linear-gradient(to bottom,rgba(0,0,0,.7) 0,#000 40px,#000 calc(100% - 40px),rgba(0,0,0,.7) 100%)}
 /* ===== Smooth mode (Settings → របៀបស្មូត · Smooth mode) =====
    ON: no backdrop blur anywhere, no text shadows, no heavy looping
    animations — scrolling stays on the compositor for the smoothest
@@ -1249,7 +1256,7 @@ km:{
  pubDlLimit:'អ្នកបានប្រើអស់ការទាញយកបទចម្រៀងហ្វ្រី 2 ដងហើយ — សូមទិញកញ្ចប់សេវាកម្មបទចម្រៀង ដើម្បីទាញយកបន្ត',
  acctGotFree:'អបអរសាទរ! អ្នកទទួលបាន Credit ហ្វ្រី — Image.Video Credit 250 និង Song Credit 24 ក្នុងគណនីរបស់អ្នកហើយ',
  giftTitle:'កាដូពី Admin',giftBody:'Free 250 Image.Video Credit + 24 Song Credit សម្រាប់អ្នកប្រើថ្មី',giftClaim:'ទទួលយក · Claim',
- navNotif:'ដំណឹង',notifTitle:'ដំណឹង · Notifications',notifEmpty:'មិនទាន់មានដំណឹងទេ',notifGuest:'សូម Log in ដើម្បីមើលដំណឹងរបស់អ្នក',notifLoading:'កំពុងផ្ទុក…',notifJustNow:'ទើបតែឥឡូវនេះ',notifMinAgo:'{n} នាទីមុន',notifHourAgo:'{n} ម៉ោងមុន',notifDayAgo:'{n} ថ្ងៃមុន',notifApproved:'កញ្ចប់របស់អ្នកត្រូវបានអនុម័ត ✓',notifRejected:'កញ្ចប់របស់អ្នកត្រូវបានបដិសេធ',notifGrant:'Admin បានបន្ថែម Credit ឲ្យអ្នក',notifDeduct:'Admin បានកាត់ Credit របស់អ្នក',notifInfo:'ដំណឹងពី MovAi',
+ navNotif:'ដំណឹង',notifTitle:'ដំណឹង · Notifications',notifEmpty:'មិនទាន់មានដំណឹងទេ',notifGuest:'សូម Log in ដើម្បីមើលដំណឹងរបស់អ្នក',notifLoading:'កំពុងផ្ទុក…',notifJustNow:'ទើបតែឥឡូវនេះ',notifMinAgo:'{n} នាទីមុន',notifHourAgo:'{n} ម៉ោងមុន',notifDayAgo:'{n} ថ្ងៃមុន',notifApproved:'កញ្ចប់របស់អ្នកត្រូវបានអនុម័ត ✓',notifRejected:'កញ្ចប់របស់អ្នកត្រូវបានបដិសេធ',notifLogin:'មានអ្នកប្រើថ្មី Log in',notifRequest:'មានសំណើទិញកញ្ចប់ថ្មី',notifGrant:'Admin បានបន្ថែម Credit ឲ្យអ្នក',notifDeduct:'Admin បានកាត់ Credit របស់អ្នក',notifInfo:'ដំណឹងពី MovAi',
  pushAskTitle:'បើកដំណឹងពីទូរស័ព្ទ?',pushAskBody:'ទទួលដំណឹងពិតៗចេញពីទូរស័ព្ទរបស់អ្នកផ្ទាល់ — ពេលកញ្ចប់ត្រូវបានអនុម័ត ពេល Admin បន្ថែម ឬកាត់ Credit និងពេលមានកាដូ — ទោះបីអ្នកមិនបានបើក website ក៏ដោយ',pushAllow:'បើកដំណឹង · Enable',pushNotNow:'មិនបាច់ទេ · Not now',pushSetLabel:'ដំណឹងពីទូរស័ព្ទ · Push notifications',pushStateOn:'បើកហើយ — ដំណឹងនឹងលោតលើទូរស័ព្ទរបស់អ្នក',pushStateOff:'បិទ — បើកដើម្បីទទួលដំណឹងលើទូរស័ព្ទ',pushStateBlocked:'Browser បានបិទដំណឹងឲ្យ website នេះ — សូមបើក Notification ក្នុង Settings របស់ browser',pushStateUnsupported:'Browser នេះមិនគាំទ្រ Web Push ទេ',pushStateGuest:'សូម Log in ជាមុនសិន',
  acctErrFill:'សូមបំពេញឲ្យគ្រប់ — អ៊ីមែលត្រូវមាន @ ហើយពាក្យសម្ងាត់យ៉ាងតិច 4 តួ',
  acctErrExists:'អ៊ីមែលនេះបានចុះឈ្មោះរួចហើយ — បានប្ដូរទៅ ចូលគណនី',
@@ -1429,7 +1436,7 @@ en:{
  pubDlLimit:'You have used your 2 free song downloads — please buy a Song package to keep downloading',
  acctGotFree:'Welcome! You received free credits — 250 Image.Video Credit and 24 Song Credit in your account',
  giftTitle:'A Gift from Admin',giftBody:'Free 250 Image.Video Credit + 24 Song Credit for new users',giftClaim:'Claim · ទទួលយក',
- navNotif:'Notifications',notifTitle:'Notifications · ដំណឹង',notifEmpty:'No notifications yet',notifGuest:'Log in to see your notifications',notifLoading:'Loading…',notifJustNow:'Just now',notifMinAgo:'{n} min ago',notifHourAgo:'{n} hr ago',notifDayAgo:'{n} days ago',notifApproved:'Your package was approved ✓',notifRejected:'Your package was rejected',notifGrant:'Admin added credits to your account',notifDeduct:'Admin deducted credits from your account',notifInfo:'MovAi notification',
+ navNotif:'Notifications',notifTitle:'Notifications · ដំណឹង',notifEmpty:'No notifications yet',notifGuest:'Log in to see your notifications',notifLoading:'Loading…',notifJustNow:'Just now',notifMinAgo:'{n} min ago',notifHourAgo:'{n} hr ago',notifDayAgo:'{n} days ago',notifApproved:'Your package was approved ✓',notifRejected:'Your package was rejected',notifLogin:'New user signed in',notifRequest:'New package purchase request',notifGrant:'Admin added credits to your account',notifDeduct:'Admin deducted credits from your account',notifInfo:'MovAi notification',
  pushAskTitle:'Turn on phone notifications?',pushAskBody:'Get real alerts on your phone — when a package is approved, when Admin adds or deducts credits, and when a gift arrives — even when the website is closed',pushAllow:'Enable · បើកដំណឹង',pushNotNow:'Not now · មិនបាច់ទេ',pushSetLabel:'Push notifications · ដំណឹងពីទូរស័ព្ទ',pushStateOn:'On — alerts will pop up on your phone',pushStateOff:'Off — turn on to get alerts on your phone',pushStateBlocked:'This browser has blocked notifications for this site — allow Notifications in the browser settings',pushStateUnsupported:'This browser does not support Web Push',pushStateGuest:'Log in first',
  acctErrFill:'Please fill everything — email must contain @ and password at least 4 characters',
  acctErrExists:'This email is already registered — switched to Log in',
@@ -6544,16 +6551,19 @@ function pushInit(){
    REAL notifications, read from the MovAi proxy server:
      GET https://movai-proxy.onrender.com/api/public/notifications?email=<gmail>
    Newest first, each with its time. Types: gift /
-   package-approved / package-rejected / grant / deduct (anything
-   else renders as a plain notice). Tapping an unread item marks it
-   read — locally at once, and on the server via POST
-   …/notifications/read (a few common endpoint shapes are tried in
-   turn; if the server does not answer, the local read state still
-   holds for this session — nothing is faked). The list loads when
+   package-approved / package-rejected / purchase-request / login /
+   grant / deduct (anything else renders as a plain notice). Tapping
+   an unread item marks it read — locally at once, and on the server
+   via POST …/notifications/read (a few common endpoint shapes are
+   tried in turn; if the server does not answer, the local read
+   state still holds for this session — nothing is faked) — AND
+   takes the user to the place it is about (see notifItemClick:
+   login → Profile, purchase-* → Packages, gift → the gift claim
+   popup while still pending else Profile, grant/deduct → Profile).
+   The list loads when
    the app opens and refreshes every 60 seconds while signed in.
    Guests see the bell too, but tapping it asks them to log in —
-   no list is ever fetched for a guest. A gift notification tapped
-   while the welcome gift is still unclaimed claims it (giftClaim).
+   no list is ever fetched for a guest.
    Nothing here invents notifications: an unreachable server simply
    leaves the current list untouched. */
 var NOTIF_API='https://movai-proxy.onrender.com/api/public/notifications';
@@ -6583,6 +6593,8 @@ function notifType(t){
   if(t.indexOf('gift')>=0)return 'gift';
   if(t.indexOf('approv')>=0)return 'approved';
   if(t.indexOf('reject')>=0)return 'rejected';
+  if(t.indexOf('login')>=0||t.indexOf('log-in')>=0||t.indexOf('signin')>=0||t.indexOf('sign-in')>=0||t.indexOf('signup')>=0||t.indexOf('sign-up')>=0||t.indexOf('newuser')>=0||t.indexOf('new-user')>=0)return 'login';
+  if(t.indexOf('request')>=0||t.indexOf('purchase')>=0)return 'request';
   if(t.indexOf('deduct')>=0||t.indexOf('remove')>=0||t.indexOf('revoke')>=0)return 'deduct';
   if(t.indexOf('grant')>=0||t.indexOf('add')>=0||t.indexOf('topup')>=0||t.indexOf('top-up')>=0||t.indexOf('credit')>=0)return 'grant';
   return 'info';
@@ -6614,6 +6626,8 @@ function notifDefTitle(n){
   if(n.type==='gift')return tx('giftTitle');
   if(n.type==='approved')return tx('notifApproved');
   if(n.type==='rejected')return tx('notifRejected');
+  if(n.type==='login')return tx('notifLogin');
+  if(n.type==='request')return tx('notifRequest');
   if(n.type==='grant')return tx('notifGrant');
   if(n.type==='deduct')return tx('notifDeduct');
   return tx('notifInfo');
@@ -6631,6 +6645,8 @@ function notifIcon(n){
   if(n.type==='gift'){c='#addc29';bg='rgba(173,220,41,.14)';path='<rect x="3" y="8" width="18" height="4" rx="1"/><path d="M12 8v13"/><path d="M19 12v7a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-7"/><path d="M7.5 8a2.5 2.5 0 0 1 0-5C11 3 12 8 12 8s1-5 4.5-5a2.5 2.5 0 0 1 0 5"/>';}
   else if(n.type==='approved'){c='#4ade80';bg='rgba(74,222,128,.13)';path='<circle cx="12" cy="12" r="9"/><path d="M8.5 12.5l2.4 2.4 4.6-5"/>';}
   else if(n.type==='rejected'){c='#f87171';bg='rgba(248,113,113,.13)';path='<circle cx="12" cy="12" r="9"/><path d="M9 9l6 6M15 9l-6 6"/>';}
+  else if(n.type==='login'){c='#60a5fa';bg='rgba(96,165,250,.14)';path='<circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 3.6-6.5 8-6.5s8 2.5 8 6.5"/>';}
+  else if(n.type==='request'){c='#facc15';bg='rgba(250,204,21,.13)';path='<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>';}
   else if(n.type==='grant'){c='#c084fc';bg='rgba(181,55,242,.15)';path='<circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/>';}
   else if(n.type==='deduct'){c='#fb923c';bg='rgba(251,146,60,.14)';path='<circle cx="12" cy="12" r="9"/><path d="M8 12h8"/>';}
   else{c='#9a9ea6';bg='rgba(154,158,166,.14)';path='<path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/>';}
@@ -6717,8 +6733,30 @@ function notifMarkReadSrv(id){
 function notifItemClick(i){
   var n=notifItems[i];if(!n)return;
   var u=null;try{u=acctCurrent();}catch(e){}
-  if(n.type==='gift'&&u&&u.giftPending){try{giftClaim();}catch(e){}}
   if(!n.read){n.read=true;notifReadIds[n.id]=true;notifRenderAll();notifMarkReadSrv(n.id);}
+  /* Tapping also GOES to the place the notification is about (not
+     just mark-read): a sign-in notice opens the Profile sheet; a
+     purchase approved / rejected / new purchase request opens
+     Packages; a gift opens the gift claim popup while the welcome
+     gift is still pending, otherwise Profile; a credit grant /
+     deduct opens Profile so the balances are right there. The
+     notification sheet (and the drawer, when the tap came from its
+     list) closes FIRST, then the destination opens once the close
+     animation has finished. Plain notices only mark read. */
+  var dest='';
+  if(n.type==='login')dest='profile';
+  else if(n.type==='approved'||n.type==='rejected'||n.type==='request')dest='packages';
+  else if(n.type==='gift')dest=(u&&u.giftPending)?'gift':'profile';
+  else if(n.type==='grant'||n.type==='deduct')dest='profile';
+  if(!dest)return;
+  notifSheetClose();
+  try{closeMenu();}catch(e){}
+  var openDest=function(){
+    if(dest==='packages'){try{packagesShow();}catch(e){}}
+    else if(dest==='gift'){try{giftShow();}catch(e){}}
+    else{try{profileOpen();}catch(e){}}
+  };
+  if(sheetAnimReduced())openDest();else setTimeout(openDest,270);
 }
 function notifBellClick(){
   var u=null;try{u=acctCurrent();}catch(e){}
