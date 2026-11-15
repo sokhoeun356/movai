@@ -858,9 +858,6 @@ html[data-smooth="1"] .brand-frame,html[data-smooth="1"] .acct-chip,html[data-sm
   </div>
 </section>
 <section id="page-gen" style="display:none">
-  <div class="hero">
-    <h1 data-i18n="heroTitle">បង្កើតរូបភាព វីដេអូ</h1>
-  </div>
   <div class="panel" id="sec-create">
     <div class="composer">
       <span class="chip-label" id="genPromptLabel">Prompt · អ្វីដែលចង់បង្កើត</span>
@@ -2911,7 +2908,7 @@ function genSetDuration(d){
 function genSetRes(r){gen.res=r;genRenderOptions();genNote();}
 function genNote(){
   var el=document.getElementById('genNote');
-  if(el)el.textContent=gen.mode==='3d'?tx('note3d'):(gen.mode==='song'?'':tx('noteAdminGen'));
+  if(el)el.textContent='';
   var lk=document.getElementById('genProviderLink');if(lk)lk.innerHTML='';
 }
 
