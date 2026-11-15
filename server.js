@@ -1145,6 +1145,60 @@ function apiRoute(req, res, urlPath) {
     }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
     return;
   }
+  // ---- Package-interaction events (Packages tab tracking) ----
+  // The MovAi website logs every package interaction so the admin can
+  // tell real buyers apart from people who only looked and cancelled:
+  // 'view' = opened the Packages panel / looked at a package,
+  // 'buy' = tapped Buy on a package, 'cancel' = closed/cancelled the
+  // buy flow, 'request' = sent the purchase request to the admin.
+  // Storage: ./data/package-events.json, capped at 5000 events (oldest
+  // dropped). No passwords, no API keys, no amounts stored — only who
+  // did what to which package, and when.
+  const PKG_EVENTS_FILE = path.join(DATA_DIR, 'package-events.json');
+  const PKG_EVENTS_MAX = 5000;
+  const PKG_EVENT_ACTIONS = ['view', 'buy', 'cancel', 'request'];
+  function loadPkgEvents() {
+    try { const j = JSON.parse(fs.readFileSync(PKG_EVENTS_FILE, 'utf8')); if (Array.isArray(j)) return j; } catch (e) {}
+    return [];
+  }
+  function savePkgEvents(arr) {
+    try { fs.mkdirSync(DATA_DIR, { recursive: true }); } catch (e) {}
+    fs.writeFileSync(PKG_EVENTS_FILE, JSON.stringify(arr, null, 2));
+  }
+  // POST /api/public/package-event — PUBLIC. {email, packageId, action}
+  // email may be 'guest' for visitors who are not signed in.
+  if (req.method === 'POST' && urlPath === '/api/public/package-event') {
+    readJSONBody(req, 64 * 1024).then((body) => {
+      const rawEmail = typeof body.email === 'string' ? body.email.trim().toLowerCase() : '';
+      const email = rawEmail === 'guest' ? 'guest' : normEmail(rawEmail);
+      if (!email) return sendJSON(res, 200, { ok: false, error: 'សូមដាក់ Gmail ត្រឹមត្រូវ' });
+      const packageId = typeof body.packageId === 'string' ? body.packageId.trim().slice(0, 100) : '';
+      if (!packageId) return sendJSON(res, 200, { ok: false, error: 'សូមដាក់ packageId' });
+      const action = typeof body.action === 'string' ? body.action.trim().toLowerCase() : '';
+      if (!PKG_EVENT_ACTIONS.includes(action)) return sendJSON(res, 200, { ok: false, error: 'action មិនត្រឹមត្រូវទេ' });
+      const events = loadPkgEvents();
+      events.push({ at: new Date().toISOString(), email, packageId, action });
+      if (events.length > PKG_EVENTS_MAX) events.splice(0, events.length - PKG_EVENTS_MAX);
+      savePkgEvents(events);
+      return sendJSON(res, 200, { ok: true });
+    }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
+    return;
+  }
+  // GET /api/admin/package-events?email=&packageId=&action= — admin key
+  // required. Newest first, limit 500.
+  if (req.method === 'GET' && urlPath === '/api/admin/package-events') {
+    const a = adminKeyOk(req);
+    if (!a.ok) return sendJSON(res, 200, { ok: false, error: a.error });
+    const q = new URL(req.url, 'http://localhost').searchParams;
+    const fEmail = (q.get('email') || '').trim().toLowerCase();
+    const fPkg = (q.get('packageId') || '').trim();
+    const fAction = (q.get('action') || '').trim().toLowerCase();
+    const list = loadPkgEvents()
+      .filter((e) => e && (!fEmail || e.email === fEmail) && (!fPkg || e.packageId === fPkg) && (!fAction || e.action === fAction))
+      .sort((x, y) => String(y.at || '').localeCompare(String(x.at || '')))
+      .slice(0, 500);
+    return sendJSON(res, 200, { ok: true, events: list });
+  }
   return sendJSON(res, 404, errBody('not_found', 'រកមិនឃើញទេ', 'Not found'));
 }
 
