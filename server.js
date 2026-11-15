@@ -107,8 +107,36 @@ function genUserId(existingIds) {
   } while (existingIds && existingIds.has(id));
   return id;
 }
+// Client IP + device type, captured on every /api/admin/sync so the Admin
+// app can show where each user connects from and on what device. The IP
+// comes from X-Forwarded-For (Render/proxy) with a socket fallback; the
+// device is parsed from the User-Agent header. No DNS server info is
+// available to a web server — the browser never sends it.
+function getClientIp(req) {
+  try {
+    const xff = req.headers && req.headers['x-forwarded-for'];
+    if (typeof xff === 'string' && xff.trim()) {
+      const first = xff.split(',')[0].trim();
+      if (first) return first.replace(/^::ffff:/, '').slice(0, 64);
+    }
+    const ra = req.socket && req.socket.remoteAddress;
+    if (ra) return String(ra).replace(/^::ffff:/, '').slice(0, 64);
+  } catch (e) {}
+  return '';
+}
+function deviceFromUA(ua) {
+  const s = typeof ua === 'string' ? ua : '';
+  if (/Android/i.test(s)) return 'Android';
+  if (/iPhone/i.test(s)) return 'iPhone';
+  if (/iPad/i.test(s)) return 'iPad';
+  if (/Windows/i.test(s)) return 'Windows PC';
+  if (/Macintosh|Mac OS X/i.test(s)) return 'Mac';
+  if (/CrOS/i.test(s)) return 'Chromebook';
+  if (/Linux/i.test(s)) return 'Linux';
+  return s ? 'Unknown' : '';
+}
 function pubUser(u) {
-  return { id: u.id || '', email: u.email, name: u.name || '', firstName: u.firstName || '', lastName: u.lastName || '', credits: u.credits, songCredits: u.songCredits, plan: u.plan || '', songPlan: u.songPlan || '', createdAt: u.createdAt, updatedAt: u.updatedAt };
+  return { id: u.id || '', email: u.email, name: u.name || '', firstName: u.firstName || '', lastName: u.lastName || '', credits: u.credits, songCredits: u.songCredits, plan: u.plan || '', songPlan: u.songPlan || '', createdAt: u.createdAt, updatedAt: u.updatedAt, lastIp: u.lastIp || '', device: u.device || '', lastSeen: u.lastSeen || '' };
 }
 function logGrant(entry) {
   try {
@@ -964,6 +992,12 @@ function apiRoute(req, res, urlPath) {
         if (typeof body.songPlan === 'string') u.songPlan = body.songPlan.slice(0, 50);
         u.updatedAt = now;
       }
+      // Capture where this user connects from + on what device (every sync).
+      const _cip = getClientIp(req);
+      if (_cip) u.lastIp = _cip;
+      const _dev = deviceFromUA(req.headers && req.headers['user-agent']);
+      if (_dev) u.device = _dev;
+      u.lastSeen = now;
       u.credits = Math.max(0, Math.floor(numOr(u.credits, 0)));
       u.songCredits = Math.max(0, Math.floor(numOr(u.songCredits, 0)));
       saveUsers(users);
