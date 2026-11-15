@@ -138,6 +138,11 @@ html[data-mode="light"] .err-title{color:#b91c1c}
 .ep-dur{font-size:0.75rem;font-weight:700;color:var(--accent-text);background:rgba(var(--accent-rgb),.12);border-radius:999px;padding:5px 10px;white-space:nowrap}
 .ep-text{font-size:0.875rem;color:var(--text2);line-height:1.7;margin-top:10px;white-space:pre-wrap;overflow-wrap:break-word}
 .ep-msg{font-size:0.8125rem;margin-top:10px;min-height:16px;line-height:1.5}
+.pglow{display:inline-block;width:10px;height:10px;border-radius:50%;flex:0 0 auto;animation:pglowPulse 2.2s ease-in-out infinite}
+.pglow-green{background:#4ade80;box-shadow:0 0 6px 2px rgba(74,222,128,.85),0 0 16px 6px rgba(74,222,128,.45),0 0 30px 12px rgba(74,222,128,.22)}
+.pglow-accent{background:var(--accent);box-shadow:0 0 6px 2px rgba(var(--accent-rgb),.85),0 0 16px 6px rgba(var(--accent-rgb),.45),0 0 30px 12px rgba(var(--accent-rgb),.22)}
+@keyframes pglowPulse{0%,100%{opacity:1}50%{opacity:.72}}
+@media (prefers-reduced-motion:reduce){.pglow{animation:none}}
 footer{text-align:center;color:var(--faint);font-size:0.8125rem;padding:32px 16px 104px;line-height:1.7}
 .set-box{margin-top:22px;padding-top:20px;border-top:1px solid var(--line2)}
 .set-label{font-size:0.8125rem;font-weight:700;color:var(--label);letter-spacing:.02em}
@@ -186,7 +191,6 @@ img,video{max-width:100%}
 html[data-mode="light"] .drawer-backdrop{background:rgba(20,22,40,.35)}
 html[data-mode="light"] .d3-drop{border-color:rgba(20,22,30,.3)}
 html[data-mode="light"] #genProviderDrop{background:#ffffff !important;border-color:rgba(20,22,30,.12) !important;box-shadow:0 16px 40px rgba(20,22,40,.16)}
-html[data-mode="light"] #genReplicaId{background:#ffffff !important}
 html[data-mode="light"] [style*="color:#9a9ea6"]{color:#5f646e !important}
 html[data-mode="light"] [style*="background:rgba(255,255,255,.1)"]{background:rgba(20,22,30,.12) !important}
 html[data-mode="light"] [style*="border-top:1px solid rgba(255,255,255,.08)"]{border-top-color:rgba(20,22,30,.1) !important}
@@ -296,10 +300,6 @@ html[data-mode="light"] [style*="border-top:1px solid rgba(255,255,255,.08)"]{bo
     <div class="composer">
       <span class="chip-label" id="genPromptLabel">Prompt · អ្វីដែលចង់បង្កើត</span>
       <textarea class="input" id="genPrompt" rows="4" placeholder="ឧ. ទេសភាពព្រៃឈើពេលល្ងាច មានផ្ទះឈើ..." style="width:100%"></textarea>
-      <div id="genTavusBox" style="display:none;margin-top:10px">
-        <p style="font-size:0.8125rem;color:#9a9ea6" data-i18n="tavusText">Tavus បង្កើតវីដេអូ avatar និយាយតាម script — ដាក់ Replica ID (Face ID) របស់អ្នក៖</p>
-        <input class="input" id="genReplicaId" placeholder="r... (Face ID ពី Tavus)" data-i18n-ph="tavusPh" style="width:100%;margin-top:8px;background:#14161a">
-      </div>
       <div class="composer-tools">
         <div class="modes">
           <button class="kbtn kbtn-black" id="genTabImg" onclick="genSetMode('image')" data-i18n="tabImage">រូបភាព</button>
@@ -308,7 +308,7 @@ html[data-mode="light"] [style*="border-top:1px solid rgba(255,255,255,.08)"]{bo
         </div>
         <div id="genProviderWrap">
           <button type="button" class="input" id="genProviderField" onclick="genToggleProviders()" style="display:flex;justify-content:space-between;align-items:center;gap:10px;cursor:pointer;text-align:left;width:100%">
-            <span id="genProviderFieldName" style="font-weight:700">Pollinations</span>
+            <span style="display:flex;align-items:center;gap:8px;min-width:0"><span id="genProviderFieldName" style="font-weight:700">Pollinations</span><span id="genProviderFieldGlow" class="pglow" style="display:none"></span></span>
             <span style="display:flex;align-items:center;gap:8px;flex:0 0 auto"><span id="genProviderFieldLimit" style="font-size:0.75rem;color:#9a9ea6;white-space:nowrap"></span><span style="font-size:0.75rem;color:#9a9ea6">▼</span></span>
           </button>
           <div id="genProviderDrop" style="display:none;position:absolute;left:0;right:0;top:100%;z-index:30;background:#1a1c21;border:1px solid rgba(255,255,255,.12);border-radius:12px;margin-top:6px;overflow:hidden;box-shadow:0 16px 40px rgba(0,0,0,.5)"></div>
@@ -434,7 +434,6 @@ km:{
  setMode:'យប់ / ថ្ងៃ',modeDark:'យប់',modeLight:'ថ្ងៃ',modeAuto:'អូតូ',fabLabel:'ការកំណត់រហ័ស',
  setGlass:'កញ្ចក់ · ថ្លា / ព្រាល / ចាំង',glassClearP:'ថ្លា · Clear',glassClearLo:'0% · មិនថ្លា',glassClearHi:'100% · ថ្លាខ្លាំង',glassBlurP:'ព្រាល · Frosted / Blur',glassBlurLo:'0% · មិនព្រាល',glassBlurHi:'100% · ព្រាលខ្លាំង',glassShineP:'ចាំង · Shine',glassShineLo:'0% · មិនចាំង',glassShineHi:'100% · ចាំងខ្លាំង',setTxtBlur:'ព្រាលផ្ទៃខាងក្រោយអក្សរ',txtBlurLo:'0% · ច្បាស់',txtBlurHi:'100% · ព្រាលខ្លាំង',setBgBright:'ពន្លឺផ្ទៃខាងក្រោយ',bgBrightLo:'0% · ងងឹត',bgBrightHi:'100% · ភ្លឺខ្លាំង',setBrandFx:'អ៊ីហ្វិចឈ្មោះ MovAi',fxNone:'ធម្មតា',fxGlow:'ភ្លឺញាក់',fxShadow:'ស្រមោល',fxNeon:'ណេអុង',fxShine:'ចាំង',setTShadow:'ពណ៌ស្រមោលអក្សរ',fabKeys:'API Keys',fabSettings:'ការកំណត់',
  tabImage:'រូបភាព',tabVideo:'វីដេអូ',
- tavusText:'Tavus បង្កើតវីដេអូ avatar និយាយតាម script — ដាក់ Replica ID (Face ID) របស់អ្នក៖',tavusPh:'r... (Face ID ពី Tavus)',
  lblSize:'ទំហំ',lblDuration:'រយៈពេល',lblQuality:'គុណភាព',
  btnGenerate:'បង្កើត',btnAuto:'អូតូ',progCreating:'កំពុងបង្កើត…',
  promptLabel:'Prompt · អ្វីដែលចង់បង្កើត',promptLabel3d:'Prompt · អត្ថបទសម្រាប់ធ្វើ 3D',
@@ -450,16 +449,16 @@ km:{
  footerText:'MovAi — បង្កើតរូបភាព &amp; វីដេអូ ដោយ API ហ្វ្រី<br>Key របស់អ្នករក្សាទុកតែក្នុង browser របស់អ្នកទេ — មិនផ្ញើទៅកន្លែងណាទេ លើកលែងតែពេលបង្កើតម្ដងៗ',
  msgEnterPrompt:'សូមសរសេរ prompt ជាមុនសិន',
  msgNoKey:'មិនទាន់មាន API Key សម្រាប់ {name} ទេ — សូមដាក់ Key ក្នុងម៉ឺនុយ ☰ (API Keys) ជាមុនសិន',
- msgTavusId:'សូមដាក់ Tavus Replica ID (Face ID) ជាមុនសិន',msgDone:'បង្កើតរួចរាល់',
+ msgDone:'បង្កើតរួចរាល់',
  msgNetErr:'ហៅ API មិនបានទេ — provider នេះទំនងជាមិនអនុញ្ញាតឲ្យ browser ហៅត្រង់ (CORS) ឬអ៊ីនធឺណិតមានបញ្ហា។ Pollinations និង Puter.js ហៅត្រង់ពី browser បាន។',
  progWaiting:'កំពុងរង់ចាំវីដេអូ… ',
  errTimeoutVideo:'អស់ពេលរង់ចាំ (10 នាទី) — វីដេអូអាចនៅកំពុងបង្កើតក្នុងគណនីរបស់អ្នក',
+ errTimeoutImage:'អស់ពេលរង់ចាំ (10 នាទី) — រូបភាពអាចនៅកំពុងបង្កើតក្នុងគណនីរបស់អ្នក',
  errNoVideoUrl:'វីដេអូរួចរាល់ តែរក URL មិនឃើញ — សូមមើលក្នុងគណនីរបស់អ្នកផ្ទាល់',
  genFailed:'បង្កើតមិនបានទេ',errTitle:'បញ្ហាដែលកើតឡើង — ចម្លងទុកផ្ញើឲ្យអ្នកជួយមើល',btnCopy:'ចម្លងបញ្ហា',copiedOk:'បានចម្លងហើយ ✓',copyFail:'ចម្លងមិនបាន — សូមចុចសង្កត់លើអត្ថបទក្នុងប្រអប់ ហើយជ្រើស Copy ដោយខ្លួនឯង',unknownProvider:'Provider មិនស្គាល់ទេ',
  badImgUrl:'Provider បានផ្ដល់ URL រូបភាពមិនត្រឹមត្រូវទេ',badVidUrl:'Provider បានផ្ដល់ URL វីដេអូមិនត្រឹមត្រូវទេ',
  puterRetry:'Puter.js មិនទាន់ផ្ទុកទេ — សូមព្យាយាមម្ដងទៀត',
  puterNoImg:'Puter: មិនបានរូបភាពទេ',puterNoVid:'Puter: មិនបានវីដេអូទេ',
- gemini429:' — Key ឥឡូវថ្មីអាចបាន 429',
  novaiAcc:'គណនី NovAI',novaiBalanceNote:'Balance នេះប្រើសម្រាប់ model បង់លុយតែប៉ុណ្ណោះ — វីដេអូហ្វ្រីមិនកាត់លុយទេ',
  novaiFreeLine:'ហ្វ្រីក្នុងមួយថ្ងៃ៖ វីដេអូហ្វ្រី 5/ថ្ងៃ (cogvideox-flash) · រូប/អត្ថបទហ្វ្រី 10/ថ្ងៃ · Paid-model 10/ថ្ងៃ',
  novaiUsedToday:'ប្រើថ្ងៃនេះ៖ {x}/5 វីដេអូ',novaiFreeDone:'ហ្វ្រីអស់ហើយថ្ងៃនេះ — រង់ចាំថ្ងៃស្អែក',novaiDash:'បើក Dashboard NovAI ↗',
@@ -477,8 +476,7 @@ km:{
  puterSignInBtn:'ចូលគណនី Puter',puterSignOutBtn:'ចេញពី Puter',
  keyFillFirst:'សូមបំពេញ {field} ជាមុនសិន',keyExists:'Key នេះមានរួចហើយ',keyAdded:'បានបន្ថែម Key ({n} Keys)',
  noteMagichourAspect:' 4:6 មិនមានទេ — នឹងប្រើ 9:16 ជំនួស។',noteMagichour4k:' 4K អាចត្រូវការ plan បង់លុយ — Free ប្រើ 480p។',
- notePuterVid:' រយៈពេល/គុណភាពតាម model — មិនអាចកំណត់ 5s/10s/4K បានទេ។',noteHfVid:' រយៈពេល/គុណភាពតាម model — $0.10/ខែ តិចណាស់។',
- noteTavusVid:' ជម្រើសទំហំ/រយៈពេល/គុណភាពមិនអនុវត្តចំពោះ Tavus ទេ។',
+ notePuterVid:' រយៈពេល/គុណភាពតាម model — មិនអាចកំណត់ 5s/10s/4K បានទេ។',
  note3d:'ដាក់រូបភាព ឬសរសេរអត្ថបទ រួចចុច «ធ្វើជា 3D»។',
  d3MsgMpxNoKey:'មិនទាន់មាន Key Masterpiece X ទេ — សូមដាក់ Key ជាមុនសិន',
  d3MsgMpxOpening:'កំពុងបើកវេបសាយ Masterpiece X ដើម្បីបង្កើត 3D នៅទីនោះ…',
@@ -510,7 +508,6 @@ en:{
  setMode:'Day / Night',modeDark:'Dark',modeLight:'Light',modeAuto:'Auto',fabLabel:'Quick settings',
  setGlass:'Glass · Clear / Frosted / Shine',glassClearP:'Clear · Transparency',glassClearLo:'0% · Solid',glassClearHi:'100% · Fully clear',glassBlurP:'Frosted · Blur',glassBlurLo:'0% · No blur',glassBlurHi:'100% · Very frosted',glassShineP:'Shine · Gloss',glassShineLo:'0% · No shine',glassShineHi:'100% · Very shiny',setTxtBlur:'Text Background Blur',txtBlurLo:'0% · Sharp',txtBlurHi:'100% · Very blurred',setBgBright:'Background Brightness',bgBrightLo:'0% · Dark',bgBrightHi:'100% · Very bright',setBrandFx:'MovAi Name Effect',fxNone:'None',fxGlow:'Glow',fxShadow:'Shadow',fxNeon:'Neon',fxShine:'Shine',setTShadow:'Text Shadow Color',fabKeys:'API Keys',fabSettings:'Settings',
  tabImage:'Image',tabVideo:'Video',
- tavusText:'Tavus creates a talking avatar video from a script — enter your Replica ID (Face ID):',tavusPh:'r... (Face ID from Tavus)',
  lblSize:'Size',lblDuration:'Duration',lblQuality:'Quality',
  btnGenerate:'Generate',btnAuto:'Auto',progCreating:'Generating…',
  promptLabel:'Prompt · What do you want to create',promptLabel3d:'Prompt · Text for making 3D',
@@ -526,16 +523,16 @@ en:{
  footerText:'MovAi — Create images &amp; videos with free APIs<br>Your keys are stored only in your browser — never sent anywhere except when you generate',
  msgEnterPrompt:'Please write a prompt first',
  msgNoKey:'No API key for {name} yet — add a key in the ☰ menu (API Keys) first',
- msgTavusId:'Please enter your Tavus Replica ID (Face ID) first',msgDone:'Done',
+ msgDone:'Done',
  msgNetErr:'Could not reach the API — this provider may not allow direct browser calls (CORS), or the connection failed. Pollinations and Puter.js work directly from the browser.',
  progWaiting:'Waiting for the video… ',
  errTimeoutVideo:'Timed out after 10 minutes — the video may still be generating in your account',
+ errTimeoutImage:'Timed out after 10 minutes — the image may still be generating in your account',
  errNoVideoUrl:'Video finished but no URL was returned — please check your account',
  genFailed:'Generation failed',errTitle:'Error details — copy this to share for help',btnCopy:'Copy error',copiedOk:'Copied ✓',copyFail:'Copy failed — long-press the text in the box and copy it manually',unknownProvider:'Unknown provider',
  badImgUrl:'The provider returned an invalid image URL',badVidUrl:'The provider returned an invalid video URL',
  puterRetry:'Puter.js has not loaded yet — please try again',
  puterNoImg:'Puter: no image returned',puterNoVid:'Puter: no video returned',
- gemini429:' — new keys may return 429',
  novaiAcc:'NovAI Account',novaiBalanceNote:'This balance is used for paid models only — free videos do not deduct money',
  novaiFreeLine:'Free per day: 5 free videos/day (cogvideox-flash) · 10 free image/text/day · 10 paid-model calls/day',
  novaiUsedToday:'Used today: {x}/5 videos',novaiFreeDone:'Free quota used up today — wait until tomorrow',novaiDash:'Open NovAI Dashboard ↗',
@@ -553,8 +550,7 @@ en:{
  puterSignInBtn:'Sign in to Puter',puterSignOutBtn:'Sign out of Puter',
  keyFillFirst:'Please fill in {field} first',keyExists:'This key is already added',keyAdded:'Key added ({n} keys)',
  noteMagichourAspect:' 4:6 is not available — 9:16 will be used instead.',noteMagichour4k:' 4K may need a paid plan — Free uses 480p.',
- notePuterVid:' Duration/quality depend on the model — 5s/10s/4K cannot be set.',noteHfVid:' Duration/quality depend on the model — $0.10/month is very little.',
- noteTavusVid:' Size/duration/quality options do not apply to Tavus.',
+ notePuterVid:' Duration/quality depend on the model — 5s/10s/4K cannot be set.',
  note3d:'Upload an image or write text, then tap "Make 3D".',
  d3MsgMpxNoKey:'No Masterpiece X key yet — please add a key first',
  d3MsgMpxOpening:'Opening the Masterpiece X website to create your 3D there…',
@@ -836,26 +832,17 @@ function genErrText(j, fb){
   return fb;
 }
 var GEN_IMG_PROVIDERS=[
- {id:'pollinations',name:'Pollinations',limit:{km:'ហ្វ្រី · មិនបាច់ Key · ~1 រូប/15-45 វិនាទី',en:'Free · No key · ~1 image/15-45s'},note:{km:'មិនត្រូវការ API key — បង្កើតបានភ្លាម។ រូបមាន logo តូច។',en:'No API key needed — generate right away. Images carry a small logo.'}},
- {id:'puter',name:'Puter.js',limit:{km:'ហ្វ្រី · ចូលគណនី Puter',en:'Free · Puter account'},puter:true,note:{km:'អ្នកប្រើម្នាក់ៗចូលគណនី Puter ហ្វ្រីរបស់ខ្លួន (User-Pays) — អ្នកបង្កើតមិនបង់អ្វីទេ។',en:'Each user signs in with their own free Puter account (User-Pays) — the creator pays nothing.'}},
- {id:'cloudflare',name:'Cloudflare',limit:{km:'~230 រូប/ថ្ងៃ · FLUX',en:'~230 images/day · FLUX'},key:'cloudflare',note:{km:'ត្រូវការ Account ID + API Token (ចុះឈ្មោះ Cloudflare ហ្វ្រី មិនបាច់កាត)។ បញ្ជាក់៖ Cloudflare មិនអនុញ្ញាតឲ្យ browser ហៅត្រង់ទេ (CORS) ទើបបង្កើតនៅទីនេះមិនបាន — ចុចប៊ូតុង «អូតូ» នៅក្បែរ Generate ដើម្បីប្តូរទៅ Pollinations ហើយបង្កើតរូប។',en:'Needs an Account ID + API Token (free Cloudflare signup, no card). Note: Cloudflare does not allow direct browser calls (CORS), so it cannot generate here — tap the "Auto" button next to Generate to switch to Pollinations and create your image.'}},
- {id:'gemini',name:'Gemini',limit:{km:'Key ហ្វ្រី · Nano Banana',en:'Free key · Nano Banana'},key:'gemini',note:{km:'ត្រូវការ API Key ហ្វ្រីពី AI Studio (មិនបាច់កាត)។ បញ្ជាក់៖ Google មិនឲ្យបង្កើតរូបភាពហ្វ្រីតាម API Key ទេ (limit 0) ទើបបង្កើតមិនបាន — ចុចប៊ូតុង «អូតូ» នៅក្បែរ Generate ដើម្បីប្តូរទៅ Pollinations ហើយបង្កើតរូប។',en:'Needs a free API key from AI Studio (no card). Note: Google does not allow free image generation via API key (limit 0), so it cannot generate here — tap the "Auto" button next to Generate to switch to Pollinations and create your image.'}},
- {id:'hf',name:'Hugging Face',limit:{km:'$0.10/ខែ · តិចណាស់',en:'$0.10/mo · very little'},key:'hf',note:{km:'ត្រូវការ Token ហ្វ្រី។ $0.10/ខែ បានតែប៉ុន្មានរូបទេ។',en:'Needs a free token. $0.10/month covers only a few images.'}}
+ {id:'magichour',name:'Magic Hour',glow:'green',limit:{km:'Credits ហ្វ្រី · trial',en:'Free credits · trial'},key:'magichour',note:{km:'ត្រូវការ API Key (credits ហ្វ្រីពេលចុះឈ្មោះ មិនបាច់កាត)។ Magic Hour បង្កើតបានទាំងរូបភាពទាំងវីដេអូ។',en:'Needs an API key (free credits on signup, no card). Magic Hour creates both images and videos.'}},
+ {id:'pollinations',name:'Pollinations',hidden:true,limit:{km:'ហ្វ្រី · មិនបាច់ Key · ~1 រូប/15-45 វិនាទី',en:'Free · No key · ~1 image/15-45s'},note:{km:'មិនត្រូវការ API key — បង្កើតបានភ្លាម។ រូបមាន logo តូច។',en:'No API key needed — generate right away. Images carry a small logo.'}}
 ];
 var GEN_VID_PROVIDERS=[
- {id:'novai',name:'NovAI',limit:{km:'ហ្វ្រី · 5 វីដេអូ/ថ្ងៃ',en:'Free · 5 videos/day'},key:'novai',note:''},
- {id:'magichour',name:'Magic Hour',limit:{km:'Credits ហ្វ្រី · trial',en:'Free credits · trial'},key:'magichour',note:{km:'ត្រូវការ API Key (credits ហ្វ្រីពេលចុះឈ្មោះ មិនបាច់កាត)។',en:'Needs an API key (free credits on signup, no card).'}},
- {id:'puter',name:'Puter.js',limit:{km:'ហ្វ្រី · ចូលគណនី Puter',en:'Free · Puter account'},puter:true,note:{km:'អ្នកប្រើម្នាក់ៗចូលគណនី Puter ហ្វ្រីរបស់ខ្លួន។ Model default Wan 2.7។',en:'Each user signs in with their own free Puter account. Default model: Wan 2.7.'}},
- {id:'hf',name:'Hugging Face',limit:{km:'$0.10/ខែ · 5-50 clip/ខែ',en:'$0.10/mo · 5-50 clips/mo'},key:'hf',note:{km:'ត្រូវការ Token ហ្វ្រី។ វីដេអូខ្លី តិចណាស់។',en:'Needs a free token. Short videos, very few.'}},
- {id:'tavus',name:'Tavus',limit:{km:'Avatar តែប៉ុណ្ណោះ · 5 នាទី/ខែ',en:'Avatar only · 5 min/mo'},key:'tavus',note:{km:'វីដេអូ avatar និយាយតាម script តែប៉ុណ្ណោះ — មិនមែន scene ទេ។ ត្រូវការ Replica ID (Face ID)។',en:'Talking avatar videos from a script only — not scenes. Needs a Replica ID (Face ID).'}}
+ {id:'novai',name:'NovAI',glow:'accent',limit:{km:'ហ្វ្រី · 5 វីដេអូ/ថ្ងៃ',en:'Free · 5 videos/day'},key:'novai',note:''},
+ {id:'magichour',name:'Magic Hour',glow:'green',limit:{km:'Credits ហ្វ្រី · trial',en:'Free credits · trial'},key:'magichour',note:{km:'ត្រូវការ API Key (credits ហ្វ្រីពេលចុះឈ្មោះ មិនបាច់កាត)។',en:'Needs an API key (free credits on signup, no card).'}},
+ {id:'puter',name:'Puter.js',limit:{km:'ហ្វ្រី · ចូលគណនី Puter',en:'Free · Puter account'},puter:true,note:{km:'អ្នកប្រើម្នាក់ៗចូលគណនី Puter ហ្វ្រីរបស់ខ្លួន។ Model default Wan 2.7។',en:'Each user signs in with their own free Puter account. Default model: Wan 2.7.'}}
 ];
 var GEN_KEY_PROVIDERS=[
- {id:'cloudflare',name:'Cloudflare',limit:{km:'~230 រូប/ថ្ងៃ',en:'~230 images/day'},url:'https://dash.cloudflare.com',fields:[{k:'accountId',ph:'Account ID'},{k:'token',ph:'API Token'}],hint:{km:'Account ID + API Token — យកពី Cloudflare Dashboard (My Profile → API Tokens)។',en:'Account ID + API Token — from the Cloudflare Dashboard (My Profile → API Tokens).'}},
- {id:'gemini',name:'Gemini (AI Studio)',limit:{km:'Key ហ្វ្រី',en:'Free key'},url:'https://aistudio.google.com',fields:[{k:'key',ph:'API Key (AIza...)'}],hint:{km:'យក Key ហ្វ្រីពី Google AI Studio — មិនបាច់កាត។',en:'Get a free key from Google AI Studio — no card.'}},
- {id:'hf',name:'Hugging Face',limit:{km:'$0.10/ខែ',en:'$0.10/mo'},url:'https://huggingface.co',fields:[{k:'key',ph:'HF Token (hf_...)'}],hint:{km:'យក Token ហ្វ្រីពី huggingface.co/settings/tokens។',en:'Get a free token at huggingface.co/settings/tokens.'}},
  {id:'novai',name:'NovAI',limit:{km:'5 វីដេអូ/ថ្ងៃ',en:'5 videos/day'},url:'https://aiapi-pro.com',fields:[{k:'key',ph:'API Key'}],hint:{km:'ចុះឈ្មោះដោយ email នៅ aiapi-pro.com — មិនបាច់កាត។',en:'Sign up with email at aiapi-pro.com — no card.'}},
  {id:'magichour',name:'Magic Hour',limit:{km:'Credits ហ្វ្រី',en:'Free credits'},url:'https://magichour.ai',fields:[{k:'key',ph:'API Key'}],hint:{km:'បង្កើត Key នៅ magichour.ai/developer — មិនបាច់កាត។',en:'Create a key at magichour.ai/developer — no card.'}},
- {id:'tavus',name:'Tavus',limit:{km:'Avatar · 5 នាទី/ខែ',en:'Avatar · 5 min/mo'},url:'https://tavus.io',fields:[{k:'key',ph:'API Key'}],hint:{km:'បង្កើត Key នៅ Tavus — Basic plan ហ្វ្រី។',en:'Create a key at Tavus — free Basic plan.'}},
  {id:'masterpiecex',name:'Masterpiece X',limit:{km:'3D តែប៉ុណ្ណោះ · ហ្វ្រី 250 credits',en:'3D only · Free 250 credits'},url:'https://www.masterpiecex.com',fields:[{k:'key',ph:'API Key'}],hint:{km:'សម្រាប់រូប 3D Design តែប៉ុណ្ណោះ — យក API Key ពី masterpiecex.com ក្រោយចុះឈ្មោះ (ហ្វ្រី 250 credits = 5 models)។',en:'For 3D Design only — get an API key from masterpiecex.com after signing up (free 250 credits = 5 models).'}},
  {id:'hunyuan3d',name:'Hunyuan3D',limit:{km:'3D តែប៉ុណ្ណោះ · ហ្វ្រី 200 credits',en:'3D only · Free 200 credits'},url:'https://cloud.tencent.com',fields:[{k:'secretId',ph:'Secret ID'},{k:'secretKey',ph:'Secret Key'}],hint:{km:'សម្រាប់រូប 3D Design តែប៉ុណ្ណោះ — យក Secret ID + Secret Key ពី Tencent Cloud (ហ្វ្រី 200 credits)។',en:'For 3D Design only — get a Secret ID + Secret Key from Tencent Cloud (free 200 credits).'}}
 ];
@@ -952,7 +939,6 @@ function genSetMode(m){
   var gl=document.getElementById('genPromptLabel');
   if(gl){gl.style.display='block';gl.textContent=m==='3d'?tx('promptLabel3d'):tx('promptLabel');}
   var ag=document.getElementById('genAspectGroup');if(ag)ag.style.display=m==='3d'?'none':'flex';
-  var tb=document.getElementById('genTavusBox');if(tb)tb.style.display='none';
   var sb=document.getElementById('storyBox');if(sb)sb.style.display=m==='video'?'block':'none';
   genRenderProviders();genCloseProviders();genRenderOptions();genNote();
 }
@@ -963,10 +949,13 @@ function genRenderProviders(){
   var fl=document.getElementById('genProviderFieldLimit');
   if(fn)fn.textContent=p?p.name:'';
   if(fl)fl.textContent=p?loc(p.limit):'';
+  var fg=document.getElementById('genProviderFieldGlow');
+  if(fg){if(p&&p.glow){fg.className='pglow pglow-'+p.glow;fg.style.display='inline-block';}else fg.style.display='none';}
   var drop=document.getElementById('genProviderDrop');
-  if(drop)drop.innerHTML=list.map(function(x){
+  if(drop)drop.innerHTML=list.filter(function(x){return !x.hidden;}).map(function(x){
     var on=x.id===gen.provider;
-    return '<div onclick="genSetProvider(\''+x.id+'\')" style="padding:12px 14px;cursor:pointer;border-top:1px solid rgba(255,255,255,.08);min-height:44px;'+(on?'background:rgba(var(--accent-rgb),.13);color:var(--accent-text);font-weight:800;':'')+'"><div style="font-weight:700;font-size:0.9375rem">'+x.name+'</div><div style="font-size:0.75rem;color:#9a9ea6;margin-top:2px">'+loc(x.limit)+'</div></div>';
+    var glowHtml=x.glow?'<span class="pglow pglow-'+x.glow+'"></span>'+(x.glow==='green'?'<span style="font-size:0.75rem;font-weight:700;color:#4ade80">Online Live</span>':''):'';
+    return '<div onclick="genSetProvider(\''+x.id+'\')" style="padding:12px 14px;cursor:pointer;border-top:1px solid rgba(255,255,255,.08);min-height:44px;'+(on?'background:rgba(var(--accent-rgb),.13);color:var(--accent-text);font-weight:800;':'')+'"><div style="display:flex;align-items:center;gap:9px;font-weight:700;font-size:0.9375rem"><span>'+x.name+'</span>'+glowHtml+'</div><div style="font-size:0.75rem;color:#9a9ea6;margin-top:2px">'+loc(x.limit)+'</div></div>';
   }).join('');
 }
 function genToggleProviders(){
@@ -980,7 +969,6 @@ function genCloseProviders(){
 }
 function genSetProvider(id){
   gen.provider=id;genRenderProviders();genCloseProviders();genRenderOptions();genNote();
-  var tb=document.getElementById('genTavusBox');if(tb)tb.style.display=(gen.mode==='video'&&id==='tavus')?'block':'none';
 }
 function genRenderOptions(){
   var aspects=['16:9','9:16','4:6'];
@@ -1010,11 +998,10 @@ function genNote(){
   var p=null;var list=gen.mode==='video'?GEN_VID_PROVIDERS:GEN_IMG_PROVIDERS;
   for(var i=0;i<list.length;i++)if(list[i].id===gen.provider)p=list[i];
   var t=p?loc(p.note):'';
+  if(gen.mode==='image'&&p&&p.id==='magichour'&&gen.aspect==='4:6')t+=tx('noteMagichourAspect');
   if(gen.mode==='video'&&p){
     if(p.id==='magichour'){if(gen.aspect==='4:6')t+=tx('noteMagichourAspect');if(gen.res===4000)t+=tx('noteMagichour4k');}
     if(p.id==='puter')t+=tx('notePuterVid');
-    if(p.id==='hf')t+=tx('noteHfVid');
-    if(p.id==='tavus')t+=tx('noteTavusVid');
   }
   if(gen.mode==='3d')t=tx('note3d');
   var el=document.getElementById('genNote');if(el)el.textContent=t;
@@ -1136,15 +1123,10 @@ async function genGenerate(){
   var p=null;for(var i=0;i<list.length;i++)if(list[i].id===gen.provider)p=list[i];
   if(!p)return;
   if(gen.mode==='video'&&p.id==='novai'&&novaiVideoUse()>=5){genMsg(tx('novaiFreeDone'));return;}
-  var key=null,accountId='';
+  var key=null;
   if(p.key){
     key=genNextKey(p.key);
     if(!key){genMsg(tx('msgNoKey').replace('{name}',p.name));genKeyOpen[p.key]=true;genRenderKeys();openMenu();setTimeout(function(){var c=document.getElementById('keyAcc-'+p.key);if(c)c.scrollIntoView({block:'center'});},350);return;}
-    if(p.key==='cloudflare'){accountId=key.accountId;key=key.token;}
-  }
-  if(p.id==='tavus'){
-    var rid=(document.getElementById('genReplicaId').value||'').trim();
-    if(!rid){genMsg(tx('msgTavusId'));return;}
   }
   var btn=document.getElementById('genBtn');btn.disabled=true;
   genAnyBusy=true;epSyncButtons();
@@ -1160,7 +1142,7 @@ async function genGenerate(){
         catch(e2){if(genIsBusy(e2&&e2.message?e2.message:String(e2))){await genBusyWait();continue;}throw e2;}
       }
     }
-    else await genDoImage(p,gen.mode==='3d'?prompt+', 3D render, octane render, ultra detailed 3D design, studio lighting':prompt,key,accountId);
+    else await genDoImage(p,gen.mode==='3d'?prompt+', 3D render, octane render, ultra detailed 3D design, studio lighting':prompt,key);
     genMsg(tx('msgDone'));
   }catch(e){
     var m=(e&&e.message?e.message:String(e));
@@ -1177,7 +1159,7 @@ async function genAutoGenerate(){
   genSetProvider('pollinations');
   await genGenerate();
 }
-async function genDoImage(p,prompt,key,accountId){
+async function genDoImage(p,prompt,key){
   var a=GEN_ASPECTS[gen.aspect];
   if(p.id==='pollinations'){
     var url='https://image.pollinations.ai/prompt/'+encodeURIComponent(prompt)+'?width='+a.w+'&height='+a.h+'&nologo=true&seed='+Math.floor(Math.random()*100000);
@@ -1186,37 +1168,27 @@ async function genDoImage(p,prompt,key,accountId){
     genShowImage(URL.createObjectURL(blob),blob,null);
     return;
   }
-  if(p.id==='puter'){
-    if(!window.puter||!puter.ai||!puter.ai.txt2img)throw new Error(tx('puterRetry'));
-    var img=await puter.ai.txt2img(prompt);
-    var src=img&&img.src?img.src:'';
-    if(!src)throw new Error(tx('puterNoImg'));
-    genShowImage(src,null,src);
-    return;
-  }
-  if(p.key==='cloudflare'){
-    var rc=await fetch('https://api.cloudflare.com/client/v4/accounts/'+encodeURIComponent(accountId)+'/ai/run/@cf/black-forest-labs/flux-1-schnell',{method:'POST',headers:{'Authorization':'Bearer '+key,'Content-Type':'application/json'},body:JSON.stringify({prompt:prompt,width:a.w,height:a.h})});
-    var ctc=rc.headers.get('content-type')||'';
-    if(ctc.indexOf('image/')===0){var bc=await rc.blob();genShowImage(URL.createObjectURL(bc),bc,null);return;}
-    var jc=await rc.json().catch(function(){return null;});
-    if(jc&&jc.result&&jc.result.image){genShowImage('data:image/jpeg;base64,'+jc.result.image,null,null);return;}
-    throw new Error('Cloudflare: '+((jc&&jc.errors&&jc.errors[0]&&jc.errors[0].message)||('HTTP '+rc.status)));
-  }
-  if(p.key==='gemini'){
-    var gp=prompt+' ('+(gen.aspect==='16:9'?'wide 16:9 landscape':gen.aspect==='9:16'?'tall 9:16 portrait':'portrait 4:6')+' aspect ratio)';
-    var rg=await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image:generateContent',{method:'POST',headers:{'x-goog-api-key':key,'Content-Type':'application/json'},body:JSON.stringify({contents:[{parts:[{text:gp}]}],generationConfig:{responseModalities:['TEXT','IMAGE']}})});
-    var jg=await rg.json().catch(function(){return null;});
-    var parts=jg&&jg.candidates&&jg.candidates[0]&&jg.candidates[0].content&&jg.candidates[0].content.parts;
-    var gimg=null;(parts||[]).forEach(function(pp){if(pp.inlineData&&pp.inlineData.data)gimg=pp;});
-    if(gimg){genShowImage('data:'+(gimg.inlineData.mimeType||'image/png')+';base64,'+gimg.inlineData.data,null,null);return;}
-    throw new Error('Gemini: '+genErrText(jg,'HTTP '+rg.status+tx('gemini429')));
-  }
-  if(p.key==='hf'){
-    var rh=await fetch('https://router.huggingface.co/hf-inference/models/black-forest-labs/FLUX.1-schnell',{method:'POST',headers:{'Authorization':'Bearer '+key,'Content-Type':'application/json'},body:JSON.stringify({inputs:prompt,parameters:{width:a.w,height:a.h}})});
-    var cth=rh.headers.get('content-type')||'';
-    if(cth.indexOf('image/')===0){var bh=await rh.blob();genShowImage(URL.createObjectURL(bh),bh,null);return;}
-    var jh=await rh.json().catch(function(){return null;});
-    throw new Error('Hugging Face: '+genErrText(jh,'HTTP '+rh.status));
+  if(p.id==='magichour'){
+    var orient=a.w>=a.h?'landscape':'portrait';
+    var rmh=await fetch('https://api.magichour.ai/v1/ai-image-generator',{method:'POST',headers:{'Authorization':'Bearer '+key,'Content-Type':'application/json'},body:JSON.stringify({name:'MovAi image',image_count:1,orientation:orient,style:{prompt:prompt}})});
+    var jmh=await rmh.json().catch(function(){return null;});
+    if(!jmh||!jmh.id)throw new Error('Magic Hour: '+genErrText(jmh,'HTTP '+rmh.status));
+    var t0m=Date.now();
+    while(Date.now()-t0m<10*60*1000){
+      await new Promise(function(res){setTimeout(res,4000);});
+      genProgTxt(tx('progCreating')+' ('+Math.floor((Date.now()-t0m)/1000)+'s)');
+      var rpm=await fetch('https://api.magichour.ai/v1/image-projects/'+encodeURIComponent(jmh.id),{headers:{'Authorization':'Bearer '+key}});
+      var jpm=await rpm.json().catch(function(){return null;});
+      var stm=jpm&&jpm.status;
+      if(stm==='complete'){
+        var dlu=jpm.downloads&&jpm.downloads[0]&&jpm.downloads[0].url;
+        if(!dlu)throw new Error(tx('badImgUrl'));
+        genShowImage(dlu,null,dlu);
+        return;
+      }
+      if(stm==='error'||stm==='canceled')throw new Error('Magic Hour: '+((jpm&&jpm.error)||tx('genFailed')));
+    }
+    throw new Error(tx('errTimeoutImage'));
   }
   throw new Error(tx('unknownProvider'));
 }
@@ -1257,13 +1229,6 @@ async function genDoVideo(p,prompt,key){
     return;
   }
   var a=GEN_ASPECTS[gen.aspect];
-  if(p.id==='hf'){
-    var rh=await fetch('https://router.huggingface.co/hf-inference/models/Wan-AI/Wan2.1-T2V-1.3B',{method:'POST',headers:{'Authorization':'Bearer '+key,'Content-Type':'application/json'},body:JSON.stringify({inputs:prompt})});
-    var cth=rh.headers.get('content-type')||'';
-    if(cth.indexOf('video/')===0){var bh=await rh.blob();genShowVideo(URL.createObjectURL(bh));return;}
-    var jh=await rh.json().catch(function(){return null;});
-    throw new Error('Hugging Face: '+genErrText(jh,'HTTP '+rh.status));
-  }
   var jobId=null;
   if(p.id==='novai'){
     var rn=await fetch('https://aiapi-pro.com/v1/video/generations',{method:'POST',headers:{'Authorization':'Bearer '+key,'Content-Type':'application/json'},body:JSON.stringify({model:'cogvideox-flash',prompt:prompt})});
@@ -1276,12 +1241,6 @@ async function genDoVideo(p,prompt,key){
     var rm=await fetch('https://api.magichour.ai/v1/text-to-video',{method:'POST',headers:{'Authorization':'Bearer '+key,'Content-Type':'application/json'},body:JSON.stringify({name:'MovAi video',end_seconds:gen.duration,aspect_ratio:aspect,resolution:resName,model:'default',style:{prompt:prompt}})});
     var jm=await rm.json().catch(function(){return null;});
     if(jm&&jm.id)jobId=jm.id;else throw new Error('Magic Hour: '+genErrText(jm,'HTTP '+rm.status));
-  }
-  else if(p.id==='tavus'){
-    var rid=(document.getElementById('genReplicaId').value||'').trim();
-    var rt=await fetch('https://tavusapi.com/v2/videos',{method:'POST',headers:{'x-api-key':key,'Content-Type':'application/json'},body:JSON.stringify({replica_id:rid,script:prompt,video_name:'MovAi video'})});
-    var jt=await rt.json().catch(function(){return null;});
-    if(jt&&jt.video_id)jobId=jt.video_id;else throw new Error('Tavus: '+genErrText(jt,'HTTP '+rt.status));
   }
   if(!jobId)throw new Error(tx('unknownProvider'));
   var t0=Date.now();
@@ -1320,14 +1279,6 @@ async function genPollVideo(p,key,jobId){
       return dl||'';
     }
     if(st2==='error')throw new Error('Magic Hour: '+((j2&&j2.error)||tx('genFailed')));
-    return null;
-  }
-  if(p.id==='tavus'){
-    var r3=await fetch('https://tavusapi.com/v2/videos/'+encodeURIComponent(jobId),{headers:{'x-api-key':key}});
-    var j3=await r3.json().catch(function(){return null;});
-    var st3=j3&&j3.status;
-    if(st3==='ready')return (j3.download_url)||'';
-    if(st3==='error')throw new Error('Tavus: '+tx('genFailed'));
     return null;
   }
   return null;
@@ -1485,10 +1436,6 @@ async function epGenerate(i){
       setTimeout(function(){var c=document.getElementById('keyAcc-'+p.key);if(c)c.scrollIntoView({block:'center'});},350);
       return;
     }
-  }
-  if(p.id==='tavus'){
-    var rid=(document.getElementById('genReplicaId').value||'').trim();
-    if(!rid){epSetMsg(i,tx('msgTavusId'),true);return;}
   }
   var card=epCardEl(i);if(!card)return;
   genAnyBusy=true;epSyncButtons();
