@@ -196,6 +196,20 @@ function wrapGenLog(res, mode, ctx) {
     return origEnd(chunk, ...rest);
   };
 }
+// Followers of the Public page (./data/followers.json) — users who tapped
+// Follow on the Public page. A new public post notifies ONLY followers
+// (in-app 'post' notification + Web Push to their phones). Stored as a
+// plain array of lowercased emails, capped at 5000.
+const FOLLOWERS_FILE = path.join(DATA_DIR, 'followers.json');
+const FOLLOWERS_MAX = 5000;
+function loadFollowers() {
+  try { const j = JSON.parse(fs.readFileSync(FOLLOWERS_FILE, 'utf8')); if (Array.isArray(j)) return j.filter((e) => typeof e === 'string'); } catch (e) {}
+  return [];
+}
+function saveFollowers(arr) {
+  try { fs.mkdirSync(DATA_DIR, { recursive: true }); } catch (e) {}
+  fs.writeFileSync(FOLLOWERS_FILE, JSON.stringify(arr, null, 2));
+}
 // Notifications (./data/notifications.json) — real notifications for the
 // admin AND for users. The Admin app reads them (GET /api/admin/notifications)
 // and the website reads its own (GET /api/public/notifications?email=).
@@ -349,7 +363,7 @@ function sendWebPush(sub, payload) {
 function sendPushForNotification(n) {
   try {
     const ADMIN_KINDS = ['login', 'purchase-request', 'gift-claimed'];
-    const USER_KINDS = ['purchase-approved', 'purchase-rejected', 'grant', 'deduct', 'gift-claimed'];
+    const USER_KINDS = ['purchase-approved', 'purchase-rejected', 'grant', 'deduct', 'gift-claimed', 'post'];
     const subs = loadPushSubs();
     if (!subs.length) return;
     const targets = new Map();
@@ -358,8 +372,10 @@ function sendPushForNotification(n) {
       const sEmail = String(s.email || '').toLowerCase();
       const isAdminSub = s.role === 'admin' || ADMIN_EMAILS.includes(sEmail);
       const isUserSub = !!n.email && sEmail === String(n.email).toLowerCase();
-      // Broadcast kinds (new public post) go to EVERY subscribed device.
-      const isBroadcast = n.kind === 'post' || n.email === '*';
+      // 'post' notifications now carry a real follower email (per-follower),
+      // so they flow through USER_KINDS above. The old '*' broadcast is
+      // kept only for backward compat with any broadcast already stored.
+      const isBroadcast = n.email === '*';
       if (isBroadcast || (ADMIN_KINDS.includes(n.kind) && isAdminSub) || (USER_KINDS.includes(n.kind) && isUserSub)) {
         targets.set(s.endpoint, s);
       }
@@ -1445,6 +1461,34 @@ function apiRoute(req, res, urlPath) {
     const list = loadNotifications().filter((n) => n && (n.email === email || n.email === '*')).slice(0, 50);
     return sendJSON(res, 200, { ok: true, notifications: list });
   }
+  // ---- Follow the Public page ----
+  // POST /api/public/follow — PUBLIC. {email, follow: true|false}.
+  // follow=true adds the email to the followers list; false removes it.
+  // Returns {ok, following, followers}.
+  if (req.method === 'POST' && urlPath === '/api/public/follow') {
+    readJSONBody(req, 64 * 1024).then((body) => {
+      const email = normEmail(body && body.email);
+      if (!email) return sendJSON(res, 200, { ok: false, error: 'សូមដាក់ Gmail ត្រឹមត្រូវ' });
+      const want = !!(body && body.follow);
+      let arr = loadFollowers();
+      if (want) {
+        if (!arr.includes(email)) arr.push(email);
+      } else {
+        arr = arr.filter((e) => e !== email);
+      }
+      if (arr.length > FOLLOWERS_MAX) arr = arr.slice(-FOLLOWERS_MAX);
+      saveFollowers(arr);
+      return sendJSON(res, 200, { ok: true, following: want, followers: arr.length });
+    }).catch((e) => sendJSON(res, 200, { ok: false, error: String(e && e.message ? e.message : e) }));
+    return;
+  }
+  // GET /api/public/follow?email= — PUBLIC. Returns {ok, following, followers}.
+  if (req.method === 'GET' && urlPath === '/api/public/follow') {
+    const rawEmail = (new URL(req.url, 'http://localhost').searchParams.get('email') || '').trim().toLowerCase();
+    const email = normEmail(rawEmail);
+    const arr = loadFollowers();
+    return sendJSON(res, 200, { ok: true, following: !!(email && arr.includes(email)), followers: arr.length });
+  }
   // ---- Web Push (phone-native push, from the phone itself) ----
   // GET /api/public/vapid-key — PUBLIC. Returns the public VAPID key the
   // website/Admin app needs to subscribe for Web Push. The private key is
@@ -1597,12 +1641,13 @@ function apiRoute(req, res, urlPath) {
       posts.push(p);
       if (posts.length > PUBLIC_MAX) posts.splice(0, posts.length - PUBLIC_MAX);
       savePublicPosts(posts);
-      // New public post -> broadcast notification to EVERYONE at once:
-      // in-app notification in every user's feed + Web Push to all
-      // subscribed phones (Website + App) immediately. Private posts
-      // never notify anyone.
+      // New public post -> notify FOLLOWERS only (one 'post' notification
+      // per follower, in-app + Web Push to their phones immediately).
+      // Private posts never notify anyone.
       if (visibility === 'public') {
-        addNotification('post', '*', '📢 បានផុសថ្មី · New post', p.title + ' (' + mode + ') — ' + (p.name || email));
+        for (const f of loadFollowers()) {
+          addNotification('post', f, '📢 បានផុសថ្មី · New post', p.title + ' (' + mode + ') — ' + (p.name || email));
+        }
       }
       return sendJSON(res, 200, { ok: true, post: pubPost(p) });
     }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
