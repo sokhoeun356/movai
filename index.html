@@ -438,6 +438,10 @@ km:{
  puterRetry:'Puter.js មិនទាន់ផ្ទុកទេ — សូមព្យាយាមម្ដងទៀត',
  puterNoImg:'Puter: មិនបានរូបភាពទេ',puterNoVid:'Puter: មិនបានវីដេអូទេ',
  gemini429:' — Key ឥឡូវថ្មីអាចបាន 429',
+ novaiAcc:'គណនី NovAI',novaiBalanceNote:'Balance នេះប្រើសម្រាប់ model បង់លុយតែប៉ុណ្ណោះ — វីដេអូហ្វ្រីមិនកាត់លុយទេ',
+ novaiFreeLine:'ហ្វ្រីក្នុងមួយថ្ងៃ៖ វីដេអូហ្វ្រី 5/ថ្ងៃ (cogvideox-flash) · រូប/អត្ថបទហ្វ្រី 10/ថ្ងៃ · Paid-model 10/ថ្ងៃ',
+ novaiUsedToday:'ប្រើថ្ងៃនេះ៖ {x}/5 វីដេអូ',novaiFreeDone:'ហ្វ្រីអស់ហើយថ្ងៃនេះ — រង់ចាំថ្ងៃស្អែក',novaiDash:'បើក Dashboard NovAI ↗',
+ progBusyWait:'ម៉ូដែលកំពុងរវល់ — កំពុងរង់ចាំដល់វេនរបស់អ្នក… សាកម្ដងទៀតក្នុង {s} វិនាទី',
  msgAutoFallback:'{name} បង្កើតមិនបានទេ — បានប្តូរទៅ Pollinations ឲ្យដោយស្វ័យប្រវត្តិ ហើយបង្កើតរូបឲ្យនៅទីនេះហើយ',progFallback:'កំពុងប្តូរទៅ Pollinations…',
  dlImage:'ទាញយករូបភាព',dlVideo:'ទាញយកវីដេអូ',dlPrefix:'ទាញយក ',
  imgAltCreated:'រូបភាពដែលបានបង្កើត',alt3dPreview:'រូបមើលមុនរបស់ 3D model',
@@ -503,6 +507,10 @@ en:{
  puterRetry:'Puter.js has not loaded yet — please try again',
  puterNoImg:'Puter: no image returned',puterNoVid:'Puter: no video returned',
  gemini429:' — new keys may return 429',
+ novaiAcc:'NovAI Account',novaiBalanceNote:'This balance is used for paid models only — free videos do not deduct money',
+ novaiFreeLine:'Free per day: 5 free videos/day (cogvideox-flash) · 10 free image/text/day · 10 paid-model calls/day',
+ novaiUsedToday:'Used today: {x}/5 videos',novaiFreeDone:'Free quota used up today — wait until tomorrow',novaiDash:'Open NovAI Dashboard ↗',
+ progBusyWait:'Model is busy — waiting for your turn… retrying in {s}s',
  msgAutoFallback:'{name} could not generate — automatically switched to Pollinations and created your image right here',progFallback:'Switching to Pollinations…',
  dlImage:'Download Image',dlVideo:'Download Video',dlPrefix:'Download ',
  imgAltCreated:'Generated image',alt3dPreview:'3D model preview',
@@ -822,7 +830,7 @@ function updateErrBox(boxId,textId,msgId,t,contextLabel){
   var box=document.getElementById(boxId);if(!box)return;
   var ta=document.getElementById(textId);
   var cm=document.getElementById(msgId);if(cm)cm.textContent='';
-  var infoVals=[tx('msgDone'),tx('d3MsgDone'),tx('d3MsgUploaded'),tx('d3MsgImgReady'),tx('d3MsgMpxOpening')];
+  var infoVals=[tx('msgDone'),tx('d3MsgDone'),tx('d3MsgUploaded'),tx('d3MsgImgReady'),tx('d3MsgMpxOpening'),tx('novaiFreeDone')];
   if(!t||infoVals.indexOf(t)>=0){box.style.display='none';if(ta)ta.value='';return;}
   box.style.display='block';
   if(ta){
@@ -855,15 +863,29 @@ function genStartProg(){
   var w=document.getElementById('genProg');if(w)w.style.display='block';
   var b=document.getElementById('genProgBar');if(b)b.style.width='0%';
   genProgTxt(tx('progCreating'));
-  var s=document.getElementById('genProgSec');if(s)s.textContent='0s';
+  var s=document.getElementById('genProgSec');if(s)s.textContent='0s · 0%';
   clearInterval(gen.progTimer);
   gen.progTimer=setInterval(function(){
     gen.progSec++;
-    var s2=document.getElementById('genProgSec');if(s2)s2.textContent=gen.progSec+'s';
-    var b2=document.getElementById('genProgBar');if(b2)b2.style.width=Math.min(95,gen.progSec*2)+'%';
+    var pct=Math.min(95,gen.progSec*2);
+    var s2=document.getElementById('genProgSec');if(s2)s2.textContent=gen.progSec+'s · '+pct+'%';
+    var b2=document.getElementById('genProgBar');if(b2)b2.style.width=pct+'%';
   },1000);
 }
 function genStopProg(){clearInterval(gen.progTimer);var w=document.getElementById('genProg');if(w)w.style.display='none';}
+/* Busy providers (e.g. the NovAI free video model at peak time) are NOT
+   shown as an error: MovAi waits on screen — seconds counting + percent —
+   and retries on its own every 30-60s until the turn comes and the video
+   arrives. Any other error still goes to the copy-error box as before. */
+function genIsBusy(msg){return /busy|concurrency|please retry|too many requests|rate limit|overloaded/i.test(msg||'');}
+async function genBusyWait(){
+  var wait=30+Math.floor(Math.random()*31);
+  for(var s=wait;s>0;s--){
+    genProgTxt(tx('progBusyWait').replace('{s}',s));
+    await new Promise(function(res){setTimeout(res,1000);});
+  }
+  genProgTxt(tx('progCreating'));
+}
 function genSetMode(m){
   gen.mode=m;genMsg('');
   document.getElementById('genTabImg').className=m==='image'?'kbtn kbtn-black':'kbtn kbtn-white';
@@ -945,6 +967,29 @@ function genNextKey(pid){
   var ks=genKeysGet(pid);if(!ks.length)return null;
   var i=gen.keyIdx[pid]||0;var k=ks[i%ks.length];gen.keyIdx[pid]=(i+1)%ks.length;return k;
 }
+/* ===== NovAI account panel (inside the NovAI API Keys card) =====
+   Balance is the user's own NovAI account balance, editable by hand and
+   kept in localStorage 'movai-novai-balance' (default 2.00). The free
+   video counter is counted by MovAi itself in localStorage with the
+   date, so a new day starts again from 0; failed videos never count. */
+function novaiTodayStr(){var d=new Date();function p2(n){return (n<10?'0':'')+n;}return d.getFullYear()+'-'+p2(d.getMonth()+1)+'-'+p2(d.getDate());}
+function novaiVideoUse(){try{var o=JSON.parse(localStorage.getItem('movai-novai-video-use')||'null');if(o&&o.date===novaiTodayStr())return parseInt(o.count,10)||0;}catch(e){}return 0;}
+function novaiAddVideoUse(){var n=novaiVideoUse()+1;try{localStorage.setItem('movai-novai-video-use',JSON.stringify({date:novaiTodayStr(),count:n}));}catch(e){}genRenderKeys();}
+function novaiBalanceVal(){var v=NaN;try{v=parseFloat(localStorage.getItem('movai-novai-balance'));}catch(e){}return isNaN(v)?2:v;}
+function novaiSetBalance(v){var n=parseFloat(v);if(isNaN(n)||n<0)n=0;try{localStorage.setItem('movai-novai-balance',String(n));}catch(e){}}
+function novaiAccountHtml(){
+  var used=novaiVideoUse();
+  var h='<div style="margin-top:14px;border-top:1px solid var(--glass-line);padding-top:12px">';
+  h+='<p style="font-weight:800;font-size:0.9375rem">'+tx('novaiAcc')+'</p>';
+  h+='<div style="display:flex;align-items:center;gap:8px;margin-top:10px;flex-wrap:wrap"><span style="font-size:0.875rem;font-weight:700">Balance&nbsp;$</span><input type="number" class="input" min="0" step="0.01" value="'+novaiBalanceVal().toFixed(2)+'" onchange="novaiSetBalance(this.value)" style="width:120px;min-height:42px;padding:9px 12px" aria-label="NovAI balance"></div>';
+  h+='<p style="margin-top:8px">'+tx('novaiBalanceNote')+'</p>';
+  h+='<p style="margin-top:8px">'+tx('novaiFreeLine')+'</p>';
+  h+='<p style="margin-top:8px;font-weight:700">'+tx('novaiUsedToday').replace('{x}',used)+'</p>';
+  if(used>=5)h+='<p style="margin-top:8px;font-weight:800;color:#f87171">'+tx('novaiFreeDone')+'</p>';
+  h+='<p style="margin-top:10px"><a href="https://aiapi-pro.com/dashboard" target="_blank" rel="noopener" style="color:var(--accent-text);font-weight:700;text-decoration:none">'+tx('novaiDash')+'</a></p>';
+  h+='</div>';
+  return h;
+}
 function genKeyCard(id,name,right,body){
   var open=!!genKeyOpen[id];
   return '<div class="key-acc'+(open?' open':'')+'" id="keyAcc-'+id+'"><button type="button" class="key-acc-head" onclick="genToggleKey(\''+id+'\',this)"><span class="kn">'+name+'</span><span class="kr"><span>'+right+'</span><span class="kchev">'+(open?'▴':'▾')+'</span></span></button><div class="key-acc-body">'+body+'</div></div>';
@@ -970,6 +1015,7 @@ function genKeyProviderCard(kp){
     return '<div style="display:flex;align-items:center;gap:8px;background:var(--accent-soft);border-radius:10px;padding:10px 12px;margin-top:8px"><span style="flex:1;font-family:monospace;font-size:0.875rem;word-break:break-all">'+t+'</span><button onclick="genDelKey(\''+kp.id+'\','+i+')" style="border:none;background:transparent;color:#f87171;font-size:1rem;font-weight:900;cursor:pointer;min-width:36px;min-height:36px">✕</button></div>';
   }).join('');
   body+='</div>';
+  if(kp.id==='novai')body+=novaiAccountHtml();
   return genKeyCard(kp.id,kp.name,right,body);
 }
 function genRenderKeys(){
@@ -1023,6 +1069,7 @@ async function genGenerate(){
   var list=gen.mode==='video'?GEN_VID_PROVIDERS:GEN_IMG_PROVIDERS;
   var p=null;for(var i=0;i<list.length;i++)if(list[i].id===gen.provider)p=list[i];
   if(!p)return;
+  if(gen.mode==='video'&&p.id==='novai'&&novaiVideoUse()>=5){genMsg(tx('novaiFreeDone'));return;}
   var key=null,accountId='';
   if(p.key){
     key=genNextKey(p.key);
@@ -1040,7 +1087,12 @@ async function genGenerate(){
   genMsg('');
   genStartProg();
   try{
-    if(gen.mode==='video')await genDoVideo(p,prompt,key);
+    if(gen.mode==='video'){
+      while(true){
+        try{await genDoVideo(p,prompt,key);break;}
+        catch(e2){if(genIsBusy(e2&&e2.message?e2.message:String(e2))){await genBusyWait();continue;}throw e2;}
+      }
+    }
     else await genDoImage(p,gen.mode==='3d'?prompt+', 3D render, octane render, ultra detailed 3D design, studio lighting':prompt,key,accountId);
     genMsg(tx('msgDone'));
   }catch(e){
@@ -1173,6 +1225,7 @@ async function genDoVideo(p,prompt,key){
     if(url!==null){
       if(!url)throw new Error(tx('errNoVideoUrl'));
       genShowVideo(url);
+      if(p.id==='novai')novaiAddVideoUse();
       return;
     }
   }
