@@ -204,6 +204,9 @@ function addNotification(kind, email, title, text) {
   if (kind === 'login' || kind === 'purchase-request' || kind === 'gift-claimed') {
     sendTelegramAdmin('🔔 ' + n.title + '\n' + n.text);
   }
+  // Phone-native Web Push for the same event (admin devices and/or the
+  // user the notification is about). Fire-and-forget, never blocks.
+  sendPushForNotification(n);
   return n;
 }
 function sendTelegramAdmin(text) {
@@ -219,6 +222,119 @@ function sendTelegramAdmin(text) {
       body: JSON.stringify({ chat_id: chatId, text: String(text).slice(0, 4000) }),
       signal: AbortSignal.timeout(10000),
     }).catch(() => {});
+  } catch (e) {}
+}
+// Web Push notifications (phone-native push, from the phone itself — not
+// Telegram). Uses the `web-push` package + VAPID keys.
+// VAPID keys: ./data/vapid.json, created on first use if missing (never in
+// code, never in git). The PUBLIC key is exposed at GET /api/public/vapid-key
+// so the website/Admin app can subscribe; the PRIVATE key never leaves the
+// server. Push subscriptions: ./data/push-subs.json, capped at 5000.
+// A subscription: {email, endpoint, keys:{p256dh, auth}, role, createdAt,
+// updatedAt}. role 'admin' marks an admin device (the Admin app subscribes
+// with {email:<admin gmail>, role:'admin'}).
+const ADMIN_EMAILS = ['sokhoeun7788@gmail.com', 'yemsokhoeun98@gmail.com', 'sokhoeun350@gmail.com'];
+const VAPID_FILE = path.join(DATA_DIR, 'vapid.json');
+const VAPID_SUBJECT = 'mailto:sokhoeun356@gmail.com';
+const PUSH_SUBS_FILE = path.join(DATA_DIR, 'push-subs.json');
+const PUSH_SUBS_MAX = 5000;
+let webPushLib = undefined; // undefined = not tried yet
+function getWebPush() {
+  if (webPushLib === undefined) {
+    try { webPushLib = require('web-push'); } catch (e) { webPushLib = null; }
+  }
+  return webPushLib;
+}
+function getVapidKeys() {
+  const wp = getWebPush();
+  if (!wp) return null;
+  try {
+    let keys = null;
+    try {
+      const j = JSON.parse(fs.readFileSync(VAPID_FILE, 'utf8'));
+      if (j && typeof j.publicKey === 'string' && j.publicKey && typeof j.privateKey === 'string' && j.privateKey) keys = j;
+    } catch (e) {}
+    if (!keys) {
+      keys = wp.generateVAPIDKeys();
+      try { fs.mkdirSync(DATA_DIR, { recursive: true }); } catch (e) {}
+      fs.writeFileSync(VAPID_FILE, JSON.stringify(keys, null, 2));
+    }
+    wp.setVapidDetails(VAPID_SUBJECT, keys.publicKey, keys.privateKey);
+    return keys;
+  } catch (e) { return null; }
+}
+function getVapidPublicKey() {
+  const keys = getVapidKeys();
+  return keys ? keys.publicKey : '';
+}
+function loadPushSubs() {
+  try { const j = JSON.parse(fs.readFileSync(PUSH_SUBS_FILE, 'utf8')); if (Array.isArray(j)) return j; } catch (e) {}
+  return [];
+}
+function savePushSubs(arr) {
+  try { fs.mkdirSync(DATA_DIR, { recursive: true }); } catch (e) {}
+  fs.writeFileSync(PUSH_SUBS_FILE, JSON.stringify(arr, null, 2));
+}
+// Validate a browser PushSubscription JSON. Returns {endpoint, keys} or null.
+function cleanPushSub(s) {
+  if (!s || typeof s !== 'object') return null;
+  const endpoint = typeof s.endpoint === 'string' ? s.endpoint.trim() : '';
+  if (!endpoint || endpoint.length > 2000) return null;
+  const keys = s.keys && typeof s.keys === 'object' ? s.keys : {};
+  const p256dh = typeof keys.p256dh === 'string' ? keys.p256dh.trim() : '';
+  const auth = typeof keys.auth === 'string' ? keys.auth.trim() : '';
+  if (!p256dh || !auth) return null;
+  return { endpoint, keys: { p256dh, auth } };
+}
+function removePushSubByEndpoint(endpoint) {
+  try {
+    const arr = loadPushSubs();
+    const kept = arr.filter((s) => s && s.endpoint !== endpoint);
+    if (kept.length !== arr.length) savePushSubs(kept);
+  } catch (e) {}
+}
+// Send one Web Push. Fire-and-forget: the caller never awaits it. A 410/404
+// from the push service means the subscription is gone — delete it. All
+// other push errors are swallowed.
+function sendWebPush(sub, payload) {
+  const wp = getWebPush();
+  if (!wp) return;
+  const keys = getVapidKeys();
+  if (!keys) return;
+  const subObj = cleanPushSub(sub);
+  if (!subObj) return;
+  try {
+    const p = wp.sendNotification(subObj, JSON.stringify(payload));
+    Promise.resolve(p).catch((err) => {
+      const code = err && err.statusCode;
+      if (code === 410 || code === 404) removePushSubByEndpoint(subObj.endpoint);
+    });
+  } catch (e) {}
+}
+// Send a Web Push for a notification. Admin kinds (login, purchase-request,
+// gift-claimed) go to admin subscriptions (role 'admin' or an admin Gmail);
+// user kinds (purchase-approved, purchase-rejected, grant, deduct,
+// gift-claimed) go to that user's own subscriptions. Deduplicated by
+// endpoint. Fire-and-forget — never blocks the response.
+function sendPushForNotification(n) {
+  try {
+    const ADMIN_KINDS = ['login', 'purchase-request', 'gift-claimed'];
+    const USER_KINDS = ['purchase-approved', 'purchase-rejected', 'grant', 'deduct', 'gift-claimed'];
+    const subs = loadPushSubs();
+    if (!subs.length) return;
+    const targets = new Map();
+    for (const s of subs) {
+      if (!s || typeof s.endpoint !== 'string') continue;
+      const sEmail = String(s.email || '').toLowerCase();
+      const isAdminSub = s.role === 'admin' || ADMIN_EMAILS.includes(sEmail);
+      const isUserSub = !!n.email && sEmail === String(n.email).toLowerCase();
+      if ((ADMIN_KINDS.includes(n.kind) && isAdminSub) || (USER_KINDS.includes(n.kind) && isUserSub)) {
+        targets.set(s.endpoint, s);
+      }
+    }
+    if (!targets.size) return;
+    const payload = { title: n.title || 'MovAi', body: n.text || '', tag: n.kind || 'movai' };
+    for (const s of targets.values()) sendWebPush(s, payload);
   } catch (e) {}
 }
 function fmtCreditDelta(dMedia, dSong) {
@@ -1290,6 +1406,52 @@ function apiRoute(req, res, urlPath) {
     if (!email) return sendJSON(res, 200, { ok: false, error: 'សូមដាក់ Gmail ត្រឹមត្រូវ' });
     const list = loadNotifications().filter((n) => n && n.email === email).slice(0, 50);
     return sendJSON(res, 200, { ok: true, notifications: list });
+  }
+  // ---- Web Push (phone-native push, from the phone itself) ----
+  // GET /api/public/vapid-key — PUBLIC. Returns the public VAPID key the
+  // website/Admin app needs to subscribe for Web Push. The private key is
+  // never exposed. The key pair is created on first use (./data/vapid.json).
+  if (req.method === 'GET' && urlPath === '/api/public/vapid-key') {
+    const pub = getVapidPublicKey();
+    if (!pub) return sendJSON(res, 200, { ok: false, error: 'Web Push មិនទាន់បើកទេ' });
+    return sendJSON(res, 200, { ok: true, publicKey: pub });
+  }
+  // POST /api/public/push-subscribe — PUBLIC. {email, subscription, role?}
+  // subscription = browser PushSubscription JSON {endpoint, keys:{p256dh,
+  // auth}}. Stored/overwritten by endpoint+email. role 'admin' marks an
+  // admin device (the Admin app subscribes with its admin Gmail + role).
+  if (req.method === 'POST' && urlPath === '/api/public/push-subscribe') {
+    readJSONBody(req, 64 * 1024).then((body) => {
+      const email = normEmail(body && body.email);
+      if (!email) return sendJSON(res, 200, { ok: false, error: 'សូមដាក់ Gmail ត្រឹមត្រូវ' });
+      const sub = cleanPushSub(body && body.subscription);
+      if (!sub) return sendJSON(res, 200, { ok: false, error: 'subscription មិនត្រឹមត្រូវទេ' });
+      const role = body && body.role === 'admin' ? 'admin' : '';
+      const arr = loadPushSubs();
+      const now = new Date().toISOString();
+      const idx = arr.findIndex((s) => s && s.endpoint === sub.endpoint && String(s.email || '').toLowerCase() === email);
+      const rec = { email, endpoint: sub.endpoint, keys: sub.keys, role, createdAt: idx >= 0 && arr[idx].createdAt ? arr[idx].createdAt : now, updatedAt: now };
+      if (idx >= 0) arr[idx] = rec; else arr.push(rec);
+      if (arr.length > PUSH_SUBS_MAX) arr.splice(0, arr.length - PUSH_SUBS_MAX);
+      savePushSubs(arr);
+      return sendJSON(res, 200, { ok: true, subscribed: true });
+    }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
+    return;
+  }
+  // POST /api/public/push-unsubscribe — PUBLIC. {email, endpoint} — removes
+  // the matching subscription(s). email is optional (endpoint alone matches).
+  if (req.method === 'POST' && urlPath === '/api/public/push-unsubscribe') {
+    readJSONBody(req, 64 * 1024).then((body) => {
+      const endpoint = body && typeof body.endpoint === 'string' ? body.endpoint.trim() : '';
+      if (!endpoint) return sendJSON(res, 200, { ok: false, error: 'សូមដាក់ endpoint' });
+      const email = normEmail(body && body.email);
+      const arr = loadPushSubs();
+      const kept = arr.filter((s) => !(s && s.endpoint === endpoint && (!email || String(s.email || '').toLowerCase() === email)));
+      const removed = arr.length - kept.length;
+      if (removed) savePushSubs(kept);
+      return sendJSON(res, 200, { ok: true, removed });
+    }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
+    return;
   }
   // ---- Public feed (Public tab) ----
   // Anyone can post their creations as public (visible to everyone, ranked

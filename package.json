@@ -1,1 +1,1 @@
-{"description":"MovAi — standalone image & video generation website (Khmer). All free APIs, no video translation, no Web2App, no payments.","engines":{"node":">=18"},"main":"server.js","name":"movai-gen-website","scripts":{"start":"node server.js"},"version":"1.0.0"}
+{"dependencies":{"web-push":"^4.0.0"},"description":"MovAi — standalone image & video generation website (Khmer). All free APIs, no video translation, no Web2App, no payments.","engines":{"node":">=18"},"main":"server.js","name":"movai-gen-website","scripts":{"start":"node server.js"},"version":"1.0.0"}
