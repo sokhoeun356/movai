@@ -106,19 +106,52 @@ function logGrant(entry) {
     fs.writeFileSync(GRANTS_FILE, JSON.stringify(arr, null, 2));
   } catch (e) {}
 }
-// Server settings (admin-controlled, read by the website). Only one setting
-// for now: smoothModeAuto — when true, every MovAi website enables Smooth
-// mode automatically; when false, each user controls it themselves.
+// Server settings (admin-controlled, read by the website). smoothModeAuto:
+// when true, every MovAi website enables Smooth mode automatically.
+// Appearance fields mirror the website's own Settings (localStorage keys
+// movai-theme / movai-font / movai-glass-* / movai-tshadow / movai-txtblur /
+// movai-bgb / movai-brandfx / movai-mode) — the admin is the truth for them;
+// the website applies them on load and hides its own appearance controls.
+const SETTINGS_DEFAULTS = {
+  smoothModeAuto: false,
+  theme: 0, font: 50,
+  glassClear: 45, glassBlur: 65, glassShine: 55,
+  tshadow: 'none', txtblur: 0, bgb: 50, brandfx: 'none', mode: 'dark',
+};
+function clampNum(v, lo, hi, dflt) {
+  const n = Number(v);
+  if (!Number.isFinite(n)) return dflt;
+  return Math.min(hi, Math.max(lo, n));
+}
+function cleanSettings(j, base) {
+  // base = stored settings when merging (invalid/missing fields keep the
+  // stored value); defaults when loading from disk.
+  const s = Object.assign({}, base || SETTINGS_DEFAULTS);
+  if (!j || typeof j !== 'object' || Array.isArray(j)) return s;
+  if (typeof j.smoothModeAuto === 'boolean') s.smoothModeAuto = j.smoothModeAuto;
+  s.theme = Math.round(clampNum(j.theme, 0, 6, s.theme));
+  s.font = clampNum(j.font, 0, 100, s.font);
+  s.glassClear = clampNum(j.glassClear, 0, 100, s.glassClear);
+  s.glassBlur = clampNum(j.glassBlur, 0, 100, s.glassBlur);
+  s.glassShine = clampNum(j.glassShine, 0, 100, s.glassShine);
+  if (typeof j.tshadow === 'string' && j.tshadow) s.tshadow = j.tshadow.slice(0, 50);
+  s.txtblur = clampNum(j.txtblur, 0, 100, s.txtblur);
+  s.bgb = clampNum(j.bgb, 0, 100, s.bgb);
+  if (typeof j.brandfx === 'string' && j.brandfx) s.brandfx = j.brandfx.slice(0, 50);
+  if (j.mode === 'dark' || j.mode === 'light' || j.mode === 'auto') s.mode = j.mode;
+  return s;
+}
 function loadSettings() {
   try {
     const j = JSON.parse(fs.readFileSync(SETTINGS_FILE, 'utf8'));
-    if (j && typeof j === 'object' && !Array.isArray(j)) return { smoothModeAuto: j.smoothModeAuto === true };
+    return cleanSettings(j);
   } catch (e) {}
-  return { smoothModeAuto: false };
+  return Object.assign({}, SETTINGS_DEFAULTS);
 }
-function saveSettings(s) {
+function saveSettings(s, base) {
   try { fs.mkdirSync(DATA_DIR, { recursive: true }); } catch (e) {}
-  const out = { smoothModeAuto: s.smoothModeAuto === true, updatedAt: new Date().toISOString() };
+  const out = cleanSettings(s, base);
+  out.updatedAt = new Date().toISOString();
   fs.writeFileSync(SETTINGS_FILE, JSON.stringify(out, null, 2));
   return out;
 }
@@ -483,12 +516,17 @@ function apiRoute(req, res, urlPath) {
   if (req.method === 'GET' && urlPath === '/api/admin/settings') {
     return sendJSON(res, 200, { ok: true, settings: loadSettings() });
   }
-  // POST /api/admin/settings — {smoothModeAuto:boolean} — admin key required.
+  // POST /api/admin/settings — {smoothModeAuto, theme, font, glassClear,
+  // glassBlur, glassShine, tshadow, txtblur, bgb, brandfx, mode} — admin key
+  // required. Fields sent are merged over the stored settings; missing
+  // fields keep their stored value. Values are validated/clamped.
   if (req.method === 'POST' && urlPath === '/api/admin/settings') {
     const a = adminKeyOk(req);
     if (!a.ok) return sendJSON(res, 200, { ok: false, error: a.error });
     readJSONBody(req, 64 * 1024).then((body) => {
-      const saved = saveSettings({ smoothModeAuto: body && body.smoothModeAuto === true });
+      const cur = loadSettings();
+      const merged = Object.assign({}, cur, body && typeof body === 'object' && !Array.isArray(body) ? body : {});
+      const saved = saveSettings(merged, cur);
       return sendJSON(res, 200, { ok: true, settings: saved });
     }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
     return;
