@@ -141,6 +141,8 @@ html[data-mode="light"] .err-title{color:#b91c1c}
 .pglow{display:inline-block;width:10px;height:10px;border-radius:50%;flex:0 0 auto;animation:pglowPulse 2.2s ease-in-out infinite}
 .pglow-green{background:#4ade80;box-shadow:0 0 6px 2px rgba(74,222,128,.85),0 0 16px 6px rgba(74,222,128,.45),0 0 30px 12px rgba(74,222,128,.22)}
 .pglow-accent{background:var(--accent);box-shadow:0 0 6px 2px rgba(var(--accent-rgb),.85),0 0 16px 6px rgba(var(--accent-rgb),.45),0 0 30px 12px rgba(var(--accent-rgb),.22)}
+.pglow-amber{background:#fbbf24;box-shadow:0 0 6px 2px rgba(251,191,36,.85),0 0 16px 6px rgba(251,191,36,.45),0 0 30px 12px rgba(251,191,36,.22)}
+.pglow-red{background:#f87171;box-shadow:0 0 6px 2px rgba(248,113,113,.85),0 0 16px 6px rgba(248,113,113,.45),0 0 30px 12px rgba(248,113,113,.22)}
 @keyframes pglowPulse{0%,100%{opacity:1}50%{opacity:.72}}
 @media (prefers-reduced-motion:reduce){.pglow{animation:none}}
 footer{text-align:center;color:var(--faint);font-size:0.8125rem;padding:32px 16px 104px;line-height:1.7}
@@ -308,7 +310,7 @@ html[data-mode="light"] [style*="border-top:1px solid rgba(255,255,255,.08)"]{bo
         </div>
         <div id="genProviderWrap">
           <button type="button" class="input" id="genProviderField" onclick="genToggleProviders()" style="display:flex;justify-content:space-between;align-items:center;gap:10px;cursor:pointer;text-align:left;width:100%">
-            <span style="display:flex;align-items:center;gap:8px;min-width:0"><span id="genProviderFieldName" style="font-weight:700">Pollinations</span><span id="genProviderFieldGlow" class="pglow" style="display:none"></span></span>
+            <span style="display:flex;align-items:center;gap:20px;min-width:0"><span id="genProviderFieldName" style="font-weight:700">Pollinations</span><span id="genProviderFieldGlow" class="pglow" style="display:none"></span></span>
             <span style="display:flex;align-items:center;gap:8px;flex:0 0 auto"><span id="genProviderFieldLimit" style="font-size:0.75rem;color:#9a9ea6;white-space:nowrap"></span><span style="font-size:0.75rem;color:#9a9ea6">▼</span></span>
           </button>
           <div id="genProviderDrop" style="display:none;position:absolute;left:0;right:0;top:100%;z-index:30;background:#1a1c21;border:1px solid rgba(255,255,255,.12);border-radius:12px;margin-top:6px;overflow:hidden;box-shadow:0 16px 40px rgba(0,0,0,.5)"></div>
@@ -836,9 +838,9 @@ var GEN_IMG_PROVIDERS=[
  {id:'pollinations',name:'Pollinations',hidden:true,limit:{km:'ហ្វ្រី · មិនបាច់ Key · ~1 រូប/15-45 វិនាទី',en:'Free · No key · ~1 image/15-45s'},note:{km:'មិនត្រូវការ API key — បង្កើតបានភ្លាម។ រូបមាន logo តូច។',en:'No API key needed — generate right away. Images carry a small logo.'}}
 ];
 var GEN_VID_PROVIDERS=[
- {id:'novai',name:'NovAI',glow:'accent',limit:{km:'ហ្វ្រី · 5 វីដេអូ/ថ្ងៃ',en:'Free · 5 videos/day'},key:'novai',note:''},
+ {id:'novai',name:'NovAI',glow:'amber',limit:{km:'ហ្វ្រី · 5 វីដេអូ/ថ្ងៃ',en:'Free · 5 videos/day'},key:'novai',note:''},
  {id:'magichour',name:'Magic Hour',glow:'green',limit:{km:'Credits ហ្វ្រី · trial',en:'Free credits · trial'},key:'magichour',note:{km:'ត្រូវការ API Key (credits ហ្វ្រីពេលចុះឈ្មោះ មិនបាច់កាត)។',en:'Needs an API key (free credits on signup, no card).'}},
- {id:'puter',name:'Puter.js',limit:{km:'ហ្វ្រី · ចូលគណនី Puter',en:'Free · Puter account'},puter:true,note:{km:'អ្នកប្រើម្នាក់ៗចូលគណនី Puter ហ្វ្រីរបស់ខ្លួន។ Model default Wan 2.7។',en:'Each user signs in with their own free Puter account. Default model: Wan 2.7.'}}
+ {id:'puter',name:'Puter.js',locked:true,lockNote:{km:'ចាក់សោរ · មិនទាន់ដំណើរការ',en:'Locked · Not yet available'},limit:{km:'ហ្វ្រី · ចូលគណនី Puter',en:'Free · Puter account'},puter:true,note:{km:'អ្នកប្រើម្នាក់ៗចូលគណនី Puter ហ្វ្រីរបស់ខ្លួន។ Model default Wan 2.7។',en:'Each user signs in with their own free Puter account. Default model: Wan 2.7.'}}
 ];
 var GEN_KEY_PROVIDERS=[
  {id:'novai',name:'NovAI',limit:{km:'5 វីដេអូ/ថ្ងៃ',en:'5 videos/day'},url:'https://aiapi-pro.com',fields:[{k:'key',ph:'API Key'}],hint:{km:'ចុះឈ្មោះដោយ email នៅ aiapi-pro.com — មិនបាច់កាត។',en:'Sign up with email at aiapi-pro.com — no card.'}},
@@ -954,7 +956,12 @@ function genRenderProviders(){
   var drop=document.getElementById('genProviderDrop');
   if(drop)drop.innerHTML=list.filter(function(x){return !x.hidden;}).map(function(x){
     var on=x.id===gen.provider;
-    var glowHtml=x.glow?'<span class="pglow pglow-'+x.glow+'"></span>'+(x.glow==='green'?'<span style="font-size:0.75rem;font-weight:700;color:#4ade80">Online Live</span>':''):'';
+    var glowLabel=x.glow==='green'?'<span style="font-size:0.75rem;font-weight:700;color:#4ade80">Online Live</span>':(x.glow==='amber'?'<span style="font-size:0.75rem;font-weight:700;color:#fbbf24">'+(LANG==='en'?'Busy':'រវល់')+'</span>':(x.glow==='red'?'<span style="font-size:0.75rem;font-weight:700;color:#f87171">'+(LANG==='en'?'Problem':'មានបញ្ហា')+'</span>':''));
+    var glowHtml=x.glow?'<span style="display:inline-flex;align-items:center;gap:7px;margin-left:22px"><span class="pglow pglow-'+x.glow+'"></span>'+glowLabel+'</span>':'';
+    if(x.locked){
+      var lockSvg='<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>';
+      return '<div aria-disabled="true" style="padding:12px 14px;border-top:1px solid rgba(255,255,255,.08);min-height:44px;opacity:.55"><div style="display:flex;align-items:center;gap:9px;font-weight:700;font-size:0.9375rem"><span>'+x.name+'</span><span style="margin-left:auto;display:inline-flex;align-items:center;gap:6px;color:#fbbf24;font-size:0.75rem;font-weight:700;white-space:nowrap">'+lockSvg+loc(x.lockNote)+'</span></div><div style="font-size:0.75rem;color:#9a9ea6;margin-top:2px">'+loc(x.limit)+'</div></div>';
+    }
     return '<div onclick="genSetProvider(\''+x.id+'\')" style="padding:12px 14px;cursor:pointer;border-top:1px solid rgba(255,255,255,.08);min-height:44px;'+(on?'background:rgba(var(--accent-rgb),.13);color:var(--accent-text);font-weight:800;':'')+'"><div style="display:flex;align-items:center;gap:9px;font-weight:700;font-size:0.9375rem"><span>'+x.name+'</span>'+glowHtml+'</div><div style="font-size:0.75rem;color:#9a9ea6;margin-top:2px">'+loc(x.limit)+'</div></div>';
   }).join('');
 }
@@ -968,6 +975,8 @@ function genCloseProviders(){
   if(d)d.style.display='none';
 }
 function genSetProvider(id){
+  var list=gen.mode==='video'?GEN_VID_PROVIDERS:GEN_IMG_PROVIDERS;
+  for(var i=0;i<list.length;i++)if(list[i].id===id&&list[i].locked)return;
   gen.provider=id;genRenderProviders();genCloseProviders();genRenderOptions();genNote();
 }
 function genRenderOptions(){
