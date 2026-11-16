@@ -97,6 +97,35 @@ main{max-width:720px;margin:0 auto;padding:calc(4.75rem + env(safe-area-inset-to
 .notif-main .notif-amt{font-weight:700;color:var(--text2)}
 .notif-main .ntime{display:block;font-size:0.6875rem;color:var(--muted);margin-top:4px}
 .notif-dot{width:8px;height:8px;border-radius:50%;background:var(--accent);flex:0 0 auto;margin-top:7px}
+/* ===== New device / New user cards — exactly 5 neat rows =====
+   «ឧបករណ៍ថ្មី · New device» and «អ្នកប្រើថ្មី · New user» notices
+   never show the server's raw sentence. The card is one compact
+   header line (icon + title + time) over exactly FIVE single-line
+   rows, in this order: Name, Gmail, ID, IP, Model. Every value is
+   cut to ONE line — white-space:nowrap + overflow:hidden +
+   text-overflow:ellipsis — so a long Gmail / ID / model can never
+   spill outside the card or outside the ☰ drawer, however narrow
+   it is. The small Copy buttons (Gmail / ID / IP only) sit INSIDE
+   their row, pinned to the right (flex:0 0 auto), so they never
+   push the card wider either. */
+.notif-dev{flex-direction:column;align-items:stretch;gap:7px;overflow:hidden;max-width:100%}
+.nd-head{display:flex;align-items:center;gap:8px;min-width:0}
+.nd-head .notif-ico{width:28px;height:28px}
+.nd-head .notif-ico svg{width:15px;height:15px}
+.nd-head .notif-dot{margin-top:0}
+.nd-title{flex:1 1 auto;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:0.875rem;font-weight:800;line-height:1.35}
+.nd-time{flex:0 0 auto;font-size:0.6875rem;color:var(--muted);white-space:nowrap;line-height:1.35}
+.nd-rows{display:block;min-width:0}
+.nd-row{display:flex;align-items:center;gap:6px;min-width:0;margin-top:5px}
+.nd-row:first-child{margin-top:0}
+.nd-val{flex:1 1 auto;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:0.8125rem;line-height:1.4;color:var(--text2)}
+.nd-val.nd-name{font-weight:800;color:var(--text);font-size:0.875rem}
+.nd-copy{flex:0 0 auto;border:1px solid var(--line2);background:transparent;color:var(--accent-text);border-radius:999px;padding:3px 9px;font-size:0.6875rem;font-weight:800;font-family:inherit;cursor:pointer;line-height:1.3;white-space:nowrap}
+.nd-copy:active{opacity:.75}
+.drawer .nd-time{color:var(--glass-muted)}
+.drawer .nd-val{color:var(--glass-text2)}
+.drawer .nd-val.nd-name{color:var(--glass-text)}
+.drawer .nd-copy{border-color:var(--glass-line2)}
 /* ===== Web Push · ដំណឹងចេញពីទូរស័ព្ទ =====
    Pill switch in the ☰ drawer settings box. Its state always
    reflects this device's REAL push subscription: knob right +
@@ -7494,7 +7523,7 @@ function notifType(t){
   if(t.indexOf('post')>=0)return 'post';
   if(t.indexOf('approv')>=0)return 'approved';
   if(t.indexOf('reject')>=0)return 'rejected';
-  if(t.indexOf('login')>=0||t.indexOf('log-in')>=0||t.indexOf('signin')>=0||t.indexOf('sign-in')>=0||t.indexOf('signup')>=0||t.indexOf('sign-up')>=0||t.indexOf('newuser')>=0||t.indexOf('new-user')>=0)return 'login';
+  if(t.indexOf('login')>=0||t.indexOf('log-in')>=0||t.indexOf('signin')>=0||t.indexOf('sign-in')>=0||t.indexOf('signup')>=0||t.indexOf('sign-up')>=0||t.indexOf('newuser')>=0||t.indexOf('new-user')>=0||t.indexOf('new_user')>=0||t.indexOf('device')>=0)return 'login';
   if(t.indexOf('request')>=0||t.indexOf('purchase')>=0)return 'request';
   if(t.indexOf('deduct')>=0||t.indexOf('remove')>=0||t.indexOf('revoke')>=0)return 'deduct';
   if(t.indexOf('grant')>=0||t.indexOf('add')>=0||t.indexOf('topup')>=0||t.indexOf('top-up')>=0||t.indexOf('credit')>=0)return 'grant';
@@ -7514,13 +7543,28 @@ function notifNorm(raw,idx){
   var pkg=raw.packageName||raw.package||raw.planName||raw.plan||'';
   if(pkg&&typeof pkg==='object')pkg=pkg.name||pkg.id||'';
   var tsRaw=raw.createdAt!=null?raw.createdAt:(raw.created_at!=null?raw.created_at:(raw.ts!=null?raw.ts:(raw.time!=null?raw.time:(raw.date!=null?raw.date:raw.at))));
+  /* Structured fields for the «New device» / «New user» cards: the
+     server may send name / Gmail / User ID / IP / model as their own
+     fields (possibly nested in a user/account object). Whatever is
+     missing here is parsed out of the title/body text later, in
+     notifDevFields — the card itself only ever shows those 5 rows. */
+  var pick=function(){for(var a=0;a<arguments.length;a++){var v=arguments[a];if(typeof v==='string'&&v.trim())return v.trim();if(typeof v==='number'&&isFinite(v))return String(v);}return '';};
+  var sub=(raw.user&&typeof raw.user==='object')?raw.user:((raw.account&&typeof raw.account==='object')?raw.account:{});
+  var devObj=(raw.device&&typeof raw.device==='object')?raw.device:{};
+  var dName=pick(raw.name,raw.userName,raw.username,raw.displayName,raw.fullName,sub.name,sub.userName,sub.displayName);
+  var dEmail=pick(raw.email,raw.gmail,raw.userEmail,raw.accountEmail,sub.email,sub.gmail);
+  var dId=pick(raw.userId,raw.user_id,raw.uid,raw.accountId,sub.id,sub.userId);
+  var dIp=pick(raw.ip,raw.ipAddress,raw.ip_address,raw.userIp,sub.ip);
+  var dModel=pick(raw.model,raw.deviceModel,raw.deviceName,(typeof raw.device==='string'?raw.device:''),devObj.model,devObj.name,sub.model,sub.deviceModel);
   return {
     id:String(id),type:type,
+    dtype:String(raw.type||raw.kind||raw.event||''),
     title:(typeof raw.title==='string'?raw.title:'')||(typeof raw.subject==='string'?raw.subject:''),
     body:(typeof raw.body==='string'?raw.body:'')||(typeof raw.message==='string'?raw.message:'')||(typeof raw.text==='string'?raw.text:'')||(typeof raw.note==='string'?raw.note:''),
     ts:notifTs(tsRaw),
     read:!!(raw.read||raw.seen||raw.isRead)||!!notifReadIds[String(id)],
-    media:media,song:song,pkg:String(pkg||'')
+    media:media,song:song,pkg:String(pkg||''),
+    dName:dName,dEmail:dEmail,dId:dId,dIp:dIp,dModel:dModel
   };
 }
 function notifDefTitle(n){
@@ -7564,7 +7608,87 @@ function notifTimeStr(ts){
   if(diff<7*86400000)return tx('notifDayAgo').replace('{n}',String(Math.floor(diff/86400000)));
   try{return new Date(ts).toLocaleDateString();}catch(e){return '';}
 }
+/* ===== New device / New user cards: exactly 5 rows =====
+   A notice is one of these cards when it is a sign-in notice
+   (type 'login') or its title/body names a new device / new user.
+   Such a card shows ONLY five one-line rows — Name, Gmail, ID, IP,
+   Model — never the raw server sentence. Values come from the
+   notice's own structured fields first (notifNorm), then from
+   parsing the notice text, then — when the notice is about the
+   signed-in account itself — from that account. */
+function notifIsDevCard(n){
+  if(!n)return false;
+  if(n.type==='login')return true;
+  var s=(String(n.title||'')+' '+String(n.body||'')+' '+String(n.dtype||'')).toLowerCase();
+  return s.indexOf('device')>=0||s.indexOf('ឧបករណ៍')>=0||s.indexOf('new user')>=0||s.indexOf('អ្នកប្រើថ្មី')>=0;
+}
+function notifDevFields(n){
+  var name=n.dName||'',email=n.dEmail||'',id=n.dId||'',ip=n.dIp||'',model=n.dModel||'';
+  var body=String(n.body||'').replace(/\s+/g,' ');
+  var text=(body+' '+String(n.title||'')).replace(/\s+/g,' ');
+  if(!email){var em=text.match(/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/);if(em)email=em[0];}
+  if(!ip){var im=text.match(/\b(?:\d{1,3}\.){3}\d{1,3}\b/);if(im)ip=im[0];}
+  if(!id){
+    var idm=text.match(/(?:\bID\b|លេខសម្គាល់)\s*[:#]?\s*([A-Za-z0-9]{6,14})/);
+    if(idm)id=idm[1];
+    else{var idm2=text.match(/\b[A-Z0-9]{10}\b/);if(idm2)id=idm2[0];}
+  }
+  if(!model){
+    var mm=text.match(/(?:device|model|ម៉ូដែល)\s*[:\-]\s*([A-Za-z0-9][A-Za-z0-9 _\-]{1,30})/i);
+    if(mm){var cand=mm[1].split(/[·•|]/)[0].replace(/\s+IP\s.*$/i,'').trim();if(cand&&!/^(login|log in|new|user)$/i.test(cand))model=cand;}
+    if(!model){var mm2=text.match(/\b[A-Z]{2,}[0-9]{3,}[A-Z0-9-]*\b/);if(mm2&&mm2[0]!==id)model=mm2[0];}
+  }
+  if(!name){
+    var nm=body.match(/^\s*([^()@]{2,60}?)\s*\([^()]*@[A-Za-z0-9.-]+\.[A-Za-z]{2,}[^()]*\)/);
+    if(nm)name=nm[1].trim();
+    if(!name){var nm2=body.match(/(?:name|ឈ្មោះ)\s*[:\-]\s*([^·•|,\n]{2,60})/i);if(nm2)name=nm2[1].trim();}
+    name=name.replace(/\s*(logged in|log in|បាន).*$/i,'').trim();
+  }
+  var u=null;try{u=acctCurrent();}catch(e){}
+  if(u&&u.email){
+    var same=!email||email.toLowerCase()===String(u.email).toLowerCase();
+    if(same){
+      if(!email)email=String(u.email);
+      if(!name)name=String(u.name||((u.firstName||'')+' '+(u.lastName||'')).trim()||'');
+      if(!id&&acctValidUserId(u.id))id=u.id;
+    }
+  }
+  return {name:name,email:email,id:id,ip:ip,model:model};
+}
+function notifDevRow(v,cls,field,i){
+  var val=(v&&String(v).trim())?String(v).trim():'—';
+  var h='<div class="nd-row"><span class="nd-val'+(cls?' '+cls:'')+'" title="'+escHtml(val)+'">'+escHtml(val)+'</span>';
+  if(field&&val!=='—')h+='<button type="button" class="nd-copy" onclick="notifCopyField(event,this,'+i+',\''+field+'\')">'+escHtml(tx('profileCopy'))+'</button>';
+  return h+'</div>';
+}
+function notifDevItemHtml(n,i){
+  var f=notifDevFields(n);
+  var h='<div class="notif-item notif-dev'+(n.read?'':' unread')+'" onclick="notifItemClick('+i+')">';
+  h+='<div class="nd-head">'+notifIcon(n)+'<span class="nd-title">'+escHtml(n.title||notifDefTitle(n))+'</span>';
+  if(!n.read)h+='<span class="notif-dot" aria-hidden="true"></span>';
+  var t=notifTimeStr(n.ts);
+  if(t)h+='<span class="nd-time">'+escHtml(t)+'</span>';
+  h+='</div><div class="nd-rows">';
+  h+=notifDevRow(f.name,'nd-name','',i);
+  h+=notifDevRow(f.email,'','email',i);
+  h+=notifDevRow(f.id,'','id',i);
+  h+=notifDevRow(f.ip,'','ip',i);
+  h+=notifDevRow(f.model,'','',i);
+  h+='</div></div>';
+  return h;
+}
+function notifCopyField(ev,btn,i,field){
+  if(ev){ev.stopPropagation();if(ev.preventDefault)ev.preventDefault();}
+  var n=notifItems[i];if(!n)return;
+  var f=notifDevFields(n);
+  var v=field==='email'?f.email:(field==='ip'?f.ip:f.id);
+  if(!v)return;
+  var done=function(){if(!btn)return;var old=btn.textContent;btn.textContent=tx('profileCopied');setTimeout(function(){btn.textContent=old;},1600);};
+  if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(v).then(done).catch(function(){profileCopyIdFallback(v);done();});}
+  else{profileCopyIdFallback(v);done();}
+}
 function notifItemHtml(n,i){
+  if(notifIsDevCard(n))return notifDevItemHtml(n,i);
   var h='<button type="button" class="notif-item'+(n.read?'':' unread')+'" onclick="notifItemClick('+i+')">';
   h+=notifIcon(n);
   h+='<span class="notif-main"><span class="nt">'+escHtml(n.title||notifDefTitle(n))+'</span>';
