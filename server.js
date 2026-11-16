@@ -1278,6 +1278,51 @@ function rotErr(message, httpStatus) {
 // resets on restart). The key that last succeeded is pinned as the next
 // start, so a working key keeps being tried first.
 const _keyRotationStart = new Map();
+// ---- API key health (red/green) ----
+// Per provider + key index: 'ok' (green, working) or 'exhausted' (red,
+// ran out of credits/quota or auth failed). Persisted to key-health.json
+// so it survives restarts. Key VALUES are never stored or exposed — only
+// the index + status + a short error note.
+const KEY_HEALTH_FILE = path.join(DATA_DIR, 'key-health.json');
+let _keyHealth = {};
+try { const _kh = JSON.parse(fs.readFileSync(KEY_HEALTH_FILE, 'utf8')); if (_kh && typeof _kh === 'object') _keyHealth = _kh; } catch (e) {}
+function keyHealthSave() {
+  try { fs.mkdirSync(DATA_DIR, { recursive: true }); fs.writeFileSync(KEY_HEALTH_FILE, JSON.stringify(_keyHealth, null, 2)); ghPersistFile(KEY_HEALTH_FILE); } catch (e) {}
+}
+function keyHealthSet(provider, idx, status, note) {
+  const p = String(provider || '').toLowerCase();
+  if (!_keyHealth[p]) _keyHealth[p] = {};
+  const cur = _keyHealth[p][String(idx)] || {};
+  _keyHealth[p][String(idx)] = { status, note: String(note || '').slice(0, 120), at: new Date().toISOString(), lastOk: status === 'ok' ? new Date().toISOString() : (cur.lastOk || '') };
+  keyHealthSave();
+}
+function keyHealthList() {
+  // Returns {provider: [{key: 1, status, note, at, lastOk}, ...]} for every
+  // provider that has stored keys. Keys are identified by 1-based index only.
+  const out = {};
+  for (const p of Object.keys(_keyHealth)) {
+    const arr = [];
+    for (const idx of Object.keys(_keyHealth[p]).sort((a, b) => Number(a) - Number(b))) {
+      const h = _keyHealth[p][idx] || {};
+      arr.push({ key: Number(idx) + 1, status: h.status || 'unknown', note: h.note || '', at: h.at || '', lastOk: h.lastOk || '' });
+    }
+    out[p] = arr;
+  }
+  // Also include providers that have keys configured but no health record
+  // yet (shown as 'unknown' until first use).
+  try {
+    for (const p of ['suno', 'magichour', 'musicapi', 'novai', 'groq']) {
+      const n = adminProviderKeyList(p).length;
+      if (!n) continue;
+      if (!out[p]) out[p] = [];
+      for (let i = 0; i < n; i++) {
+        if (!out[p].some((x) => x.key === i + 1)) out[p].push({ key: i + 1, status: 'unknown', note: '', at: '', lastOk: '' });
+      }
+      out[p].sort((a, b) => a.key - b.key);
+    }
+  } catch (e) {}
+  return out;
+}
 function _isRotatableError(e) {
   if (!e) return false;
   const st = e && e.httpStatus;
@@ -1317,10 +1362,12 @@ async function withProviderKeyRotation(provider, fn, reqKey, candidatesOverride)
     try {
       const out = await fn(cand.key, cand.endpoint);
       _keyRotationStart.set(p, idx);
+      keyHealthSet(p, idx, 'ok', '');
       return out;
     } catch (e) {
       lastErr = e;
       if (!_isRotatableError(e)) throw e;
+      keyHealthSet(p, idx, 'exhausted', String((e && e.message) || e).slice(0, 120));
       if (i < n - 1) console.log('[keys] ' + p + ' key ' + (idx + 1) + '/' + n + ' failed (' + String((e && e.message) || e).slice(0, 120) + '), trying next key');
     }
   }
@@ -3750,6 +3797,13 @@ function apiRoute(req, res, urlPath) {
     return { id: p.id, email: p.email, name: p.name || '', userId: p.userId || '', mode: p.mode, title: p.title, url: p.url, cover: p.cover || '', aspect: p.aspect || '', youtube: p.youtube || '', youtubeChannel: p.youtubeChannel || '', visibility: p.visibility, likes: p.likes || 0, views: p.views || 0, downloads: p.downloads || 0, createdAt: p.createdAt };
   }
   // ---- File uploads for the Admin app Post form (MP3 + cover image) ----
+  // GET /api/public/provider-status — PUBLIC (no admin key). API key
+  // health for the website's red/green indicators: green = working,
+  // red = exhausted (out of credits/quota/auth failed), unknown = not
+  // used yet. Key values are never exposed — only index + status.
+  if (req.method === 'GET' && urlPath === '/api/public/provider-status') {
+    return sendJSON(res, 200, { ok: true, providers: keyHealthList() });
+  }
   // POST /api/public/upload — ADMIN KEY required. JSON {kind: 'audio'|'image',
   // filename, data: base64}. Saves under ./data/uploads/ and returns the
   // public URL. Audio max 15 MB; image (cover) has NO size cap — any size
