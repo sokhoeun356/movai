@@ -1757,7 +1757,17 @@ function apiRoute(req, res, urlPath) {
           // duration 15-300s, 1 credit/sec. style: {instrumental, lyrics, prompt}.
           // Returns a project id; poll GET /v1/audio-projects/{id}.
           const instrumental = body.instrumental === true || body.make_instrumental === true;
-          const mhDuration = (typeof body.duration === 'number' && body.duration >= 15 && body.duration <= 300) ? Math.round(body.duration) : 120;
+          // The website sends duration in MINUTES (picker: 1, 2, 3, 3.5, 5).
+          // Magic Hour wants SECONDS (15-300). Convert minutes to seconds.
+          // A small value (<= 5) is minutes; 15-300 is already seconds.
+          let mhDuration = 120;
+          if (typeof body.duration === 'number' && body.duration > 0) {
+            const d = body.duration;
+            if (d <= 5) mhDuration = Math.round(d * 60);
+            else if (d >= 15 && d <= 300) mhDuration = Math.round(d);
+          }
+          if (mhDuration < 15) mhDuration = 15;
+          if (mhDuration > 300) mhDuration = 300;
           const mhPromptParts = [];
           if (style) mhPromptParts.push(style);
           if (voice === 'male' && !instrumental) mhPromptParts.push('male vocals');
