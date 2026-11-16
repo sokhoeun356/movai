@@ -3797,6 +3797,104 @@ function apiRoute(req, res, urlPath) {
     return { id: p.id, email: p.email, name: p.name || '', userId: p.userId || '', mode: p.mode, title: p.title, url: p.url, cover: p.cover || '', aspect: p.aspect || '', youtube: p.youtube || '', youtubeChannel: p.youtubeChannel || '', visibility: p.visibility, likes: p.likes || 0, views: p.views || 0, downloads: p.downloads || 0, createdAt: p.createdAt };
   }
   // ---- File uploads for the Admin app Post form (MP3 + cover image) ----
+  // ---- Server-side MP3 conversion (WAV -> MP3 128kbps) ----
+  // The browser (old phone) takes 118s+ to convert a 3-5 min song with
+  // lamejs in JS. The server encodes the same song in a few seconds.
+  // GET /api/gen/song/mp3?u=<audio-url>&name=<filename.mp3> — PUBLIC.
+  // Fetches the audio; if already MP3 it streams through as-is; if WAV
+  // it decodes PCM and encodes to MP3 128kbps. Always returns audio/mpeg
+  // with Content-Disposition attachment so the download is a small .mp3.
+  let _lamejsMod = null;
+  async function getLamejs() {
+    if (!_lamejsMod) _lamejsMod = await import('@breezystack/lamejs');
+    return _lamejsMod;
+  }
+  function wavParsePcm(buf) {
+    // Minimal WAV/RIFF parser. Returns {channels, sampleRate, left, right}
+    // (Int16Array per channel) for PCM 8/16-bit. Throws on bad format.
+    if (!buf || buf.length < 44 || buf.toString('ascii', 0, 4) !== 'RIFF' || buf.toString('ascii', 8, 12) !== 'WAVE') throw new Error('not a WAV file');
+    let off = 12, fmt = null, dataOff = -1, dataLen = 0;
+    while (off + 8 <= buf.length) {
+      const id = buf.toString('ascii', off, off + 4);
+      const size = buf.readUInt32LE(off + 4);
+      if (id === 'fmt ') {
+        fmt = { audioFormat: buf.readUInt16LE(off + 8), channels: buf.readUInt16LE(off + 10), sampleRate: buf.readUInt32LE(off + 12), bitsPerSample: buf.readUInt16LE(off + 22) };
+      } else if (id === 'data') { dataOff = off + 8; dataLen = size; break; }
+      off += 8 + size + (size % 2);
+    }
+    if (!fmt || dataOff < 0) throw new Error('WAV fmt/data chunk missing');
+    if (fmt.audioFormat !== 1) throw new Error('WAV not PCM (format ' + fmt.audioFormat + ')');
+    const ch = fmt.channels, bps = fmt.bitsPerSample, sr = fmt.sampleRate;
+    if (ch < 1 || ch > 2 || (bps !== 8 && bps !== 16)) throw new Error('WAV unsupported: ' + ch + 'ch ' + bps + 'bit');
+    const bytesPerSample = bps / 8;
+    const frames = Math.floor(dataLen / (bytesPerSample * ch));
+    const left = new Int16Array(frames), right = new Int16Array(frames);
+    for (let i = 0; i < frames; i++) {
+      for (let c = 0; c < ch; c++) {
+        const p = dataOff + (i * ch + c) * bytesPerSample;
+        let v;
+        if (bps === 16) v = buf.readInt16LE(p);
+        else v = (buf[p] - 128) * 256;
+        if (c === 0) left[i] = v; else right[i] = v;
+      }
+      if (ch === 1) right[i] = left[i];
+    }
+    return { channels: ch, sampleRate: sr, left, right };
+  }
+  async function pcmToMp3(pcm, kbps) {
+    const { Mp3Encoder } = await getLamejs();
+    const enc = new Mp3Encoder(pcm.channels, pcm.sampleRate, kbps || 128);
+    const chunks = [];
+    const BLOCK = 1152;
+    for (let i = 0; i < pcm.left.length; i += BLOCK) {
+      const l = pcm.left.subarray(i, i + BLOCK);
+      const r = pcm.right.subarray(i, i + BLOCK);
+      const out = enc.encodeBuffer(l, r);
+      if (out && out.length) chunks.push(Buffer.from(out));
+    }
+    const tail = enc.flush();
+    if (tail && tail.length) chunks.push(Buffer.from(tail));
+    return Buffer.concat(chunks);
+  }
+  function isMp3Bytes(buf) {
+    if (!buf || buf.length < 3) return false;
+    if (buf.toString('ascii', 0, 3) === 'ID3') return true;
+    return buf[0] === 0xFF && (buf[1] & 0xE0) === 0xE0;
+  }
+  if (req.method === 'GET' && urlPath === '/api/gen/song/mp3') {
+    // Handler is NOT async — run the async work in an IIFE (same pattern
+    // as /api/gen/video/file).
+    (async () => {
+      // NOTE: `q` is defined later in apiRoute — parse the query here.
+      const qp = new URL(req.url, 'http://localhost').searchParams;
+      const u = (qp.get('u') || '').trim();
+      const name = (qp.get('name') || 'song').replace(/[\\/:*?"<>|]/g, '_').replace(/\.mp3$/i, '') + '.mp3';
+      if (!u) return sendJSON(res, 400, { ok: false, error: 'missing u' });
+      try {
+        const ctrl = new AbortController();
+        const t = setTimeout(() => ctrl.abort(), 120000);
+        const r = await fetch(u, { signal: ctrl.signal, headers: { 'User-Agent': 'MovAi/1.0' } });
+        clearTimeout(t);
+        if (!r.ok) return sendJSON(res, 502, { ok: false, error: 'audio fetch failed: ' + r.status });
+        const ab = await r.arrayBuffer();
+        const buf = Buffer.from(ab);
+        let mp3;
+        if (isMp3Bytes(buf)) {
+          mp3 = buf;
+        } else if (buf.toString('ascii', 0, 4) === 'RIFF') {
+          const pcm = wavParsePcm(buf);
+          mp3 = await pcmToMp3(pcm, 128);
+        } else {
+          return sendJSON(res, 415, { ok: false, error: 'audio format not supported (need MP3 or WAV)' });
+        }
+        res.writeHead(200, { 'Content-Type': 'audio/mpeg', 'Content-Disposition': 'attachment; filename="' + name.replace(/"/g, '') + '"', 'Content-Length': mp3.length, 'Cache-Control': 'public, max-age=86400' });
+        res.end(mp3);
+      } catch (e) {
+        try { sendJSON(res, 500, { ok: false, error: 'MP3 convert failed: ' + String((e && e.message) || e).slice(0, 200) }); } catch (e2) {}
+      }
+    })();
+    return;
+  }
   // GET /api/public/provider-status — PUBLIC (no admin key). API key
   // health for the website's red/green indicators: green = working,
   // red = exhausted (out of credits/quota/auth failed), unknown = not
