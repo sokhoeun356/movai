@@ -425,6 +425,10 @@ img.hist-media,.d3-preview{cursor:zoom-in}
 .pglow-accent{background:var(--accent);box-shadow:0 0 6px 2px rgba(var(--accent-rgb),.85),0 0 16px 6px rgba(var(--accent-rgb),.45),0 0 30px 12px rgba(var(--accent-rgb),.22)}
 .pglow-amber{background:#fbbf24;box-shadow:0 0 6px 2px rgba(251,191,36,.85),0 0 16px 6px rgba(251,191,36,.45),0 0 30px 12px rgba(251,191,36,.22)}
 .pglow-red{background:#f87171;box-shadow:0 0 6px 2px rgba(248,113,113,.85),0 0 16px 6px rgba(248,113,113,.45),0 0 30px 12px rgba(248,113,113,.22)}
+.pglow-gray{background:#9a9ea6;box-shadow:0 0 6px 2px rgba(154,158,166,.45),0 0 14px 5px rgba(154,158,166,.22);animation:none}
+.pstat-key{font-size:0.75rem;font-weight:700;color:#9a9ea6;white-space:nowrap}
+.pstat-note{font-size:0.72rem;font-weight:700;color:#f87171;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:36vw}
+.pstat-slot{display:inline-flex;align-items:center;gap:6px;margin-left:8px;vertical-align:middle}
 @keyframes pglowPulse{0%,100%{opacity:1}50%{opacity:.72}}
 @media (prefers-reduced-motion:reduce){.pglow{animation:none}}
 /* ===== Provider / model dropdown option rows =====
@@ -1065,8 +1069,6 @@ html[data-mode="light"] .offline-ico{color:#dc2626;background:rgba(220,38,38,.1)
 #page-packages.blur-out .panel{animation:clearBlurOut .25s ease-in both}
 #pkgBackdrop.blur-in{animation:sheetFadeIn .3s ease-out both}
 #pkgBackdrop.blur-out{animation:sheetFadeOut .25s ease-in both}
-.fab-panel.blur-in{animation:blurClearIn .3s ease-out both}
-.fab-panel.blur-out{animation:clearBlurOut .25s ease-in both}
 .fs-viewer.blur-in{animation:sheetFadeIn .3s ease-out both}
 .fs-viewer.blur-out{animation:sheetFadeOut .25s ease-in both}
 .fs-viewer.blur-in .fs-body{animation:blurClearIn .3s ease-out both}
@@ -1074,7 +1076,7 @@ html[data-mode="light"] .offline-ico{color:#dc2626;background:rgba(220,38,38,.1)
 .drawer{transition:transform .28s ease,opacity .3s ease,filter .3s ease}
 .drawer.open{opacity:0;filter:blur(14px)}
 .drawer.shown{opacity:1;filter:blur(0)}
-@media (prefers-reduced-motion: reduce){.pkg-sheet.blur-in,.pkg-sheet.blur-out,.pkg-sheet.blur-in .pkg-sheet-card,.pkg-sheet.blur-out .pkg-sheet-card,#page-packages.blur-in .panel,#page-packages.blur-out .panel,#pkgBackdrop.blur-in,#pkgBackdrop.blur-out,.fab-panel.blur-in,.fab-panel.blur-out,.fs-viewer.blur-in,.fs-viewer.blur-out,.fs-viewer.blur-in .fs-body,.fs-viewer.blur-out .fs-body{animation:none}.drawer{transition:none}}
+@media (prefers-reduced-motion: reduce){.pkg-sheet.blur-in,.pkg-sheet.blur-out,.pkg-sheet.blur-in .pkg-sheet-card,.pkg-sheet.blur-out .pkg-sheet-card,#page-packages.blur-in .panel,#page-packages.blur-out .panel,#pkgBackdrop.blur-in,#pkgBackdrop.blur-out,.fs-viewer.blur-in,.fs-viewer.blur-out,.fs-viewer.blur-in .fs-body,.fs-viewer.blur-out .fs-body{animation:none}.drawer{transition:none}}
 /* «Network ready» toast — appears ONLY when the connection comes
    back after the offline popup was shown; auto-hides after ~3 s. */
 .net-ready-toast{position:fixed;top:calc(env(safe-area-inset-top,0px) + 14px);left:50%;transform:translateX(-50%);z-index:320;display:flex;align-items:center;gap:10px;max-width:calc(100vw - 32px);background:#101f06;border:1.5px solid var(--lime,#ADDC29);color:#fff;border-radius:999px;padding:10px 18px 10px 12px;box-shadow:0 10px 30px rgba(0,0,0,.45);font-size:0.9375rem;font-weight:800;line-height:1.35}
@@ -1146,12 +1148,6 @@ button{min-width:0}
 #genProviderField>span:last-child{flex:0 1 auto !important;min-width:0}
 #genProviderFieldLimit{white-space:normal !important;text-align:right;overflow-wrap:break-word}
 img,video{max-width:100%}
-/* ===== Floating quick-settings button (AssistiveTouch-style) ===== */
-.fab-wrap{position:fixed;right:16px;bottom:calc(16px + env(safe-area-inset-bottom,0px));z-index:60;display:flex;flex-direction:column;align-items:flex-end;gap:12px}
-.fab-btn{width:54px;height:54px;flex:0 0 auto;border-radius:50%;border:1px solid rgba(var(--glass-text-rgb),calc(.18 + var(--glass-shine,.55)*.22));background:rgba(var(--glass-tint),var(--glass-alpha,.5));-webkit-backdrop-filter:blur(var(--glass-blur,18px)) saturate(160%);backdrop-filter:blur(var(--glass-blur,18px)) saturate(160%);box-shadow:0 8px 24px rgba(0,0,0,.35),inset 0 1px 0 rgba(255,255,255,calc(.08 + var(--glass-shine,.55)*.5));display:flex;align-items:center;justify-content:center;cursor:pointer;padding:0}
-.fab-dot{width:23px;height:23px;border-radius:50%;background:rgba(var(--glass-text-rgb),.28);border:3px solid rgba(var(--glass-text-rgb),.92);box-sizing:border-box}
-.fab-panel{display:none;width:min(86vw,308px);max-height:min(72vh,580px);overflow-y:auto;border-radius:18px;padding:16px 14px 18px;color:var(--glass-text);text-shadow:0 1px 2px rgba(var(--glass-shadow-rgb),.25);background:linear-gradient(160deg,rgba(255,255,255,calc(.03 + var(--glass-shine,.55)*.32)),rgba(255,255,255,calc(var(--glass-shine,.55)*.08)) 36%,rgba(190,198,212,calc(var(--glass-frost,.65)*.22)) 74%,rgba(var(--glass-tint),.42));background-color:rgba(var(--glass-tint),var(--glass-alpha,.5));-webkit-backdrop-filter:blur(var(--glass-blur,18px)) saturate(170%);backdrop-filter:blur(var(--glass-blur,18px)) saturate(170%);border:1px solid rgba(var(--glass-text-rgb),calc(.14 + var(--glass-shine,.55)*.2));box-shadow:0 18px 44px rgba(0,0,0,.35)}
-.fab-panel.open{display:block}
 /* ===== Bottom dock (iPhone home-screen style, icons only) =====
    A wide glass dock stretched across the bottom of the page with
    five icon destinations: Public, Create, History, Packages,
@@ -1335,13 +1331,10 @@ html[data-mode="light"] #genProviderDrop,html[data-mode="light"] #genMhModelDrop
 html[data-mode="light"] [style*="color:#9a9ea6"]{color:#5f646e !important}
 html[data-mode="light"] [style*="background:rgba(255,255,255,.1)"]{background:rgba(20,22,30,.12) !important}
 html[data-mode="light"] [style*="border-top:1px solid rgba(255,255,255,.08)"]{border-top-color:rgba(20,22,30,.1) !important}
-.fab-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
-.fab-tile{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:7px;padding:12px 4px;border-radius:14px;background:rgba(var(--glass-text-rgb),.08);border:1px solid var(--glass-line);color:inherit;font-family:inherit;font-size:0.75rem;font-weight:700;cursor:pointer;min-height:70px;line-height:1.3;text-align:center;overflow-wrap:break-word;min-width:0}
-.fab-tile svg{width:24px;height:24px;flex:0 0 auto}
-.fab-tile:active{background:rgba(var(--accent-rgb),.18)}
+
 /* Glass shine/frost are driven by --glass-shine / --glass-frost on every surface at once */
 /* ===== Text background blur (behind text panels) ===== */
-.panel,.composer,.kiri-card,.threed-card,.key-acc,.fab-tile,#genProviderDrop{-webkit-backdrop-filter:blur(var(--txtblur,0px));backdrop-filter:blur(var(--txtblur,0px))}
+.panel,.composer,.kiri-card,.threed-card,.key-acc,#genProviderDrop{-webkit-backdrop-filter:blur(var(--txtblur,0px));backdrop-filter:blur(var(--txtblur,0px))}
 /* ===== MovAi song model names — two-tone like the MovAi wordmark =====
    All three model names (v6, v6-wild, v6-mini) render in two colours,
    in the dropdown options AND in the selected field value: the «v»
@@ -1397,7 +1390,6 @@ html[data-mode="light"] .mv-a{color:var(--accent-text)}
    repainting the page underneath on every frame. */
 .hist-carousel{transform:translateZ(0)}
 .drawer{will-change:transform}
-.fab-panel{transform:translateZ(0)}
 .pkg-sheet-card{transform:translateZ(0)}
 #genProviderDrop,#genMhModelDrop,#genMhVidModelDrop,#genSunoModelDrop{transform:translateZ(0)}
 /* Looping animations paused by the smart-activation observer while
@@ -1424,7 +1416,7 @@ html[data-mode="light"] .mv-a{color:var(--accent-text)}
 html[data-smooth="1"] *,html[data-smooth="1"] *::before,html[data-smooth="1"] *::after{-webkit-backdrop-filter:none !important;backdrop-filter:none !important;text-shadow:none !important}
 html[data-smooth="1"] .blur-fill,html[data-smooth="1"] .song-cover-solid.creating,html[data-smooth="1"] .pglow,html[data-smooth="1"] .media-reveal{animation:none !important}
 html[data-smooth="1"] .wm-cover{background:rgba(12,13,16,.92)}
-html[data-smooth="1"] .brand-frame,html[data-smooth="1"] .acct-chip,html[data-smooth="1"] .notif-bell,html[data-smooth="1"] .drawer,html[data-smooth="1"] .fab-panel,html[data-smooth="1"] .fab-btn{background-color:rgba(var(--glass-tint),.96)}
+html[data-smooth="1"] .brand-frame,html[data-smooth="1"] .acct-chip,html[data-smooth="1"] .notif-bell,html[data-smooth="1"] .drawer{background-color:rgba(var(--glass-tint),.96)}
 /* Reduced motion: calm every animation, not just a few named ones. */
 @media (prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms !important;animation-iteration-count:1 !important;scroll-behavior:auto !important}}
 </style>
@@ -1523,7 +1515,7 @@ html[data-smooth="1"] .brand-frame,html[data-smooth="1"] .acct-chip,html[data-sm
         </div>
         <div id="genProviderWrap">
           <button type="button" class="input" id="genProviderField" onclick="genToggleProviders()" style="display:none;justify-content:space-between;align-items:center;gap:10px;cursor:pointer;text-align:left;width:100%">
-            <span style="display:flex;align-items:center;gap:20px;min-width:0"><span id="genProviderFieldName" style="font-weight:700">Pollinations</span><span id="genProviderFieldGlow" class="pglow" style="display:none"></span></span>
+            <span style="display:flex;align-items:center;gap:20px;min-width:0"><span id="genProviderFieldName" style="font-weight:700">Pollinations</span><span style="display:flex;align-items:center;gap:8px;min-width:0"><span id="genProviderFieldGlow" class="pglow" style="display:none"></span><span id="genProviderFieldStat"></span></span></span>
             <span style="display:flex;align-items:center;gap:8px;flex:0 0 auto"><span id="genProviderFieldLimit" style="font-size:0.75rem;color:#9a9ea6;white-space:nowrap"></span><span style="font-size:0.75rem;color:#9a9ea6">▼</span></span>
           </button>
           <div id="genProviderDrop" style="display:none;position:absolute;left:0;right:0;top:100%;z-index:30;background:#1a1c21;border:1px solid rgba(255,255,255,.12);border-radius:12px;margin-top:6px;overflow-y:auto;max-height:11.25rem;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;touch-action:pan-y;box-shadow:0 16px 40px rgba(0,0,0,.5)"></div>
@@ -1975,18 +1967,6 @@ html[data-smooth="1"] .brand-frame,html[data-smooth="1"] .acct-chip,html[data-sm
   <span class="net-ready-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.55a11 11 0 0 1 14.08 0"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><line x1="12" y1="20" x2="12.01" y2="20"/></svg><span class="net-ready-check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></span></span>
   <span>Network ready · អ៊ីនធឺណិតមកវិញហើយ</span>
 </div>
-<div class="fab-wrap" id="fabWrap">
-  <div class="fab-panel" id="fabPanel">
-    <div class="fab-grid">
-      <button type="button" class="fab-tile" onclick="fabGo('image')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="1.6"/><path d="M21 16l-5-5-9 9"/></svg><span data-i18n="navImage">បង្កើតរូបភាព</span></button>
-      <button type="button" class="fab-tile" onclick="fabGo('video')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="3"/><path d="M10.2 9.3 15.5 12l-5.3 2.7z" fill="currentColor" stroke="none"/></svg><span data-i18n="navVideo">បង្កើតវីដេអូ</span></button>
-      <button type="button" class="fab-tile" onclick="fabGo('3d')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l8 4.5v9L12 21l-8-4.5v-9z"/><path d="M12 12l8-4.5M12 12L4 7.5M12 12v9"/></svg><span data-i18n="nav3d">រូប 3D Design</span></button>
-      <button type="button" class="fab-tile" onclick="fabGo('song')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg><span data-i18n="navSong">បង្កើតបទចម្រៀង</span></button>
-      <button type="button" class="fab-tile" onclick="fabGo('history')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/><path d="M12 7v5l3 3"/></svg><span data-i18n="navHistory">ប្រវត្តិ</span></button>
-    </div>
-  </div>
-  <button class="fab-btn" id="fabBtn" onclick="toggleFab()" aria-label="ការកំណត់រហ័ស" aria-expanded="false"><span class="fab-dot"></span></button>
-</div>
 <nav class="dock" id="dockBar" aria-label="Dock">
   <button type="button" class="dock-item on" id="dockPublic" onclick="dockGo('public')" aria-label="Public · សាធារណៈ"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.6 3.9 5.7 3.9 9S14.5 18.4 12 21c-2.5-2.6-3.9-5.7-3.9-9S9.5 5.6 12 3z"/></svg></button>
   <button type="button" class="dock-item" id="dockCreate" onclick="dockGo('create')" aria-label="Create · បង្កើត"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button>
@@ -2155,8 +2135,8 @@ km:{
  mhOpenBtn:'បើក Magic Hour យក API Key ↗',mhKeyPh:'ដាក់ Magic Hour API Key នៅទីនេះ',mhConnectBtn:'ភ្ជាប់ Key',
  mhNote:'ជំហានធ្វើម្ដង៖ បើក Magic Hour → បង្កើត/ចម្លង API Key → ដាក់នៅទីនេះ។ ពេលដាក់ Key ភ្លាម MovAi ភ្ជាប់ឲ្យអូតូភ្លាម ហើយប្រើបានរហូត។',
  setLang:'ភាសា',setFont:'ទំហំអក្សរ',fontSmall:'0% · តូចខ្លាំង',fontLarge:'100% · ធំខ្លាំង',setColor:'ពណ៌ App',
- setMode:'យប់ / ថ្ងៃ',modeDark:'យប់',modeLight:'ថ្ងៃ',modeAuto:'អូតូ',fabLabel:'ការកំណត់រហ័ស',
- setGlass:'កញ្ចក់ · ថ្លា / ព្រាល / ចាំង',glassClearP:'ថ្លា · Clear',glassClearLo:'0% · មិនថ្លា',glassClearHi:'100% · ថ្លាខ្លាំង',glassBlurP:'ព្រាល · Frosted / Blur',glassBlurLo:'0% · មិនព្រាល',glassBlurHi:'100% · ព្រាលខ្លាំង',glassShineP:'ចាំង · Shine',glassShineLo:'0% · មិនចាំង',glassShineHi:'100% · ចាំងខ្លាំង',setTxtBlur:'ព្រាលផ្ទៃខាងក្រោយអក្សរ',txtBlurLo:'0% · ច្បាស់',txtBlurHi:'100% · ព្រាលខ្លាំង',setBgBright:'ពន្លឺផ្ទៃខាងក្រោយ',bgBrightLo:'0% · ងងឹត',bgBrightHi:'100% · ភ្លឺខ្លាំង',setBrandFx:'អ៊ីហ្វិចឈ្មោះ MovAi',fxNone:'ធម្មតា',fxGlow:'ភ្លឺញាក់',fxShadow:'ស្រមោល',fxNeon:'ណេអុង',fxShine:'ចាំង',setTShadow:'ពណ៌ស្រមោលអក្សរ',setSmooth:'របៀបស្មូត · Smooth mode',smoothOn:'បើក · On',smoothOff:'បិទ · Off',smoothLocked:'🔒 ចាក់សោរដោយ Admin · ទូរសព្ទនេះត្រូវការ Smooth — បិទមិនបាន',fabKeys:'API Keys',fabSettings:'ការកំណត់',
+ setMode:'យប់ / ថ្ងៃ',modeDark:'យប់',modeLight:'ថ្ងៃ',modeAuto:'អូតូ',
+ setGlass:'កញ្ចក់ · ថ្លា / ព្រាល / ចាំង',glassClearP:'ថ្លា · Clear',glassClearLo:'0% · មិនថ្លា',glassClearHi:'100% · ថ្លាខ្លាំង',glassBlurP:'ព្រាល · Frosted / Blur',glassBlurLo:'0% · មិនព្រាល',glassBlurHi:'100% · ព្រាលខ្លាំង',glassShineP:'ចាំង · Shine',glassShineLo:'0% · មិនចាំង',glassShineHi:'100% · ចាំងខ្លាំង',setTxtBlur:'ព្រាលផ្ទៃខាងក្រោយអក្សរ',txtBlurLo:'0% · ច្បាស់',txtBlurHi:'100% · ព្រាលខ្លាំង',setBgBright:'ពន្លឺផ្ទៃខាងក្រោយ',bgBrightLo:'0% · ងងឹត',bgBrightHi:'100% · ភ្លឺខ្លាំង',setBrandFx:'អ៊ីហ្វិចឈ្មោះ MovAi',fxNone:'ធម្មតា',fxGlow:'ភ្លឺញាក់',fxShadow:'ស្រមោល',fxNeon:'ណេអុង',fxShine:'ចាំង',setTShadow:'ពណ៌ស្រមោលអក្សរ',setSmooth:'របៀបស្មូត · Smooth mode',smoothOn:'បើក · On',smoothOff:'បិទ · Off',smoothLocked:'🔒 ចាក់សោរដោយ Admin · ទូរសព្ទនេះត្រូវការ Smooth — បិទមិនបាន',
  tabImage:'រូបភាព',tabVideo:'វីដេអូ',tabSong:'បទចម្រៀង',navSong:'បង្កើតបទចម្រៀង',navSongSub:'Song',
  lblSongDur:'រយៈពេលបទ',lblSongPrice:'តម្លៃ',
  lblSongTitle:'ចំណងជើង',songTitlePh:'ឧ. ឈ្មោះបទចម្រៀងរបស់អ្នក...',
@@ -2225,7 +2205,7 @@ km:{
  songFreeNote:'ទទួលដោយស្វ័យប្រវត្តិ ពេលចុះឈ្មោះគណនីថ្មី',songFreeAuto:'ទទួលដោយស្វ័យប្រវត្តិ',
  songPkgOnlyNote:'បានតែ Song Credit ប៉ុណ្ណោះ',pkgMediaOnlyNote:'បានតែ Image & Video Credit ប៉ុណ្ណោះ',profileSongPlan:'កញ្ចប់បទចម្រៀង',
  songDoneFmt:'ទិញរួចរាល់! កញ្ចប់បទចម្រៀង {name} បានបើក ហើយ Song Credit {c} បានបន្ថែមចូលគណនីរបស់អ្នកហើយ',
- pkgPremium:'Premium',mhPerSec:'Credit/វិនាទី',adminLock:'🔐 ចាក់សោ',provOnline:'Online Live',provBusy:'រវល់',provProblem:'មានបញ្ហា',
+ pkgPremium:'Premium',mhPerSec:'Credit/វិនាទី',adminLock:'🔐 ចាក់សោ',provOnline:'Online Live',provBusy:'រវល់',provProblem:'មានបញ្ហា',apiWorking:'API ដំណើរការ',apiExhausted:'API អស់ហើយ',apiUnused:'មិនទាន់ប្រើ',apiKeyW:'Key',
  pkgSheetTitle:'សំណើរទិញ',pkgSheetPlan:'កញ្ចប់',pkgCreditsLbl:'Credit ដែលទទួលបាន',pkgTotal:'តម្លៃសរុប',
  pkgConfirm:'បញ្ជាក់ការទិញ',pkgCancel:'បោះបង់',
  payTitle:'របៀបបង់លុយ — ជ្រើសមួយ',payLocal:'🇰🇭 ក្នុងស្រុក',payLocalNote:'ជ្រើសរបៀបបង់មួយ — បង្ហាញ KHQR ដើម្បីស្កេនបង់ ឬបើកក្នុង App Canadia Bank',payShowKhqrBtn:'🇰🇭 បង្ហាញ KHQR · Show KHQR',payCanadiaBtn:'🏦 បើកក្នុង App Canadia Bank · Open in Canadia Bank App',payKhqrTitle:'🇰🇭 KHQR',payKhqrNote:'ស្កេន QR នេះជាមួយ app ធនាគារណាក៏បាន (ABA, Wing, Canadia…) — QR នេះមិនមានចំនួនលុយថេរទេ សូមបញ្ចូលចំនួនលុយតាមកញ្ចប់ដែលអ្នកទិញដោយខ្លួនឯង',payKhqrClose:'បិទ · Close',payIntl:'🌍 ក្រៅស្រុក',payUsdtNote:'បង់ USDT (Binance) មកអាសយដ្ឋាននេះ៖',payUsdtEmpty:'អាសយដ្ឋាន USDT មិនទាន់មានទេ — សូមទាក់ទង Admin ដើម្បីបង់លុយ',payCopyAddr:'ចម្លង',payPaidBtn:'ខ្ញុំបានបង់រួចហើយ',payLoading:'កំពុងផ្ទុករបៀបបង់លុយ…',payNone:'មិនទាន់មានរបៀបបង់លុយទេ — សូមទាក់ទង Admin',
@@ -2381,8 +2361,8 @@ en:{
  mhOpenBtn:'Open Magic Hour to get API Key ↗',mhKeyPh:'Paste your Magic Hour API key here',mhConnectBtn:'Connect key',
  mhNote:'One-time step: open Magic Hour → create/copy the API key → paste it here. The moment you paste it, MovAi connects it automatically and it works from then on.',
  setLang:'Language',setFont:'Font Size',fontSmall:'0% · Very small',fontLarge:'100% · Very large',setColor:'App Color',
- setMode:'Day / Night',modeDark:'Dark',modeLight:'Light',modeAuto:'Auto',fabLabel:'Quick settings',
- setGlass:'Glass · Clear / Frosted / Shine',glassClearP:'Clear · Transparency',glassClearLo:'0% · Solid',glassClearHi:'100% · Fully clear',glassBlurP:'Frosted · Blur',glassBlurLo:'0% · No blur',glassBlurHi:'100% · Very frosted',glassShineP:'Shine · Gloss',glassShineLo:'0% · No shine',glassShineHi:'100% · Very shiny',setTxtBlur:'Text Background Blur',txtBlurLo:'0% · Sharp',txtBlurHi:'100% · Very blurred',setBgBright:'Background Brightness',bgBrightLo:'0% · Dark',bgBrightHi:'100% · Very bright',setBrandFx:'MovAi Name Effect',fxNone:'None',fxGlow:'Glow',fxShadow:'Shadow',fxNeon:'Neon',fxShine:'Shine',setTShadow:'Text Shadow Color',setSmooth:'Smooth mode',smoothOn:'On',smoothOff:'Off',smoothLocked:'🔒 Locked by Admin · This phone needs Smooth — it cannot be turned off',fabKeys:'API Keys',fabSettings:'Settings',
+ setMode:'Day / Night',modeDark:'Dark',modeLight:'Light',modeAuto:'Auto',
+ setGlass:'Glass · Clear / Frosted / Shine',glassClearP:'Clear · Transparency',glassClearLo:'0% · Solid',glassClearHi:'100% · Fully clear',glassBlurP:'Frosted · Blur',glassBlurLo:'0% · No blur',glassBlurHi:'100% · Very frosted',glassShineP:'Shine · Gloss',glassShineLo:'0% · No shine',glassShineHi:'100% · Very shiny',setTxtBlur:'Text Background Blur',txtBlurLo:'0% · Sharp',txtBlurHi:'100% · Very blurred',setBgBright:'Background Brightness',bgBrightLo:'0% · Dark',bgBrightHi:'100% · Very bright',setBrandFx:'MovAi Name Effect',fxNone:'None',fxGlow:'Glow',fxShadow:'Shadow',fxNeon:'Neon',fxShine:'Shine',setTShadow:'Text Shadow Color',setSmooth:'Smooth mode',smoothOn:'On',smoothOff:'Off',smoothLocked:'🔒 Locked by Admin · This phone needs Smooth — it cannot be turned off',
  tabImage:'Image',tabVideo:'Video',tabSong:'Song',navSong:'Create Song',navSongSub:'បទចម្រៀង',
  lblSongDur:'Song length',lblSongPrice:'Price',
  lblSongTitle:'Title',songTitlePh:'e.g. Your song title...',
@@ -2451,7 +2431,7 @@ en:{
  songFreeNote:'Granted automatically when a new account signs up',songFreeAuto:'Automatic',
  songPkgOnlyNote:'Song Credit only',pkgMediaOnlyNote:'Image & Video Credit only',profileSongPlan:'Song package',
  songDoneFmt:'Purchase complete! The {name} song package is active and {c} Song Credit were added to your account',
- pkgPremium:'Premium',mhPerSec:'credits/sec',adminLock:'🔐 Locked',provOnline:'Online Live',provBusy:'Busy',provProblem:'Problem',
+ pkgPremium:'Premium',mhPerSec:'credits/sec',adminLock:'🔐 Locked',provOnline:'Online Live',provBusy:'Busy',provProblem:'Problem',apiWorking:'API working',apiExhausted:'API exhausted',apiUnused:'Not used yet',apiKeyW:'Key',
  pkgSheetTitle:'Purchase request',pkgSheetPlan:'Package',pkgCreditsLbl:'Credits you receive',pkgTotal:'Total',
  pkgConfirm:'Confirm purchase',pkgCancel:'Cancel',
  payTitle:'How to pay — choose one',payLocal:'🇰🇭 Local (Cambodia)',payLocalNote:'Choose how to pay — show the KHQR to scan, or open in the Canadia Bank app',payShowKhqrBtn:'🇰🇭 បង្ហាញ KHQR · Show KHQR',payCanadiaBtn:'🏦 បើកក្នុង App Canadia Bank · Open in Canadia Bank App',payKhqrTitle:'🇰🇭 KHQR',payKhqrNote:'Scan this QR with any bank app (ABA, Wing, Canadia…) — this QR has no fixed amount, so enter the amount of the package you are buying yourself',payKhqrClose:'បិទ · Close',payIntl:'🌍 International',payUsdtNote:'Send USDT (Binance) to this address:',payUsdtEmpty:'No USDT address yet — please contact the Admin to pay',payCopyAddr:'Copy',payPaidBtn:'I have paid',payLoading:'Loading payment options…',payNone:'No payment method yet — please contact the Admin',
@@ -2530,7 +2510,7 @@ var THEMES=[
 ];
 var THEME_IDX=0;
 function renderSwatches(){
-  var rows=[document.getElementById('colorRow'),document.getElementById('fabColorRow')];
+  var rows=[document.getElementById('colorRow')];
   rows.forEach(function(row){
     if(!row)return;
     row.innerHTML='';
@@ -2574,7 +2554,7 @@ function setMode(m,save){
   if(save!==false){try{localStorage.setItem('movai-mode',MODE);}catch(e){}}
 }
 function syncModeBtns(){
-  var map={dark:['modeBtnDark','fabModeDark'],light:['modeBtnLight','fabModeLight'],auto:['modeBtnAuto','fabModeAuto']};
+  var map={dark:['modeBtnDark'],light:['modeBtnLight'],auto:['modeBtnAuto']};
   for(var k in map){
     var on=(MODE===k);
     map[k].forEach(function(id){var b=document.getElementById(id);if(b)b.className=on?'on':'';});
@@ -2776,10 +2756,9 @@ function applyLang(){
   var dr=document.getElementById('drawer');if(dr)dr.setAttribute('aria-label',tx('menuLabel'));
   var cb=document.querySelector('#drawer .drawer-close');if(cb)cb.setAttribute('aria-label',tx('closeLabel'));
   var mb=document.getElementById('menuBtn');if(mb)mb.setAttribute('aria-label',tx('menuLabel'));
-  var fb=document.getElementById('fabBtn');if(fb)fb.setAttribute('aria-label',tx('fabLabel'));
-  [['langBtnKm','fabLangKm','km'],['langBtnEn','fabLangEn','en']].forEach(function(g){
-    var on=(LANG===g[2]);
-    [g[0],g[1]].forEach(function(id){var b=document.getElementById(id);if(b)b.className=on?'on':'';});
+  [['langBtnKm','km'],['langBtnEn','en']].forEach(function(g){
+    var on=(LANG===g[1]);
+    var b=document.getElementById(g[0]);if(b)b.className=on?'on':'';
   });
   var pm=gen.mode,pp=gen.provider;
   genSetMode(pm);
@@ -3104,6 +3083,83 @@ function modelsLiveLoad(){
    into view (the 5-minute interval + first load are wired in the
    init block next to pkgPricesLoad). */
 document.addEventListener('visibilitychange',function(){if(document.visibilityState==='visible')modelsLiveLoad();});
+/* ================= API status — live per-key provider status =================
+   GET https://movai-proxy.onrender.com/api/public/provider-status
+   (public, no key) returns {providers:{suno:[{key,status,note,at,
+   lastOk},...], magichour:[...], musicapi:[...], novai:[...],
+   groq:[...]}} — one entry per API key the Admin runs on the
+   server. Everywhere a provider name shows (the Create provider
+   dropdown + its selected field, the API Keys cards) a coloured
+   dot appears next to it: green = a key is working (ok), red =
+   every key is exhausted (out of credit/quota or auth failed),
+   gray = not used yet (unknown). When one key runs out the
+   server auto-switches to the next key — the label names the
+   key now in use («Key 2») and an exhausted key's short reason
+   (the server note) shows in red. Fetched on page open, every
+   5 minutes, when the page becomes visible again, and after
+   every Generate (hooks in the generate finally blocks + init).
+   ANY failure keeps the last known status — the UI never breaks. */
+var PROV_STATUS_URL='https://movai-proxy.onrender.com/api/public/provider-status';
+var PROV_STATUS={};
+function provServerKey(pid){
+  if(pid==='suno'||pid==='magichour'||pid==='musicapi'||pid==='novai'||pid==='groq')return pid;
+  return null;
+}
+function provStatusInfo(pid){
+  var sk=provServerKey(pid);if(!sk)return null;
+  var arr=PROV_STATUS[sk];
+  if(!Array.isArray(arr)||!arr.length)return{state:'unknown',keyNum:null,exKey:null,exNote:''};
+  var active=null,ex=null;
+  for(var i=0;i<arr.length;i++){
+    var k=arr[i];if(!k)continue;
+    if(k.status==='ok'&&!active)active=k;
+    if(k.status==='exhausted'&&!ex)ex=k;
+  }
+  if(active)return{state:'ok',keyNum:active.key,exKey:ex?ex.key:null,exNote:ex?String(ex.note||''):''};
+  if(ex)return{state:'exhausted',keyNum:null,exKey:ex.key,exNote:String(ex.note||'')};
+  return{state:'unknown',keyNum:null,exKey:null,exNote:''};
+}
+function provStatusDotCls(st){return st==='ok'?'pglow-green':(st==='exhausted'?'pglow-red':'pglow-gray');}
+function provStatusTitle(st){return tx(st==='ok'?'apiWorking':(st==='exhausted'?'apiExhausted':'apiUnused'));}
+/* Dot + «Key N» in use (+ the exhausted reason in red when no key
+   works) — the inline status shown right next to a provider name. */
+function provStatusInlineHtml(pid){
+  var info=provStatusInfo(pid);if(!info)return '';
+  var h='<span class="pglow '+provStatusDotCls(info.state)+'" title="'+escHtml(provStatusTitle(info.state))+'"></span>';
+  if(info.state==='ok'&&info.keyNum!=null)h+='<span class="pstat-key">'+escHtml(tx('apiKeyW'))+' '+info.keyNum+'</span>';
+  if(info.state==='exhausted')h+='<span class="pstat-note" title="'+escHtml(info.exNote||provStatusTitle('exhausted'))+'">'+escHtml(info.exNote||provStatusTitle('exhausted'))+'</span>';
+  return h;
+}
+/* When another key still works, the dead key's reason still shows
+   (small red note, e.g. in the provider dropdown's right side). */
+function provStatusExNoteHtml(pid){
+  var info=provStatusInfo(pid);if(!info)return '';
+  if(info.state==='ok'&&info.exKey!=null&&info.exNote){
+    var t=tx('apiKeyW')+' '+info.exKey+': '+info.exNote;
+    return '<span class="pstat-note" title="'+escHtml(t)+'">'+escHtml(t)+'</span>';
+  }
+  return '';
+}
+function provStatusApply(){
+  try{genRenderProviders();}catch(e){}
+  var slots=document.querySelectorAll('[data-pstat]');
+  for(var i=0;i<slots.length;i++)slots[i].innerHTML=provStatusInlineHtml(slots[i].getAttribute('data-pstat'));
+}
+function provStatusLoad(){
+  try{
+    var ctrl=('AbortController' in window)?new AbortController():null;
+    var to=null,opts={method:'GET'};
+    if(ctrl){opts.signal=ctrl.signal;to=setTimeout(function(){try{ctrl.abort();}catch(e){}},9000);}
+    fetch(PROV_STATUS_URL,opts).then(function(r){
+      if(to)clearTimeout(to);
+      if(!r.ok)throw new Error('HTTP '+r.status);
+      return r.json();
+    }).then(function(j){
+      if(j&&j.providers&&typeof j.providers==='object'){PROV_STATUS=j.providers;provStatusApply();}
+    }).catch(function(){if(to)clearTimeout(to);});
+  }catch(e){}
+}
+document.addEventListener('visibilitychange',function(){if(document.visibilityState==='visible')provStatusLoad();});
 /* NovAI models — the page's built-in defaults are the free models
    the generation calls have always used (image cogview-3-flash,
    video cogvideox-flash); the Auto Update list above can append
@@ -4120,7 +4176,23 @@ function genRenderProviders(){
       pf.style.display='flex';
       var nm=document.getElementById('genProviderFieldName');if(nm)nm.innerHTML=provNameHtml(cur.name);
       var gl=document.getElementById('genProviderFieldGlow');
-      if(gl){if(cur.glow){gl.style.display='inline-block';gl.className='pglow pglow-'+cur.glow;}else{gl.style.display='none';}}
+      var stEl=document.getElementById('genProviderFieldStat');
+      var pstF=provStatusInfo(cur.id);
+      if(pstF){
+        /* Live API status from the server (provider-status) takes
+           the glow dot's place for providers the server reports
+           on: green/red/gray dot + the key now in use, or the
+           exhausted reason in red. */
+        if(gl){gl.style.display='inline-block';gl.className='pglow '+provStatusDotCls(pstF.state);gl.title=provStatusTitle(pstF.state);}
+        if(stEl){
+          if(pstF.state==='ok'&&pstF.keyNum!=null){stEl.className='pstat-key';stEl.textContent=tx('apiKeyW')+' '+pstF.keyNum;stEl.title='';}
+          else if(pstF.state==='exhausted'){stEl.className='pstat-note';stEl.textContent=pstF.exNote||provStatusTitle('exhausted');stEl.title=pstF.exNote||'';}
+          else{stEl.className='pstat-key';stEl.textContent='';stEl.title='';}
+        }
+      }else{
+        if(gl){if(cur.glow){gl.style.display='inline-block';gl.className='pglow pglow-'+cur.glow;gl.title='';}else{gl.style.display='none';}}
+        if(stEl){stEl.textContent='';stEl.title='';}
+      }
       var lm=document.getElementById('genProviderFieldLimit');if(lm)lm.textContent=cur.limit?loc(cur.limit):'';
     }
   }
@@ -4130,13 +4202,21 @@ function genRenderProviders(){
       if(p.hidden)return '';
       var al=provAdminLocked(p),lk=!!p.locked;
       var h='<button type="button" class="dd-opt'+(p.id===gen.provider?' on':'')+((lk||al)?' off':'')+'"'+((lk||al)?' aria-disabled="true"':' onclick="genSetProvider(\''+p.id+'\')"')+'>';
-      /* Owner rule 2026-11-16: name + coloured glow dot ONLY —
-         no status text («Online Live» …) next to a provider. */
-      h+='<span class="dd-opt-main"><span>'+provNameHtml(p.name)+'</span>'+(p.glow?'<span class="pglow pglow-'+p.glow+'"></span>':'')+'</span>';
+      /* API status (owner rule 2026-11-16): providers the server
+         reports on show the LIVE status from
+         /api/public/provider-status — coloured dot (green ok /
+         red exhausted / gray not used yet) + the key now in use
+         («Key 2») + an exhausted key's short reason; providers
+         with no server status keep their built-in glow dot. */
+      var pst=provStatusInfo(p.id);
+      h+='<span class="dd-opt-main"><span>'+provNameHtml(p.name)+'</span>'+(pst?provStatusInlineHtml(p.id):(p.glow?'<span class="pglow pglow-'+p.glow+'"></span>':''))+'</span>';
       h+='<span class="dd-opt-right">';
       if(al)h+='<span class="dd-lock">'+escHtml(tx('adminLock'))+'</span>';
       else if(lk)h+='<span class="dd-locknote">'+escHtml(loc(p.lockNote))+'</span>';
-      else if(p.limit)h+='<span>'+escHtml(loc(p.limit))+'</span>';
+      else{
+        if(pst&&pst.state==='ok')h+=provStatusExNoteHtml(p.id);
+        if(p.limit)h+='<span>'+escHtml(loc(p.limit))+'</span>';
+      }
       h+='</span></button>';
       return h;
     }).join('');
@@ -4330,7 +4410,7 @@ function genKeyProviderCard(kp){
   body+='</div>';
   if(kp.id==='novai')body+=novaiAccountHtml();
   if(kp.id==='magichour')body+=magichourFreeHtml();
-  return genKeyCard(kp.id,provNameHtml(kp.name),right,body);
+  return genKeyCard(kp.id,provNameHtml(kp.name)+'<span class="pstat-slot" data-pstat="'+kp.id+'">'+provStatusInlineHtml(kp.id)+'</span>',right,body);
 }
 function genRenderKeys(){
   var box=document.getElementById('genKeys');if(!box)return;
@@ -4492,7 +4572,7 @@ async function genGenerate(){
       genMsg(m);
     }
   }
-  finally{genStopProg();btn.disabled=false;if(abtn)abtn.disabled=false;genAnyBusy=false;epSyncButtons();try{genGateSync();}catch(e){}}
+  finally{genStopProg();btn.disabled=false;if(abtn)abtn.disabled=false;genAnyBusy=false;epSyncButtons();try{genGateSync();}catch(e){}try{provStatusLoad();}catch(e){}}
 }
 
 /* Manual «អូតូ» (Auto) button next to Generate: nothing switches on its own —
@@ -4524,7 +4604,7 @@ async function genAutoGenerate(){
       genMsg(m);
     }
   }
-  finally{genStopProg();btn.disabled=false;if(abtn)abtn.disabled=false;genAnyBusy=false;epSyncButtons();}
+  finally{genStopProg();btn.disabled=false;if(abtn)abtn.disabled=false;genAnyBusy=false;epSyncButtons();try{provStatusLoad();}catch(e){}}
 }
 
 async function genDoImage(p,prompt,key){
@@ -6684,6 +6764,7 @@ async function epGenerate(i){
     genStopProg();
     genProgTarget=null;genTargetBox=null;
     genAnyBusy=false;epSyncButtons();
+    try{provStatusLoad();}catch(e){}
   }
 }
 
@@ -7024,7 +7105,6 @@ function menuGo(id,mode){
    sheet; Notifications → the notifications sheet (guests get the
    log-in sheet instead, exactly like the header bell). */
 function dockGo(dest){
-  try{closeFab();}catch(e){}
   if(dest==='packages'){packagesShow();dockSync();return;}
   if(dest==='notif'){notifBellClick();dockSync();return;}
   packagesHide();
@@ -7074,40 +7154,6 @@ function chatFabShow(){
   f.style.visibility='';
   f.style.opacity='';
   f.style.pointerEvents='';
-}
-var fabAnimTimer=null;
-function toggleFab(){
-  var p=document.getElementById('fabPanel');if(!p)return;
-  var b=document.getElementById('fabBtn');
-  if(p.classList.contains('open')){closeFab();return;}
-  if(fabAnimTimer){clearTimeout(fabAnimTimer);fabAnimTimer=null;}
-  p.classList.remove('blur-out');
-  p.classList.add('open');
-  p.classList.remove('blur-in');void p.offsetWidth;p.classList.add('blur-in');
-  if(b)b.setAttribute('aria-expanded','true');
-}
-function fabGo(a){
-  closeFab();
-  appSetView('create');
-  if(a==='history'){
-    packagesHide();
-    var eh=document.getElementById('sec-history');
-    if(eh)eh.scrollIntoView({behavior:'smooth',block:'start'});
-    return;
-  }
-  packagesHide();
-  genSetMode(a);
-  var el=document.getElementById('sec-create');
-  if(el)el.scrollIntoView({behavior:'smooth',block:'start'});
-}
-function closeFab(){
-  var p=document.getElementById('fabPanel');if(!p)return;
-  var b=document.getElementById('fabBtn');if(b)b.setAttribute('aria-expanded','false');
-  if(!p.classList.contains('open'))return;
-  if(sheetAnimReduced()){p.classList.remove('open');p.classList.remove('blur-in');p.classList.remove('blur-out');return;}
-  p.classList.remove('blur-in');p.classList.remove('blur-out');void p.offsetWidth;p.classList.add('blur-out');
-  if(fabAnimTimer)clearTimeout(fabAnimTimer);
-  fabAnimTimer=setTimeout(function(){fabAnimTimer=null;p.classList.remove('open');p.classList.remove('blur-out');},250);
 }
 /* ================= Public feed + Post to Public =================
    The «Public» tab is the DEFAULT view: the site opens on the
@@ -12971,6 +13017,7 @@ function genInit(){
   try{adminLoadSettings();}catch(e){}
   try{pkgPricesLoad();}catch(e){}
   try{modelsLiveLoad();setInterval(modelsLiveLoad,5*60*1000);}catch(e){}
+  try{provStatusLoad();setInterval(provStatusLoad,5*60*1000);}catch(e){}
   histWatchInit();
   animWatchScan();
   if(window.puter){genPuterStatus();}
@@ -12990,11 +13037,8 @@ function genInit(){
     var nw=document.getElementById('genNovaiModelWrap');
     var nd=document.getElementById('genNovaiModelDrop');
     if(nw&&nd&&!nw.contains(e.target))nd.style.display='none';
-    var fw=document.getElementById('fabWrap');
-    var fp=document.getElementById('fabPanel');
-    if(fw&&fp&&fp.classList.contains('open')&&!fw.contains(e.target))closeFab();
   });
-  document.addEventListener('keydown',function(e){if(e.key==='Escape'){closeMenu();closeFab();profileClose();loginSheetClose();pubSheetClose();notifSheetClose();packagesHide();}});
+  document.addEventListener('keydown',function(e){if(e.key==='Escape'){closeMenu();profileClose();loginSheetClose();pubSheetClose();notifSheetClose();packagesHide();}});
 }
 
 (function(){ try{genInit()}catch(e){} })();
