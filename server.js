@@ -2947,7 +2947,7 @@ function apiRoute(req, res, urlPath) {
   // POST /api/public/like — PUBLIC. {postId, email}. One like per email;
   // a repeat like from the same email returns the current count unchanged.
   if (req.method === 'POST' && urlPath === '/api/public/like') {
-    readJSONBody(req, 64 * 1024).then((body) => {
+    readJSONBody(req, 64 * 1024).then(async (body) => {
       const postId = typeof body.postId === 'string' ? body.postId.trim() : '';
       const email = normEmail(body && body.email) || (typeof body.email === 'string' ? body.email.trim().toLowerCase().slice(0, 200) : '');
       if (!postId) return sendJSON(res, 200, { ok: false, error: 'សូមដាក់ postId' });
@@ -2960,6 +2960,7 @@ function apiRoute(req, res, urlPath) {
         p.likedBy.push(email);
         p.likes = p.likedBy.length;
         savePublicPosts(posts);
+        await ghFlushFile(PUBLIC_FILE);
       }
       return sendJSON(res, 200, { ok: true, likes: p.likes || 0 });
     }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
@@ -2967,7 +2968,7 @@ function apiRoute(req, res, urlPath) {
   }
   // POST /api/public/view — PUBLIC. {postId}. Counts one view.
   if (req.method === 'POST' && urlPath === '/api/public/view') {
-    readJSONBody(req, 64 * 1024).then((body) => {
+    readJSONBody(req, 64 * 1024).then(async (body) => {
       const postId = typeof body.postId === 'string' ? body.postId.trim() : '';
       if (!postId) return sendJSON(res, 200, { ok: false, error: 'សូមដាក់ postId' });
       const posts = loadPublicPosts();
@@ -2975,6 +2976,7 @@ function apiRoute(req, res, urlPath) {
       if (!p) return sendJSON(res, 404, { ok: false, error: 'រក post នេះមិនឃើញទេ' });
       p.views = (p.views || 0) + 1;
       savePublicPosts(posts);
+      await ghFlushFile(PUBLIC_FILE);
       return sendJSON(res, 200, { ok: true, views: p.views });
     }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
     return;
