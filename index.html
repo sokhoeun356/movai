@@ -573,7 +573,7 @@ html[data-mode="light"] .btn-free{color:#63910c}
    normal text colour (no class). */
 .premium-name{color:#ff5fa2 !important;background:linear-gradient(90deg,rgba(255,95,162,.30),rgba(255,213,79,.38));padding:1px 8px;border-radius:999px;box-decoration-break:clone;-webkit-box-decoration-break:clone}
 /* Profile User ID row: the Copy button sits at the row's end. */
-.uid-copy{margin-left:auto;flex:0 0 auto;background:var(--accent-fill);color:#0d1005;border:1px solid transparent;border-radius:999px;padding:7px 14px;font-family:inherit;font-size:0.75rem;font-weight:800;cursor:pointer;min-height:34px}
+.uid-copy{flex:0 0 auto;background:var(--accent-fill);color:#0d1005;border:1px solid transparent;border-radius:999px;padding:5px 13px;font-family:inherit;font-size:0.75rem;font-weight:800;cursor:pointer;min-height:30px;line-height:1.3;white-space:nowrap}
 .uid-copy:active{filter:brightness(.93)}
 /* ===== Public / Create view tabs + Public feed =====
    Two big tabs sit at the top of the page: «Public» (the default
@@ -953,11 +953,12 @@ html[data-smooth="1"] .dock{background-color:rgba(var(--glass-tint),.96)}
 .chat-react-btn:active{opacity:.75}
 .chat-react-btn.on{background:var(--accent-fill);border-color:transparent}
 /* Listen button (owner order 2026-11-16): every AI bubble gets a
-   «🔊 ស្ដាប់» button beside Copy — it plays the answer aloud via the
-   server's Microsoft Edge TTS endpoint (POST /api/chat/tts, no API
-   key on the client), falling back to the browser's own
-   speechSynthesis when the server TTS fails. While audio plays the
-   button shows the playing state; tapping it again stops. */
+   «🔊 ស្ដាប់» button beside Copy — it plays the answer aloud with
+   the browser's own speechSynthesis (the server's Microsoft TTS
+   is blocked by Microsoft, so the browser voice is used first and
+   only; see the spoken-replies section at the end of the file).
+   While it speaks the button shows the playing state; tapping it
+   again stops, and the button always resets when speech ends. */
 .chat-listen-btn{border:1px solid var(--line2);background:transparent;color:var(--accent-text);border-radius:999px;padding:5px 13px;font-size:0.75rem;font-weight:800;font-family:inherit;cursor:pointer;line-height:1.35;min-height:32px;white-space:nowrap}
 .chat-listen-btn:active{opacity:.75}
 .chat-listen-btn.playing{color:#22c55e;border-color:rgba(34,197,94,.55);animation:chatListenPulse 1.2s ease-in-out infinite}
@@ -1123,10 +1124,6 @@ html[data-smooth="1"] .brand-frame,html[data-smooth="1"] .acct-chip,html[data-sm
     <button onclick="menuGo('sec-history')"><span data-i18n="navHistory">ប្រវត្តិ</span> <small>History</small></button>
     <button onclick="menuGo('sec-packages')"><span data-i18n="navPackages">កញ្ចប់សេវាកម្ម</span> <small data-i18n="navPackagesSub">Packages</small></button>
   </nav>
-  <div class="set-box" id="notifBox" style="margin-top:22px">
-    <span class="set-label"><span data-i18n="navNotif">ដំណឹង</span> · Notifications<span class="notif-count" id="notifDrawerBadge" style="display:none">0</span></span>
-    <div id="notifDrawerList"></div>
-  </div>
   <div class="set-box" id="acctBox" style="margin-top:22px">
     <div id="acctUser" style="display:none"></div>
   </div>
@@ -1153,6 +1150,7 @@ html[data-smooth="1"] .brand-frame,html[data-smooth="1"] .acct-chip,html[data-sm
         <span id="pushStateNote" style="font-size:0.75rem;color:var(--glass-muted);line-height:1.5"></span>
       </div>
     </div>
+    <div id="setIpSlot"></div>
 
   </div>
   <div class="drawer-foot" style="margin-top:26px;padding-top:16px;border-top:1px solid var(--glass-line);display:flex;gap:18px;flex-wrap:wrap">
@@ -6990,16 +6988,24 @@ function acctNameHtml(u){
 }
 function profileIdRow(u){
   if(!u||!acctValidUserId(u.id))return '';
-  return '<div style="display:flex;align-items:center;gap:10px;margin-top:12px;background:rgba(140,150,170,.10);border:1px solid var(--line);border-radius:12px;padding:10px 13px"><span style="font-size:0.8125rem;font-weight:800;color:var(--muted);flex:0 0 auto">'+escHtml(tx('profileUserId'))+'</span><b style="font-size:0.9375rem;font-weight:900;letter-spacing:.08em">'+escHtml(u.id)+'</b><button type="button" class="uid-copy" data-uid="'+escHtml(u.id)+'" onclick="profileCopyId(this)">'+escHtml(tx('profileCopy'))+'</button></div>';
+  /* Two lines, so the Copy button can NEVER spill past the card or
+     the ☰ drawer edge (owner fix 2026-11-16): line 1 is the label +
+     the ID itself (the ID may ellipsis-shrink on very narrow
+     screens, it never pushes anything out), line 2 holds the small
+     Copy pill, right-aligned, entirely inside the card. */
+  return '<div style="margin-top:12px;background:rgba(140,150,170,.10);border:1px solid var(--line);border-radius:12px;padding:10px 13px"><div style="display:flex;align-items:center;gap:10px;min-width:0"><span style="font-size:0.8125rem;font-weight:800;color:var(--muted);flex:0 0 auto">'+escHtml(tx('profileUserId'))+'</span><b style="font-size:0.875rem;font-weight:900;letter-spacing:.05em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0">'+escHtml(u.id)+'</b></div><div style="display:flex;justify-content:flex-end;margin-top:8px"><button type="button" class="uid-copy" data-uid="'+escHtml(u.id)+'" onclick="profileCopyId(this)">'+escHtml(tx('profileCopy'))+'</button></div></div>';
 }
-/* The signed-in user's own IP shows exactly ONCE in the ☰ drawer:
-   here, as a row in the drawer's account box under the User ID row
-   (alongside the name, Gmail and User ID) — and nowhere else in the
-   drawer; the drawer's notification cards no longer carry it.
-   Source, in order: the IP the Admin sync returned for this very
-   account (rec.ip, adopted in acctApplyServerData), else the IP on
-   the newest notification about this account itself. No IP known
-   yet → no row at all (never a guessed or placeholder address). */
+/* The signed-in user's own IP shows in exactly TWO places (owner
+   order 2026-11-16): as a row in the drawer's account / Profile box
+   under the User ID row (alongside the name, Gmail and User ID),
+   and as a row in the drawer's Settings box. It NEVER appears in a
+   notification card — not in the drawer (which no longer carries
+   notification cards at all) and not in the separate Notifications
+   sheet. Source, in order: the IP the Admin sync returned for this
+   very account (rec.ip, adopted in acctApplyServerData), else the
+   IP on the newest notification about this account itself. No IP
+   known yet → no row at all (never a guessed or placeholder
+   address). */
 function acctMyIp(u){
   u=u||acctCurrent();if(!u)return '';
   if(u.ip&&/^\d{1,3}(\.\d{1,3}){3}$/.test(String(u.ip)))return String(u.ip);
@@ -7015,12 +7021,14 @@ function profileIpRowHtml(u){
   return '<div style="display:flex;align-items:center;gap:10px;margin-top:8px;background:rgba(140,150,170,.10);border:1px solid var(--line);border-radius:12px;padding:10px 13px"><span style="font-size:0.8125rem;font-weight:800;color:var(--muted);flex:0 0 auto">IP</span><b style="font-size:0.875rem;font-weight:800;letter-spacing:.04em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0">'+escHtml(ip)+'</b></div>';
 }
 /* Notifications can arrive after the account box was rendered (the
-   IP may only become known then) — refresh just the IP slot in
-   place, never the whole box, so a half-typed name field survives. */
+   IP may only become known then) — refresh just the IP slots in
+   place (the account-box slot AND the Settings-box slot), never the
+   whole box, so a half-typed name field survives. */
 function acctIpSlotSync(){
-  var slot=document.getElementById('acctIpSlot');if(!slot)return;
   var u=null;try{u=acctCurrent();}catch(e){}
-  slot.innerHTML=u?profileIpRowHtml(u):'';
+  var html=u?profileIpRowHtml(u):'';
+  var slot=document.getElementById('acctIpSlot');if(slot)slot.innerHTML=html;
+  var s2=document.getElementById('setIpSlot');if(s2)s2.innerHTML=html;
 }
 function profileCopyId(btn){
   var id=btn&&btn.getAttribute?btn.getAttribute('data-uid'):'';if(!id)return;
@@ -7742,9 +7750,9 @@ function notifTimeStr(ts){
 /* ===== New device / New user cards: exactly 5 rows =====
    A notice is one of these cards when it is a sign-in notice
    (type 'login') or its title/body names a new device / new user.
-   Such a card shows ONLY one-line rows — Name, Gmail, ID, IP,
-   Model (just IP + Model when it is about the signed-in user) —
-   never the raw server sentence. Values come from the
+   Such a card shows ONLY one-line rows — Name, Gmail, ID, Model
+   (just Model when it is about the signed-in user; NO card shows
+   an IP row any more) — never the raw server sentence. Values come from the
    notice's own structured fields first (notifNorm), then from
    parsing the notice text, then — when the notice is about the
    signed-in account itself — from that account. */
@@ -7798,14 +7806,14 @@ function notifDevRow(v,cls,field,i){
    is the account's own Gmail — or, with no Gmail anywhere, when its
    User ID resolves to the account's. Such a card must NOT repeat
    the name / Gmail / User ID: that identity already shows ONCE in
-   the drawer's account box below. It shows only the event (header
-   title + time) and the event's own facts — IP and Model — with a
-   Copy button for the IP only. Notices about OTHER people keep all
-   five rows (Name, Gmail, ID, IP, Model). In the ☰ DRAWER the IP
-   row is dropped from EVERY device/user card (noIp): the signed-in
-   user's IP shows exactly once, in the drawer's account box (see
-   profileIpRowHtml), so a self card there is just event + Model +
-   time. The separate notifications sheet keeps the IP rows. */
+   the drawer's account box. It shows only the event (header
+   title + time) and the event's own device fact — the Model.
+   Notices about OTHER people keep four rows (Name, Gmail, ID,
+   Model). The IP row is dropped from EVERY device/user card
+   everywhere (noIp is always on, owner order 2026-11-16): the
+   signed-in user's IP shows only in the account / Profile box and
+   in the Settings box (see profileIpRowHtml), never in a
+   notification card. */
 function notifIsSelf(n){
   var u=null;try{u=acctCurrent();}catch(e){}
   if(!u||!u.email)return false;
@@ -7851,8 +7859,11 @@ function notifCopyField(ev,btn,i,field){
   if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(v).then(done).catch(function(){profileCopyIdFallback(v);done();});}
   else{profileCopyIdFallback(v);done();}
 }
-function notifItemHtml(n,i,inDrawer){
-  if(notifIsDevCard(n))return notifDevItemHtml(n,i,!!inDrawer);
+function notifItemHtml(n,i){
+  /* noIp is ALWAYS on (owner order 2026-11-16): no notification
+     card anywhere shows an IP row — the user's IP lives only in
+     the account / Profile box and the Settings box. */
+  if(notifIsDevCard(n))return notifDevItemHtml(n,i,true);
   var h='<button type="button" class="notif-item'+(n.read?'':' unread')+'" onclick="notifItemClick('+i+')">';
   h+=notifIcon(n);
   h+='<span class="notif-main"><span class="nt">'+escHtml(n.title||notifDefTitle(n))+'</span>';
@@ -7873,16 +7884,17 @@ function notifRenderAll(){
   var label=c>99?'99+':String(c);
   var b=document.getElementById('notifBadge');
   if(b){if(u&&c>0){b.style.display='';b.textContent=label;}else b.style.display='none';}
-  var db=document.getElementById('notifDrawerBadge');
-  if(db){if(u&&c>0){db.style.display='';db.textContent=label;}else db.style.display='none';}
   var kb=document.getElementById('dockNotifBadge');
   if(kb){if(u&&c>0){kb.style.display='';kb.textContent=label;}else kb.style.display='none';}
-  var html,drawerHtml;
-  if(!u){html='<p class="notif-note">'+escHtml(tx('notifGuest'))+'</p>';drawerHtml=html;}
-  else if(!notifItems.length){html='<p class="notif-note">'+escHtml(tx(notifLoaded?'notifEmpty':'notifLoading'))+'</p>';drawerHtml=html;}
-  else{html='';drawerHtml='';for(var i=0;i<notifItems.length;i++){html+=notifItemHtml(notifItems[i],i,false);drawerHtml+=notifItemHtml(notifItems[i],i,true);}}
+  /* Notifications render ONLY into the separate Notifications
+     sheet (owner order 2026-11-16): the ☰ drawer carries no
+     notification cards at all — just the menu and the account /
+     Profile box. The bell + dock badges above still count unread. */
+  var html;
+  if(!u){html='<p class="notif-note">'+escHtml(tx('notifGuest'))+'</p>';}
+  else if(!notifItems.length){html='<p class="notif-note">'+escHtml(tx(notifLoaded?'notifEmpty':'notifLoading'))+'</p>';}
+  else{html='';for(var i=0;i<notifItems.length;i++){html+=notifItemHtml(notifItems[i],i);}}
   var l1=document.getElementById('notifList');if(l1)l1.innerHTML=html;
-  var l2=document.getElementById('notifDrawerList');if(l2)l2.innerHTML=drawerHtml;
   try{acctIpSlotSync();}catch(e){}
 }
 function notifLoad(){
@@ -8249,6 +8261,7 @@ function acctRender(){
       if(acctBox)acctBox.style.display='none';
     }
   }
+  try{acctIpSlotSync();}catch(e){}
   try{pkgRender();}catch(e){}
 }
 function acctRenderUser(u){
@@ -9315,9 +9328,9 @@ function aiChatAddBubble(role,text,isErr,opts){
     var crow=document.createElement('div');
     crow.className='chat-copy-row';
     /* Listen button beside Copy (owner order 2026-11-16): plays this
-       answer aloud with the chosen Edge voice (ប្រុស Piseth / ស្រី
-       Sreymom) through the server TTS endpoint, or the browser's
-       speechSynthesis if the server fails. Same stopPropagation
+       answer aloud with the browser's own speechSynthesis voice
+       (the server's Microsoft TTS is blocked by Microsoft — the
+       browser voice is used first and only). Same stopPropagation
        guard as Copy so it never toggles the collapsible bubble. */
     var lbtn=document.createElement('button');
     lbtn.type='button';
@@ -9472,30 +9485,28 @@ async function aiChatSend(){
 document.addEventListener('keydown',function(e){
   if(e.key==='Escape'){var p=document.getElementById('chatPanel');if(p&&p.classList.contains('open'))aiChatClose();}
 });
-/* ================= AI Chat — spoken replies (Edge TTS) =================
+/* ================= AI Chat — spoken replies (browser voice) =================
    Owner order 2026-11-16: every AI answer can be LISTENED to. The
-   «🔊 ស្ដាប់» button on each AI bubble POSTs the answer text to the
-   MovAi proxy's Microsoft Edge TTS endpoint — Edge TTS needs no API
-   key; the server does the synthesis and returns MP3 audio:
-     POST https://movai-proxy.onrender.com/api/chat/tts
-     {text: <answer>, voice: 'Piseth' | 'Sreymom'}
-   The reply may be the MP3 itself (audio/*), a JSON {url}/{audioUrl},
-   or a JSON {audio: <base64>} — all three are played. If the server
-   TTS fails for any reason (offline, error status, unplayable), the
-   browser's own speechSynthesis speaks the text instead, preferring
-   a Khmer (km) voice when one is installed, so listening still
-   works. The ប្រុស/ស្រី toggle under the chat header picks the voice
-   (male = Piseth, female = Sreymom) and is remembered in
-   localStorage ('movai-chat-voice'). Only one answer plays at a
-   time; tapping the playing button again stops it. */
-var AI_CHAT_TTS_URL='https://movai-proxy.onrender.com/api/chat/tts';
+   «🔊 ស្ដាប់» button speaks the answer with the BROWSER's own
+   speechSynthesis — FIRST and only. It used to call the server's
+   Microsoft Edge TTS endpoint first, but Microsoft blocks that
+   endpoint from the server (403), and waiting on the dead server
+   call was exactly what left the button stuck on «កំពុងចាក់…»
+   forever with no sound. The browser voice needs no server at
+   all: it prefers a Khmer (km) voice when the phone has one. If
+   the answer is Khmer and the phone has NO Khmer voice, a clear
+   note says so under the answer instead of a stuck button. The
+   button ALWAYS returns to «🔊 ស្ដាប់»: the utterance's own
+   onend/onerror reset it, and a watchdog (aiChatSpeakNow) resets
+   it even on phones that never fire those events. The ប្រុស/ស្រី
+   toggle under the chat header is remembered in localStorage
+   ('movai-chat-voice'). Only one answer plays at a time; tapping
+   the playing button again stops it. */
 var aiChatVoice='male';
 try{var _savedVoice=localStorage.getItem('movai-chat-voice');if(_savedVoice==='male'||_savedVoice==='female')aiChatVoice=_savedVoice;}catch(e){}
-var aiChatAudio=null;
-var aiChatObjUrl=null;
 var aiChatSpeakBtn=null;
 var aiChatSpeakToken=0;
-function aiChatVoiceName(){return aiChatVoice==='female'?'Sreymom':'Piseth';}
+var aiChatWatchdog=null;
 function aiChatVoiceUI(){
   var m=document.getElementById('chatVoiceMale'),f=document.getElementById('chatVoiceFemale');
   if(m)m.classList.toggle('on',aiChatVoice==='male');
@@ -9511,73 +9522,106 @@ function aiChatResetSpeakBtn(){
   if(aiChatSpeakBtn&&aiChatSpeakBtn.isConnected){aiChatSpeakBtn.textContent='🔊 ស្ដាប់';aiChatSpeakBtn.classList.remove('playing');}
   aiChatSpeakBtn=null;
 }
+function aiChatSpeakWatchdogClear(){if(aiChatWatchdog){try{clearInterval(aiChatWatchdog);}catch(e){}aiChatWatchdog=null;}}
 function aiChatStopSpeak(){
   aiChatSpeakToken++;
-  if(aiChatAudio){try{aiChatAudio.pause();}catch(e){}aiChatAudio=null;}
-  if(aiChatObjUrl){try{URL.revokeObjectURL(aiChatObjUrl);}catch(e){}aiChatObjUrl=null;}
+  aiChatSpeakWatchdogClear();
   try{if('speechSynthesis' in window)speechSynthesis.cancel();}catch(e){}
   aiChatResetSpeakBtn();
 }
-function aiChatSpeakBrowser(text,btn,token){
-  /* Fallback: the browser's built-in speech synthesis. Prefers a
-     Khmer voice when the device has one; otherwise the default
-     voice still reads the text aloud. */
+function aiChatSpeakDone(token){
+  if(token!==aiChatSpeakToken)return;
+  aiChatSpeakWatchdogClear();
+  aiChatResetSpeakBtn();
+}
+function aiChatHasKhmer(t){return /[\u1780-\u17FF]/.test(String(t||''));}
+function aiChatKmVoice(vs){
+  for(var i=0;i<vs.length;i++){if(vs[i]&&vs[i].lang&&String(vs[i].lang).toLowerCase().indexOf('km')===0)return vs[i];}
+  return null;
+}
+function aiChatSpeakNote(btn,msg){
+  /* A clear note under the answer, shown when listening is
+     impossible (e.g. the phone has no Khmer voice) — it stays a
+     few seconds, then removes itself. */
   try{
-    if(!('speechSynthesis' in window)){aiChatResetSpeakBtn();return;}
+    var row=btn&&btn.parentNode?btn.parentNode:null;if(!row||!row.parentNode)return;
+    var old=row.parentNode.querySelector('.chat-speak-note');if(old)old.remove();
+    var note=document.createElement('div');
+    note.className='chat-speak-note';
+    note.style.cssText='margin-top:6px;font-size:0.75rem;font-weight:700;line-height:1.55;color:#f87171;text-align:right';
+    note.textContent=msg;
+    row.parentNode.insertBefore(note,row.nextSibling);
+    setTimeout(function(){try{note.remove();}catch(e){}},5000);
+  }catch(e){}
+}
+function aiChatSpeakBrowser(text,btn,token){
+  /* Speak with the browser's own speech synthesis. The voice list
+     can load a beat late, so an empty list waits briefly for
+     «voiceschanged» (a few short tries) before deciding whether
+     the phone has a Khmer voice at all. */
+  if(!('speechSynthesis' in window)){aiChatSpeakDone(token);aiChatSpeakNote(btn,(typeof LANG!=='undefined'&&LANG==='en')?'⚠ This browser cannot speak aloud':'⚠ Browser នេះមិនអាចនិយាយជាសំឡេងបានទេ');return;}
+  var waits=0;
+  var begin=function(){
+    if(token!==aiChatSpeakToken)return;
+    var vs=[];try{vs=speechSynthesis.getVoices()||[];}catch(e){}
+    if(!vs.length&&waits<3){
+      waits++;
+      var go=function(){try{speechSynthesis.removeEventListener('voiceschanged',go);}catch(e){}begin();};
+      try{speechSynthesis.addEventListener('voiceschanged',go);}catch(e){}
+      setTimeout(function(){try{speechSynthesis.removeEventListener('voiceschanged',go);}catch(e){}begin();},700);
+      return;
+    }
+    aiChatSpeakNow(text,btn,token,vs);
+  };
+  begin();
+}
+function aiChatSpeakNow(text,btn,token,vs){
+  try{
+    var km=aiChatKmVoice(vs);
+    if(aiChatHasKhmer(text)&&vs.length&&!km){
+      /* The phone HAS voices but none of them is Khmer: a foreign
+         voice reading Khmer — or total silence — helps no one.
+         Say clearly that there is no Khmer voice, and reset. */
+      aiChatSpeakDone(token);
+      aiChatSpeakNote(btn,(typeof LANG!=='undefined'&&LANG==='en')?'⚠ No Khmer voice on this phone — install a Khmer voice in the phone\u2019s Text-to-speech settings to listen':'⚠ ទូរស័ព្ទនេះគ្មានសំឡេងខ្មែរទេ — សូមដំឡើងសំឡេងខ្មែរក្នុងការកំណត់ Text-to-speech របស់ទូរស័ព្ទ ទើបអាចស្ដាប់បាន');
+      return;
+    }
     speechSynthesis.cancel();
     var u=new SpeechSynthesisUtterance(String(text||''));
-    var vs=[];try{vs=speechSynthesis.getVoices()||[];}catch(e){}
-    for(var i=0;i<vs.length;i++){
-      if(vs[i]&&vs[i].lang&&String(vs[i].lang).toLowerCase().indexOf('km')===0){u.voice=vs[i];u.lang=vs[i].lang;break;}
-    }
-    if(!u.voice){try{u.lang='km-KH';}catch(e){}}
+    if(km){u.voice=km;u.lang=km.lang;}
+    else if(aiChatHasKhmer(text)){try{u.lang='km-KH';}catch(e){}}
     if(aiChatSpeakBtn===btn)btn.textContent='⏹ កំពុងចាក់…';
-    u.onend=function(){if(token===aiChatSpeakToken)aiChatResetSpeakBtn();};
-    u.onerror=function(){if(token===aiChatSpeakToken)aiChatResetSpeakBtn();};
+    u.onend=function(){aiChatSpeakDone(token);};
+    u.onerror=function(){aiChatSpeakDone(token);};
     speechSynthesis.speak(u);
-  }catch(e){aiChatResetSpeakBtn();}
+    /* Watchdog — the button must NEVER stay stuck on «កំពុងចាក់…»:
+       some phones never fire onend (long text, a voice that fails
+       silently). While the browser reports it is speaking, leave
+       it playing — the tick also calls resume(), which unsticks
+       Chrome's long-utterance pause. Once the browser reports
+       silence twice in a row, or a generous cap for the text
+       length passes, stop everything and reset the button. */
+    var started=Date.now();
+    var cap=Math.min(180000,Math.max(20000,String(text||'').length*110));
+    var silent=0;
+    aiChatSpeakWatchdogClear();
+    aiChatWatchdog=setInterval(function(){
+      if(token!==aiChatSpeakToken){aiChatSpeakWatchdogClear();return;}
+      var speaking=false;try{speaking=!!(speechSynthesis.speaking||speechSynthesis.pending);}catch(e){}
+      if(speaking){silent=0;try{speechSynthesis.resume();}catch(e){}}
+      else if(Date.now()-started>1500){silent++;if(silent>=2){aiChatSpeakDone(token);return;}}
+      if(Date.now()-started>cap){try{speechSynthesis.cancel();}catch(e){}aiChatSpeakDone(token);}
+    },500);
+  }catch(e){aiChatSpeakDone(token);}
 }
-async function aiChatSpeak(text,btn){
+function aiChatSpeak(text,btn){
   if(aiChatSpeakBtn===btn){aiChatStopSpeak();return;}
   aiChatStopSpeak();
   var token=aiChatSpeakToken;
   aiChatSpeakBtn=btn;
   btn.classList.add('playing');
-  btn.textContent='⏳ កំពុងផ្ទុក…';
-  var url=null;
-  try{
-    var res=await fetch(AI_CHAT_TTS_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:String(text||''),voice:aiChatVoiceName()})});
-    if(token!==aiChatSpeakToken)return;
-    if(!res.ok)throw new Error('tts '+res.status);
-    var ct='';try{ct=(res.headers.get('content-type')||'').toLowerCase();}catch(e){}
-    if(ct.indexOf('audio')===0||ct.indexOf('octet-stream')>=0){
-      var blob=await res.blob();
-      if(token!==aiChatSpeakToken)return;
-      aiChatObjUrl=URL.createObjectURL(blob);
-      url=aiChatObjUrl;
-    }else{
-      var d=null;try{d=await res.json();}catch(e){}
-      if(token!==aiChatSpeakToken)return;
-      if(d){
-        if(typeof d.url==='string'&&d.url)url=d.url;
-        else if(typeof d.audioUrl==='string'&&d.audioUrl)url=d.audioUrl;
-        else if(typeof d.audio==='string'&&d.audio){
-          url=(d.audio.indexOf('http')===0||d.audio.indexOf('data:')===0)?d.audio:('data:audio/mpeg;base64,'+d.audio);
-        }
-      }
-    }
-    if(!url)throw new Error('tts no audio');
-    var a=new Audio(url);
-    aiChatAudio=a;
-    btn.textContent='⏹ កំពុងចាក់…';
-    a.onended=function(){if(token===aiChatSpeakToken)aiChatStopSpeak();};
-    a.onerror=function(){if(token===aiChatSpeakToken){aiChatAudio=null;aiChatSpeakBrowser(text,btn,token);}};
-    var pr=null;try{pr=a.play();}catch(e){}
-    if(pr&&pr.catch)pr.catch(function(){if(token===aiChatSpeakToken&&aiChatAudio===a){aiChatAudio=null;aiChatSpeakBrowser(text,btn,token);}});
-  }catch(err){
-    if(token!==aiChatSpeakToken)return;
-    aiChatSpeakBrowser(text,btn,token);
-  }
+  btn.textContent='⏹ កំពុងចាក់…';
+  aiChatSpeakBrowser(String(text||''),btn,token);
 }
 aiChatVoiceUI();
 try{if('speechSynthesis' in window){speechSynthesis.getVoices();if(speechSynthesis.onvoiceschanged!==undefined)speechSynthesis.addEventListener('voiceschanged',function(){try{speechSynthesis.getVoices();}catch(e){}});}}catch(e){}
