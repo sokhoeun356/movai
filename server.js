@@ -490,6 +490,36 @@ function logGrant(entry) {
     ghPersistFile(GRANTS_FILE);
   } catch (e) {}
 }
+// ---- Server-side credit deduction (real, persistent) ----
+// Generation used to deduct credits only in the browser; the next sync
+// overwrote the browser value with the server value, so spent credits
+// came back. Now the server is the truth: it checks the balance BEFORE
+// calling the provider, and deducts AFTER the provider accepts the job.
+// Every deduction is logged to grants.json (the credit history) and the
+// user file is GitHub-flushed before returning success.
+async function deductForGeneration(email, mediaCost, songCost, reason) {
+  const em = normEmail(email);
+  if (!em) return { ok: true, guest: true };
+  const users = loadUsers();
+  const u = users[em];
+  if (!u) return { ok: true, guest: true };
+  const mCost = Math.floor(numOr(mediaCost, 0));
+  const sCost = Math.floor(numOr(songCost, 0));
+  const mBal = Math.floor(numOr(u.credits, 0));
+  const sBal = Math.floor(numOr(u.songCredits, 0));
+  if (mCost > 0 && mBal < mCost) return { ok: false, error: 'Image.Video Credit មិនគ្រប់ទេ', needBuy: true, kind: 'media', balance: mBal, cost: mCost };
+  if (sCost > 0 && sBal < sCost) return { ok: false, error: 'Song Credit មិនគ្រប់ទេ', needBuy: true, kind: 'song', balance: sBal, cost: sCost };
+  if (mCost > 0 || sCost > 0) {
+    if (mCost > 0) u.credits = Math.max(0, mBal - mCost);
+    if (sCost > 0) u.songCredits = Math.max(0, sBal - sCost);
+    u.updatedAt = new Date().toISOString();
+    saveUsers(users);
+    await ghFlushFile(USERS_FILE);
+    logGrant({ email: em, credits: -mCost, songCredits: -sCost, note: reason || 'generation', at: u.updatedAt });
+  }
+  return { ok: true, credits: Math.floor(numOr(u.credits, 0)), songCredits: Math.floor(numOr(u.songCredits, 0)) };
+}
+
 // Activity log (./data/activity.json) — one record per generation attempt
 // (create calls only: /api/gen/image, /api/gen/video, /api/gen/song) and
 // per /api/admin/sync call (user sign-in/app open), so the Admin app can
@@ -1672,6 +1702,19 @@ function apiRoute(req, res, urlPath) {
         const prompt = typeof body.prompt === 'string' ? body.prompt.trim().slice(0, 2000) : '';
         const model = typeof body.model === 'string' && body.model.trim() ? body.model.trim().slice(0, 50) : 'v6';
         if (!title && !lyrics && !style && !prompt) return sendJSON(res, 200, { ok: false, error: 'សូមសរសេរ prompt ជាមុនសិន' });
+        // Server-side credit check: a song costs 12 Song Credits. If the
+        // user cannot pay, fail BEFORE calling the provider (so the admin's
+        // provider account is never charged for a song the user cannot afford).
+        // needBuy tells the website to offer buying more credit.
+        const SONG_COST = 12;
+        const _songEm = normEmail(body.email);
+        if (_songEm) {
+          const _songUsers = loadUsers();
+          const _songU = _songUsers[_songEm];
+          if (_songU && Math.floor(numOr(_songU.songCredits, 0)) < SONG_COST) {
+            return sendJSON(res, 200, { ok: false, error: 'Song Credit មិនគ្រប់ទេ · Not enough Song Credits — សូមទិញ Credit បន្ថែម', needBuy: true, kind: 'song', balance: Math.floor(numOr(_songU.songCredits, 0)), cost: SONG_COST });
+          }
+        }
         if (provider === 'musicapi') {
           let reqBody;
           if (lyrics) {
@@ -1710,7 +1753,8 @@ function apiRoute(req, res, urlPath) {
             if (e && e.noKey) return sendJSON(res, 200, { ok: false, error: 'Admin មិនទាន់ដាក់ MusicAPI Key ទេ' });
             return sendJSON(res, 200, { ok: false, error: (e && e.message) || 'MusicAPI: request failed' });
           }
-          return sendJSON(res, 200, { ok: true, jobId: out.jobId });
+          const _ded = await deductForGeneration(body.email, 0, SONG_COST, 'song:' + provider);
+          return sendJSON(res, 200, { ok: true, jobId: out.jobId, credits: _ded.credits, songCredits: _ded.songCredits });
         }
         if (provider === 'suno') {
           // Suno (MovAi) via sunoapi.org — the admin-stored gateway
@@ -1750,7 +1794,8 @@ function apiRoute(req, res, urlPath) {
           } catch (e) {
             return sendJSON(res, 200, { ok: false, error: (e && e.message) || 'Suno: request failed' });
           }
-          return sendJSON(res, 200, { ok: true, jobId: out.jobId });
+          const _ded = await deductForGeneration(body.email, 0, SONG_COST, 'song:' + provider);
+          return sendJSON(res, 200, { ok: true, jobId: out.jobId, credits: _ded.credits, songCredits: _ded.songCredits });
         }
         if (provider === 'magichour') {
           // Magic Hour music — POST /v1/ai-music-generator.
@@ -1796,7 +1841,8 @@ function apiRoute(req, res, urlPath) {
             if (e && e.noKey) return sendJSON(res, 200, { ok: false, error: 'Admin មិនទាន់ដាក់ Magic Hour Key ទេ' });
             return sendJSON(res, 200, { ok: false, error: (e && e.message) || 'Magic Hour: request failed' });
           }
-          return sendJSON(res, 200, { ok: true, jobId: out.jobId });
+          const _ded = await deductForGeneration(body.email, 0, SONG_COST, 'song:' + provider);
+          return sendJSON(res, 200, { ok: true, jobId: out.jobId, credits: _ded.credits, songCredits: _ded.songCredits });
         }
         return sendJSON(res, 200, { ok: false, error: 'Provider មិនស្គាល់ទេ' });
       } catch (e) { return sendJSON(res, 200, { ok: false, error: 'ហៅ API មិនបានទេ៖ ' + (e && e.message ? e.message : 'unknown') }); }
@@ -2697,6 +2743,18 @@ function apiRoute(req, res, urlPath) {
     const s = loadSettings();
     return sendJSON(res, 200, { ok: true, providers: s.providers || { image: null, video: null, song: null } });
   }
+  // GET /api/public/credit-history?email=... — PUBLIC. The user's own
+  // credit history: every grant (+) and deduction (-) with note + time,
+  // newest first. This is what the Profile shows as "History".
+  if (req.method === 'GET' && urlPath === '/api/public/credit-history') {
+    const email = normEmail(new URL(req.url, 'http://localhost').searchParams.get('email') || '');
+    if (!email) return sendJSON(res, 200, { ok: false, error: 'សូមដាក់ Gmail' });
+    let arr = [];
+    try { const j = JSON.parse(fs.readFileSync(GRANTS_FILE, 'utf8')); if (Array.isArray(j)) arr = j; } catch (e) {}
+    const mine = arr.filter((g) => g && typeof g.email === 'string' && g.email.toLowerCase() === email).slice(-100).reverse();
+    return sendJSON(res, 200, { ok: true, email, history: mine.map((g) => ({ credits: numOr(g.credits, 0), songCredits: numOr(g.songCredits, 0), note: typeof g.note === 'string' ? g.note : '', at: g.at || '' })) });
+  }
+
   // ---- Auto Update Version New (endpoints) ----
   // GET /api/admin/updates — admin key required. Lists updates + settings.
   if (req.method === 'GET' && urlPath === '/api/admin/updates') {
