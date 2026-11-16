@@ -4901,12 +4901,28 @@ async function dlSaveSongMp3(src,title,fallback){
   mp3ProgStart();
   try{
     var rp=null;
-    /* Wake the server first (Render free tier sleeps after 15 min idle):
-       a light request that absorbs the ~40s cold start, so the
-       conversion request below does not die while the server boots.
-       Then retry the conversion on network failure (a cold server drops
-       the first connection). The server caches/queues conversions, so
-       a retry never converts twice. */
+    /* FAST PATH (owner order 2026-11-16): the audio is already an MP3
+       (Public feed songs, uploads/*.mp3) — download it DIRECTLY from
+       the browser, no server conversion, no waiting for the server to
+       wake. Falls through to the server conversion only if the direct
+       fetch fails (network/CORS) or the URL is not an MP3. */
+    if(/\.mp3(\?|#|$)/i.test(src)){
+      try{
+        var dctrl=new AbortController();
+        var dt=setTimeout(function(){dctrl.abort();},60000);
+        var dr=await fetch(src,{signal:dctrl.signal});
+        clearTimeout(dt);
+        if(dr.ok){
+          var dblob=await dr.blob();
+          if(dblob&&dblob.size){ mp3ProgSet(100); dlBlobSave(dblob,fname); mp3ProgDone(); return; }
+        }
+      }catch(e){}
+    }
+    /* Server conversion (WAV → MP3, or CORS-blocked MP3): wake the
+       server first (Render free tier sleeps after 15 min idle) — a
+       light request that absorbs the ~40s cold start — then retry the
+       conversion on network failure. The server caches/queues
+       conversions, so a retry never converts twice. */
     try{ await fetch(GEN_API+'/public/vapid-key'); }catch(e){}
     var attempt=0;
     while(attempt<3&&!rp){
