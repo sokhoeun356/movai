@@ -3278,6 +3278,7 @@ function apiRoute(req, res, urlPath) {
         plan: typeof body.plan === 'string' ? body.plan.slice(0, 50) : packageId,
         amount: pkg.price,
         credits: pkg.credits, songCredits: pkg.songCredits, days: pkg.days,
+        receiptUrl: typeof body.receiptUrl === 'string' ? body.receiptUrl.trim().slice(0, 500) : '',
         status: 'pending', createdAt: now, updatedAt: now,
       };
       reqs.push(r);
@@ -3723,6 +3724,37 @@ function apiRoute(req, res, urlPath) {
         return sendJSON(res, 200, { ok: true, url: proto + '://' + host + '/uploads/' + name, name, kind, size: buf.length });
       } catch (e) {
         return sendJSON(res, 200, { ok: false, error: 'រក្សាទុកឯកសារបរាជ័យ' });
+      }
+    }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
+    return;
+  }
+  // POST /api/public/purchase-receipt — PUBLIC (no admin key). The website
+  // uploads a payment-receipt screenshot (image only, max 5 MB) and gets
+  // back a public URL, which it then sends with the purchase request as
+  // receiptUrl. The Admin app shows the receipt so the Admin can verify
+  // the payment is real before approving (stops fake "I have paid").
+  // Receipts are saved under ./data/uploads/ with an "rcpt-" prefix and
+  // backed up to GitHub like other uploads.
+  if (req.method === 'POST' && urlPath === '/api/public/purchase-receipt') {
+    readJSONBody(req, 8 * 1024 * 1024).then(async (body) => {
+      const email = normEmail(body && body.email);
+      if (!email) return sendJSON(res, 200, { ok: false, error: 'សូមដាក់ Gmail ត្រឹមត្រូវ' });
+      const ext = uploadSafeExt('image', body.filename);
+      if (!ext) return sendJSON(res, 200, { ok: false, error: 'សូមជ្រើសរូបភាព (JPG/PNG/WebP)' });
+      const b64 = typeof body.data === 'string' ? body.data.replace(/\s/g, '') : '';
+      if (!b64 || !/^[A-Za-z0-9+/=]+$/.test(b64)) return sendJSON(res, 200, { ok: false, error: 'ទិន្នន័យរូបភាពមិនត្រឹមត្រូវទេ' });
+      const buf = Buffer.from(b64, 'base64');
+      if (!buf.length || buf.length > 5 * 1024 * 1024) return sendJSON(res, 200, { ok: false, error: 'រូបភាពធំពេក (អតិបរមា 5 MB)' });
+      try {
+        fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+        const name = 'rcpt-' + Date.now().toString(36) + '-' + crypto.randomInt(100000, 999999) + ext;
+        fs.writeFileSync(path.join(UPLOADS_DIR, name), buf);
+        const proto = req.headers && req.headers['x-forwarded-proto'] === 'http' ? 'http' : 'https';
+        const host = (req.headers && req.headers.host) || 'movai-proxy.onrender.com';
+        await ghPutUpload(name, b64);
+        return sendJSON(res, 200, { ok: true, url: proto + '://' + host + '/uploads/' + name, name, size: buf.length });
+      } catch (e) {
+        return sendJSON(res, 200, { ok: false, error: 'រក្សាទុកវិក្កយបត្របរាជ័យ' });
       }
     }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
     return;
