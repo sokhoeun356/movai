@@ -102,7 +102,7 @@ const GH_DATA_FILES = [
   'push-subs.json', 'packages.json', 'purchase-requests.json',
   'public.json', 'package-events.json', 'blocked-models.json',
   'model-logins.json', 'blocked-ips.json', 'blocked-emails.json',
-  'updates.json',
+  'updates.json', 'admin-lockouts.json',
 ];
 const ghShaCache = {}; // filename -> GitHub blob sha (for PUT updates)
 function ghEnabled() { return !!GH_TOKEN; }
@@ -224,39 +224,74 @@ async function ghRestoreAll() {
   await ghRestoreUploads(); // uploaded MP3/cover files (GitHub-backed)
 }
 
-// Failed admin-key attempts (attack detection) — in-memory ONLY, never
-// persisted to a file. Map: client IP -> {count, firstAt, model}.
-// AUTO-BLOCK (attack only): 5 failed admin-key attempts from one IP
-// within 10 minutes auto-blocks that IP at once (added to
-// blocked-ips.json + a 'security' admin notification). A correct admin
-// key always wins over an IP block (the key IS the admin identity), so
-// the real admin can never lock themselves out — a successful call with
-// the right key clears the failure counter for that IP. A NEW or changed
-// IP is NEVER blocked here — it only raises a 'new device' notification
-// on sync for the admin to review; IP blocking itself is MANUAL.
-const FAILED_ADMIN_MAX = 5;
-const FAILED_ADMIN_WINDOW_MS = 10 * 60 * 1000;
-const failedAdminAttempts = new Map();
+// Graduated admin-key lockout (owner order 2026-11-16) — wrong Admin
+// key attempts escalate per IP, stored in ./data/admin-lockouts.json
+// (GitHub-backed, survives restarts): 1st strike → 5 min, 2nd → 20 min,
+// 3rd → 1 hour, 4th+ → 12 hours. The block auto-expires; a correct key
+// always wins (the key IS the admin identity) and clears all strikes,
+// so the real admin can never lock themselves out. Attempts made WHILE
+// blocked do not add strikes or extend the block. Manual blocks in
+// blocked-ips.json stay permanent and are checked separately.
+const ADMIN_LOCKOUTS_FILE = path.join(DATA_DIR, 'admin-lockouts.json');
+const LOCKOUT_MINUTES = [5, 20, 60, 720]; // index = strikes-1, capped at 12h
+function loadAdminLockouts() {
+  try { const j = JSON.parse(fs.readFileSync(ADMIN_LOCKOUTS_FILE, 'utf8')); if (j && typeof j === 'object' && !Array.isArray(j)) return j; } catch (e) {}
+  return {};
+}
+function saveAdminLockouts(obj) {
+  try { fs.mkdirSync(DATA_DIR, { recursive: true }); } catch (e) {}
+  fs.writeFileSync(ADMIN_LOCKOUTS_FILE, JSON.stringify(obj, null, 2));
+  ghPersistFile(ADMIN_LOCKOUTS_FILE);
+}
+function lockoutMinutesFor(strikes) {
+  return LOCKOUT_MINUTES[Math.min(Math.max(strikes, 1) - 1, LOCKOUT_MINUTES.length - 1)];
+}
+function adminLockoutRemainingMs(ip) {
+  try {
+    if (!ip) return 0;
+    const rec = loadAdminLockouts()[ip];
+    if (!rec || !rec.blockedUntil) return 0;
+    return Math.max(0, rec.blockedUntil - Date.now());
+  } catch (e) { return 0; }
+}
+function lockoutTextKm(ms) {
+  const mins = Math.ceil(ms / 60000);
+  if (mins < 60) return mins + ' នាទី';
+  const h = Math.floor(mins / 60), r = mins % 60;
+  return h + ' ម៉ោង' + (r ? ' ' + r + ' នាទី' : '');
+}
+function lockoutTextEn(ms) {
+  const mins = Math.ceil(ms / 60000);
+  if (mins < 60) return mins + (mins === 1 ? ' minute' : ' minutes');
+  const h = Math.floor(mins / 60), r = mins % 60;
+  return h + (h === 1 ? ' hour' : ' hours') + (r ? ' ' + r + (r === 1 ? ' minute' : ' minutes') : '');
+}
+function clearAdminLockout(ip) {
+  try {
+    if (!ip) return;
+    const all = loadAdminLockouts();
+    if (all[ip]) { delete all[ip]; saveAdminLockouts(all); ghFlushFile(ADMIN_LOCKOUTS_FILE).catch(() => {}); }
+  } catch (e) {}
+}
 function recordFailedAdminAttempt(req, ip) {
   try {
     if (!ip) return;
     const now = Date.now();
-    let rec = failedAdminAttempts.get(ip);
-    if (!rec || (now - rec.firstAt) > FAILED_ADMIN_WINDOW_MS) rec = { count: 0, firstAt: now, model: '' };
-    rec.count += 1;
+    const all = loadAdminLockouts();
+    let rec = all[ip];
+    if (!rec || typeof rec !== 'object') rec = { strikes: 0, blockedUntil: 0, model: '' };
+    // Already inside a lockout: do not extend it, do not add strikes.
+    if (rec.blockedUntil && rec.blockedUntil > now) return;
+    rec.strikes = (rec.strikes || 0) + 1;
+    const mins = lockoutMinutesFor(rec.strikes);
+    rec.blockedUntil = now + mins * 60 * 1000;
+    rec.updatedAt = new Date().toISOString();
     const model = modelFromUA(req.headers && req.headers['user-agent']);
     if (model) rec.model = model;
-    failedAdminAttempts.set(ip, rec);
-    if (rec.count >= FAILED_ADMIN_MAX) {
-      failedAdminAttempts.delete(ip);
-      const blocked = loadBlockedIps();
-      if (!blocked.some((b) => b === ip)) {
-        blocked.push(ip);
-        saveBlockedIps(blocked);
-        ghFlushFile(BLOCKED_IPS_FILE).catch(() => {});
-        addNotification('security', '', '🚫 វាយប្រហារ · Auto-blocked attack', 'IP ' + ip + (rec.model ? ' (' + rec.model + ')' : '') + ' ព្យាយាមចូល Admin ដោយ key ខុស ' + rec.count + ' ដងក្នុង 10 នាទី — ត្រូវបានប្លុកដោយអូតូ');
-      }
-    }
+    all[ip] = rec;
+    saveAdminLockouts(all);
+    ghFlushFile(ADMIN_LOCKOUTS_FILE).catch(() => {});
+    addNotification('security', '', '🚫 វាយប្រហារ · Auto-blocked attack', 'IP ' + ip + (rec.model ? ' (' + rec.model + ')' : '') + ' ព្យាយាមចូល Admin ដោយ key ខុស (លើកទី ' + rec.strikes + ') — ត្រូវបានប្លុក ' + mins + ' នាទី');
   } catch (e) {}
 }
 function adminKeyOk(req) {
@@ -265,17 +300,25 @@ function adminKeyOk(req) {
   const h = String(req.headers['authorization'] || '');
   const m = /^Bearer\s+(.+)$/.exec(h);
   if (m && m[1] === k) {
-    // Correct key proves the admin — clear any failed attempts from
+    // Correct key proves the admin — clear any lockout/strikes from
     // this IP (a typo storm is forgiven once the right key arrives).
-    try { failedAdminAttempts.delete(getClientIp(req)); } catch (e) {}
+    try { clearAdminLockout(getClientIp(req)); } catch (e) {}
     return { ok: true };
   }
-  // Wrong or missing key. An auto/manual-blocked IP stays blocked.
+  // Wrong or missing key. A manually-blocked IP stays blocked.
   const ip = getClientIp(req);
   if (ip && loadBlockedIps().some((b) => b === ip)) {
     return { ok: false, error: 'គណនីនេះត្រូវបានប្លុក · This account is blocked' };
   }
+  const remMs = adminLockoutRemainingMs(ip);
+  if (remMs > 0) {
+    return { ok: false, error: 'គណនីនេះត្រូវបានប្លុក ' + lockoutTextKm(remMs) + 'ទៀត · This account is blocked for ' + lockoutTextEn(remMs) + ' more' };
+  }
   recordFailedAdminAttempt(req, ip);
+  const remMs2 = adminLockoutRemainingMs(ip);
+  if (remMs2 > 0) {
+    return { ok: false, error: 'Admin key មិនត្រឹមត្រូវទេ — ត្រូវបានប្លុក ' + lockoutTextKm(remMs2) + ' · Wrong admin key — blocked for ' + lockoutTextEn(remMs2) };
+  }
   return { ok: false, error: 'Admin key មិនត្រឹមត្រូវទេ' };
 }
 function normEmail(v) {
@@ -1590,6 +1633,8 @@ function ipRateCheck(req) {
   const ip = getClientIp(req);
   if (!ip) return { ok: true };
   if (loadBlockedIps().some((b) => b === ip)) return { ok: false, blocked: true };
+  const lockMs = adminLockoutRemainingMs(ip);
+  if (lockMs > 0) return { ok: false, blocked: true, lockoutMs: lockMs };
   const now = Date.now();
   let rec = _ipRate.get(ip);
   if (!rec || (now - rec.windowStart) >= IP_WINDOW_MS) { rec = { count: 0, windowStart: now }; _ipRate.set(ip, rec); }
@@ -1681,7 +1726,11 @@ function apiRoute(req, res, urlPath) {
   if (!isAdminKeyRequest(req)) {
     const ipc = ipRateCheck(req);
     if (!ipc.ok) {
-      if (ipc.blocked) return sendJSON(res, 200, { ok: false, error: 'គណនីនេះត្រូវបានប្លុក · This account is blocked' });
+      if (ipc.blocked) {
+        const rem = ipc.lockoutMs || 0;
+        const err = rem > 0 ? ('គណនីនេះត្រូវបានប្លុក ' + lockoutTextKm(rem) + 'ទៀត · This account is blocked for ' + lockoutTextEn(rem) + ' more') : 'គណនីនេះត្រូវបានប្លុក · This account is blocked';
+        return sendJSON(res, 200, { ok: false, error: err });
+      }
       if (ipc.rateLimited) { try { res.setHeader('Retry-After', String(ipc.retryAfter || 60)); } catch (e) {} return sendJSON(res, 429, { ok: false, error: 'Request ច្រើនពេក — សូមរង់ចាំ ' + (ipc.retryAfter || 60) + ' វិនាទី · Too many requests, please wait' }); }
     }
   }
