@@ -1659,6 +1659,7 @@ function apiRoute(req, res, urlPath) {
       }
       try {
         if (!body || typeof body.prompt !== 'string' || !body.prompt.trim()) return sendJSON(res, 200, { ok: false, error: 'សូមសរសេរ prompt ជាមុនសិន' });
+        if (!normEmail(body.email)) return sendJSON(res, 200, { ok: false, error: 'សូមចូលគណនេយ្យជាមុនសិន · Please sign in first', needLogin: true });
         const provider = body.provider;
         const _gateErr = await genFairnessGate(normEmail(body.email), provider);
         if (_gateErr) return sendJSON(res, 200, { ok: false, error: _gateErr });
@@ -1828,6 +1829,7 @@ function apiRoute(req, res, urlPath) {
       }
       try {
         if (!body || typeof body.prompt !== 'string' || !body.prompt.trim()) return sendJSON(res, 200, { ok: false, error: 'សូមសរសេរ prompt ជាមុនសិន' });
+        if (!normEmail(body.email)) return sendJSON(res, 200, { ok: false, error: 'សូមចូលគណនេយ្យជាមុនសិន · Please sign in first', needLogin: true });
         const provider = body.provider;
         const _gateErr = await genFairnessGate(normEmail(body.email), provider);
         if (_gateErr) return sendJSON(res, 200, { ok: false, error: _gateErr });
@@ -2053,6 +2055,10 @@ function apiRoute(req, res, urlPath) {
         const prompt = typeof body.prompt === 'string' ? body.prompt.trim().slice(0, 2000) : '';
         const model = typeof body.model === 'string' && body.model.trim() ? body.model.trim().slice(0, 50) : 'v6';
         if (!title && !lyrics && !style && !prompt) return sendJSON(res, 200, { ok: false, error: 'សូមសរសេរ prompt ជាមុនសិន' });
+        // Require a logged-in account: without an email the server cannot
+        // check or deduct credit, so the generation would be FREE (guest
+        // loophole). Block it instead of letting it through.
+        if (!normEmail(body.email)) return sendJSON(res, 200, { ok: false, error: 'សូមចូលគណនេយ្យជាមុនសិន · Please sign in first', needLogin: true });
         // Server-side credit check: a song costs 12 Song Credits. If the
         // user cannot pay, fail BEFORE calling the provider (so the admin's
         // provider account is never charged for a song the user cannot afford).
