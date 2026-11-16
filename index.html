@@ -43,7 +43,7 @@ main{max-width:720px;margin:0 auto;padding:calc(4.75rem + env(safe-area-inset-to
    notification bell sits on the LEFT, and the profile avatar (or,
    for guests, the Log in button) sits on the RIGHT beside it. The
    credit chips are GONE from the header entirely (owner order
-   2026-11-15): both balances (Song YELLOW, Image & Video PURPLE)
+   2026-11-15): both balances (Song LIME, Image & Video PURPLE)
    live ONLY in the Profile sheet now — tapping the avatar shows
    them there as clear balance rows. After log in, the Log in
    button is replaced by a glossy 3D profile avatar in the same
@@ -414,8 +414,8 @@ html[data-mode="light"] #genSunoModelDrop .dd-opt{color:#fff;border-top-color:rg
 .pkg-tabs{display:flex;gap:8px;margin-top:0}
 .pkg-tab{flex:1 1 0;min-width:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0;padding:7px 8px;border-radius:12px;border:1px solid var(--line);background:var(--card2);color:var(--muted);font-family:inherit;font-weight:800;font-size:0.92rem;cursor:pointer;min-height:44px;line-height:1.25;overflow-wrap:break-word;text-align:center}
 .pkg-tab small{font-size:0.65rem;font-weight:700;letter-spacing:.02em}
-.pkg-tab.song.on{background:rgba(255,196,0,.16);border-color:rgba(255,196,0,.65);color:#ffd83d}
-html[data-mode="light"] .pkg-tab.song.on{color:#8a6100}
+.pkg-tab.song.on{background:rgba(173,220,41,.16);border-color:rgba(173,220,41,.65);color:#ADDC29}
+html[data-mode="light"] .pkg-tab.song.on{color:#63910c}
 .pkg-tab.media.on{background:rgba(181,55,242,.16);border-color:rgba(181,55,242,.65);color:#e3aaff}
 html[data-mode="light"] .pkg-tab.media.on{color:#8f27c9}
 .pkg-pane{display:none}
@@ -464,29 +464,25 @@ html[data-mode="light"] .pkg-tab.media.on{color:#8f27c9}
    SOKHOEUN / Create by Owner» lives only on the free-video watermark
    cover, nowhere in the header and on no package card. */
 /* Package groups, colour-matched to the top credit chips:
-   purple = Image & Video packages, yellow = Song packages. */
+   purple = Image & Video packages, lime green = Song packages. */
 .pkg-group-head{display:flex;align-items:center;gap:7px;margin-top:8px}
 .pkg-group-head .gdot{width:10px;height:10px;border-radius:50%;flex:0 0 auto}
 .gdot-media{background:#b537f2;box-shadow:0 0 9px rgba(181,55,242,.85)}
-.gdot-song{background:#ffc400;box-shadow:0 0 9px rgba(255,196,0,.85)}
+.gdot-song{background:#ADDC29;box-shadow:0 0 9px rgba(173,220,41,.85)}
 .pkg-group-head h3{font-size:0.88rem;font-weight:900}
 .pkg-group-note{font-size:0.72rem;color:var(--muted);margin-top:3px;line-height:1.45}
-/* Package card colours follow the owner's reference cards (owner
-   order 2026-11-15, superseding the earlier yellow/purple flat
-   colours): Song packages wear an ORANGE gradient, Image & Video
-   packages a PURPLE gradient, like the two sample cards. The
-   gradients are PURE saturated colour end to end (owner order):
-   no white and no pale lavender mixed in, both card types built
-   the same way. NO green/lime behind or around the cards at all
-   (owner order 2026-11-15 18:21: the lime glow is removed
-   entirely — cards sit on the plain panel with only a neutral
-   dark drop shadow). All card
-   text is white; the Buy button
-   is a white pill whose label takes the card's own gradient
-   colour (orange on song cards, purple on media cards). Colour
-   only — prices, plan names, tabs, the carousel and the Buy
-   flow are untouched. */
-.pkg-card.song{background:linear-gradient(155deg,#ffb300 0%,#ff9100 55%,#f57c00 100%);color:#fff;border-radius:14px}
+/* Package card colours (owner order 2026-11-16, superseding the
+   2026-11-15 orange song cards): Song packages wear a LIME GREEN
+   gradient (#ADDC29, the app accent), Image & Video packages a
+   PURPLE gradient — only TWO colours now, no yellow/orange left.
+   The gradients are PURE saturated colour end to end: no white
+   and no pale lavender mixed in, both card types built the same
+   way; cards sit on the plain panel with only a neutral dark
+   drop shadow. All card text is white; the Buy button is a white
+   pill whose label takes the card's own colour (dark lime on
+   song cards, purple on media cards). Colour only — prices,
+   plan names, tabs, the carousel and the Buy flow are untouched. */
+.pkg-card.song{background:linear-gradient(155deg,#c2ec4e 0%,#ADDC29 55%,#86b814 100%);color:#fff;border-radius:14px}
 .pkg-card.media{background:linear-gradient(155deg,#b537f2 0%,#9b30e8 55%,#7e1fd1 100%);color:#fff;border-radius:14px}
 .pkg-card.song,.pkg-card.media{border-color:transparent;box-shadow:0 6px 18px rgba(0,0,0,.35)}
 .pkg-card.media.hot{border-color:transparent;box-shadow:0 6px 18px rgba(0,0,0,.35)}
@@ -497,10 +493,10 @@ html[data-mode="light"] .pkg-card.song .pkg-credits,html[data-mode="light"] .pkg
 .pkg-card .pkg-feats{color:rgba(255,255,255,.94)}
 .pkg-card.media>p{color:rgba(255,255,255,.85) !important}
 .pkg-card .btn{background:#fff;border-color:transparent}
-.pkg-card.song .btn{color:#d95d00}
+.pkg-card.song .btn{color:#63910c}
 .pkg-card.media .btn{color:#8f3bf2}
-.btn-free{background:rgba(255,196,0,.14);color:#ffd83d;border:1px solid rgba(255,196,0,.45)}
-html[data-mode="light"] .btn-free{color:#8a6100}
+.btn-free{background:rgba(173,220,41,.16);color:#ADDC29;border:1px solid rgba(173,220,41,.5)}
+html[data-mode="light"] .btn-free{color:#63910c}
 /* Profile sheet: packages are NOT listed inline — one tappable row
    opens the Packages section. */
 .prof-pkg-open{display:flex;align-items:center;gap:10px;width:100%;margin-top:16px;background:rgba(140,150,170,.08);border:1px solid var(--line);border-radius:12px;padding:14px 14px;font-family:inherit;font-size:0.9375rem;font-weight:900;color:var(--text);cursor:pointer;text-align:left;min-height:48px}
@@ -1201,12 +1197,12 @@ html[data-smooth="1"] .brand-frame,html[data-smooth="1"] .acct-chip,html[data-sm
   <div class="panel" id="sec-packages">
     <p id="pkgStatus" style="font-size:0.78rem;margin-top:6px;line-height:1.5"></p>
     <div class="pkg-tabs" role="tablist" aria-label="Package type">
-      <button type="button" class="pkg-tab song on" id="pkgTabSong" role="tab" aria-selected="true" onclick="pkgSetTab('song')"><span data-i18n="pkgTabSong">បទចម្រៀង</span><small>Songs</small></button>
-      <button type="button" class="pkg-tab media" id="pkgTabMedia" role="tab" aria-selected="false" onclick="pkgSetTab('media')"><span data-i18n="pkgTabMedia">រូបភាព និង វីដេអូ</span><small>Image &amp; Video</small></button>
+      <button type="button" class="pkg-tab song on" id="pkgTabSong" role="tab" aria-selected="true" onclick="pkgSetTab('song')"><span data-i18n="pkgTabSong">Create Music</span></button>
+      <button type="button" class="pkg-tab media" id="pkgTabMedia" role="tab" aria-selected="false" onclick="pkgSetTab('media')"><span data-i18n="pkgTabMedia">Create Video</span></button>
     </div>
     <div class="pkg-group-head" id="pkgHeadSong"><span class="gdot gdot-song"></span><h3 data-i18n="pkgGroupSong">សម្រាប់បទចម្រៀង · Song Credit</h3></div>
     <div class="pkg-group-head" id="pkgHeadMedia" style="display:none"><span class="gdot gdot-media"></span><h3 data-i18n="pkgGroupMedia">សម្រាប់រូបភាព និង វីដេអូ · Image.Video Credit</h3></div>
-    <p class="pkg-group-note" id="pkgNoteSong" data-i18n="pkgGroupSongNote">កញ្ចប់ពណ៌លឿង — ទិញហើយបានតែ Song Credit (ពណ៌លឿង ដូច chip នៅខាងលើ) ប៉ុណ្ណោះ</p>
+    <p class="pkg-group-note" id="pkgNoteSong" data-i18n="pkgGroupSongNote">កញ្ចប់ពណ៌ត្រួយចេក — ទិញហើយបានតែ Song Credit (ពណ៌ត្រួយចេក ដូច chip នៅខាងលើ) ប៉ុណ្ណោះ</p>
     <p class="pkg-group-note" id="pkgNoteMedia" data-i18n="pkgGroupMediaNote" style="display:none">កញ្ចប់ពណ៌ស្វាយ — ទិញហើយបានតែ Image.Video Credit (ពណ៌ស្វាយ ដូច chip នៅខាងលើ) ប៉ុណ្ណោះ</p>
     <div class="pkg-pane on" id="pkgPaneSong">
     <div class="pkg-grid" id="songPkgGrid"></div>
@@ -1530,12 +1526,12 @@ km:{
  pkgCreditsMonth:'11,000 Credit/ខែ',pkgCreditsYear:'140,000 Credit/ឆ្នាំ',
  pkgFeatMedia:'បង្កើតបានទាំងរូបភាព និងវីដេអូ',
  pkgFeatPremium:'បើក model Premium ទាំងអស់ (រូបភាព + វីដេអូ)',
- pkgBuy:'ទិញឥឡូវ',pkgActive:'កំពុងប្រើកញ្ចប់នេះ',pkgTabSong:'បទចម្រៀង',pkgTabMedia:'រូបភាព និង វីដេអូ',pkgDragHint:'អូសចុះក្រោមដើម្បីបិទ · Drag down to close',pkgWaitingAdmin:'រង់ចាំ Admin អនុម័ត',pkgReqSent:'បានផ្ញើសំណើរទិញទៅ Admin ហើយ — រង់ចាំ Admin អនុម័ត ទើប Credit ចូលគណនីរបស់អ្នក',pkgReqFail:'ផ្ញើសំណើរមិនបានទេ — Server មិនទាន់ភ្ជាប់ សូមព្យាយាមម្ដងទៀតបន្តិចក្រោយ',pkgReqSending:'កំពុងផ្ញើសំណើរទិញទៅ Admin…',
+ pkgBuy:'ទិញឥឡូវ',pkgActive:'កំពុងប្រើកញ្ចប់នេះ',pkgTabSong:'Create Music',pkgTabMedia:'Create Video',pkgDragHint:'អូសចុះក្រោមដើម្បីបិទ · Drag down to close',pkgWaitingAdmin:'រង់ចាំ Admin អនុម័ត',pkgReqSent:'បានផ្ញើសំណើរទិញទៅ Admin ហើយ — រង់ចាំ Admin អនុម័ត ទើប Credit ចូលគណនីរបស់អ្នក',pkgReqFail:'ផ្ញើសំណើរមិនបានទេ — Server មិនទាន់ភ្ជាប់ សូមព្យាយាមម្ដងទៀតបន្តិចក្រោយ',pkgReqSending:'កំពុងផ្ញើសំណើរទិញទៅ Admin…',
  pkgYourPlan:'កញ្ចប់របស់អ្នក',pkgActiveUntil:'ប្រើបានដល់ {d}',
  pkgGroupMedia:'សម្រាប់រូបភាព និង វីដេអូ · Image.Video Credit',pkgGroupMediaNote:'កញ្ចប់ពណ៌ស្វាយ — ទិញហើយបានតែ Image.Video Credit (ពណ៌ស្វាយ ដូច chip នៅខាងលើ) ប៉ុណ្ណោះ',
- pkgGroupSong:'សម្រាប់បទចម្រៀង · Song Credit',pkgGroupSongNote:'កញ្ចប់ពណ៌លឿង — ទិញហើយបានតែ Song Credit (ពណ៌លឿង ដូច chip នៅខាងលើ) ប៉ុណ្ណោះ',
+ pkgGroupSong:'សម្រាប់បទចម្រៀង · Song Credit',pkgGroupSongNote:'កញ្ចប់ពណ៌ត្រួយចេក — ទិញហើយបានតែ Song Credit (ពណ៌ត្រួយចេក ដូច chip នៅខាងលើ) ប៉ុណ្ណោះ',
  songFreeNote:'Credit ហ្វ្រី 24/ខែ — ទទួលបានដោយស្វ័យប្រវត្តិ ពេលចុះឈ្មោះគណនីថ្មី',songFreeAuto:'ទទួលដោយស្វ័យប្រវត្តិ',
- songPkgOnlyNote:'បានតែ Song Credit (ពណ៌លឿង) ប៉ុណ្ណោះ',pkgMediaOnlyNote:'បានតែ Image.Video Credit (ពណ៌ស្វាយ) ប៉ុណ្ណោះ',profileSongPlan:'កញ្ចប់បទចម្រៀង',
+ songPkgOnlyNote:'បានតែ Song Credit (ពណ៌ត្រួយចេក) ប៉ុណ្ណោះ',pkgMediaOnlyNote:'បានតែ Image.Video Credit (ពណ៌ស្វាយ) ប៉ុណ្ណោះ',profileSongPlan:'កញ្ចប់បទចម្រៀង',
  songDoneFmt:'ទិញរួចរាល់! កញ្ចប់បទចម្រៀង {name} បានបើក ហើយ Song Credit {c} បានបន្ថែមចូលគណនីរបស់អ្នកហើយ',
  pkgPremium:'Premium',mhPerSec:'Credit/វិនាទី',adminLock:'🔐 ចាក់សោ',provOnline:'Online Live',provBusy:'រវល់',provProblem:'មានបញ្ហា',
  pkgSheetTitle:'សំណើរទិញ',pkgSheetPlan:'កញ្ចប់',pkgCreditsLbl:'Credit ដែលទទួលបាន',pkgTotal:'តម្លៃសរុប',
@@ -1714,12 +1710,12 @@ en:{
  pkgCreditsMonth:'11,000 credits/month',pkgCreditsYear:'140,000 credits/year',
  pkgFeatMedia:'Create both images and videos',
  pkgFeatPremium:'Unlocks every Premium model (image + video)',
- pkgBuy:'Buy now',pkgActive:'This is your active package',pkgTabSong:'Songs',pkgTabMedia:'Image & Video',pkgDragHint:'Drag down to close',pkgWaitingAdmin:'Waiting for Admin approval',pkgReqSent:'Your purchase request was sent to the Admin — credits will arrive after the Admin approves it',pkgReqFail:'Could not send the request — the server is not connected yet, please try again in a little while',pkgReqSending:'Sending your purchase request to the Admin…',
+ pkgBuy:'Buy now',pkgActive:'This is your active package',pkgTabSong:'Create Music',pkgTabMedia:'Create Video',pkgDragHint:'Drag down to close',pkgWaitingAdmin:'Waiting for Admin approval',pkgReqSent:'Your purchase request was sent to the Admin — credits will arrive after the Admin approves it',pkgReqFail:'Could not send the request — the server is not connected yet, please try again in a little while',pkgReqSending:'Sending your purchase request to the Admin…',
  pkgYourPlan:'Your package',pkgActiveUntil:'Active until {d}',
  pkgGroupMedia:'For Image & Video · Image.Video Credit',pkgGroupMediaNote:'Purple packages — they add Image.Video Credit only (purple, like the credit chip at the top)',
- pkgGroupSong:'For Songs · Song Credit',pkgGroupSongNote:'Yellow packages — they add Song Credit only (yellow, like the credit chip at the top)',
+ pkgGroupSong:'For Songs · Song Credit',pkgGroupSongNote:'Lime green packages — they add Song Credit only (lime green, like the credit chip at the top)',
  songFreeNote:'24 free credits/month — granted automatically when a new account signs up',songFreeAuto:'Automatic',
- songPkgOnlyNote:'Song Credit only (yellow)',pkgMediaOnlyNote:'Image.Video Credit only (purple)',profileSongPlan:'Song package',
+ songPkgOnlyNote:'Song Credit only (lime green)',pkgMediaOnlyNote:'Image.Video Credit only (purple)',profileSongPlan:'Song package',
  songDoneFmt:'Purchase complete! The {name} song package is active and {c} Song Credit were added to your account',
  pkgPremium:'Premium',mhPerSec:'credits/sec',adminLock:'🔐 Locked',provOnline:'Online Live',provBusy:'Busy',provProblem:'Problem',
  pkgSheetTitle:'Purchase request',pkgSheetPlan:'Package',pkgCreditsLbl:'Credits you receive',pkgTotal:'Total',
@@ -2495,7 +2491,7 @@ function pkgRender(){
       var pl=pkgPlanById(plan.id);
       h='<span style="color:var(--accent-text);font-weight:800">'+escHtml(tx('pkgYourPlan'))+': '+(pl?escHtml(loc(pl.name)):escHtml(String(plan.id)))+'</span> · '+escHtml(tx('pkgActiveUntil').replace('{d}',new Date(plan.until).toLocaleDateString()));
     }
-    if(u)h+='<br>'+escHtml(tx('acctMediaCredit'))+': <b style="color:var(--accent-text)">'+(u.credits||0)+' Credit</b><br>'+escHtml(tx('acctSongCredit'))+': <b style="color:#f0b90b">'+(u.songCredits||0)+' Credit</b>';
+    if(u)h+='<br>'+escHtml(tx('acctMediaCredit'))+': <b style="color:var(--accent-text)">'+(u.credits||0)+' Credit</b><br>'+escHtml(tx('acctSongCredit'))+': <b style="color:#ADDC29">'+(u.songCredits||0)+' Credit</b>';
     st.innerHTML=h;
   }
   PKG_PLANS.forEach(function(pl){
@@ -2505,8 +2501,10 @@ function pkgRender(){
   });
   try{pkgPricesRender();}catch(e){}
 }
-/* Packages tabs: left = Songs (yellow), right = Image & Video (purple).
-   Only ONE group is shown at a time — no long mixed scroll. */
+/* Packages tabs: left = Create Music (lime green), right = Create
+   Video (purple). Each tab shows ONE name on ONE row (owner order
+   2026-11-16 — no doubled big+small names). Only ONE group is
+   shown at a time — no long mixed scroll. */
 var PKG_TAB='song';
 function pkgSetTab(t){
   PKG_TAB=(t==='media')?'media':'song';
@@ -2727,9 +2725,9 @@ function pkgBuyConfirm(){
   if(body)body.innerHTML='<p style="font-size:0.875rem;color:var(--muted);line-height:1.7">'+escHtml(tx('pkgReqSending'))+'</p>';
   pkgSendPurchaseRequest(pl).then(function(){pkgShowWaiting();}).catch(function(){pkgShowReqFail();});
 }
-/* ================= Song packages (Suno) — YELLOW group =================
+/* ================= Song packages (Suno) — LIME group =================
    A SEPARATE package group from the image & video packages above,
-   colour-matched to the YELLOW song credit chip at the top: buying
+   colour-matched to the LIME song credit chip at the top: buying
    one adds SONG credits only (rec.songCredits), never media credits.
    MovAi's own song prices: Free 24 credits/month (granted
    automatically at sign-up), Trial $5/month = 750, Popular $10/month
@@ -2780,7 +2778,7 @@ function songPkgBuyAsk(id){
   var u=(typeof acctCurrent==='function')?acctCurrent():null;
   var h='';
   h+='<div style="display:flex;justify-content:space-between;gap:10px;padding:8px 0;border-top:1px solid var(--line)"><span>'+escHtml(tx('pkgSheetPlan'))+'</span><b>'+escHtml(loc(pl.name))+' · MovAi</b></div>';
-  h+='<div style="display:flex;justify-content:space-between;gap:10px;padding:8px 0;border-top:1px solid var(--line)"><span>'+escHtml(tx('pkgCreditsLbl'))+'</span><b style="color:#f0b90b">'+pkgFmtNum(pl.credits)+' Credit</b></div>';
+  h+='<div style="display:flex;justify-content:space-between;gap:10px;padding:8px 0;border-top:1px solid var(--line)"><span>'+escHtml(tx('pkgCreditsLbl'))+'</span><b style="color:#ADDC29">'+pkgFmtNum(pl.credits)+' Credit</b></div>';
   h+='<div style="display:flex;justify-content:space-between;gap:10px;padding:8px 0;border-top:1px solid var(--line)"><span>'+escHtml(tx('pkgTotal'))+'</span><b>$'+pkgFmtPrice(pkgCurPrice(pl))+'</b></div>';
   h+='<p style="font-size:0.8125rem;color:var(--muted);line-height:1.7;margin-top:10px">'+escHtml(pkgNoteLive(pl))+' · '+escHtml(tx('songPkgOnlyNote'))+' · '+escHtml(tx('songCostSuno'))+'</p>';
   if(u){
@@ -7775,11 +7773,11 @@ function acctSaveName(){
    The header shows NO credit chips (owner order 2026-11-15): the
    account's TWO separate balances live ONLY in the Profile sheet,
    as clear colour-coded balance rows:
-   - songCredits → YELLOW row «បទចម្រៀង · Song»
+   - songCredits → LIME row «បទចម្រៀង · Song»
    - credits     → PURPLE row «រូប និង វីដេអូ · Image & Video»
      (the purple MovAi packages top up THIS balance — they are image
      & video packages — and the 250-credit free sign-up grant lands
-     here too; the yellow song packages top up songCredits instead.)
+     here too; the lime song packages top up songCredits instead.)
    The top-right corner is ONE horizontal row: the notification
    bell on the LEFT, and the Log in button (guest) or a glossy 3D
    avatar orb (signed in, the user's initial) on the RIGHT.
@@ -7816,7 +7814,7 @@ function acctRenderTopbar(u){
   }
 }
 function profileBalRow(kind,label,val){
-  var c=(kind==='song')?'#ffc400':'#b537f2';
+  var c=(kind==='song')?'#ADDC29':'#b537f2';
   return '<div style="display:flex;align-items:center;gap:9px;margin-top:10px;background:rgba(140,150,170,.10);border:1px solid var(--line);border-radius:12px;padding:11px 13px"><span style="width:11px;height:11px;border-radius:50%;flex:0 0 auto;background:'+c+';box-shadow:0 0 8px '+c+'"></span><span style="font-size:0.875rem;font-weight:700">'+escHtml(label)+'</span><b style="margin-left:auto;font-size:1.0625rem;font-weight:900;color:'+c+';font-variant-numeric:tabular-nums">'+acctFmtBal(val)+'</b></div>';
 }
 function profileInfoRow(label,val){
