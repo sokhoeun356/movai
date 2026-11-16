@@ -1476,6 +1476,10 @@ html[data-smooth="1"] .brand-frame,html[data-smooth="1"] .acct-chip,html[data-sm
             <span class="chip-label" data-i18n="lblSongDur">រយៈពេលបទ</span>
             <div id="genSongDur"></div>
           </div>
+          <div class="tool-group" id="songFlatGroup" style="display:none">
+            <span class="chip-label" data-i18n="lblSongPrice">តម្លៃ</span>
+            <span id="songFlatPrice" style="font-size:0.875rem;font-weight:700;color:var(--accent-text);line-height:1.5"></span>
+          </div>
         </div>
       </div>
       <div id="d3Inline" style="display:none;margin-top:4px">
@@ -1857,6 +1861,10 @@ km:{
  acctCredit:'Credit របស់អ្នក',acctLogout:'ចេញពីគណនី',
  chipSong:'Song Credit',chipMedia:'Image.Video Credit',
  acctSongCredit:'Song Credit',acctMediaCredit:'Image.Video Credit',
+ histTitle:'ប្រវត្តិ Credit',histEmpty:'មិនទាន់មានប្រវត្តិ Credit ទេ — ការកាត់ និងការបញ្ចូល Credit របស់អ្នកនឹងបង្ហាញនៅទីនេះ',
+ histSong:'បង្កើតបទចម្រៀង',histGift:'កាដូពី Admin · អ្នកប្រើថ្មី',histTopup:'បញ្ចូល Credit · ពី Admin/កញ្ចប់',histAdminDeduct:'Admin កាត់ Credit',
+ histBalanceAfter:'នៅសល់',histBuyMore:'ទិញបន្ថែម',
+ creditNotEnoughFmt:'Credit មិនគ្រប់ទេ — បទនេះត្រូវការ {c} Song Credit តែសមតុល្យរបស់អ្នកមាន {b} ប៉ុណ្ណោះ។ សូមទិញ Credit បន្ថែម។',
  profileTitle:'ប្រូហ្វាល់របស់ខ្ញុំ',profileBalance:'សមតុល្យ Credit',profileAccount:'គណនី',profileEmail:'Gmail',
  profilePlan:'កញ្ចប់សេវាកម្ម',profileFree:'ឥតគិតថ្លៃ (Free)',profileSince:'សមាជិកតាំងពី',profileLabel:'ប្រូហ្វាល់',
  profileUserId:'លេខសម្គាល់ (ID)',profileCopy:'ចម្លង',profileCopied:'បានចម្លង ✓',acctFirstName:'នាម · First name',acctLastName:'គោត្តនាម · Last name',
@@ -1908,7 +1916,7 @@ km:{
  setMode:'យប់ / ថ្ងៃ',modeDark:'យប់',modeLight:'ថ្ងៃ',modeAuto:'អូតូ',fabLabel:'ការកំណត់រហ័ស',
  setGlass:'កញ្ចក់ · ថ្លា / ព្រាល / ចាំង',glassClearP:'ថ្លា · Clear',glassClearLo:'0% · មិនថ្លា',glassClearHi:'100% · ថ្លាខ្លាំង',glassBlurP:'ព្រាល · Frosted / Blur',glassBlurLo:'0% · មិនព្រាល',glassBlurHi:'100% · ព្រាលខ្លាំង',glassShineP:'ចាំង · Shine',glassShineLo:'0% · មិនចាំង',glassShineHi:'100% · ចាំងខ្លាំង',setTxtBlur:'ព្រាលផ្ទៃខាងក្រោយអក្សរ',txtBlurLo:'0% · ច្បាស់',txtBlurHi:'100% · ព្រាលខ្លាំង',setBgBright:'ពន្លឺផ្ទៃខាងក្រោយ',bgBrightLo:'0% · ងងឹត',bgBrightHi:'100% · ភ្លឺខ្លាំង',setBrandFx:'អ៊ីហ្វិចឈ្មោះ MovAi',fxNone:'ធម្មតា',fxGlow:'ភ្លឺញាក់',fxShadow:'ស្រមោល',fxNeon:'ណេអុង',fxShine:'ចាំង',setTShadow:'ពណ៌ស្រមោលអក្សរ',setSmooth:'របៀបស្មូត · Smooth mode',smoothOn:'បើក · On',smoothOff:'បិទ · Off',smoothLocked:'🔒 ចាក់សោរដោយ Admin · ទូរសព្ទនេះត្រូវការ Smooth — បិទមិនបាន',fabKeys:'API Keys',fabSettings:'ការកំណត់',
  tabImage:'រូបភាព',tabVideo:'វីដេអូ',tabSong:'បទចម្រៀង',navSong:'បង្កើតបទចម្រៀង',navSongSub:'Song',
- lblSongDur:'រយៈពេលបទ',
+ lblSongDur:'រយៈពេលបទ',lblSongPrice:'តម្លៃ',
  lblSongTitle:'ចំណងជើង',songTitlePh:'ឧ. ឈ្មោះបទចម្រៀងរបស់អ្នក...',
  lblSongLyrics:'អត្ថបទចម្រៀង',songLyricsPh:'សរសេរអត្ថបទចម្រៀង (lyrics) របស់អ្នកនៅទីនេះ...',
  lblSongStyle:'ស្ទាយបទចម្រៀង',btnAddStyle:'Add',songStylePh:'ឧ. Pop, Rock, សំឡេងខ្មែរបុរាណ...',
@@ -1917,7 +1925,7 @@ km:{
  msgEnterLyrics:'សូមសរសេរអត្ថបទចម្រៀងជាមុនសិន',
  promptLabelSong:'Prompt · អត្ថបទបទចម្រៀង / Lyrics',promptPhSong:'ឧ. សរសេរអត្ថបទបទចម្រៀង (lyrics) របស់អ្នកនៅទីនេះ...',
  songCostSuno:'MovAi · កាត់ 12 Credit ក្នុងមួយដង · បាន 2 បទ · Model v6',
- songCostMhFmt:'Magic Hour · {m} នាទី = {c} Credit (60 Credit/នាទី)',
+ songCostMhFmt:'Magic Hour · កាត់តាមរយៈពេលបទ · 60 Credit/នាទី (1 Credit/វិនាទី) · បាន 1 បទ',
  songCostAce:'ACE Music · ហ្វ្រីរហូត · អត់កាត់ Credit ទេ · Model ACE-Step 1.5',
  songCostMusicApi:'MusicAPI · កាត់ 20 Credit/ដង · បាន 2 បទ · ហ្វ្រី 75 Credit ពេលចុះឈ្មោះ (ប្រហែល 6 បទ ម្ដងគត់) · Model MovAi v6',
  dlSong:'ទាញយកបទចម្រៀង',songLabelFmt:'បទទី {n}',songCreating:'Creating...',
@@ -2056,6 +2064,10 @@ en:{
  acctCredit:'Your credits',acctLogout:'Log out',
  chipSong:'Song Credit',chipMedia:'Image.Video Credit',
  acctSongCredit:'Song Credit',acctMediaCredit:'Image.Video Credit',
+ histTitle:'Credit history',histEmpty:'No credit history yet — your credit charges and top-ups will show here',
+ histSong:'Song generation',histGift:'Admin gift · New user bonus',histTopup:'Credit top-up · Admin/package',histAdminDeduct:'Admin deducted credit',
+ histBalanceAfter:'Balance',histBuyMore:'Buy more',
+ creditNotEnoughFmt:'Not enough credit — this song needs {c} Song Credit but your balance is {b}. Please buy more credits.',
  profileTitle:'My Profile',profileBalance:'Credit balance',profileAccount:'Account',profileEmail:'Gmail',
  profilePlan:'Package',profileFree:'Free',profileSince:'Member since',profileLabel:'Profile',
  profileUserId:'User ID',profileCopy:'Copy',profileCopied:'Copied ✓',acctFirstName:'First name · នាម',acctLastName:'Last name · គោត្តនាម',
@@ -2107,7 +2119,7 @@ en:{
  setMode:'Day / Night',modeDark:'Dark',modeLight:'Light',modeAuto:'Auto',fabLabel:'Quick settings',
  setGlass:'Glass · Clear / Frosted / Shine',glassClearP:'Clear · Transparency',glassClearLo:'0% · Solid',glassClearHi:'100% · Fully clear',glassBlurP:'Frosted · Blur',glassBlurLo:'0% · No blur',glassBlurHi:'100% · Very frosted',glassShineP:'Shine · Gloss',glassShineLo:'0% · No shine',glassShineHi:'100% · Very shiny',setTxtBlur:'Text Background Blur',txtBlurLo:'0% · Sharp',txtBlurHi:'100% · Very blurred',setBgBright:'Background Brightness',bgBrightLo:'0% · Dark',bgBrightHi:'100% · Very bright',setBrandFx:'MovAi Name Effect',fxNone:'None',fxGlow:'Glow',fxShadow:'Shadow',fxNeon:'Neon',fxShine:'Shine',setTShadow:'Text Shadow Color',setSmooth:'Smooth mode',smoothOn:'On',smoothOff:'Off',smoothLocked:'🔒 Locked by Admin · This phone needs Smooth — it cannot be turned off',fabKeys:'API Keys',fabSettings:'Settings',
  tabImage:'Image',tabVideo:'Video',tabSong:'Song',navSong:'Create Song',navSongSub:'បទចម្រៀង',
- lblSongDur:'Song length',
+ lblSongDur:'Song length',lblSongPrice:'Price',
  lblSongTitle:'Title',songTitlePh:'e.g. Your song title...',
  lblSongLyrics:'Lyrics',songLyricsPh:'Write your song lyrics here...',
  lblSongStyle:'Style',btnAddStyle:'Add',songStylePh:'e.g. Pop, Rock, Khmer traditional...',
@@ -2116,7 +2128,7 @@ en:{
  msgEnterLyrics:'Please write the song lyrics first',
  promptLabelSong:'Prompt · Song lyrics',promptPhSong:'e.g. Write your song lyrics here...',
  songCostSuno:'MovAi · 12 credits per generation · 2 songs · Model v6',
- songCostMhFmt:'Magic Hour · {m} min = {c} credits (60 credits/min)',
+ songCostMhFmt:'Magic Hour · charged by song length · 60 credits/minute (1 credit/second) · 1 song',
  songCostAce:'ACE Music · Free forever · No credits charged · ACE-Step 1.5 model',
  songCostMusicApi:'MusicAPI · 20 credits per generation · 2 songs · 75 free credits on signup (about 6 songs, one-time only) · MovAi v6 model',
  dlSong:'Download Song',songLabelFmt:'Song {n}',songCreating:'Creating...',
@@ -3434,7 +3446,7 @@ var GEN_VID_PROVIDERS=[
 ];
 var GEN_SONG_PROVIDERS=[
  {id:'suno',name:'MovAi',limit:{km:'កាត់ 12 Credit/ដង · បាន 2 បទ',en:'12 credits per generation · 2 songs'},key:'suno',note:{km:'Model v6 — ច្រៀងខ្មែរច្បាស់ជាងគេ។ MovAi មិនមាន API ផ្លូវការសាធារណៈទេ — ប្រើ API Key + Endpoint ដែលអ្នកដាក់ក្នុង ☰ → API Keys (កាត MovAi)។ កាត់ 12 Credit ក្នុងមួយដង បាន 2 បទ។',en:'Model v6 — sings Khmer the clearest. MovAi has no official public API — uses the API key + endpoint you add in ☰ → API Keys (MovAi card). 12 credits per generation, 2 songs.'}},
- {id:'magichour',name:'Magic Hour',glow:'green',limit:{km:'60 Credit/នាទី',en:'60 credits/minute'},key:'magichour',note:{km:'កាត់តាមរយៈពេល — 60 Credit/នាទី (1 នាទី = 60 · 2 នាទី = 120 · 3 នាទី = 180 · 3.5 នាទី = 210 · 5 នាទី = 300 Credit)។ ប្រើ Magic Hour API Key ដែលមានស្រាប់។',en:'Charged by length — 60 credits/minute (1 min = 60 · 2 min = 120 · 3 min = 180 · 3.5 min = 210 · 5 min = 300 credits). Uses your existing Magic Hour API key.'}},
+ {id:'magichour',name:'Magic Hour',glow:'green',limit:{km:'កាត់តាមរយៈពេល · 60 Credit/នាទី · បាន 1 បទ',en:'Charged by length · 60 credits/min · 1 song'},key:'magichour',note:{km:'កាត់តាមរយៈពេលបទ — 60 Credit ក្នុង 1 នាទី (1 Credit/វិនាទី)៖ បទ 1 នាទី = 60 · 2 នាទី = 120 · 3.5 នាទី = 210 · 5 នាទី = 300។ ប្រើ Magic Hour API Key ដែលមានស្រាប់។',en:'Charged by song length — 60 credits per minute (1 credit/second): 1 min = 60 · 2 min = 120 · 3.5 min = 210 · 5 min = 300. Uses your existing Magic Hour API key.'}},
  {id:'acemusic',name:'ACE Music',locked:true,lockNote:{km:'ចាក់សោរ · មិនទាន់ដំណើរការ',en:'Locked · Not yet available'},limit:{km:'ហ្វ្រីរហូត · អត់កាត់ Credit',en:'Free forever · No credits charged'},key:'acemusic',note:{km:'ហ្វ្រីរហូត អត់កាត់ quota/Credit ទេ — បង្កើតបទមានសំឡេងច្រៀងបាន (Model ACE-Step 1.5)។ ត្រូវដាក់ API Key របស់អ្នកផ្ទាល់ក្នុង ☰ → API Keys (កាត ACE Music) — ចុះឈ្មោះយក Key ហ្វ្រីនៅ acemusic.ai អត់ត្រូវកាត។ MovAi មិនយក Key ឲ្យអ្នកដោយអូតូទេ។',en:'Free forever, no quota or credits charged — creates songs with vocals (ACE-Step 1.5 model). Add your own API key in ☰ → API Keys (ACE Music card) — sign up for a free key at acemusic.ai, no card needed. MovAi never fetches a key for you automatically.'}},
  {id:'musicapi',name:'MusicAPI',limit:{km:'កាត់ 20 Credit/ដង · ហ្វ្រី 75 Credit',en:'20 credits/generation · 75 free credits'},key:'musicapi',note:{km:'API ពិត — បង្កើតបទមានសំឡេងច្រៀង (MovAi models v6)។ កាត់ 20 Credit ក្នុងមួយដង បាន 2 បទ។ ចុះឈ្មោះហ្វ្រីនៅ musicapi.ai បាន 75 Credit អត់ត្រូវកាត — តែបានប្រហែល 6 បទម្ដងគត់ប៉ុណ្ណោះ បន្ទាប់មកត្រូវបង់លុយ។ ត្រូវដាក់ API Key របស់អ្នកផ្ទាល់ក្នុង ☰ → API Keys (កាត MusicAPI) — MovAi មិនយក Key ឲ្យអ្នកដោយអូតូទេ។',en:'Real API — creates songs with vocals (MovAi v6 models). 20 credits per generation, 2 songs. Free signup at musicapi.ai gives 75 credits, no card needed — but only about 6 songs, one-time only, then it is paid. Add your own API key in ☰ → API Keys (MusicAPI card) — MovAi never fetches a key for you automatically.'}}
 ];
@@ -3980,17 +3992,34 @@ async function genGenerate(){
        calls the provider with the Admin's own key. */
     var cfgs=await adminGetProviders();
     var cfg=cfgs?cfgs[gen.mode]:null;
+    var doneNote='',creditBlocked=false;
     if(!cfg||!cfg.provider){
       genMsg(tx('adminNotSet'));
     }else{
       if(gen.mode==='song'){
-        /* Pending cards match what the provider actually returns
-           from ONE generation: Suno / MusicAPI return 2 songs,
-           Magic Hour / ACE Music return only 1 — so only that many
-           cards are shown, never an extra empty one. */
-        var pendId=/suno/i.test(cfg.provider||'')?'suno':(/musicapi/i.test(cfg.provider||'')?'musicapi':'magichour');
-        genSongPending({id:pendId,name:''});
-        await genDoSongServer(cfg,prompt);
+        /* REAL credit charge (owner rule): the song's price is
+           checked against the account's Song Credit BEFORE
+           generating — not enough means NO generation and the
+           Packages sheet opens on the Song tab so the user can
+           buy more right there. Enough means the exact cost is
+           deducted from the account the moment the finished
+           songs arrive (never for a failed generation). */
+        var sCost=creditSongCost(cfg.provider);
+        var sBal=creditPoolBalance('song');
+        if(sCost>0&&sBal<sCost){
+          creditBlocked=true;
+          genMsg(tx('creditNotEnoughFmt').replace('{c}',String(sCost)).replace('{b}',String(sBal)));
+          try{pkgSetTab('song');packagesShow();}catch(e){}
+        }else{
+          /* Pending cards match what the provider actually returns
+             from ONE generation: Suno / MusicAPI return 2 songs,
+             Magic Hour / ACE Music return only 1 — so only that many
+             cards are shown, never an extra empty one. */
+          var pendId=/suno/i.test(cfg.provider||'')?'suno':(/musicapi/i.test(cfg.provider||'')?'musicapi':'magichour');
+          genSongPending({id:pendId,name:''});
+          await genDoSongServer(cfg,prompt);
+          if(sCost>0)doneNote=creditChargePool('song',sCost,creditSongProvName(cfg.provider));
+        }
       }else if(gen.mode==='video'){
         var busyT0=Date.now();
         while(true){
@@ -4004,9 +4033,10 @@ async function genGenerate(){
       }else{
         await genDoImageServer(cfg,prompt);
       }
-      /* A real result has arrived — only NOW may the stage show 100%. */
-      genStageBlur(100);
-      genMsg(tx('msgDone'));
+      /* A real result has arrived — only NOW may the stage show 100%.
+         A credit-blocked tap generated nothing: the not-enough
+         message (and the Packages sheet) stays exactly as it is. */
+      if(!creditBlocked){genStageBlur(100);genMsg(tx('msgDone')+(doneNote?' · '+doneNote:''));}
     }
   }catch(e){
     var sp=document.getElementById('genSongPending');if(sp)sp.remove();
@@ -4305,8 +4335,8 @@ async function genDownloadVideo(src){
      call goes to the API key + endpoint the user saved in the Suno card
      (☰ → API Keys), using the common Suno gateway shape:
      POST {endpoint}/api/generate, then poll GET {endpoint}/api/get?ids=.
-   - Magic Hour: charged by length at 60 credits/minute — duration
-     1 / 2 / 3 / 3.5 / 5 min = 60 / 120 / 180 / 210 / 300 credits — via
+   - Magic Hour: charged BY LENGTH — 60 credits per minute
+     (1 credit per second of the picked duration) — via
      POST /v1/ai-music-generator (duration in seconds), polled on
      GET /v1/audio-projects/{id}, using the existing Magic Hour key.
    - ACE Music: free forever, no quota/credits charged (ACE-Step 1.5).
@@ -4352,12 +4382,29 @@ var SONG_WAIT_MAX=25*60*1000;
 var SUNO_WAIT_MAX=5*60*1000;
 var SONG_DURS=[1,2,3,3.5,5];
 function songRenderOpts(){
-  var isSuno=gen.provider==='suno';
-  var noDur=isSuno||gen.provider==='musicapi';
+  /* Song length is chosen ONLY for Magic Hour (owner rule,
+     reconfirmed 2026-11-16): Magic Hour charges BY LENGTH — by
+     the second, 60 Credits/minute — so the picked length IS the
+     price, and the duration chooser (1 / 2 / 3 / 3.5 / 5 minutes)
+     shows for Magic Hour alone. Suno (MovAi) has NO length
+     setting at all: it charges a flat 12 Credits per generation
+     and the song comes back however long it comes back (2, 3, 5,
+     8 minutes…) — so for Suno the chooser is hidden entirely and
+     the flat price («12 Credit/ដង») shows in its place. MusicAPI
+     is the same shape — a flat 20 Credits per generation, length
+     set by the model — so its chooser is hidden the same way. */
+  var showDur=gen.provider==='magichour';
   var dg=document.getElementById('songDurGroup');
-  if(dg)dg.style.display=noDur?'none':'flex';
+  if(dg)dg.style.display=showDur?'flex':'none';
+  var flatKey=gen.provider==='suno'?'songCostSuno':(gen.provider==='musicapi'?'songCostMusicApi':null);
+  var fg=document.getElementById('songFlatGroup');
+  if(fg){
+    fg.style.display=flatKey?'flex':'none';
+    var fp=document.getElementById('songFlatPrice');
+    if(fp&&flatKey)fp.textContent=tx(flatKey);
+  }
   var box=document.getElementById('genSongDur');
-  if(box)box.innerHTML=SONG_DURS.map(function(m){return '<button class="kbtn '+(gen.songDur===m?'kbtn-black':'kbtn-white')+'" onclick="songSetDur('+m+')">'+m+' '+tx('unitM')+'</button>';}).join('');
+  if(box)box.innerHTML=showDur?SONG_DURS.map(function(m){return '<button class="kbtn '+(gen.songDur===m?'kbtn-black':'kbtn-white')+'" onclick="songSetDur('+m+')">'+m+' '+tx('unitM')+'</button>';}).join(''):'';
   var vb=document.getElementById('songVoiceChips');
   if(vb)vb.innerHTML=[['male','voiceMale'],['female','voiceFemale'],['random','voiceRandom']].map(function(v){return '<button class="kbtn '+(gen.songVoice===v[0]?'kbtn-black':'kbtn-white')+'" onclick="songSetVoice(\''+v[0]+'\')">'+tx(v[1])+'</button>';}).join('');
   /* Instrumental toggle: ON = music only, no singer; OFF = vocals +
@@ -8891,6 +8938,138 @@ function acctCurrent(){
   if(u)acctEnsureId(u);
   return u;
 }
+/* ===== Credit ledger — REAL charges + per-account history =====
+   Owner rule (2026-11-16): a generation that costs Credit must
+   REALLY deduct it — the balance in the user's account goes down
+   by the exact cost, the Admin sees the same lower balance (the
+   charge is saved on the account record and pushed to the server
+   by the usual acctAdminSync, whose payload carries the balances),
+   and EVERY movement — charges, the welcome gift, Admin top-ups /
+   package approvals, Admin deductions — is written into a
+   per-account Credit HISTORY kept on the account
+   (localStorage 'movai-credit-hist-<email>'), shown in the
+   Profile sheet. The history survives log out / log in: it is
+   keyed by the account email, never by the session.
+   Song prices (MovAi Credit, the same prices the Create panel
+   advertises): MovAi (Suno) 12 per generation · MusicAPI 20 per
+   generation · Magic Hour charged BY LENGTH — 60 per minute
+   (1 Credit per second of the picked duration) · ACE Music free
+   (0). A failed generation is never charged: the
+   charge runs only after the finished songs are in hand. */
+function creditHistKey(email){return 'movai-credit-hist-'+String(email||'').trim().toLowerCase();}
+function creditHistGet(email){
+  try{var a=JSON.parse(localStorage.getItem(creditHistKey(email))||'[]');return Array.isArray(a)?a:[];}catch(e){return [];}
+}
+function creditHistAdd(email,entry){
+  if(!email||!entry||!entry.delta)return;
+  try{
+    var a=creditHistGet(email);
+    a.unshift({t:entry.t||Date.now(),pool:entry.pool==='media'?'media':'song',delta:Math.round(entry.delta),kind:entry.kind||'topup',detail:entry.detail||'',bal:Math.max(0,Math.round(entry.bal||0))});
+    if(a.length>120)a=a.slice(0,120);
+    localStorage.setItem(creditHistKey(email),JSON.stringify(a));
+  }catch(e){}
+}
+/* In-memory guard: after THIS page charges a pool, a server sync
+   reply that simply restores the pre-charge balance (the server
+   not honouring the posted balance yet) must not be written into
+   the history as a fake «top-up» of the same amount. */
+var creditChargeGuard={};
+function creditGuardSet(pool,amount){creditChargeGuard[pool]={amt:amount,t:Date.now()};}
+function creditGuardHit(pool,delta){
+  var g=creditChargeGuard[pool];
+  return !!(g&&delta>0&&delta===g.amt&&(Date.now()-g.t)<180000);
+}
+function creditSongCost(provider){
+  var p=String(provider||'').toLowerCase();
+  if(p.indexOf('suno')>=0)return 12;
+  if(p.indexOf('musicapi')>=0)return 20;
+  /* Magic Hour charges BY LENGTH (owner rule, reconfirmed
+     2026-11-16): 60 Song Credits per minute = 1 Credit per second
+     of the picked duration — 1 min = 60, 2 min = 120, 3.5 min =
+     210, 5 min = 300. gen.songDur is in minutes, so the cost is
+     the duration in seconds. */
+  if(p.indexOf('magic')>=0)return Math.round((gen.songDur||3)*60);
+  return 0;
+}
+function creditSongProvName(provider){
+  var p=String(provider||'');
+  if(/suno/i.test(p))return 'MovAi';
+  if(/musicapi/i.test(p))return 'MusicAPI';
+  if(/magic/i.test(p))return 'Magic Hour';
+  if(/ace/i.test(p))return 'ACE Music';
+  return p;
+}
+function creditPoolBalance(pool){
+  var u=null;try{u=acctCurrent();}catch(e){}
+  if(!u)return 0;
+  return Math.max(0,parseInt(pool==='song'?u.songCredits:u.credits,10)||0);
+}
+/* Deduct `amount` from the signed-in account's pool FOR REAL:
+   the account record is updated and saved, a history entry is
+   written, every balance on screen re-renders at the new number,
+   and acctAdminSync pushes the new balance to the server so the
+   Admin's record for this user drops by the same amount.
+   Returns a short «−N Pool · នៅសល់ B» note for the result line. */
+function creditChargePool(pool,amount,detail){
+  amount=Math.round(amount||0);
+  if(!(amount>0))return '';
+  var u=null;try{u=acctCurrent();}catch(e){}
+  if(!u||!u.email)return '';
+  var us=acctUsersGet();var rec=us[u.email];if(!rec)return '';
+  var before=Math.max(0,parseInt(pool==='song'?rec.songCredits:rec.credits,10)||0);
+  var after=Math.max(0,before-amount);
+  if(pool==='song')rec.songCredits=after;else rec.credits=after;
+  acctUsersSave(us);
+  creditGuardSet(pool,before-after);
+  creditHistAdd(rec.email,{pool:pool,delta:-(before-after),kind:'song',detail:detail||'',bal:after});
+  try{acctRender();}catch(e){}
+  try{acctAdminSync();}catch(e){}
+  return '−'+acctFmtBal(before-after)+' '+(pool==='song'?tx('acctSongCredit'):tx('acctMediaCredit'))+' · '+tx('histBalanceAfter')+' '+acctFmtBal(after);
+}
+/* A balance change that arrives FROM the server (Admin top-up,
+   package approval, Admin deduction) is written into the history
+   too — top-ups really land in the history, not just the number. */
+function creditHistSyncDelta(email,pool,delta,balAfter){
+  if(!email||!delta)return;
+  if(creditGuardHit(pool,delta))return;
+  creditHistAdd(email,{pool:pool,delta:delta,kind:delta>0?'topup':'admindeduct',bal:balAfter});
+}
+function creditHistLabel(e){
+  if(e.kind==='song')return tx('histSong')+(e.detail?' · '+e.detail:'');
+  if(e.kind==='gift')return tx('histGift');
+  if(e.kind==='admindeduct')return tx('histAdminDeduct');
+  return tx('histTopup');
+}
+function creditHistHtml(email){
+  var list=creditHistGet(email);
+  if(!list.length)return '<p style="font-size:0.8125rem;color:var(--muted);margin-top:8px;line-height:1.6">'+escHtml(tx('histEmpty'))+'</p>';
+  var h='';
+  list.slice(0,40).forEach(function(e){
+    var pos=e.delta>0;
+    var c=pos?'#4ade80':'#fb923c';
+    var poolC=e.pool==='song'?'#ADDC29':'#b537f2';
+    var poolName=e.pool==='song'?tx('acctSongCredit'):tx('acctMediaCredit');
+    var when='';try{when=new Date(e.t).toLocaleString();}catch(err){}
+    h+='<div style="display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--line)">';
+    h+='<span style="font-weight:900;font-size:0.9375rem;color:'+c+';min-width:58px;font-variant-numeric:tabular-nums">'+(pos?'+':'−')+acctFmtBal(Math.abs(e.delta))+'</span>';
+    h+='<span style="flex:1;min-width:0"><span style="display:block;font-size:0.8125rem;font-weight:700;overflow-wrap:break-word">'+escHtml(creditHistLabel(e))+'</span>';
+    h+='<span style="display:block;font-size:0.6875rem;color:var(--muted);margin-top:1px">'+escHtml(when)+'</span></span>';
+    h+='<span style="text-align:right;flex:0 0 auto"><span style="display:block;font-size:0.6875rem;color:'+poolC+';font-weight:700">'+escHtml(poolName)+'</span>';
+    h+='<span style="display:block;font-size:0.6875rem;color:var(--muted);margin-top:1px">'+escHtml(tx('histBalanceAfter'))+' '+acctFmtBal(e.bal)+'</span></span>';
+    h+='</div>';
+  });
+  return h;
+}
+/* Tapping a balance row buys more of that pool: close whatever
+   account surface is open and show the Packages sheet already on
+   the matching tab (Song Credit / Image & Video Credit). */
+function profileBuyCredits(kind){
+  try{profileClose();}catch(e){}
+  try{closeMenu();}catch(e){}
+  try{pkgSetTab(kind==='song'?'song':'media');}catch(e){}
+  try{packagesShow();}catch(e){}
+}
+
 /* ===== Admin API sync (server is the truth for credits) =====
    MovAi talks to the owner's separate Admin API on the MovAi proxy
    server — the admin itself never lives inside this website:
@@ -8976,9 +9155,9 @@ function acctApplyServerData(data){
      «ទទួលយក · Claim» in the gift popup. */
   var giftHold=!!rec.giftPending;
   var c=acctSrvNum(srv.credits);
-  if(c!==null&&!giftHold){var cv=Math.max(0,Math.floor(c));if(rec.credits!==cv){rec.credits=cv;changed=true;}}
+  if(c!==null&&!giftHold){var cv=Math.max(0,Math.floor(c));if(rec.credits!==cv){try{creditHistSyncDelta(rec.email,'media',cv-rec.credits,cv);}catch(e){}rec.credits=cv;changed=true;}}
   var sc=acctSrvNum(srv.songCredits);
-  if(sc!==null&&!giftHold){var sv=Math.max(0,Math.floor(sc));if(rec.songCredits!==sv){rec.songCredits=sv;changed=true;}}
+  if(sc!==null&&!giftHold){var sv=Math.max(0,Math.floor(sc));if(rec.songCredits!==sv){try{creditHistSyncDelta(rec.email,'song',sv-rec.songCredits,sv);}catch(e){}rec.songCredits=sv;changed=true;}}
   var sp=acctSyncPlanCopy(srv.plan);
   if(sp&&(sp.until>Date.now())){rec.plan=sp;try{localStorage.setItem('movai-plan',JSON.stringify({id:sp.id,until:sp.until,email:rec.email}));}catch(e){}changed=true;}
   var ssp=acctSyncPlanCopy(srv.songPlan);
@@ -9275,6 +9454,8 @@ function giftClaim(){
   var us=acctUsersGet();var rec=us[u.email];if(!rec||!rec.giftPending)return;
   rec.credits=250;rec.songCredits=24;rec.giftPending=false;
   acctUsersSave(us);
+  creditHistAdd(rec.email,{pool:'media',delta:250,kind:'gift',bal:250});
+  creditHistAdd(rec.email,{pool:'song',delta:24,kind:'gift',bal:24});
   var s=document.getElementById('giftSheet');if(s)sheetHideAnim(s);
   acctRender();
   acctSyncGiftFlag=true;
@@ -10026,7 +10207,10 @@ function acctRenderTopbar(u){
 }
 function profileBalRow(kind,label,val){
   var c=(kind==='song')?'#ADDC29':'#b537f2';
-  return '<div style="display:flex;align-items:center;gap:9px;margin-top:10px;background:rgba(140,150,170,.10);border:1px solid var(--line);border-radius:12px;padding:11px 13px"><span style="width:11px;height:11px;border-radius:50%;flex:0 0 auto;background:'+c+';box-shadow:0 0 8px '+c+'"></span><span style="font-size:0.875rem;font-weight:700">'+escHtml(label)+'</span><b style="margin-left:auto;font-size:1.0625rem;font-weight:900;color:'+c+';font-variant-numeric:tabular-nums">'+acctFmtBal(val)+'</b></div>';
+  /* The balance row is a BUY button too (owner rule): tapping it —
+     above all when the balance has run out — opens the Packages
+     sheet on this pool's tab so the user can buy more Credit. */
+  return '<div role="button" tabindex="0" onclick="profileBuyCredits(\''+kind+'\')" style="display:flex;align-items:center;gap:9px;margin-top:10px;background:rgba(140,150,170,.10);border:1px solid var(--line);border-radius:12px;padding:11px 13px;cursor:pointer"><span style="width:11px;height:11px;border-radius:50%;flex:0 0 auto;background:'+c+';box-shadow:0 0 8px '+c+'"></span><span style="font-size:0.875rem;font-weight:700">'+escHtml(label)+'</span><b style="margin-left:auto;font-size:1.0625rem;font-weight:900;color:'+c+';font-variant-numeric:tabular-nums">'+acctFmtBal(val)+'</b><span style="font-size:0.6875rem;font-weight:800;color:var(--muted);white-space:nowrap">+ '+escHtml(tx('histBuyMore'))+'</span></div>';
 }
 function profileInfoRow(label,val){
   return '<div style="display:flex;justify-content:space-between;gap:12px;padding:8px 0;border-bottom:1px solid var(--line)"><span style="font-size:0.8125rem;color:var(--muted);flex:0 0 auto">'+escHtml(label)+'</span><b style="font-size:0.8125rem;text-align:right;overflow-wrap:break-word;min-width:0">'+escHtml(val)+'</b></div>';
@@ -10058,6 +10242,15 @@ function profileRender(){
   h+='<div style="font-size:0.8125rem;font-weight:800;color:var(--muted)">'+escHtml(tx('profileBalance'))+'</div>';
   h+=profileBalRow('song',tx('acctSongCredit'),u.songCredits);
   h+=profileBalRow('media',tx('acctMediaCredit'),u.credits);
+  h+='</div>';
+  /* Credit history (owner rule): every real movement on this
+     account — generation charges, the welcome gift, Admin
+     top-ups / package approvals, Admin deductions — with the
+     amount, the date and the balance after it. It belongs to the
+     account, so it is here on log in, every time. */
+  h+='<div style="margin-top:16px;border-top:1px solid var(--line);padding-top:12px">';
+  h+='<div style="font-size:0.8125rem;font-weight:800;color:var(--muted)">'+escHtml(tx('histTitle'))+'</div>';
+  h+=creditHistHtml(u.email);
   h+='</div>';
   h+='<div style="margin-top:14px;border-top:1px solid var(--line);padding-top:6px">';
   h+=profileInfoRowHtml(tx('profileAccount'),acctNameHtml(u));
@@ -10637,15 +10830,22 @@ async function genDoSongServer(cfg,prompt){
   var styleFull=[sStyle,voiceTag].filter(function(x){return !!x;}).join(', ');
   histCtx={prompt:prompt,provider:cfg.provider,title:sTitle,style:styleFull};
   histCtxStamp();
-  /* The duration the user picked (1 / 2 / 3 / 3.5 / 5 minutes) MUST
-     travel with the create call — without it the server/provider
-     falls back to its own 120-second default and a 3.5-minute pick
-     comes back as a 2-minute song. Sent in seconds under every
-     field name the providers use (duration is the one the direct
-     Magic Hour call uses), so whichever one the server reads, the
-     song is made at exactly the length the user set. */
-  var sSecs=Math.round((gen.songDur||3)*60);
-  var sBody={provider:cfg.provider,title:sTitle,name:sTitle,lyrics:prompt,prompt:prompt,style:styleFull,tags:styleFull,voice:sVoice,model:cfg.model,instrumental:sInstr,make_instrumental:sInstr,duration:sSecs,durationSeconds:sSecs,duration_seconds:sSecs};
+  /* The picked duration travels with the create call ONLY for
+     Magic Hour — the one provider that charges by length (60
+     Credits/minute) and makes the song at exactly the length the
+     user set; without it Magic Hour falls back to its own
+     120-second default and a 3.5-minute pick comes back as a
+     2-minute song. Suno (MovAi) and MusicAPI take NO duration at
+     all: both charge a flat rate per generation (Suno 12 ·
+     MusicAPI 20) and return songs of whatever length the model
+     produces, so no duration field is sent for them. Sent in
+     seconds under every field name Magic Hour uses, so whichever
+     one the server reads, the song is made at the set length. */
+  var sBody={provider:cfg.provider,title:sTitle,name:sTitle,lyrics:prompt,prompt:prompt,style:styleFull,tags:styleFull,voice:sVoice,model:cfg.model,instrumental:sInstr,make_instrumental:sInstr};
+  if(/magic/i.test(cfg.provider||'')){
+    var sSecs=Math.round((gen.songDur||3)*60);
+    sBody.duration=sSecs;sBody.durationSeconds=sSecs;sBody.duration_seconds=sSecs;
+  }
   if(sVoice==='male')sBody.vocal_gender='m';
   else if(sVoice==='female')sBody.vocal_gender='f';
   var j=await adminGenPost('/api/gen/song',sBody,60000);
