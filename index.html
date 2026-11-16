@@ -924,6 +924,12 @@ html[data-mode="light"] .btn-free{color:#63910c}
 #loginSheet .login-brand-credit{text-align:right;line-height:1.3;min-width:0}
 #loginSheet .login-brand-credit b{display:block;font-size:0.75rem;font-weight:800;letter-spacing:.04em;color:var(--text);white-space:nowrap}
 #loginSheet .login-brand-credit i{display:block;font-style:normal;font-size:0.6875rem;font-weight:600;color:var(--muted);white-space:nowrap}
+/* Google sign-in loading spinner — shown in the login sheet while
+   Google is opening, INSTEAD of any «Opening Google…» text (owner
+   rule: a spinning indicator only, no waiting words). */
+#loginSheet .login-spin-ring{display:block;width:28px;height:28px;border-radius:50%;border:3px solid var(--line2);border-top-color:var(--accent);animation:loginSpin .7s linear infinite}
+@keyframes loginSpin{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion:reduce){#loginSheet .login-spin-ring{animation-duration:1.8s}}
 /* ===== Mandatory name gate =====
    Shown right after a Google sign-in whose account has NO first /
    last name yet (and on app open while the name is still missing).
@@ -1767,6 +1773,7 @@ html[data-smooth="1"] .brand-frame,html[data-smooth="1"] .acct-chip,html[data-sm
     <p style="font-size:0.875rem;color:var(--muted);line-height:1.7;margin-top:10px" data-i18n="loginGoogleNote">MovAi ចូលប្រើតែជាមួយគណនី Google ប៉ុណ្ណោះ — ចុចប៊ូតុងខាងក្រោមដើម្បីភ្ជាប់គណនី Google របស់អ្នក</p>
     <button type="button" class="google-btn" id="loginGoogleBtn" onclick="loginGoogleConnect()"><svg viewBox="0 0 48 48" width="20" height="20" aria-hidden="true" style="flex:0 0 auto"><path fill="#FFC107" d="M43.6 20.1H42V20H24v8h11.3C33.7 32.7 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.9 1.2 8 3l5.7-5.7C34.3 6.1 29.3 4 24 4 13 4 4 13 4 24s9 20 20 20 20-9 20-20c0-1.3-.1-2.6-.4-3.9z"/><path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.9 1.2 8 3l5.7-5.7C34.3 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.1 26.7 36 24 36c-5.2 0-9.6-3.3-11.3-8l-6.5 5C9.5 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.1H42V20H24v8h11.3c-.8 2.3-2.3 4.3-4.1 5.6l6.2 5.2C36.9 39.2 44 34 44 24c0-1.3-.1-2.6-.4-3.9z"/></svg><span data-i18n="loginGoogleBtn">Connect account Google</span></button>
     <div id="loginGsiSlot" style="display:none;margin-top:14px;justify-content:center"></div>
+    <div id="loginSpinner" style="display:none;justify-content:center;margin-top:16px" role="status" aria-label="Loading"><span class="login-spin-ring"></span></div>
     <p id="loginMsg" style="font-size:0.8125rem;margin-top:10px;min-height:16px;line-height:1.6"></p>
     <button type="button" class="kbtn kbtn-white" style="margin-top:10px;width:100%" onclick="loginSheetClose()" data-i18n="pkgCancel">បោះបង់</button>
     <div class="legal-links" style="margin-top:16px;padding-top:14px;border-top:1px solid var(--line)">
@@ -1961,7 +1968,6 @@ km:{
  loginGoogleNote:'MovAi ចូលប្រើតែជាមួយគណនី Google ប៉ុណ្ណោះ — ចុចប៊ូតុងខាងក្រោមដើម្បីភ្ជាប់គណនី Google របស់អ្នក',loginGoogleBtn:'Connect account Google',
  loginGmailLabel:'គណនី Google (Gmail)',loginGmailPh:'yourname@gmail.com',loginContinue:'បន្ត · Continue',
  loginErrEmail:'សូមដាក់ Gmail ត្រឹមត្រូវ (ត្រូវមាន @)',
- loginGoogleBusy:'កំពុងបើក Google… សូមរង់ចាំបន្តិច',
  loginGoogleAlt:'ឬចុចប៊ូតុង Google ខាងក្រោមដើម្បីបន្ត',
  loginGoogleLive:'Google Sign-In ដំណើរការតែលើ live site ប៉ុណ្ណោះ — Origin នេះមិនទាន់បាន authorize ក្នុង Google ទេ។ សូមបើក https://movai-1.onrender.com រួចចុច «Connect account Google» នៅទីនោះដើម្បី Log in ជាមួយ Google ពិត។',
  loginGoogleFail:'ភ្ជាប់ Google មិនបានទេ — សូមព្យាយាមម្ដងទៀត',
@@ -2166,7 +2172,6 @@ en:{
  loginGoogleNote:'MovAi signs in with a Google account only. Tap below to connect your Google account.',loginGoogleBtn:'Connect account Google',
  loginGmailLabel:'Google account (Gmail)',loginGmailPh:'yourname@gmail.com',loginContinue:'Continue · បន្ត',
  loginErrEmail:'Please enter a valid Gmail (it must contain @)',
- loginGoogleBusy:'Opening Google… please wait a moment',
  loginGoogleAlt:'Or tap the Google button below to continue',
  loginGoogleLive:'Google Sign-In works on the live site only — this origin is not authorized in Google yet. Please open https://movai-1.onrender.com and tap “Connect account Google” there to sign in with real Google.',
  loginGoogleFail:'Could not connect to Google — please try again',
@@ -10056,6 +10061,7 @@ function loginSheetOpen(){
   var slot=document.getElementById('loginGsiSlot');if(slot){slot.style.display='none';slot.innerHTML='';}
   var b=document.getElementById('loginGoogleBtn');if(b)b.style.display='';
   var m=document.getElementById('loginMsg');if(m)m.textContent='';
+  loginBusy(false);
 }
 function loginSheetClose(){var s=document.getElementById('loginSheet');sheetHideAnim(s);}
 /* ===== Login gate for CREATION =====
@@ -10084,12 +10090,23 @@ function requireLogin(){
   return false;
 }
 function loginMsg(t,ok){
+  /* Any message (result, error, or clear) ends the busy state, so
+     the spinner always stops when one is set. */
+  loginBusy(false);
   var m=document.getElementById('loginMsg');
   if(m){m.textContent=t;m.style.color=ok?'var(--accent-text)':'#f87171';}
 }
+/* Busy state for the Google sign-in: a spinning ring ONLY — no
+   «Opening Google… please wait» text (owner rule). The button is
+   disabled while it spins so a second tap cannot stack prompts. */
+function loginBusy(on){
+  var sp=document.getElementById('loginSpinner');if(sp)sp.style.display=on?'flex':'none';
+  var b=document.getElementById('loginGoogleBtn');if(b)b.disabled=!!on;
+}
 function loginGoogleConnect(){
   gisWaitTries=0;
-  loginMsg(tx('loginGoogleBusy'),true);
+  var m=document.getElementById('loginMsg');if(m)m.textContent='';
+  loginBusy(true);
   gisEnsure(function(ok){
     if(!ok){loginMsg(tx('loginGoogleLive'),false);return;}
     try{
