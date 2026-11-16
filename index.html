@@ -1255,8 +1255,8 @@ html[data-smooth="1"] .brand-frame,html[data-smooth="1"] .acct-chip,html[data-sm
     <div class="pkg-grid">
       <div class="pkg-card media hot">
         <span class="pkg-name" data-i18n="pkgYearly">ប្រចាំឆ្នាំ</span>
-        <div class="pkg-price" id="pkgPrice-yearly">$18<small data-i18n="pkgPerMonth">/ខែ</small></div>
-        <p style="font-size:0.7rem;color:var(--muted);margin-top:1px" id="pkgBilled-yearly" data-i18n="pkgBilledYear">បង់ $216/ឆ្នាំ</p>
+        <div class="pkg-price" id="pkgPrice-yearly">$15<small data-i18n="pkgPerMonth">/ខែ</small></div>
+        <p style="font-size:0.7rem;color:var(--muted);margin-top:1px" id="pkgBilled-yearly" data-i18n="pkgBilledYear">បង់ $180/ឆ្នាំ</p>
         <div class="pkg-credits" data-i18n="pkgCreditsYear">140,000 Credit/ឆ្នាំ</div>
         <div class="pkg-feats">
           <div data-i18n="pkgFeatImgModels">រូបភាព · Z-Image Turbo · Qwen Image 2.1 · Flux 2 Klein · Krea 2</div>
@@ -1573,7 +1573,7 @@ km:{
  mhFreeTitle:'Magic Hour Free',mhFreeLine:'Free: 200 Credit សម្រាប់បង្កើតវីដេអូ Magic Hour',
  navPackages:'កញ្ចប់សេវាកម្ម',navPackagesSub:'Packages',
  pkgTitle:'កញ្ចប់សេវាកម្ម MovAi',
- pkgMonthly:'ប្រចាំខែ',pkgYearly:'ប្រចាំឆ្នាំ',pkgPerMonth:'/ខែ',pkgBilledYear:'បង់ $216/ឆ្នាំ',
+ pkgMonthly:'ប្រចាំខែ',pkgYearly:'ប្រចាំឆ្នាំ',pkgPerMonth:'/ខែ',pkgBilledYear:'បង់ $180/ឆ្នាំ',
  pkgCreditsMonth:'11,000 Credit/ខែ',pkgCreditsYear:'140,000 Credit/ឆ្នាំ',
  pkgFeatMedia:'បង្កើតបានទាំងរូបភាព និងវីដេអូ',
  pkgFeatPremium:'បើក Model Premium ទាំងអស់',
@@ -1758,7 +1758,7 @@ en:{
  mhFreeTitle:'Magic Hour Free',mhFreeLine:'Free: 200 Credit for creating Magic Hour videos',
  navPackages:'Packages',navPackagesSub:'កញ្ចប់សេវាកម្ម',
  pkgTitle:'MovAi Packages',
- pkgMonthly:'Monthly',pkgYearly:'Yearly',pkgPerMonth:'/month',pkgBilledYear:'Billed $216/year',
+ pkgMonthly:'Monthly',pkgYearly:'Yearly',pkgPerMonth:'/month',pkgBilledYear:'Billed $180/year',
  pkgCreditsMonth:'11,000 credits/month',pkgCreditsYear:'140,000 credits/year',
  pkgFeatMedia:'Create both images and videos',
  pkgFeatPremium:'Unlocks every Premium model',
@@ -2388,7 +2388,7 @@ function genSetSunoModel(id){
 /* ================= MovAi Packages (Monthly / Yearly) =================
    Two MovAi-branded packages for BOTH image and video creation.
    Prices and credit amounts are MovAi's own ($25/month → 11,000
-   credits/month; $18/month billed $216/year → 140,000 credits/year;
+   credits/month; $15/month billed $180/year → 140,000 credits/year;
    NO free months). The model rates and limits shown are the real
    Magic Hour Creator-plan facts. Buying shows a purchase request,
    then unlocks the package: the plan is saved on the user's account
@@ -2397,10 +2397,10 @@ function genSetSunoModel(id){
    is active, every Premium (Creator+) model — image and video — is
    unlocked; durations of 15s+ on Magic Hour video unlock too. */
 /* Display order (owner order 2026-11-16): most expensive FIRST —
-   Yearly ($216) before Monthly ($25), matching the card order in
+   Yearly ($180) before Monthly ($25), matching the card order in
    the Packages panel markup. */
 var PKG_PLANS=[
- {id:'yearly',name:{km:'ប្រចាំឆ្នាំ',en:'Yearly'},price:216,priceNote:{km:'$18/ខែ · បង់ $216/ឆ្នាំ',en:'$18/month · billed $216/year'},credits:140000,days:365},
+ {id:'yearly',name:{km:'ប្រចាំឆ្នាំ',en:'Yearly'},price:180,priceNote:{km:'$15/ខែ · បង់ $180/ឆ្នាំ',en:'$15/month · billed $180/year'},credits:140000,days:365},
  {id:'monthly',name:{km:'ប្រចាំខែ',en:'Monthly'},price:25,priceNote:{km:'$25/ខែ',en:'$25/month'},credits:11000,days:30}
 ];
 function pkgPlanById(id){for(var i=0;i<PKG_PLANS.length;i++)if(PKG_PLANS[i].id===id)return PKG_PLANS[i];return null;}

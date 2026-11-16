@@ -2026,6 +2026,101 @@ function apiRoute(req, res, urlPath) {
     });
     return sendJSON(res, 200, { ok: true, keys: list });
   }
+  // GET /api/admin/keys/values?provider=X — admin key required. Returns
+  // the FULL key values for one provider so the Admin app can show (eye)
+  // and copy them. Only the admin-key holder (the owner) can call this —
+  // the public GET /api/admin/keys never returns values.
+  if (req.method === 'GET' && urlPath === '/api/admin/keys/values') {
+    const a = adminKeyOk(req);
+    if (!a.ok) return sendJSON(res, 200, { ok: false, error: a.error });
+    const provider = normProvider(new URL(req.url, 'http://localhost').searchParams.get('provider') || '');
+    if (!KNOWN_KEY_PROVIDERS.includes(provider)) return sendJSON(res, 200, { ok: false, error: 'Provider មិនស្គាល់ទេ' });
+    const rec = loadAdminKeys()[provider];
+    const list = rec && Array.isArray(rec.keys) ? rec.keys : [];
+    return sendJSON(res, 200, { ok: true, provider, keys: list.map((e) => ({ key: e.key || '', endpoint: e.endpoint || '', addedAt: e.addedAt || '' })) });
+  }
+  // Test one provider key with a lightweight authenticated call.
+  // status: 'ok' = works (green), 'blocked' = 401/403 invalid or blocked
+  // (red), 'error' = rate limit / network / other (yellow), 'unknown' =
+  // this provider has no testable endpoint (yellow).
+  async function testProviderKey(provider, key, endpoint) {
+    const p = normProvider(provider);
+    const timeoutMs = 15000;
+    const blockedMsg = (s) => ({ status: 'blocked', message: 'Key មិនត្រឹមត្រូវ ឬត្រូវបានប្លុក (HTTP ' + s + ')' });
+    const okMsg = { status: 'ok', message: 'Ready — Key ដំណើរការល្អ' };
+    try {
+      if (p === 'groq') {
+        const r = await fetch('https://api.groq.com/openai/v1/models', { headers: { 'Authorization': 'Bearer ' + key }, signal: AbortSignal.timeout(timeoutMs) });
+        if (r.status === 200) return okMsg;
+        if (r.status === 401 || r.status === 403) return blockedMsg(r.status);
+        if (r.status === 429) return { status: 'error', message: 'Rate limit (HTTP 429) — សាកល្បងម្តងទៀតពេលក្រោយ' };
+        return { status: 'error', message: 'Groq ឆ្លើយ HTTP ' + r.status };
+      }
+      if (p === 'novai') {
+        const r = await fetch('https://aiapi-pro.com/v1/models', { headers: { 'Authorization': 'Bearer ' + key }, signal: AbortSignal.timeout(timeoutMs) });
+        if (r.status === 200) return okMsg;
+        if (r.status === 401 || r.status === 403) return blockedMsg(r.status);
+        if (r.status === 429) return { status: 'error', message: 'Rate limit (HTTP 429) — សាកល្បងម្តងទៀតពេលក្រោយ' };
+        return { status: 'error', message: 'NovAI ឆ្លើយ HTTP ' + r.status };
+      }
+      if (p === 'tavus') {
+        const r = await fetch('https://tavusapi.com/v2/replicas', { headers: { 'x-api-key': key }, signal: AbortSignal.timeout(timeoutMs) });
+        if (r.status === 200) return okMsg;
+        if (r.status === 401 || r.status === 403) return blockedMsg(r.status);
+        if (r.status === 429) return { status: 'error', message: 'Rate limit (HTTP 429) — សាកល្បងម្តងទៀតពេលក្រោយ' };
+        return { status: 'error', message: 'Tavus ឆ្លើយ HTTP ' + r.status };
+      }
+      if (p === 'magichour') {
+        // GET on the POST-only create endpoint: a valid key answers 405
+        // (wrong method, auth passed); a bad key answers 401/403.
+        const r = await fetch('https://api.magichour.ai/v1/ai-image-generator', { headers: { 'Authorization': 'Bearer ' + key }, signal: AbortSignal.timeout(timeoutMs) });
+        if (r.status === 401 || r.status === 403) return blockedMsg(r.status);
+        if (r.status === 429) return { status: 'error', message: 'Rate limit (HTTP 429) — សាកល្បងម្តងទៀតពេលក្រោយ' };
+        return okMsg;
+      }
+      if (p === 'musicapi') {
+        // GET a fake task id: a valid key answers 404/400 (task not found,
+        // auth passed); a bad key answers 401/403.
+        const r = await fetch('https://api.musicapi.ai/api/v1/sonic/task/00000000-0000-0000-0000-000000000000', { headers: { 'Authorization': 'Bearer ' + key }, signal: AbortSignal.timeout(timeoutMs) });
+        if (r.status === 401 || r.status === 403) return blockedMsg(r.status);
+        if (r.status === 429) return { status: 'error', message: 'Rate limit (HTTP 429) — សាកល្បងម្តងទៀតពេលក្រោយ' };
+        return okMsg;
+      }
+      if (p === 'suno') {
+        const ep = typeof endpoint === 'string' ? endpoint.replace(/\/+$/, '') : '';
+        if (!ep) return { status: 'unknown', message: 'មិនមាន gateway endpoint — មិនអាចសាកល្បងបាន' };
+        // GET on the gateway's POST-only generate endpoint: a valid key
+        // answers 405/400/404 (auth passed); a bad key answers 401/403.
+        const r = await fetch(ep + '/api/generate', { headers: { 'Authorization': 'Bearer ' + key }, signal: AbortSignal.timeout(timeoutMs) });
+        if (r.status === 401 || r.status === 403) return blockedMsg(r.status);
+        if (r.status === 429) return { status: 'error', message: 'Rate limit (HTTP 429) — សាកល្បងម្តងទៀតពេលក្រោយ' };
+        return okMsg;
+      }
+      return { status: 'unknown', message: 'Provider នេះមិនមាន endpoint សម្រាប់សាកល្បងទេ' };
+    } catch (e) {
+      return { status: 'error', message: 'មិនអាចភ្ជាប់បាន — ' + String((e && e.message) || e).slice(0, 120) };
+    }
+  }
+  // GET /api/admin/keys/status?provider=X — admin key required. Tests
+  // every stored key for one provider and returns per-key status
+  // (ok/blocked/error/unknown) for the Admin app's green/red/yellow dots.
+  if (req.method === 'GET' && urlPath === '/api/admin/keys/status') {
+    const a = adminKeyOk(req);
+    if (!a.ok) return sendJSON(res, 200, { ok: false, error: a.error });
+    const provider = normProvider(new URL(req.url, 'http://localhost').searchParams.get('provider') || '');
+    if (!KNOWN_KEY_PROVIDERS.includes(provider)) return sendJSON(res, 200, { ok: false, error: 'Provider មិនស្គាល់ទេ' });
+    const rec = loadAdminKeys()[provider];
+    const list = rec && Array.isArray(rec.keys) ? rec.keys : [];
+    (async () => {
+      const results = [];
+      for (let i = 0; i < list.length; i++) {
+        const t = await testProviderKey(provider, list[i].key, list[i].endpoint);
+        results.push({ index: i, status: t.status, message: t.message });
+      }
+      return sendJSON(res, 200, { ok: true, provider, results });
+    })().catch(() => sendJSON(res, 200, { ok: false, error: 'សាកល្បងមិនបានទេ' }));
+    return;
+  }
   // POST /api/admin/providers — {mode:'image'|'video'|'song', provider, model}
   // — admin key required. Sets the active provider/model for one mode.
   if (req.method === 'POST' && urlPath === '/api/admin/providers') {
