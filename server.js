@@ -224,16 +224,26 @@ async function ghRestoreAll() {
   await ghRestoreUploads(); // uploaded MP3/cover files (GitHub-backed)
 }
 
-// Graduated admin-key lockout (owner order 2026-11-16) — wrong Admin
-// key attempts escalate per IP, stored in ./data/admin-lockouts.json
-// (GitHub-backed, survives restarts): 1st strike → 5 min, 2nd → 20 min,
-// 3rd → 1 hour, 4th+ → 12 hours. The block auto-expires; a correct key
+// Graduated admin-key lockout (owner order 2026-11-16, corrected) —
+// wrong Admin key attempts escalate per IP in LEVELS, stored in
+// ./data/admin-lockouts.json (GitHub-backed, survives restarts):
+// L1: 4 wrong tries → 5 min block, L2: 3 tries → 20 min,
+// L3: 2 tries → 1 hour, L4+: 1 try → 12 hours. Each level allows
+// FEWER tries but blocks LONGER. The block auto-expires; a correct key
 // always wins (the key IS the admin identity) and clears all strikes,
 // so the real admin can never lock themselves out. Attempts made WHILE
-// blocked do not add strikes or extend the block. Manual blocks in
+// blocked do not count tries or extend the block. Manual blocks in
 // blocked-ips.json stay permanent and are checked separately.
 const ADMIN_LOCKOUTS_FILE = path.join(DATA_DIR, 'admin-lockouts.json');
-const LOCKOUT_MINUTES = [5, 20, 60, 720]; // index = strikes-1, capped at 12h
+const LOCKOUT_LEVELS = [
+  { tries: 4, mins: 5 },
+  { tries: 3, mins: 20 },
+  { tries: 2, mins: 60 },
+  { tries: 1, mins: 720 },
+];
+function lockoutLevelCfg(level) {
+  return LOCKOUT_LEVELS[Math.min(Math.max(level, 1) - 1, LOCKOUT_LEVELS.length - 1)];
+}
 function loadAdminLockouts() {
   try { const j = JSON.parse(fs.readFileSync(ADMIN_LOCKOUTS_FILE, 'utf8')); if (j && typeof j === 'object' && !Array.isArray(j)) return j; } catch (e) {}
   return {};
@@ -242,9 +252,6 @@ function saveAdminLockouts(obj) {
   try { fs.mkdirSync(DATA_DIR, { recursive: true }); } catch (e) {}
   fs.writeFileSync(ADMIN_LOCKOUTS_FILE, JSON.stringify(obj, null, 2));
   ghPersistFile(ADMIN_LOCKOUTS_FILE);
-}
-function lockoutMinutesFor(strikes) {
-  return LOCKOUT_MINUTES[Math.min(Math.max(strikes, 1) - 1, LOCKOUT_MINUTES.length - 1)];
 }
 function adminLockoutRemainingMs(ip) {
   try {
@@ -275,24 +282,37 @@ function clearAdminLockout(ip) {
 }
 function recordFailedAdminAttempt(req, ip) {
   try {
-    if (!ip) return;
+    if (!ip) return 0;
     const now = Date.now();
     const all = loadAdminLockouts();
     let rec = all[ip];
-    if (!rec || typeof rec !== 'object') rec = { strikes: 0, blockedUntil: 0, model: '' };
-    // Already inside a lockout: do not extend it, do not add strikes.
-    if (rec.blockedUntil && rec.blockedUntil > now) return;
-    rec.strikes = (rec.strikes || 0) + 1;
-    const mins = lockoutMinutesFor(rec.strikes);
-    rec.blockedUntil = now + mins * 60 * 1000;
-    rec.updatedAt = new Date().toISOString();
+    if (!rec || typeof rec !== 'object') rec = { level: 1, tries: 0, blockedUntil: 0, model: '' };
+    // Already inside a lockout: do not extend it, do not count tries.
+    if (rec.blockedUntil && rec.blockedUntil > now) return 0;
+    const level = Math.min(Math.max(rec.level || 1, 1), LOCKOUT_LEVELS.length);
+    const cfg = lockoutLevelCfg(level);
+    rec.tries = (rec.tries || 0) + 1;
+    rec.level = level;
     const model = modelFromUA(req.headers && req.headers['user-agent']);
     if (model) rec.model = model;
+    if (rec.tries >= cfg.tries) {
+      // Level reached: block for this level's duration, advance a level.
+      rec.blockedUntil = now + cfg.mins * 60 * 1000;
+      rec.tries = 0;
+      rec.level = Math.min(level + 1, LOCKOUT_LEVELS.length);
+      rec.updatedAt = new Date().toISOString();
+      all[ip] = rec;
+      saveAdminLockouts(all);
+      ghFlushFile(ADMIN_LOCKOUTS_FILE).catch(() => {});
+      addNotification('security', '', '🚫 វាយប្រហារ · Auto-blocked attack', 'IP ' + ip + (rec.model ? ' (' + rec.model + ')' : '') + ' ព្យាយាមចូល Admin ដោយ key ខុស (កម្រិតទី ' + level + ') — ត្រូវបានប្លុក ' + cfg.mins + ' នាទី');
+      return cfg.mins;
+    }
+    rec.updatedAt = new Date().toISOString();
     all[ip] = rec;
     saveAdminLockouts(all);
     ghFlushFile(ADMIN_LOCKOUTS_FILE).catch(() => {});
-    addNotification('security', '', '🚫 វាយប្រហារ · Auto-blocked attack', 'IP ' + ip + (rec.model ? ' (' + rec.model + ')' : '') + ' ព្យាយាមចូល Admin ដោយ key ខុស (លើកទី ' + rec.strikes + ') — ត្រូវបានប្លុក ' + mins + ' នាទី');
-  } catch (e) {}
+    return 0;
+  } catch (e) { return 0; }
 }
 function adminKeyOk(req) {
   const k = process.env.MOVAI_ADMIN_KEY;
@@ -314,11 +334,20 @@ function adminKeyOk(req) {
   if (remMs > 0) {
     return { ok: false, error: 'គណនីនេះត្រូវបានប្លុក ' + lockoutTextKm(remMs) + 'ទៀត · This account is blocked for ' + lockoutTextEn(remMs) + ' more' };
   }
-  recordFailedAdminAttempt(req, ip);
-  const remMs2 = adminLockoutRemainingMs(ip);
-  if (remMs2 > 0) {
-    return { ok: false, error: 'Admin key មិនត្រឹមត្រូវទេ — ត្រូវបានប្លុក ' + lockoutTextKm(remMs2) + ' · Wrong admin key — blocked for ' + lockoutTextEn(remMs2) };
+  const blockedMins = recordFailedAdminAttempt(req, ip);
+  if (blockedMins > 0) {
+    const ms = blockedMins * 60 * 1000;
+    return { ok: false, error: 'Admin key មិនត្រឹមត្រូវទេ — ត្រូវបានប្លុក ' + lockoutTextKm(ms) + ' · Wrong admin key — blocked for ' + lockoutTextEn(ms) };
   }
+  // Wrong key but not blocked yet: say how many tries are left at this level.
+  try {
+    const rec = loadAdminLockouts()[ip];
+    if (rec) {
+      const cfg = lockoutLevelCfg(rec.level || 1);
+      const left = Math.max(0, cfg.tries - (rec.tries || 0));
+      return { ok: false, error: 'Admin key មិនត្រឹមត្រូវទេ (នៅសល់ ' + left + ' ដង) · Wrong admin key (' + left + ' ' + (left === 1 ? 'try' : 'tries') + ' left)' };
+    }
+  } catch (e) {}
   return { ok: false, error: 'Admin key មិនត្រឹមត្រូវទេ' };
 }
 function normEmail(v) {
