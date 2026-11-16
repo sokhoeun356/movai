@@ -4402,25 +4402,27 @@ async function genGenerate(){
       genMsg(tx('adminNotSet'));
     }else{
       if(gen.mode==='song'){
-        /* REAL credit charge (owner rule): the song's price is
-           checked against the account's credit pool BEFORE
-           generating — not enough means NO generation and the
-           Packages sheet opens on the tab of the pool that is
-           short so the user can buy more right there. Enough
-           means the exact cost is deducted from the account THE
-           MOMENT Generate is tapped (owner order 2026-11-16):
-           creditChargePool runs BEFORE the generation starts and
-           re-renders every balance on screen at the new number
-           at once — header, Create, Profile, Packages — and the
-           charge sync pushes it to the server so the Admin drops
-           by the same amount immediately too. If the generation
-           then FAILS (or is cancelled), the charge is refunded
-           in full at once by creditRefundPool — a failed song is
-           never left charged. The POOL depends on the provider
-           (owner rule 2026-11-16): Magic Hour is a media
-           provider, so its songs check + deduct the Image.Video
-           Credit pool; Suno and MusicAPI check + deduct Song
-           Credit. */
+        /* Credit is charged by the SERVER only (owner order
+           2026-11-16): the moment Generate is tapped, the server
+           deducts the song's price from its own record BEFORE it
+           calls the provider, and its reply carries the new
+           credits / songCredits — adminGenPost applies them at
+           once (acctApplyServerData → balRenderAll), so the user
+           account, the server and the Admin always show the SAME
+           number. This page NEVER deducts locally: a local-only
+           deduction was never accepted by the server, so the
+           phone and the server drifted apart (phone 40, server
+           250) and the charge effectively happened twice. If the
+           provider then FAILS, the server refunds by itself and
+           the refunded balance rides the failure reply back the
+           same way — this page just displays it. The local
+           pre-check below only mirrors the last server-synced
+           balance so the Packages sheet can open early on the
+           short pool's tab; the server's own check is the one
+           that decides. The POOL depends on the provider (owner
+           rule 2026-11-16): Magic Hour is a media provider, so
+           its songs are paid from the Image.Video Credit pool;
+           Suno and MusicAPI from Song Credit. */
         var sCost=creditSongCost(cfg.provider);
         var sPool=creditSongPool(cfg.provider);
         var sBal=creditPoolBalance(sPool);
@@ -4435,19 +4437,13 @@ async function genGenerate(){
              cards are shown, never an extra empty one. */
           var pendId=/suno/i.test(cfg.provider||'')?'suno':(/musicapi/i.test(cfg.provider||'')?'musicapi':'magichour');
           genSongPending({id:pendId,name:''});
-          /* Deduct NOW — before the generation even starts — so
-             every balance display drops at the same instant the
-             user taps Generate (250 → 40 everywhere, no place
-             left showing the old number). */
-          if(sCost>0)doneNote=creditChargePool(sPool,sCost,creditSongProvName(cfg.provider));
-          try{
-            await genDoSongServer(cfg,prompt);
-          }catch(songErr){
-            /* The generation failed or was cancelled AFTER the
-               charge: refund the full cost at once, everywhere,
-               and let the original error surface as before. */
-            if(sCost>0){creditRefundPool(sPool,sCost,creditSongProvName(cfg.provider));doneNote='';}
-            throw songErr;
+          await genDoSongServer(cfg,prompt);
+          /* The server reply has already landed the deducted
+             balance on every surface; the done note reports the
+             server's real deduction and the balance it left. */
+          if(sCost>0){
+            var sBalAfter=creditPoolBalance(sPool);
+            if(sBalAfter<sBal)doneNote='−'+acctFmtBal(sBal-sBalAfter)+' '+(sPool==='song'?tx('acctSongCredit'):tx('acctMediaCredit'))+' · '+tx('histBalanceAfter')+' '+acctFmtBal(sBalAfter);
           }
         }
       }else if(gen.mode==='video'){
@@ -10270,28 +10266,31 @@ function acctCurrent(){
   if(u)acctEnsureId(u);
   return u;
 }
-/* ===== Credit ledger — REAL charges + per-account history =====
-   Owner rule (2026-11-16): a generation that costs Credit must
-   REALLY deduct it — the balance in the user's account goes down
-   by the exact cost, the Admin sees the same lower balance (the
-   charge is saved on the account record and pushed to the server
-   by the usual acctAdminSync, whose payload carries the balances),
-   and EVERY movement — charges, the welcome gift, Admin top-ups /
-   package approvals, Admin deductions — is written into a
-   per-account Credit HISTORY kept on the account
-   (localStorage 'movai-credit-hist-<email>'), shown in the
-   Profile sheet. The history survives log out / log in: it is
-   keyed by the account email, never by the session.
+/* ===== Credit ledger — server charges + per-account history =====
+   Owner rule (2026-11-16): the SERVER is the single source of
+   truth for credit. The server deducts the exact cost the moment
+   Generate is tapped — BEFORE it calls the provider — and every
+   reply it sends (generation results, failure/refund answers and
+   the account sync) carries the account's credits / songCredits,
+   which this page applies verbatim (acctApplyServerData) and
+   re-renders everywhere at once (balRenderAll), so the user
+   account, the server and the Admin ALWAYS show the same number.
+   This page never deducts or refunds locally, and no local value
+   may ever block a server value from landing. If a generation
+   fails after the charge, the server refunds by itself and the
+   refunded balance arrives the same way. EVERY movement the
+   server reports — generation charges, refunds, the welcome
+   gift, Admin grants / top-ups / package approvals, Admin
+   deductions — is written into a per-account Credit HISTORY kept
+   on the account (localStorage 'movai-credit-hist-<email>'),
+   shown in the Profile sheet. The history survives log out /
+   log in: it is keyed by the account email, never by the session.
    Song prices (the same prices the Create panel advertises):
    MovAi (Suno) 12 Song Credit per generation · MusicAPI 20 Song
    Credit per generation · Magic Hour charged BY LENGTH — 60 per
    minute (1 Credit per second of the picked duration) from the
    Image.Video Credit (media) pool, because Magic Hour is a media
-   provider · ACE Music free (0). The charge runs THE MOMENT
-   Generate is tapped (owner order 2026-11-16) — every balance
-   display updates at that same instant — and a generation that
-   then fails or is cancelled is refunded in full at once
-   (creditRefundPool), so a failed song is never left charged. */
+   provider · ACE Music free (0). */
 function creditHistKey(email){return 'movai-credit-hist-'+String(email||'').trim().toLowerCase();}
 function creditHistGet(email){
   try{var a=JSON.parse(localStorage.getItem(creditHistKey(email))||'[]');return Array.isArray(a)?a:[];}catch(e){return [];}
@@ -10305,28 +10304,12 @@ function creditHistAdd(email,entry){
     localStorage.setItem(creditHistKey(email),JSON.stringify(a));
   }catch(e){}
 }
-/* In-memory guard: after THIS page changes a pool balance (a
-   charge at Generate time, or a refund when that generation
-   fails), a server sync reply that simply restores the
-   PRE-change balance (the server not honouring the posted
-   balance yet) must neither resurrect the old number on screen
-   nor be written into the history as a fake movement of the
-   same amount. The guard stores the SIGNED local change
-   (charge = −cost, refund = +cost) for 3 minutes. */
-var creditChargeGuard={};
-function creditGuardSet(pool,delta){creditChargeGuard[pool]={delta:Math.round(delta||0),t:Date.now()};}
-function creditGuardHit(pool,delta){
-  var g=creditChargeGuard[pool];
-  return !!(g&&g.delta<0&&delta===-g.delta&&(Date.now()-g.t)<180000);
-}
-/* True when the server's value for a pool is exactly the balance
-   from BEFORE this page's latest local change — a stale reply
-   that must not overwrite the number the user already sees. */
-function creditGuardStale(pool,serverVal,localVal){
-  var g=creditChargeGuard[pool];
-  if(!g||!g.delta||(Date.now()-g.t)>=180000)return false;
-  return serverVal===(localVal-g.delta);
-}
+/* NO local-change guard any more (owner order 2026-11-16): the
+   old creditGuardStale blocked server replies from overwriting
+   a balance this page had changed locally, which is exactly how
+   the phone and the server ended up showing different numbers.
+   The server is the only truth — every balance it sends lands,
+   unconditionally. */
 /* Re-render EVERY surface that shows a credit balance, at the
    same moment, from the same account record — the top bar /
    Profile sheet, the ☰ drawer account box and the Packages
@@ -10378,66 +10361,22 @@ function creditPoolBalance(pool){
   if(!u)return 0;
   return Math.max(0,parseInt(pool==='song'?u.songCredits:u.credits,10)||0);
 }
-/* Deduct `amount` from the signed-in account's pool FOR REAL:
-   the account record is updated and saved, a history entry is
-   written, every balance on screen re-renders at the new number,
-   and acctAdminSync pushes the new balance to the server so the
-   Admin's record for this user drops by the same amount.
-   Returns a short «−N Pool · នៅសល់ B» note for the result line. */
-function creditChargePool(pool,amount,detail){
-  amount=Math.round(amount||0);
-  if(!(amount>0))return '';
-  var u=null;try{u=acctCurrent();}catch(e){}
-  if(!u||!u.email)return '';
-  var us=acctUsersGet();var rec=us[u.email];if(!rec)return '';
-  var before=Math.max(0,parseInt(pool==='song'?rec.songCredits:rec.credits,10)||0);
-  var after=Math.max(0,before-amount);
-  if(pool==='song')rec.songCredits=after;else rec.credits=after;
-  acctUsersSave(us);
-  creditGuardSet(pool,after-before);
-  creditHistAdd(rec.email,{pool:pool,delta:-(before-after),kind:'song',detail:detail||'',bal:after});
-  /* Bell notice for the charge (owner rule 2026-11-16): the
-     user's own bell gets the deduction at once (red −amount),
-     and the charge event rides the sync below (one-shot
-     `charge`, the giftClaimed pattern) so the server can raise
-     the Admin's bell notice naming this account. */
-  try{localNotifAdd(rec.email,{type:'deduct',title:tx('notifGenCharge')+(detail?' · '+detail:''),body:tx('histBalanceAfter')+' '+acctFmtBal(after)+' '+(pool==='song'?tx('acctSongCredit'):tx('acctMediaCredit')),media:pool==='media'?(before-after):null,song:pool==='song'?(before-after):null});}catch(e){}
-  try{acctSyncChargeFlag={pool:pool,amount:before-after,detail:detail||'',bal:after,ts:Date.now()};}catch(e){}
-  balRenderAll();
-  try{acctAdminSync();}catch(e){}
-  return '−'+acctFmtBal(before-after)+' '+(pool==='song'?tx('acctSongCredit'):tx('acctMediaCredit'))+' · '+tx('histBalanceAfter')+' '+acctFmtBal(after);
-}
-/* Refund a charge IN FULL, at once, on every surface: used when
-   a generation that was charged the moment Generate was tapped
-   then FAILS (or is cancelled) — the user is never left charged
-   for a song that never arrived. Mirrors creditChargePool: the
-   account record is updated and saved, a +amount «refund»
-   history entry + bell notice are written, every balance on
-   screen re-renders at the restored number together, and the
-   restored balance is pushed to the server by acctAdminSync so
-   the Admin sees the same number. */
-function creditRefundPool(pool,amount,detail){
-  amount=Math.round(amount||0);
-  if(!(amount>0))return;
-  var u=null;try{u=acctCurrent();}catch(e){}
-  if(!u||!u.email)return;
-  var us=acctUsersGet();var rec=us[u.email];if(!rec)return;
-  var before=Math.max(0,parseInt(pool==='song'?rec.songCredits:rec.credits,10)||0);
-  var after=before+amount;
-  if(pool==='song')rec.songCredits=after;else rec.credits=after;
-  acctUsersSave(us);
-  creditGuardSet(pool,after-before);
-  creditHistAdd(rec.email,{pool:pool,delta:amount,kind:'refund',detail:detail||'',bal:after});
-  try{localNotifAdd(rec.email,{type:'grant',title:tx('notifGenRefund')+(detail?' · '+detail:''),body:tx('histBalanceAfter')+' '+acctFmtBal(after)+' '+(pool==='song'?tx('acctSongCredit'):tx('acctMediaCredit')),media:pool==='media'?amount:null,song:pool==='song'?amount:null});}catch(e){}
-  balRenderAll();
-  try{acctAdminSync();}catch(e){}
-}
-/* A balance change that arrives FROM the server (Admin top-up,
-   package approval, Admin deduction) is written into the history
-   too — top-ups really land in the history, not just the number. */
+/* NO local charge / refund functions exist any more (owner
+   order 2026-11-16): the old creditChargePool deducted on this
+   device only, before the server call — a deduction the server
+   never accepted, so the phone and the server drifted apart and
+   the charge effectively happened twice — and creditRefundPool
+   mirrored the same mistake in reverse. The server now deducts
+   before calling the provider and refunds by itself when the
+   provider fails; both movements arrive here as server balances
+   and land through acctApplyServerData like every other server
+   movement. */
+/* A balance change that arrives FROM the server — a generation
+   charge or refund, an Admin grant / top-up, a package approval,
+   an Admin deduction — is written into the history too, so every
+   movement really lands in the history, not just the number. */
 function creditHistSyncDelta(email,pool,delta,balAfter){
   if(!email||!delta)return;
-  if(creditGuardHit(pool,delta))return;
   creditHistAdd(email,{pool:pool,delta:delta,kind:delta>0?'topup':'admindeduct',bal:balAfter});
   /* Bell notice (owner rule 2026-11-16): an Admin grant / top-up
      lands in the user's bell in green, an Admin deduction in
@@ -10524,12 +10463,10 @@ var acctSyncBusy=false;
    Admin. acctAdminPayload consumes (clears) it, so ordinary syncs
    never send it. */
 var acctSyncGiftFlag=false;
-/* One-shot flag: set by creditChargePool so the sync that follows
-   a generation charge carries `charge` — the server then creates
-   the Admin's bell notification for the charge (naming the
-   account) alongside the user's own. Consumed by
-   acctAdminPayload, so ordinary syncs never send it. */
-var acctSyncChargeFlag=null;
+/* The old one-shot `charge` sync flag is gone with the local
+   charge itself (owner order 2026-11-16): the server deducts on
+   its own side now, so it raises the Admin's charge notice from
+   its own record — nothing about a charge rides this sync. */
 function acctSyncPlanCopy(p){
   if(!p||!p.id)return null;
   return {id:p.id,until:p.until||0};
@@ -10551,7 +10488,6 @@ function acctAdminPayload(u){
     songPlan:songPlan
   };
   if(acctSyncGiftFlag){payload.giftClaimed=true;acctSyncGiftFlag=false;}
-  if(acctSyncChargeFlag){payload.charge=acctSyncChargeFlag;acctSyncChargeFlag=null;}
   return payload;
 }
 function acctSrvNum(v){
@@ -10590,21 +10526,24 @@ function acctApplyServerData(data){
      early — the balances stay 0 until the user taps
      «ទទួលយក · Claim» in the gift popup. */
   var giftHold=!!rec.giftPending;
-  /* Stale-reply guard (owner order 2026-11-16): a sync reply that
-     still carries the balance from BEFORE this page's just-made
-     charge (or refund) must NOT resurrect the old number — every
-     surface keeps the new balance the user already sees, and the
-     server's next reply (after it honours the posted balance)
-     applies normally. */
+  /* The server's balances land UNCONDITIONALLY (owner order
+     2026-11-16): the old stale-reply guard (creditGuardStale)
+     that let a local number veto the server's is removed — the
+     server is the only truth, so a generation charge, a server
+     refund, an Admin grant / top-up or an Admin deduction all
+     replace the local number the moment they arrive, and the
+     movement is written into the credit history. */
   var c=acctSrvNum(srv.credits);
-  if(c!==null&&!giftHold){var cv=Math.max(0,Math.floor(c));if(rec.credits!==cv&&!creditGuardStale('media',cv,rec.credits)){try{creditHistSyncDelta(rec.email,'media',cv-rec.credits,cv);}catch(e){}rec.credits=cv;changed=true;}}
+  if(c!==null&&!giftHold){var cv=Math.max(0,Math.floor(c));if(rec.credits!==cv){try{creditHistSyncDelta(rec.email,'media',cv-rec.credits,cv);}catch(e){}rec.credits=cv;changed=true;}}
   var sc=acctSrvNum(srv.songCredits);
-  if(sc!==null&&!giftHold){var sv=Math.max(0,Math.floor(sc));if(rec.songCredits!==sv&&!creditGuardStale('song',sv,rec.songCredits)){try{creditHistSyncDelta(rec.email,'song',sv-rec.songCredits,sv);}catch(e){}rec.songCredits=sv;changed=true;}}
+  if(sc!==null&&!giftHold){var sv=Math.max(0,Math.floor(sc));if(rec.songCredits!==sv){try{creditHistSyncDelta(rec.email,'song',sv-rec.songCredits,sv);}catch(e){}rec.songCredits=sv;changed=true;}}
   var sp=acctSyncPlanCopy(srv.plan);
   if(sp&&(sp.until>Date.now())){rec.plan=sp;try{localStorage.setItem('movai-plan',JSON.stringify({id:sp.id,until:sp.until,email:rec.email}));}catch(e){}changed=true;}
   var ssp=acctSyncPlanCopy(srv.songPlan);
   if(ssp&&(ssp.until>Date.now())){rec.songPlan=ssp;try{localStorage.setItem('movai-song-plan',JSON.stringify({id:ssp.id,until:ssp.until,email:rec.email}));}catch(e){}changed=true;}
-  if(changed){acctUsersSave(us);try{acctRender();}catch(e){}try{pkgRender();}catch(e){}}
+  /* Every balance surface re-renders at the server's number at
+     the same moment — header, Profile, drawer, Create, Packages. */
+  if(changed){acctUsersSave(us);try{balRenderAll();}catch(e){}}
 }
 function acctAdminSync(){
   var u=null;try{u=acctCurrent();}catch(e){}
@@ -11485,18 +11424,15 @@ function notifBellRing(){
 }
 /* ===== Local bell notices for credit movements (owner rule
    2026-11-16) =====
-   A generation charge (creditChargePool) and a balance change
-   landed from the server (creditHistSyncDelta — Admin grant /
-   package top-up / Admin deduction) ALSO raise a notice in the
-   account's own bell at once: the charge in red, the grant in
+   Every balance change landed from the server (creditHistSyncDelta
+   — a generation charge or refund, an Admin grant / package
+   top-up, an Admin deduction) ALSO raises a notice in the
+   account's own bell at once: money out in red, money in in
    green. They are kept per account on this device
    ('movai-local-notif-<email>') and merged into the bell list on
    every server load — de-duplicated against server notices and
    each other by type + pool amounts + a 10-minute window, so a
-   movement the server also reports never shows twice. The
-   charge additionally rides the account sync payload (one-shot
-   `charge`, the giftClaimed pattern) so the server can raise
-   the Admin's own bell notice naming the account. */
+   movement the server also reports never shows twice. */
 function localNotifKey(email){return 'movai-local-notif-'+String(email||'').trim().toLowerCase();}
 function localNotifGet(email){
   try{var a=JSON.parse(localStorage.getItem(localNotifKey(email))||'[]');return Array.isArray(a)?a:[];}catch(e){return [];}
@@ -12675,6 +12611,15 @@ async function adminGenPost(path,body,timeoutMs){
   try{r=await fetch(ADMIN_API_BASE+path,opts);}
   finally{if(timer)clearTimeout(timer);}
   var j=await r.json().catch(function(){return null;});
+  /* Server-charged credit (owner order 2026-11-16): the server
+     deducts BEFORE calling the provider, so every generation
+     reply — the create call and every status poll, for image,
+     video, song and 3D alike — carries the account's new credits
+     / songCredits. Apply them the moment the reply lands, on the
+     failure path too: when the provider fails the server refunds
+     by itself and the refunded balance rides this same reply, so
+     the restored number shows everywhere before the error does. */
+  if(j){try{acctApplyServerData(j);}catch(e){}}
   if(j&&j.ok===false)throw new Error(String(j.error||tx('genFailed')));
   if(!r.ok)throw new Error(genErrText(j,'HTTP '+r.status));
   if(!j)throw new Error(tx('genFailed'));
