@@ -401,7 +401,8 @@ html[data-mode="light"] #genSunoModelDrop .dd-opt{color:#fff;border-top-color:rg
    list scrolls inside the panel. */
 #page-packages{position:fixed;left:0;right:0;bottom:0;z-index:85;transform:translateY(105%);transition:transform .34s cubic-bezier(.22,.8,.3,1);max-height:72vh;display:flex;flex-direction:column;pointer-events:none}
 #page-packages.open{transform:translateY(0);pointer-events:auto}
-#page-packages .panel{margin:0 auto calc(92px + env(safe-area-inset-bottom,0px));width:calc(100% - 20px);max-width:700px;max-height:72vh;overflow-y:auto;border-radius:22px;box-shadow:0 -18px 50px rgba(0,0,0,.5);-webkit-overflow-scrolling:touch;overscroll-behavior:contain}
+#page-packages .panel{margin:0 auto calc(92px + env(safe-area-inset-bottom,0px));width:calc(100% - 20px);max-width:700px;max-height:72vh;overflow-y:auto;border-radius:22px;box-shadow:0 -18px 50px rgba(0,0,0,.5);-webkit-overflow-scrolling:touch;overscroll-behavior:contain;padding:12px 12px 14px}
+#pkgStatus:empty{display:none;margin:0;padding:0}
 #pkgBackdrop{position:fixed;inset:0;z-index:84;background:rgba(0,0,0,.62);display:none}
 #pkgBackdrop.open{display:block}
 /* Package type tabs (owner order 2026-11-15 18:11): the two names
@@ -410,9 +411,9 @@ html[data-mode="light"] #genSunoModelDrop .dd-opt{color:#fff;border-top-color:rg
    title, each name shown in full on its own side: Songs on the
    LEFT half, Image & Video on the RIGHT half. The group heading
    («For Songs» / «For Image & Video») sits under the tab row. */
-.pkg-tabs{display:flex;gap:10px;margin-top:14px}
-.pkg-tab{flex:1 1 0;min-width:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;padding:10px 10px;border-radius:14px;border:1px solid var(--line);background:var(--card2);color:var(--muted);font-family:inherit;font-weight:800;font-size:1rem;cursor:pointer;min-height:56px;line-height:1.3;overflow-wrap:break-word;text-align:center}
-.pkg-tab small{font-size:0.6875rem;font-weight:700;letter-spacing:.02em}
+.pkg-tabs{display:flex;gap:8px;margin-top:0}
+.pkg-tab{flex:1 1 0;min-width:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0;padding:7px 8px;border-radius:12px;border:1px solid var(--line);background:var(--card2);color:var(--muted);font-family:inherit;font-weight:800;font-size:0.92rem;cursor:pointer;min-height:44px;line-height:1.25;overflow-wrap:break-word;text-align:center}
+.pkg-tab small{font-size:0.65rem;font-weight:700;letter-spacing:.02em}
 .pkg-tab.song.on{background:rgba(255,196,0,.16);border-color:rgba(255,196,0,.65);color:#ffd83d}
 html[data-mode="light"] .pkg-tab.song.on{color:#8a6100}
 .pkg-tab.media.on{background:rgba(181,55,242,.16);border-color:rgba(181,55,242,.65);color:#e3aaff}
@@ -425,16 +426,16 @@ html[data-mode="light"] .pkg-tab.media.on{color:#8f27c9}
    right-to-left / left-to-right through the packages instead of
    scrolling the list top-to-bottom. Each card takes most of the
    row so the next package peeks in as the swipe affordance. */
-.pkg-grid{display:flex;gap:10px;margin-top:10px;overflow-x:auto;overflow-y:hidden;scroll-snap-type:x mandatory;padding:10px 4px 12px;-webkit-overflow-scrolling:touch;overscroll-behavior-x:contain;scrollbar-width:none}
+.pkg-grid{display:flex;gap:8px;margin-top:6px;overflow-x:auto;overflow-y:hidden;scroll-snap-type:x mandatory;padding:6px 2px 8px;-webkit-overflow-scrolling:touch;overscroll-behavior-x:contain;scrollbar-width:none}
 .pkg-grid::-webkit-scrollbar{display:none}
 .pkg-grid>.pkg-card{flex:0 0 74%;scroll-snap-align:start}
 #page-packages .pkg-card{content-visibility:visible}
 @media(min-width:560px){.pkg-grid>.pkg-card{flex-basis:42%}}
-.pkg-card{background:var(--card2);border:1px solid var(--line);border-radius:12px;padding:12px 13px;display:flex;flex-direction:column;-webkit-backdrop-filter:blur(var(--txtblur,0px));backdrop-filter:blur(var(--txtblur,0px))}
+.pkg-card{background:var(--card2);border:1px solid var(--line);border-radius:12px;padding:9px 10px;display:flex;flex-direction:column;-webkit-backdrop-filter:blur(var(--txtblur,0px));backdrop-filter:blur(var(--txtblur,0px))}
 .pkg-card.hot{border-color:rgba(var(--accent-rgb),.55)}
-.pkg-name{font-size:0.875rem;font-weight:800}
-.pkg-price{font-size:1.375rem;font-weight:900;margin-top:4px;line-height:1.1}
-.pkg-price small{font-size:0.75rem;font-weight:700;color:var(--muted)}
+.pkg-name{font-size:0.78rem;font-weight:800}
+.pkg-price{font-size:1.375rem;font-weight:900;margin-top:3px;line-height:1.1}
+.pkg-price small{font-size:0.7rem;font-weight:700;color:var(--muted)}
 /* Live sale price (from the server): when the current price is
    below the package's original price, the original shows struck
    through beside it with a discount badge (e.g. -20%). A price
@@ -456,20 +457,20 @@ html[data-mode="light"] .pkg-tab.media.on{color:#8f27c9}
 .pay-copy{flex:0 0 auto;border:none;border-radius:999px;padding:9px 14px;font-size:0.8125rem;font-weight:800;font-family:inherit;cursor:pointer;background:var(--accent-fill);color:#0d1005;min-height:38px}
 .pay-copy:active{filter:brightness(.93)}
 .pay-loading{font-size:0.8125rem;color:var(--muted);margin-top:12px;line-height:1.6}
-.pkg-credits{margin-top:3px;font-size:0.8125rem;font-weight:800;color:var(--accent-text)}
-.pkg-feats{margin-top:8px;font-size:0.75rem;color:var(--muted);line-height:1.55;flex:1}
-.pkg-card .btn{margin-top:10px;width:100%;padding:10px 16px;font-size:0.875rem;min-height:40px}
+.pkg-credits{margin-top:2px;font-size:0.875rem;font-weight:900;color:var(--accent-text)}
+.pkg-feats{margin-top:5px;font-size:0.68rem;color:var(--muted);line-height:1.4;flex:1}
+.pkg-card .btn{margin-top:8px;width:100%;padding:10px 16px;font-size:0.875rem;min-height:40px}
 /* Package cards carry NO brand/creator credit — «MovAi» + «YEM
    SOKHOEUN / Create by Owner» lives only on the free-video watermark
    cover, nowhere in the header and on no package card. */
 /* Package groups, colour-matched to the top credit chips:
    purple = Image & Video packages, yellow = Song packages. */
-.pkg-group-head{display:flex;align-items:center;gap:9px;margin-top:14px}
-.pkg-group-head .gdot{width:12px;height:12px;border-radius:50%;flex:0 0 auto}
+.pkg-group-head{display:flex;align-items:center;gap:7px;margin-top:8px}
+.pkg-group-head .gdot{width:10px;height:10px;border-radius:50%;flex:0 0 auto}
 .gdot-media{background:#b537f2;box-shadow:0 0 9px rgba(181,55,242,.85)}
 .gdot-song{background:#ffc400;box-shadow:0 0 9px rgba(255,196,0,.85)}
-.pkg-group-head h3{font-size:1rem;font-weight:900}
-.pkg-group-note{font-size:0.8125rem;color:var(--muted);margin-top:5px;line-height:1.6}
+.pkg-group-head h3{font-size:0.88rem;font-weight:900}
+.pkg-group-note{font-size:0.72rem;color:var(--muted);margin-top:3px;line-height:1.45}
 /* Package card colours follow the owner's reference cards (owner
    order 2026-11-15, superseding the earlier yellow/purple flat
    colours): Song packages wear an ORANGE gradient, Image & Video
@@ -814,7 +815,8 @@ html[data-smooth="1"] .dock{background-color:rgba(var(--glass-tint),.96)}
    Chat is login-only: guests are sent to the log-in sheet instead
    (see aiChatOpen in the script). Every reply comes live from the
    MovAi proxy server (POST /api/chat) — nothing is pre-written. */
-.chat-fab{position:fixed;left:16px;bottom:calc(16px + env(safe-area-inset-bottom,0px));z-index:90;transform:translateZ(0);width:58px;height:58px;border-radius:50%;border:1px solid rgba(0,0,0,.18);background:var(--accent-fill);color:#0d1005;display:flex;align-items:center;justify-content:center;cursor:pointer;padding:0;box-shadow:0 10px 26px rgba(0,0,0,.4),inset 0 1px 0 rgba(255,255,255,.35);-webkit-tap-highlight-color:transparent}
+.chat-fab{position:fixed;left:16px;bottom:calc(16px + env(safe-area-inset-bottom,0px));z-index:35;transform:translateZ(0);width:58px;height:58px;border-radius:50%;border:1px solid rgba(0,0,0,.18);background:var(--accent-fill);color:#0d1005;display:flex;align-items:center;justify-content:center;cursor:pointer;padding:0;box-shadow:0 10px 26px rgba(0,0,0,.4),inset 0 1px 0 rgba(255,255,255,.35);-webkit-tap-highlight-color:transparent;transition:opacity .2s ease,visibility .2s ease}
+.chat-fab.chat-fab-hidden{opacity:0;visibility:hidden;pointer-events:none}
 .chat-fab svg{width:32px;height:32px;display:block}
 .chat-fab:active{filter:brightness(.93)}
 .chat-fab .chat-fab-eye{animation:chatBlink 4.6s ease-in-out infinite;transform-origin:center;transform-box:fill-box}
@@ -1197,8 +1199,7 @@ html[data-smooth="1"] .brand-frame,html[data-smooth="1"] .acct-chip,html[data-sm
 <div id="pkgBackdrop" onclick="packagesHide()"></div>
 <section id="page-packages" aria-label="Packages">
   <div class="panel" id="sec-packages">
-    <h2 style="font-size:1.125rem;font-weight:800;text-align:center" data-i18n="pkgTitle">កញ្ចប់សេវាកម្ម MovAi</h2>
-    <p id="pkgStatus" style="font-size:0.875rem;margin-top:12px;line-height:1.7"></p>
+    <p id="pkgStatus" style="font-size:0.78rem;margin-top:6px;line-height:1.5"></p>
     <div class="pkg-tabs" role="tablist" aria-label="Package type">
       <button type="button" class="pkg-tab song on" id="pkgTabSong" role="tab" aria-selected="true" onclick="pkgSetTab('song')"><span data-i18n="pkgTabSong">បទចម្រៀង</span><small>Songs</small></button>
       <button type="button" class="pkg-tab media" id="pkgTabMedia" role="tab" aria-selected="false" onclick="pkgSetTab('media')"><span data-i18n="pkgTabMedia">រូបភាព និង វីដេអូ</span><small>Image &amp; Video</small></button>
@@ -1226,7 +1227,7 @@ html[data-smooth="1"] .brand-frame,html[data-smooth="1"] .acct-chip,html[data-sm
       <div class="pkg-card media hot">
         <span class="pkg-name" data-i18n="pkgYearly">ប្រចាំឆ្នាំ</span>
         <div class="pkg-price" id="pkgPrice-yearly">$18<small data-i18n="pkgPerMonth">/ខែ</small></div>
-        <p style="font-size:0.8125rem;color:var(--muted);margin-top:2px" id="pkgBilled-yearly" data-i18n="pkgBilledYear">បង់ $216/ឆ្នាំ</p>
+        <p style="font-size:0.7rem;color:var(--muted);margin-top:1px" id="pkgBilled-yearly" data-i18n="pkgBilledYear">បង់ $216/ឆ្នាំ</p>
         <div class="pkg-credits" data-i18n="pkgCreditsYear">140,000 Credit/ឆ្នាំ</div>
         <div class="pkg-feats">
           <div data-i18n="pkgFeatMedia">បង្កើតបានទាំងរូបភាព និងវីដេអូ</div>
@@ -5430,9 +5431,10 @@ function openMenu(){
   try{pushRefreshToggle();}catch(e){}
   d.classList.add('open');if(b)b.classList.add('open');
   document.body.style.overflow='hidden';
-  try{chatFabShow();}catch(e){}
+  try{chatFabHide();}catch(e){}
   requestAnimationFrame(function(){requestAnimationFrame(function(){
     d.classList.add('shown');if(b)b.classList.add('shown');
+    try{chatFabHide();}catch(e){}
   });});
 }
 function closeMenu(){
@@ -5526,16 +5528,28 @@ function dockSync(force){
   if(cre)cre.classList.toggle('on',!onPub&&force!=='history');
   if(his)his.classList.toggle('on',force==='history');
 }
-/* The AI chat robot button must ALWAYS stay visible and tappable —
-   while the ☰ drawer is open and after it closes. openMenu and
-   closeMenu call this so no inline hiding can ever be left on it:
-   the button can never stay gone. (Its layer is also kept above
-   the drawer in CSS — see .chat-fab z-index.) */
+/* The AI chat robot button HIDES while the ☰ drawer is open (so it
+   never floats over the drawer content) and ALWAYS comes back —
+   visible and tappable — when the drawer closes. openMenu calls
+   chatFabHide(); closeMenu calls chatFabShow() immediately and
+   again in its settle timeout, so no hiding can ever be left on
+   the button after the drawer is gone. Its CSS z-index (35) also
+   stays BELOW the drawer backdrop (40) and the drawer (50), so it
+   can never cover the drawer even mid-transition. */
+function chatFabHide(){
+  var f=document.getElementById('chatFab');if(!f)return;
+  f.classList.add('chat-fab-hidden');
+  f.style.visibility='hidden';
+  f.style.opacity='0';
+  f.style.pointerEvents='none';
+}
 function chatFabShow(){
   var f=document.getElementById('chatFab');if(!f)return;
+  f.classList.remove('chat-fab-hidden');
   if(f.style.display==='none')f.style.display='';
   f.style.visibility='';
   f.style.opacity='';
+  f.style.pointerEvents='';
 }
 var fabAnimTimer=null;
 function toggleFab(){
