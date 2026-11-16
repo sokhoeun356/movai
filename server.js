@@ -2303,7 +2303,6 @@ function apiRoute(req, res, urlPath) {
           }
           const cb = sunoCallbacks.get(jobId);
           if (cb && cb.status === 'SUCCESS' && cb.songs && cb.songs.length) {
-            warmMp3ForSongs(cb.songs);
             return sendJSON(res, 200, { ok: true, status: 'done', songs: cb.songs });
           }
           if (cb && cb.status === 'FIRST_SUCCESS' && cb.preview) {
@@ -2334,7 +2333,6 @@ function apiRoute(req, res, urlPath) {
           } catch (e) {
             return sendJSON(res, 200, { ok: false, error: (e && e.message) || 'Suno: request failed' });
           }
-          if (out && out.status === 'done' && Array.isArray(out.songs)) warmMp3ForSongs(out.songs);
           return sendJSON(res, 200, Object.assign({ ok: true }, out));
         }
         if (provider === 'musicapi') {
@@ -2382,7 +2380,6 @@ function apiRoute(req, res, urlPath) {
             if (e && e.noKey) return sendJSON(res, 200, { ok: false, error: 'Admin មិនទាន់ដាក់ MusicAPI Key ទេ' });
             return sendJSON(res, 200, { ok: false, error: (e && e.message) || 'MusicAPI: request failed' });
           }
-          if (out && out.status === 'done' && Array.isArray(out.songs)) warmMp3ForSongs(out.songs);
           return sendJSON(res, 200, Object.assign({ ok: true }, out));
         }
         if (provider === 'magichour') {
@@ -2409,7 +2406,6 @@ function apiRoute(req, res, urlPath) {
             if (e && e.noKey) return sendJSON(res, 200, { ok: false, error: 'Admin មិនទាន់ដាក់ Magic Hour Key ទេ' });
             return sendJSON(res, 200, { ok: false, error: (e && e.message) || 'Magic Hour: request failed' });
           }
-          if (out && out.status === 'done' && Array.isArray(out.songs)) warmMp3ForSongs(out.songs);
           return sendJSON(res, 200, Object.assign({ ok: true }, out));
         }
         return sendJSON(res, 200, { ok: false, error: 'Provider មិនស្គាល់ទេ' });
@@ -3887,23 +3883,10 @@ function apiRoute(req, res, urlPath) {
     try { if (fs.existsSync(fp) && fs.statSync(fp).size > 1000) return fp; } catch (e) {}
     return null;
   }
-  // Kick off background MP3 pre-conversion for a songs array (fire and
-  // forget — never blocks the response). So the MP3 is usually cached
-  // before the user taps Download. Accepts url/audioUrl/audio_url/streamUrl.
-  function warmMp3ForSongs(songs) {
-    try {
-      if (!Array.isArray(songs)) return;
-      // Only warm the first 3 songs per call — conversions are serialized
-      // (one at a time) so warming a whole feed would queue up minutes of
-      // background work on the 512 MB Free instance.
-      let n = 0;
-      for (const s of songs) {
-        if (n >= 3) break;
-        const u = s && (s.url || s.audioUrl || s.audio_url || s.streamUrl);
-        if (typeof u === 'string' && u.startsWith('http')) { n++; convertAndCacheMp3(u).catch(() => {}); }
-      }
-    } catch (e) {}
-  }
+  // MP3 pre-warm REMOVED (owner order 2026-11-16 ~22:00): NO background
+  // conversion. The MP3 is converted ONLY when the user taps Download on
+  // that one song (GET /api/gen/song/mp3) — never at generation, never
+  // when a song is shown or played.
   // Convert a source audio URL to MP3 128kbps, cache it in uploads/, and
   // return the cached filename. Returns null on failure. If already cached
   // returns the cached filename immediately (no re-convert).
@@ -3976,18 +3959,8 @@ function apiRoute(req, res, urlPath) {
     })();
     return;
   }
-  // GET /api/gen/song/mp3-warm?u=<audio-url> — warm the MP3 cache in the
-  // background; returns immediately {ok:true, cached}. The website calls
-  // this when a song is shown/played so the MP3 is ready before the user
-  // taps Download (the download then starts instantly).
-  if (req.method === 'GET' && urlPath === '/api/gen/song/mp3-warm') {
-    const qp = new URL(req.url, 'http://localhost').searchParams;
-    const u = qp.get('u') || '';
-    if (!u || !/^https?:\/\//i.test(u)) return sendJSON(res, 400, { ok: false, error: 'missing u' });
-    const already = !!mp3CacheGet(u);
-    if (!already) convertAndCacheMp3(u).catch(() => {});
-    return sendJSON(res, 200, { ok: true, cached: already });
-  }
+  // GET /api/gen/song/mp3-warm — REMOVED (owner order 2026-11-16 ~22:00):
+  // no background pre-conversion; MP3 is made only on Download tap.
   // GET /api/public/provider-status — PUBLIC (no admin key). API key
   // health for the website's red/green indicators: green = working,
   // red = exhausted (out of credits/quota/auth failed), unknown = not
