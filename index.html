@@ -1018,8 +1018,9 @@ html[data-smooth="1"] .dock{background-color:rgba(var(--glass-tint),.96)}
    «🔊 ស្ដាប់» button beside Copy — it plays the answer aloud with
    Microsoft Edge TTS called directly from the phone's browser
    (real Piseth / Sreymom voices; the server route is blocked by
-   Microsoft), falling back to the browser's own speechSynthesis
-   (see the spoken-replies section at the end of the file). While
+   Microsoft), then Google's free read-aloud voice, and only then
+   the browser's own speechSynthesis (see the spoken-replies
+   section at the end of the file). While
    it speaks the button shows the playing state; tapping it again
    stops, and the button always resets when speech ends. */
 .chat-listen-btn{border:1px solid var(--line2);background:transparent;color:var(--accent-text);border-radius:999px;padding:5px 13px;font-size:0.75rem;font-weight:800;font-family:inherit;cursor:pointer;line-height:1.35;min-height:32px;white-space:nowrap}
@@ -10098,7 +10099,10 @@ document.addEventListener('keydown',function(e){
    own connection is accepted (the same route the SOKHOEUN app
    uses). If a socket dies with no audio, ONE fresh retry is made
    (new proof token + connection id); if Edge still fails, the
-   button falls back to the browser's own speechSynthesis, which
+   GOOGLE voice takes over (aiChatSpeakGoogle — Google's free
+   read-aloud MP3, Khmer + English, no key, fetched straight from
+   Google by the phone), and only if Google fails too does the
+   button fall back to the browser's own speechSynthesis, which
    prefers a Khmer (km) voice when the phone has one; if the
    answer is Khmer and the phone has NO Khmer voice, a clear note
    says so under the answer instead of a long silent wait. Per the
@@ -10236,13 +10240,13 @@ function aiChatSpeakEdge(text,btn,token){
      the first socket dies with no audio (a transient refusal or
      a dropped connection), ONE fresh retry is made with a new
      proof token + connection id; only if that also fails does
-     the browser voice take over (aiChatSpeakBrowser). */
+     the Google voice take over (aiChatSpeakGoogle). */
   var voice=(aiChatVoice==='female')?'km-KH-SreymomNeural':'km-KH-PisethNeural';
   var attempts=0;
   function giveUp(){
     if(token!==aiChatSpeakToken)return;
     aiChatEdgeCleanup();
-    aiChatSpeakBrowser(text,btn,token);
+    aiChatSpeakGoogle(text,btn,token);
   }
   function attempt(){
     attempts++;
@@ -10299,10 +10303,10 @@ function aiChatSpeakEdge(text,btn,token){
         if(token!==aiChatSpeakToken){try{ws.close();}catch(e){}return;}
         var ts=aiChatEdgeTs();
         try{
-          ws.send('X-Timestamp:'+ts+'\r\nContent-Type:application/json; charset=utf-8\r\nPath:speech.config\r\n\r\n{"context":{"synthesis":{"audio":{"metadataoptions":{"sentenceBoundaryEnabled":"false","wordBoundaryEnabled":"false"},"outputFormat":"audio-24khz-48kbitrate-mono-mp3"}}}}');
+          ws.send('X-Timestamp:'+ts+'\r\nContent-Type:application/json; charset=utf-8\r\nPath:speech.config\r\n\r\n{"context":{"system":{"name":"SpeechSDK","version":"1.19.0","build":"JavaScript","lang":"JavaScript","os":{"platform":"Browser/Mobile","name":"Android","bits":"32"}},"os":{"platform":"Browser/Mobile","name":"Android","bits":"32"},"synthesis":{"audio":{"metadataoptions":{"sentenceBoundaryEnabled":"false","wordBoundaryEnabled":"false"},"outputFormat":"audio-24khz-48kbitrate-mono-mp3"}}}}');
           var esc=String(text||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&apos;');
           var ssml="<speak version='1.0' xmlns='http://www.w3.org/2001/10/synthesis' xmlns:mstts='https://www.w3.org/2001/mstts' xml:lang='km-KH'><voice name='"+voice+"'><prosody pitch='+0Hz' rate='+0%' volume='+0%'>"+esc+"</prosody></voice></speak>";
-          ws.send('X-RequestId:'+aiChatEdgeGenId()+'\r\nContent-Type:application/ssml+xml\r\nX-Timestamp:'+ts+'\r\nPath:ssml\r\n\r\n'+ssml);
+          ws.send('X-RequestId:'+aiChatEdgeGenId()+'\r\nContent-Type:application/ssml+xml\r\nX-Timestamp:'+ts+'Z\r\nPath:ssml\r\n\r\n'+ssml);
         }catch(e){fail();}
       };
       ws.onmessage=function(ev){
@@ -10344,7 +10348,7 @@ function aiChatEdgePlay(chunks,text,btn,token){
      seconds after play() — the silent hang the owner reported,
      where the old watchdog only noticed via a 25s cap because a
      paused element never counted as «stalled»), play() is
-     retried once and then the browser voice takes over; a
+     retried once and then the Google voice takes over; a
      mid-play freeze ends the listen cleanly. The button ALWAYS
      returns to «🔊 ស្ដាប់» within seconds. */
   try{
@@ -10365,14 +10369,14 @@ function aiChatEdgePlay(chunks,text,btn,token){
     au.onerror=function(){
       aiChatEdgeCleanup();
       if(token!==aiChatSpeakToken)return;
-      aiChatSpeakBrowser(text,btn,token);
+      aiChatSpeakGoogle(text,btn,token);
     };
     var pr=null;
     try{pr=au.play();}catch(e){}
     if(pr&&pr.catch)pr.catch(function(){
       aiChatEdgeCleanup();
       if(token!==aiChatSpeakToken)return;
-      aiChatSpeakBrowser(text,btn,token);
+      aiChatSpeakGoogle(text,btn,token);
     });
     aiChatSpeakWatchdogClear();
     var lastT=-1,stall=0,replayed=false;
@@ -10391,19 +10395,19 @@ function aiChatEdgePlay(chunks,text,btn,token){
           if(ct===0&&!replayed){
             /* Never started — one more explicit play() now the
                element is fully loaded; if it still will not
-               move, the browser voice takes over instead of
+               move, the Google voice takes over instead of
                silence. */
             replayed=true;stall=0;startedAt=now;
             var pr2=null;try{pr2=au.play();}catch(e){}
             if(pr2&&pr2.catch)pr2.catch(function(){
               aiChatEdgeCleanup();
-              if(token===aiChatSpeakToken)aiChatSpeakBrowser(text,btn,token);
+              if(token===aiChatSpeakToken)aiChatSpeakGoogle(text,btn,token);
             });
             return;
           }
           try{au.pause();}catch(e){}
           aiChatEdgeCleanup();
-          if(ct===0&&token===aiChatSpeakToken)aiChatSpeakBrowser(text,btn,token);
+          if(ct===0&&token===aiChatSpeakToken)aiChatSpeakGoogle(text,btn,token);
           else aiChatSpeakDone(token);
           return;
         }
@@ -10412,8 +10416,108 @@ function aiChatEdgePlay(chunks,text,btn,token){
     },500);
   }catch(e){
     aiChatEdgeCleanup();
-    if(token===aiChatSpeakToken)aiChatSpeakBrowser(text,btn,token);
+    if(token===aiChatSpeakToken)aiChatSpeakGoogle(text,btn,token);
   }
+}
+function aiChatGoogleChunks(text){
+  /* Split an answer into <=180-char pieces for Google's read-aloud
+     endpoint (it refuses longer requests): pack whole sentences
+     together, hard-split an over-long sentence at a space. */
+  var clean=String(text||'').replace(/\s+/g,' ').trim();
+  if(!clean)return [];
+  var parts=clean.match(/[^.!?…។\n]+[.!?…។]*/g)||[clean];
+  var chunks=[],cur='';
+  function push(s){s=String(s||'').trim();if(s)chunks.push(s);}
+  for(var i=0;i<parts.length;i++){
+    var p=String(parts[i]||'').trim();
+    if(!p)continue;
+    if((cur?cur.length+1:0)+p.length<=180){cur=cur?cur+' '+p:p;continue;}
+    if(cur){push(cur);cur='';}
+    while(p.length>180){
+      var cut=p.lastIndexOf(' ',180);
+      if(cut<60)cut=180;
+      push(p.slice(0,cut));
+      p=p.slice(cut).trim();
+    }
+    cur=p;
+  }
+  if(cur)push(cur);
+  return chunks;
+}
+function aiChatSpeakGoogle(text,btn,token){
+  /* Speak with GOOGLE's free read-aloud voice — the tier between
+     Microsoft Edge and the phone's own voices (owner report
+     2026-11-16: Edge refused on the phone, the fallback then
+     claimed «no Khmer voice on this phone» even though the chat
+     used to speak both Khmer and English). Google serves a real
+     Khmer MP3 (and a real English one) from
+     translate.google.com/translate_tts — no API key, no account,
+     fetched directly by the phone and played through a plain
+     <audio> element (playback needs no CORS). One voice only:
+     the ប្រុស/ស្រី toggle picks the pitch instead — male plays
+     slower with pitch preservation OFF, which deepens it (the
+     same trick MovAi's video pipeline uses for this voice).
+     Chunks play back-to-back on ONE element (the one primed
+     inside the tap when there is one); a chunk that errors or
+     stalls ~4s is skipped, and only when EVERY chunk fails does
+     the browser voice take over (aiChatSpeakBrowser). */
+  if(token!==aiChatSpeakToken)return;
+  var chunks=aiChatGoogleChunks(text);
+  if(!chunks.length){aiChatSpeakBrowser(text,btn,token);return;}
+  var au=aiChatEdgePrimed||new Audio();
+  aiChatEdgePrimed=null;
+  aiChatEdgeAudio=au;
+  var idx=0,failed=0,gen=0;
+  function failChunk(g){
+    if(g!==gen||token!==aiChatSpeakToken)return;
+    gen++;
+    failed++;
+    if(failed>=chunks.length){aiChatEdgeCleanup();aiChatSpeakBrowser(text,btn,token);return;}
+    next();
+  }
+  function next(){
+    if(token!==aiChatSpeakToken)return;
+    if(idx>=chunks.length){aiChatEdgeCleanup();aiChatSpeakDone(token);return;}
+    gen++;
+    var g=gen;
+    var chunk=chunks[idx++];
+    var tl=aiChatHasKhmer(chunk)?'km':'en';
+    au.onended=function(){if(g===gen&&token===aiChatSpeakToken)next();};
+    au.onerror=function(){failChunk(g);};
+    try{au.pause();}catch(e){}
+    try{
+      if(aiChatVoice==='male'){
+        au.playbackRate=0.85;
+        try{au.preservesPitch=false;au.webkitPreservesPitch=false;au.mozPreservesPitch=false;}catch(e){}
+      }else{
+        au.playbackRate=1;
+        try{au.preservesPitch=true;au.webkitPreservesPitch=true;au.mozPreservesPitch=true;}catch(e){}
+      }
+    }catch(e){}
+    au.src='https://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&tl='+tl+'&q='+encodeURIComponent(chunk);
+    try{au.load();}catch(e){}
+    var pr=null;
+    try{pr=au.play();}catch(e){}
+    if(pr&&pr.catch)pr.catch(function(){failChunk(g);});
+  }
+  /* Watchdog — same contract as the other tiers: the button must
+     ALWAYS return to «🔊 ស្ដាប់». A chunk whose playhead has not
+     moved for ~4s is skipped as failed; a generous length-based
+     cap ends the whole listen. */
+  aiChatSpeakWatchdogClear();
+  var startedAt=Date.now();
+  var cap=Math.min(240000,Math.max(20000,String(text||'').length*130+8000));
+  var lastT=-1,stall=0,lastGen=gen;
+  aiChatWatchdog=setInterval(function(){
+    if(token!==aiChatSpeakToken){aiChatSpeakWatchdogClear();return;}
+    if(!aiChatEdgeAudio||aiChatEdgeAudio!==au)return;
+    if(gen!==lastGen){lastGen=gen;lastT=-1;stall=0;}
+    var ct=0;try{ct=au.currentTime||0;}catch(e){}
+    if(ct>lastT){stall=0;lastT=ct;}
+    else{stall++;if(stall>=8){stall=0;lastT=-1;failChunk(gen);}}
+    if(Date.now()-startedAt>cap){aiChatEdgeCleanup();aiChatSpeakDone(token);}
+  },500);
+  next();
 }
 function aiChatSpeakBrowser(text,btn,token){
   /* Speak with the browser's own speech synthesis. The voice list
@@ -10499,7 +10603,8 @@ function aiChatSpeak(text,btn){
     try{prime.pause();}catch(e){}
   }catch(e){}
   /* Microsoft Edge TTS from the phone itself FIRST (real Piseth /
-     Sreymom voices); the browser voice is the fallback inside. */
+     Sreymom voices); Google's free read-aloud voice next, and the
+     browser voice last — the fallbacks live inside. */
   aiChatSpeakEdge(String(text||''),btn,token);
 }
 aiChatVoiceUI();
