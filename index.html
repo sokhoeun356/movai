@@ -1089,6 +1089,14 @@ html[data-mode="light"] .offline-ico{color:#dc2626;background:rgba(220,38,38,.1)
 @keyframes netReadyBlurIn{from{opacity:0;filter:blur(12px);transform:translateX(-50%) translateY(-8px) scale(.97)}to{opacity:1;filter:blur(0);transform:translateX(-50%) translateY(0) scale(1)}}
 @keyframes netReadyBlurOut{from{opacity:1;filter:blur(0);transform:translateX(-50%) translateY(0) scale(1)}to{opacity:0;filter:blur(12px);transform:translateX(-50%) translateY(-8px) scale(.97)}}
 @media (prefers-reduced-motion: reduce){.net-ready-toast.blur-in,.net-ready-toast.blur-out{animation:none}}
+/* Download-failed notice — same pill language as the network toast,
+   shown only when BOTH the direct byte fetch and the server-proxy
+   fetch fail, so a failed download explains itself in-page instead
+   of the tab ever navigating away to the provider's URL. */
+.dl-fail-toast{position:fixed;top:calc(env(safe-area-inset-top,0px) + 14px);left:50%;transform:translateX(-50%);z-index:320;max-width:calc(100vw - 32px);background:#2a0d0d;border:1.5px solid #e5484d;color:#fff;border-radius:999px;padding:10px 18px;box-shadow:0 10px 30px rgba(0,0,0,.45);font-size:0.9375rem;font-weight:800;line-height:1.35;text-align:center}
+.dl-fail-toast.blur-in{animation:netReadyBlurIn .3s ease-out both}
+.dl-fail-toast.blur-out{animation:netReadyBlurOut .25s ease-in both}
+@media (prefers-reduced-motion: reduce){.dl-fail-toast.blur-in,.dl-fail-toast.blur-out{animation:none}}
 footer{text-align:center;color:var(--faint);font-size:0.8125rem;padding:32px 16px 104px;line-height:1.7}
 .legal-links{display:flex;align-items:center;justify-content:center;gap:10px;font-size:0.8125rem}
 .legal-links a{color:var(--muted);font-weight:600;text-decoration:none}
@@ -1983,15 +1991,13 @@ html[data-smooth="1"] .brand-frame,html[data-smooth="1"] .acct-chip,html[data-sm
   <button type="button" class="dock-item" id="dockPackages" onclick="dockGo('packages')" aria-label="Packages · កញ្ចប់សេវាកម្ម"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="8" width="18" height="4" rx="1"/><path d="M12 8v13"/><path d="M19 12v7a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-7"/><path d="M7.5 8a2.5 2.5 0 0 1 0-5C11 3 12 8 12 8s1-5 4.5-5a2.5 2.5 0 0 1 0 5"/></svg></button>
   <button type="button" class="dock-item" id="dockNotif" onclick="dockGo('notif')" aria-label="Notifications · ដំណឹង"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg><span class="dock-badge" id="dockNotifBadge" style="display:none">0</span></button>
 </nav>
-<!-- Floating mini-player (owner rule 2026-11-16): while a Public
-     song plays and its card is out of sight (another view, or
-     scrolled away), this round logo floats like the chat button
-     and can be dragged anywhere; tapping it opens the expanded
-     player below; the panel ✕ collapses the player back to the
-     logo. The logo carries its own ✕ badge (top-right corner):
-     tapping it — or dragging the logo onto the ✕ drop zone that
-     appears while dragging — stops the song completely and the
-     logo disappears; it never has to stay stuck on screen. -->
+<!-- Pinned now-playing player (owner rule 2026-11-16): while a
+     song is loaded, the player panel below stays FIXED at the
+     bottom of the screen — Play/Pause, seek bar and time always
+     visible, however far the feed is scrolled. It leaves only
+     when the song is stopped (panel ⏹ or ✕). The round logo
+     element is kept in the DOM for the older drag machinery but
+     is never shown anymore: the pinned panel replaces it. -->
 <button type="button" class="mini-logo" id="miniLogo" style="display:none" aria-label="បទកំពុងចាក់ · Now playing"></button>
 <div class="mini-drop" id="miniDrop" style="display:none" aria-hidden="true"><span class="mini-drop-x">✕</span><span>ទម្លាក់ទីនេះដើម្បីឈប់ចាក់ · Drop here to stop</span></div>
 <div class="mini-panel" id="miniPanel" style="display:none" role="dialog" aria-label="កម្មវិធីចាក់បទ · Song player">
@@ -2001,7 +2007,7 @@ html[data-smooth="1"] .brand-frame,html[data-smooth="1"] .acct-chip,html[data-sm
       <div class="mini-title" id="miniTitle"></div>
       <div class="mini-sub" id="miniSub"></div>
     </div>
-    <button type="button" class="mini-x" id="miniClose" aria-label="បិទ · Close">✕</button>
+    <button type="button" class="mini-x" id="miniClose" aria-label="ឈប់ចាក់ និងបិទ · Stop & close">✕</button>
   </div>
   <div class="mini-prow">
     <div class="pub-prog" id="miniProg" role="slider" aria-label="Seek" style="flex:1 1 auto">
@@ -2103,7 +2109,7 @@ km:{
  pubEmpty:'មិនទាន់មានអ្វីផុសនៅ Public នៅឡើយទេ — ចូលទៅ បង្កើត ហើយចុច «ផុសទៅ Public» ដើម្បីផុសដំបូងគេ!',
  pubError:'ផ្ទុក Public feed មិនបាន — server អាចកំពុងដេក សូមចុចព្យាយាមម្ដងទៀត',pubRetry:'ព្យាយាមម្ដងទៀត',
  pubTier1:'Tier 1',pubTier1Sub:'Top 50 · ល្អបំផុត',pubTier2:'Tier 2',pubTier2Sub:'មធ្យម',pubTier3:'Tier 3',pubTier3Sub:'ទាប',
- pubViews:'អ្នកមើល',pubPostBtn:'ផុសទៅ Public',pubPostTitle:'ផុសទៅ Public',
+ pubViews:'អ្នកមើល',pubDownloads:'ទាញយក',pubPostBtn:'ផុសទៅ Public',pubPostTitle:'ផុសទៅ Public',
  pubFollow:'Follow · តាមដាន',pubFollowing:'Following · កំពុងតាមដាន',pubFollowers:'អ្នកតាមដាន (Followers)',pubFollowHint:'ទទួលដំណឹងភ្លាមៗពេលមានផុសថ្មី',pubFollowAria:'Follow ទំព័រ Public',pubUnfollowAria:'Unfollow ទំព័រ Public',
  pubOptPublic:'Public — គ្រប់គ្នាមើលបាន',pubOptPrivate:'Private — មានតែខ្ញុំមើលបាន',
  pubPosting:'កំពុងផុស...',pubPostedOk:'បានផុសហើយ! វានឹងបង្ហាញក្នុង Public feed',pubPrivateOk:'បានរក្សាទុកជា Private ហើយ — មានតែអ្នកមើលបាន',
@@ -2130,8 +2136,8 @@ km:{
  postUploading:'កំពុង upload',postPosting:'កំពុងផុស',postFileBig:'ឯកសារធំពេក (MP3 អតិបរមា 15MB · រូបភាព 5MB)',
  postBadFile:'សូមជ្រើសឯកសារ MP3 / audio',postNeedTitle:'សូមដាក់ចំណងជើងបទ',postViewPublic:'មើលក្នុង Public',
  postSrcFile:'ពីទូរសព្ទ',postSrcWeb:'ពី website',postPackages:'មើលកញ្ចប់ · Packages',
- pubDlFreeLeft:'ទាញយកបទចម្រៀងហ្វ្រីនៅសល់ {n} ដង',
- pubDlLimit:'អ្នកបានប្រើអស់ការទាញយកបទចម្រៀងហ្វ្រី 2 ដងហើយ — សូមទិញកញ្ចប់សេវាកម្មបទចម្រៀង ដើម្បីទាញយកបន្ត',
+ pubDlFreeLeft:'ទាញយកបទហ្វ្រីនៅសល់ {n}/4 ដង · Suno {s}/2 · Magic Hour {m}/2',
+ pubDlLimit:'អ្នកបានប្រើអស់ការទាញយកហ្វ្រី {p} 2 ដងហើយ — សូមទិញកញ្ចប់បទចម្រៀង ដើម្បីទាញយកបន្ត',
  acctGotFree:'អបអរសាទរ! អ្នកទទួលបាន Credit ហ្វ្រី — Image.Video Credit 250 និង Song Credit 24 ក្នុងគណនីរបស់អ្នកហើយ',
  giftTitle:'កាដូពី Admin',giftBody:'Free 250 Image.Video Credit + 24 Song Credit សម្រាប់អ្នកប្រើថ្មី',giftClaim:'ទទួលយក · Claim',blockedTitle:'គណនីនេះត្រូវបានប្លុក · This account is blocked',blockedBody:'គណនី / IP / ឧបករណ៍នេះត្រូវបាន Admin ប្លុក — អ្នកចូលប្រើ ឬបង្កើតអ្វីមិនបានទេ។ បើចង់ដោះស្រាយ សូមទាក់ទង Admin។',blockedContact:'ទាក់ទង Admin តាម Telegram',blockedLogout:'ចេញពីគណនី · Log out',
  navNotif:'ដំណឹង',notifTitle:'ដំណឹង · Notifications',notifEmpty:'មិនទាន់មានដំណឹងទេ',notifGuest:'សូម Log in ដើម្បីមើលដំណឹងរបស់អ្នក',notifLoading:'កំពុងផ្ទុក…',notifJustNow:'ទើបតែឥឡូវនេះ',notifMinAgo:'{n} នាទីមុន',notifHourAgo:'{n} ម៉ោងមុន',notifDayAgo:'{n} ថ្ងៃមុន',notifApproved:'កញ្ចប់របស់អ្នកត្រូវបានអនុម័ត ✓',notifRejected:'កញ្ចប់របស់អ្នកត្រូវបានបដិសេធ',notifLogin:'មានអ្នកប្រើថ្មី Log in',notifRequest:'មានសំណើទិញកញ្ចប់ថ្មី',notifGrant:'Admin បានបន្ថែម Credit ឲ្យអ្នក',notifDeduct:'Admin បានកាត់ Credit របស់អ្នក',notifInfo:'ដំណឹងពី MovAi',notifPost:'បានផុសថ្មីទៅ Public',notifGenCharge:'បានកាត់ Credit ពីការបង្កើត',
@@ -2188,6 +2194,7 @@ km:{
  errNoVideoUrl:'វីដេអូរួចរាល់ តែរក URL មិនឃើញ — សូមមើលក្នុងគណនីរបស់អ្នកផ្ទាល់',
  genFailed:'បង្កើតមិនបានទេ',errTitle:'បញ្ហាដែលកើតឡើង — ចម្លងទុកផ្ញើឲ្យអ្នកជួយមើល',btnCopy:'ចម្លងបញ្ហា',copiedOk:'បានចម្លងហើយ ✓',copyFail:'ចម្លងមិនបាន — សូមចុចសង្កត់លើអត្ថបទក្នុងប្រអប់ ហើយជ្រើស Copy ដោយខ្លួនឯង',unknownProvider:'Provider មិនស្គាល់ទេ',adminNotSet:'Admin មិនទាន់កំណត់ provider/model សម្រាប់ផ្នែកនេះទេ — សូមរង់ចាំ Admin កំណត់សិន',serverOffline:'Server មិនទាន់ភ្ជាប់ទេ — សូមព្យាយាមម្ដងទៀតបន្តិចក្រោយ',noteAdminGen:'Provider និង Model ត្រូវបាន Admin កំណត់ឲ្យពី server — អ្នកគ្រាន់តែសរសេរ Prompt ហើយចុចបង្កើត',songCostAdmin:'បង្កើតបទចម្រៀងតាម Provider/Model ដែល Admin កំណត់ឲ្យ',d3HintAdmin:'3D Design ដំណើរការតាម Key ដែល Admin គ្រប់គ្រងលើ server — អ្នកគ្រាន់តែដាក់រូបភាព ឬសរសេរអត្ថបទ រួចចុច «ធ្វើជា 3D»',d3MsgServer3d:'Server 3D មិនទាន់ភ្ជាប់ទេ — Key 3D ត្រូវបាន Admin គ្រប់គ្រងលើ server សូមព្យាយាមម្ដងទៀតបន្តិចក្រោយ',
  badImgUrl:'Provider បានផ្ដល់ URL រូបភាពមិនត្រឹមត្រូវទេ',badVidUrl:'Provider បានផ្ដល់ URL វីដេអូមិនត្រឹមត្រូវទេ',
+ dlFailed:'ទាញយកមិនបានទេ — សូមព្យាយាមម្ដងទៀត',
  puterRetry:'Puter.js មិនទាន់ផ្ទុកទេ — សូមព្យាយាមម្ដងទៀត',
  puterNoImg:'Puter: មិនបានរូបភាពទេ',puterNoVid:'Puter: មិនបានវីដេអូទេ',
  novaiAcc:'គណនី NovAI',novaiBalanceNote:'Balance នេះប្រើសម្រាប់ model បង់លុយតែប៉ុណ្ណោះ — វីដេអូហ្វ្រីមិនកាត់លុយទេ',
@@ -2200,7 +2207,7 @@ km:{
  pkgCreditsMonth:'11,000 Credit/ខែ',pkgCreditsYear:'140,000 Credit/ឆ្នាំ',
  pkgFeatMedia:'បង្កើតបានទាំងរូបភាព និងវីដេអូ',
  pkgFeatPremium:'បើក Model Premium ទាំងអស់',
- pkgModelSong:'ម៉ូដែល · Model v6',pkgSongPerGen:'បង្កើត 1 ដង · 12 Credit · បាន 2 បទ',pkgDlFree2:'Download · បាន 2 ដងប៉ុណ្ណោះ',pkgDlUnlimited:'Download · ឥតកំណត់',pkgDur30:'រយៈពេល · 30 ថ្ងៃ (1 ខែ)',pkgDur365:'រយៈពេល · 365 ថ្ងៃ (12 ខែ)',pkgFeatImgModels:'រូបភាព · Z-Image Turbo · Qwen Image 2.1 · Flux 2 Klein · Krea 2',pkgFeatVidModels:'វីដេអូ · LTX 2.5 · MiniMax H3',pkgFeatPremImg:'Premium រូបភាព · GPT Image 2 · Nano Banana 2.1 · Nano Banana Pro',pkgFeatPremVid:'Premium វីដេអូ · Kling 3.0 · Kling 4.0 · Veo 3.1 · Seedance 2.5',
+ pkgModelSong:'ម៉ូដែល · Model v6',pkgSongPerGen:'បង្កើត 1 ដង · 12 Credit · បាន 2 បទ',pkgDlFree2:'Download · ហ្វ្រី 4 ដង (Suno 2 + Magic Hour 2)',pkgDlUnlimited:'Download · ឥតកំណត់',pkgDur30:'រយៈពេល · 30 ថ្ងៃ (1 ខែ)',pkgDur365:'រយៈពេល · 365 ថ្ងៃ (12 ខែ)',pkgFeatImgModels:'រូបភាព · Z-Image Turbo · Qwen Image 2.1 · Flux 2 Klein · Krea 2',pkgFeatVidModels:'វីដេអូ · LTX 2.5 · MiniMax H3',pkgFeatPremImg:'Premium រូបភាព · GPT Image 2 · Nano Banana 2.1 · Nano Banana Pro',pkgFeatPremVid:'Premium វីដេអូ · Kling 3.0 · Kling 4.0 · Veo 3.1 · Seedance 2.5',
  pkgBuy:'ទិញឥឡូវ',pkgActive:'កំពុងប្រើកញ្ចប់នេះ',pkgTabSong:'Create Music',pkgTabMedia:'Create Video',pkgDragHint:'អូសចុះក្រោមដើម្បីបិទ · Drag down to close',pkgWaitingAdmin:'រង់ចាំ Admin អនុម័ត',pkgReqSent:'បានផ្ញើសំណើរទិញទៅ Admin ហើយ — រង់ចាំ Admin អនុម័ត ទើប Credit ចូលគណនីរបស់អ្នក',pkgReqFail:'ផ្ញើសំណើរមិនបានទេ — Server មិនទាន់ភ្ជាប់ សូមព្យាយាមម្ដងទៀតបន្តិចក្រោយ',pkgReqSending:'កំពុងផ្ញើសំណើរទិញទៅ Admin…',
  pkgYourPlan:'កញ្ចប់របស់អ្នក',pkgActiveUntil:'ប្រើបានដល់ {d}',
  pkgGroupMedia:'សម្រាប់រូបភាព និង វីដេអូ · Image & Video Credit',pkgGroupMediaNote:'បន្ថែមតែ Image & Video Credit ប៉ុណ្ណោះ — ប្រើសម្រាប់បង្កើតរូបភាព និងវីដេអូ',
@@ -2323,7 +2330,7 @@ en:{
  pubEmpty:'Nothing has been posted to Public yet — go to Create, make something, and tap "Post to Public" to be the first!',
  pubError:'Could not load the Public feed — the server may be asleep. Please try again',pubRetry:'Try again',
  pubTier1:'Tier 1',pubTier1Sub:'Top 50 · Best',pubTier2:'Tier 2',pubTier2Sub:'Middle',pubTier3:'Tier 3',pubTier3Sub:'Lower',
- pubViews:'views',pubPostBtn:'Post to Public',pubPostTitle:'Post to Public',
+ pubViews:'views',pubDownloads:'downloads',pubPostBtn:'Post to Public',pubPostTitle:'Post to Public',
  pubFollow:'Follow',pubFollowing:'Following',pubFollowers:'Followers',pubFollowHint:'Get notified instantly when a new post arrives',pubFollowAria:'Follow the Public page',pubUnfollowAria:'Unfollow the Public page',
  pubOptPublic:'Public — everyone can see it',pubOptPrivate:'Private — only I can see it',
  pubPosting:'Posting...',pubPostedOk:'Posted! It will show in the Public feed',pubPrivateOk:'Saved as Private — only you can see it',
@@ -2350,8 +2357,8 @@ en:{
  postUploading:'Uploading',postPosting:'Posting',postFileBig:'File too large (MP3 max 15MB · image 5MB)',
  postBadFile:'Please pick an MP3 / audio file',postNeedTitle:'Please enter a song title',postViewPublic:'View in Public',
  postSrcFile:'From phone',postSrcWeb:'From website',postPackages:'View packages · កញ្ចប់',
- pubDlFreeLeft:'{n} free song downloads left',
- pubDlLimit:'You have used your 2 free song downloads — please buy a Song package to keep downloading',
+ pubDlFreeLeft:'{n}/4 free song downloads left · Suno {s}/2 · Magic Hour {m}/2',
+ pubDlLimit:'You have used your 2 free {p} downloads — please buy a Song package to keep downloading',
  acctGotFree:'Welcome! You received free credits — 250 Image.Video Credit and 24 Song Credit in your account',
  giftTitle:'A Gift from Admin',giftBody:'Free 250 Image.Video Credit + 24 Song Credit for new users',giftClaim:'Claim · ទទួលយក',blockedTitle:'This account is blocked · គណនីនេះត្រូវបានប្លុក',blockedBody:'This account / IP / device has been blocked by the Admin — you cannot log in or create anything. To resolve this, contact the Admin.',blockedContact:'Contact Admin on Telegram',blockedLogout:'Log out · ចេញពីគណនី',
  navNotif:'Notifications',notifTitle:'Notifications · ដំណឹង',notifEmpty:'No notifications yet',notifGuest:'Log in to see your notifications',notifLoading:'Loading…',notifJustNow:'Just now',notifMinAgo:'{n} min ago',notifHourAgo:'{n} hr ago',notifDayAgo:'{n} days ago',notifApproved:'Your package was approved ✓',notifRejected:'Your package was rejected',notifLogin:'New user signed in',notifRequest:'New package purchase request',notifGrant:'Admin added credits to your account',notifDeduct:'Admin deducted credits from your account',notifInfo:'MovAi notification',notifPost:'New post on Public',notifGenCharge:'Credit charged for a creation',
@@ -2408,6 +2415,7 @@ en:{
  errNoVideoUrl:'Video finished but no URL was returned — please check your account',
  genFailed:'Generation failed',errTitle:'Error details — copy this to share for help',btnCopy:'Copy error',copiedOk:'Copied ✓',copyFail:'Copy failed — long-press the text in the box and copy it manually',unknownProvider:'Unknown provider',adminNotSet:'The admin has not set a provider/model for this mode yet — please wait for the admin to set it',serverOffline:'The server is not connected yet — please try again in a little while',noteAdminGen:'The provider and model are set by the admin on the server — just write a prompt and tap Generate',songCostAdmin:'Songs are created with the provider/model the admin set',d3HintAdmin:'3D Design runs on keys the admin manages on the server — just upload an image or write text, then tap Make 3D',d3MsgServer3d:'The 3D server is not connected yet — 3D keys are managed by the admin on the server, please try again in a little while',
  badImgUrl:'The provider returned an invalid image URL',badVidUrl:'The provider returned an invalid video URL',
+ dlFailed:'Download failed — please try again',
  puterRetry:'Puter.js has not loaded yet — please try again',
  puterNoImg:'Puter: no image returned',puterNoVid:'Puter: no video returned',
  novaiAcc:'NovAI Account',novaiBalanceNote:'This balance is used for paid models only — free videos do not deduct money',
@@ -2420,7 +2428,7 @@ en:{
  pkgCreditsMonth:'11,000 credits/month',pkgCreditsYear:'140,000 credits/year',
  pkgFeatMedia:'Create both images and videos',
  pkgFeatPremium:'Unlocks every Premium model',
- pkgModelSong:'Model · Model v6',pkgSongPerGen:'Per generation · 12 credits · 2 songs',pkgDlFree2:'Downloads · 2 only',pkgDlUnlimited:'Downloads · Unlimited',pkgDur30:'Duration · 30 days (1 month)',pkgDur365:'Duration · 365 days (12 months)',pkgFeatImgModels:'Image · Z-Image Turbo · Qwen Image 2.1 · Flux 2 Klein · Krea 2',pkgFeatVidModels:'Video · LTX 2.5 · MiniMax H3',pkgFeatPremImg:'Premium image · GPT Image 2 · Nano Banana 2.1 · Nano Banana Pro',pkgFeatPremVid:'Premium video · Kling 3.0 · Kling 4.0 · Veo 3.1 · Seedance 2.5',
+ pkgModelSong:'Model · Model v6',pkgSongPerGen:'Per generation · 12 credits · 2 songs',pkgDlFree2:'Downloads · 4 free (Suno 2 + Magic Hour 2)',pkgDlUnlimited:'Downloads · Unlimited',pkgDur30:'Duration · 30 days (1 month)',pkgDur365:'Duration · 365 days (12 months)',pkgFeatImgModels:'Image · Z-Image Turbo · Qwen Image 2.1 · Flux 2 Klein · Krea 2',pkgFeatVidModels:'Video · LTX 2.5 · MiniMax H3',pkgFeatPremImg:'Premium image · GPT Image 2 · Nano Banana 2.1 · Nano Banana Pro',pkgFeatPremVid:'Premium video · Kling 3.0 · Kling 4.0 · Veo 3.1 · Seedance 2.5',
  pkgBuy:'Buy now',pkgActive:'This is your active package',pkgTabSong:'Create Music',pkgTabMedia:'Create Video',pkgDragHint:'Drag down to close',pkgWaitingAdmin:'Waiting for Admin approval',pkgReqSent:'Your purchase request was sent to the Admin — credits will arrive after the Admin approves it',pkgReqFail:'Could not send the request — the server is not connected yet, please try again in a little while',pkgReqSending:'Sending your purchase request to the Admin…',
  pkgYourPlan:'Your package',pkgActiveUntil:'Active until {d}',
  pkgGroupMedia:'For Image & Video · Image & Video Credit',pkgGroupMediaNote:'Adds Image & Video Credit only — for creating images and videos',
@@ -4584,18 +4592,83 @@ function genShowImage(src,blob,remoteSrc){
   pb.addEventListener('click',function(){pubOpenSheet({type:'image',url:(remoteSrc&&/^https:/i.test(remoteSrc))?remoteSrc:(/^https:/i.test(src)?src:''),prompt:histCtx?histCtx.prompt:''});});
   row.appendChild(pb);
   box.appendChild(row);
-  gen.lastImg={src:src,blob:blob,remote:remoteSrc};
+  gen.lastImg={src:src,blob:blob,remote:remoteSrc,name:(histCtx?histCtx.prompt:'')};
   histAddImage(src,blob,remoteSrc);
+}
+/* ===== In-page downloads (owner rule 2026-11-16) =====
+   Every Download tap saves the file FROM this page, under the
+   item's OWN name — the song's title, or the prompt the image /
+   video was made from. Never a new tab, never a redirect to
+   another page, and NO anchor ever points at the remote URL:
+   browsers ignore the download attribute on cross-origin links,
+   so clicking one would navigate THIS tab away to the provider
+   (the Suno / Magic Hour CDNs block the direct byte fetch with
+   CORS all the time). So when the direct fetch fails, the bytes
+   are fetched through the server proxy instead —
+   PUB_API + '/gen/video/file?u=<src>&name=<fname>' (the server
+   sends CORS * and honours ?name= for the filename) — and saved
+   through the same in-page blob anchor. If even the proxy fails,
+   the tap stays on this page and shows a short notice; nothing
+   ever navigates away. */
+function dlCleanName(raw,fallback){
+  var base=String(raw||'').trim().replace(/[\\/:*?"<>|]+/g,' ').replace(/\s+/g,' ').trim().slice(0,80);
+  return base||fallback;
+}
+function dlNameFor(raw,url,type,fallback){
+  var m=/\.([a-z0-9]{2,5})(\?|#|$)/i.exec(url||'');
+  var ext=m?('.'+m[1].toLowerCase()):(type==='song'?'.mp3':type==='video'?'.mp4':type==='image'?'.jpg':type==='3d'?'.glb':'.bin');
+  return dlCleanName(raw,fallback)+ext;
+}
+function dlBlobSave(blob,fname){
+  var u=URL.createObjectURL(blob);
+  var a=document.createElement('a');a.href=u;a.download=fname;document.body.appendChild(a);a.click();a.remove();
+  setTimeout(function(){try{URL.revokeObjectURL(u);}catch(e){}},4000);
+}
+var dlFailTimer=null;
+function dlFailShow(){
+  var t=document.getElementById('dlFailToast');
+  if(!t){
+    t=document.createElement('div');
+    t.id='dlFailToast';t.className='dl-fail-toast';t.setAttribute('role','status');t.setAttribute('aria-live','polite');
+    document.body.appendChild(t);
+  }
+  t.textContent=tx('dlFailed');
+  t.style.display='block';
+  t.classList.remove('blur-out');t.classList.add('blur-in');
+  if(dlFailTimer)clearTimeout(dlFailTimer);
+  dlFailTimer=setTimeout(function(){
+    t.classList.remove('blur-in');t.classList.add('blur-out');
+    dlFailTimer=setTimeout(function(){t.style.display='none';t.classList.remove('blur-out');},260);
+  },3000);
+}
+async function dlSave(src,fname){
+  if(!src)return;
+  if(src.indexOf('data:')===0||src.indexOf('blob:')===0){
+    var a=document.createElement('a');a.href=src;a.download=fname;document.body.appendChild(a);a.click();a.remove();return;
+  }
+  try{
+    var r=await fetch(src);if(!r.ok)throw new Error('http '+r.status);
+    dlBlobSave(await r.blob(),fname);
+    return;
+  }catch(e){/* direct fetch blocked (CORS) — fall through to the server proxy */}
+  try{
+    var rp=await fetch(PUB_API+'/gen/video/file?u='+encodeURIComponent(src)+'&name='+encodeURIComponent(fname));
+    if(!rp.ok)throw new Error('http '+rp.status);
+    dlBlobSave(await rp.blob(),fname);
+    return;
+  }catch(e2){/* proxy failed too — stay on this page and say so, never navigate away */}
+  dlFailShow();
 }
 async function genDownload(){
   var it=gen.lastImg;if(!it)return;
-  var url=it.src;
-  if(it.blob){url=URL.createObjectURL(it.blob);}
-  else{
-    try{var r=await fetch(it.src);var b=await r.blob();url=URL.createObjectURL(b);}
-    catch(e){window.open(it.src,'_blank');return;}
+  var fname=dlNameFor(it.name,it.src,'image','movai-image');
+  if(it.blob){
+    var u=URL.createObjectURL(it.blob);
+    var a=document.createElement('a');a.href=u;a.download=fname;document.body.appendChild(a);a.click();a.remove();
+    setTimeout(function(){try{URL.revokeObjectURL(u);}catch(e){}},4000);
+    return;
   }
-  var a=document.createElement('a');a.href=url;a.download='movai-image.jpg';document.body.appendChild(a);a.click();a.remove();
+  await dlSave(it.src,fname);
 }
 async function genDoVideo(p,prompt,key){
   histCtx={prompt:prompt,provider:p.name};
@@ -4702,17 +4775,12 @@ function genShowVideo(src){
   row.appendChild(pb);
   box.appendChild(row);
   gen.lastVideo=src;
+  gen.lastVideoName=histCtx?histCtx.prompt:'';
   histAdd({type:'video',url:/^https:/i.test(src)?src:null,prompt:histCtx?histCtx.prompt:'',provider:histCtx?histCtx.provider:histProviderName()});
 }
-async function genDownloadVideo(src){
+async function genDownloadVideo(src,name){
   src=src||gen.lastVideo;if(!src)return;
-  if(src.indexOf('data:')===0||src.indexOf('blob:')===0){
-    var a=document.createElement('a');a.href=src;a.download='movai-video.mp4';document.body.appendChild(a);a.click();a.remove();return;
-  }
-  try{
-    var r=await fetch(src);var b=await r.blob();var u=URL.createObjectURL(b);
-    var a2=document.createElement('a');a2.href=u;a2.download='movai-video.mp4';document.body.appendChild(a2);a2.click();a2.remove();
-  }catch(e){window.open(src,'_blank');}
+  await dlSave(src,dlNameFor(name||gen.lastVideoName,src,'video','movai-video'));
 }
 /* ================= Songs (Song mode) =================
    ONE song workspace, three providers chosen by name in the same provider
@@ -5350,7 +5418,7 @@ function genSongCard(song,n,it,title,prov,prompt,streaming){
   });
   rowEl.appendChild(lk);
   var dl=songIcoBtn(tx('histDownload'),SONG_SVG_DL);
-  dl.addEventListener('click',function(){genDownloadSong(u,n);});
+  dl.addEventListener('click',function(){genDownloadSong(u,n,title);});
   rowEl.appendChild(dl);
   var sh=songIcoBtn(tx('histShare'),SONG_SVG_SHARE);
   sh.addEventListener('click',function(){histShare(it||{type:'song',url:u,title:title,prompt:prompt},sh);});
@@ -5390,16 +5458,11 @@ function genSongCard(song,n,it,title,prov,prompt,streaming){
   });
   return card;
 }
-async function genDownloadSong(src,n){
+async function genDownloadSong(src,n,title){
   if(!src)return;
-  var fname='movai-song-'+(n||1)+'.mp3';
-  if(src.indexOf('data:')===0||src.indexOf('blob:')===0){
-    var a=document.createElement('a');a.href=src;a.download=fname;document.body.appendChild(a);a.click();a.remove();return;
-  }
-  try{
-    var r=await fetch(src);var b=await r.blob();var u=URL.createObjectURL(b);
-    var a2=document.createElement('a');a2.href=u;a2.download=fname;document.body.appendChild(a2);a2.click();a2.remove();
-  }catch(e){window.open(src,'_blank');}
+  /* The saved file carries the SONG'S OWN title (owner rule) —
+     «Song 1» style names only when the song has no title. */
+  await dlSave(src,dlNameFor(title,src,'song','movai-song-'+(n||1)));
 }
 /* ================= History — every creation, kept forever =================
    Every finished creation is saved the moment it appears, into this
@@ -6177,17 +6240,11 @@ function histPlayerSync(){
 }
 /* ---- Per-item actions: Download / Like / Share / Delete ---- */
 async function histDownload(it){
-  if(it.type==='video'){genDownloadVideo(it.url);return;}
-  if(it.type==='song'){genDownloadSong(it.url,1);return;}
+  if(it.type==='video'){genDownloadVideo(it.url,it.title||it.prompt);return;}
+  if(it.type==='song'){genDownloadSong(it.url,1,it.title);return;}
   if(it.type==='3d'){if(it.url)window.open(it.url,'_blank');return;}
   var src=it.url||it.thumb;if(!src)return;
-  if(src.indexOf('data:')===0){
-    var a=document.createElement('a');a.href=src;a.download='movai-image.jpg';document.body.appendChild(a);a.click();a.remove();return;
-  }
-  try{
-    var r=await fetch(src);var b=await r.blob();var u=URL.createObjectURL(b);
-    var a2=document.createElement('a');a2.href=u;a2.download='movai-image.jpg';document.body.appendChild(a2);a2.click();a2.remove();
-  }catch(e){window.open(src,'_blank');}
+  await dlSave(src,dlNameFor(it.title||it.prompt,src,'image','movai-image'));
 }
 function histToggleLike(id,btn){
   var a=histGet(),liked=false;
@@ -6872,8 +6929,9 @@ function closeFab(){
      included — no log in is asked for any of them.
    - Downloads run FROM MovAi itself: the bytes are fetched and
      saved by this page under the post's own title. Songs carry a
-     free quota: 2 free downloads for users without a Song
-     package, then the Packages panel (Songs tab) opens. Song
+     free quota: 4 free downloads for users without a Song
+     package, split Suno 2 + Magic Hour 2, then the Packages
+     panel (Songs tab) opens. Song
      cards carry NO meta/details text under them (owner rule) —
      just the cover, title, player and action pills. */
 var PUB_API='https://movai-proxy.onrender.com/api/public';
@@ -7164,6 +7222,7 @@ function pubNormItem(x){
   var rank=pubSrvNum(x.rank);if(rank===null)rank=pubSrvNum(x.position);
   var tier=pubSrvNum(x.tier);
   var views=pubSrvNum(x.views);if(views===null)views=pubSrvNum(x.viewCount);
+  var downloads=pubSrvNum(x.downloads);if(downloads===null)downloads=pubSrvNum(x.downloadCount);
   var likes=pubSrvNum(x.likes);if(likes===null)likes=pubSrvNum(x.likeCount);
   var dislikes=pubSrvNum(x.dislikes);if(dislikes===null)dislikes=pubSrvNum(x.dislikeCount);
   var dur=pubSrvNum(x.duration);if(dur===null)dur=pubSrvNum(x.durationSec);
@@ -7179,12 +7238,14 @@ function pubNormItem(x){
     likes:Math.max(0,Math.floor(likes||0)),
     dislikes:Math.max(0,Math.floor(dislikes||0)),
     views:Math.max(0,Math.floor(views||0)),
+    downloads:Math.max(0,Math.floor(downloads||0)),
     rank:(rank===null?null:Math.floor(rank)),
     tier:(tier===null?null:Math.min(3,Math.max(1,Math.floor(tier)))),
     liked:!!(x.liked||x.likedByMe),
     disliked:!!(x.disliked||x.dislikedByMe),
     duration:(dur===null?null:dur),
     model:String(x.model||x.modelName||''),
+    provider:String(x.provider||x.providerName||''),
     genre:String(x.genre||x.style||''),
     youtube:String(x.youtube||x.youtubeUrl||x.youtube_url||''),
     youtubeChannel:String(x.youtubeChannel||x.youtube_channel||x.channelUrl||x.channel_url||''),
@@ -7247,11 +7308,15 @@ function pubFeedUrl(){
    keeps the higher of the old and new view counts. */
 function pubKeepViews(out){
   try{
-    var old={};
-    for(var i=0;i<pubItems.length;i++)old[pubItems[i].id]=pubItems[i].views;
+    var old={},oldDl={};
+    for(var i=0;i<pubItems.length;i++){old[pubItems[i].id]=pubItems[i].views;oldDl[pubItems[i].id]=pubItems[i].downloads||0;}
     for(var j=0;j<out.length;j++){
       var o=old[out[j].id];
       if(o!==undefined&&o>out[j].views)out[j].views=o;
+      /* Downloads never go down either (owner rule): a stale
+         server snapshot must not lower a count already shown. */
+      var od=oldDl[out[j].id];
+      if(od!==undefined&&od>(out[j].downloads||0))out[j].downloads=od;
     }
   }catch(e){}
   return out;
@@ -7312,6 +7377,7 @@ function pubLockMerge(fresh){
          the floor. Likes / dislikes follow the server's fresh
          copy, so an un-like still counts down as it should. */
       if(old.views>f.views)f.views=old.views;
+      if((old.downloads||0)>(f.downloads||0))f.downloads=old.downloads;
       return;
     }
     /* The server now returns this post under its real id (same
@@ -8049,23 +8115,22 @@ function pubVizReset(){
   var bars=viz.querySelectorAll('i');
   for(var i=0;i<bars.length;i++)bars[i].style.height='';
 }
-/* ===== Floating mini-player (owner rule 2026-11-16) =====
-   While a Public song is playing, the moment its card leaves
-   the user's sight — they open Create / History / Packages, or
-   just scroll past the card — the round floating logo appears
-   (the song's cover), exactly like the chat button: it can be
-   dragged anywhere and the song keeps playing underneath
-   whatever the user is doing. Tapping the logo opens the
-   expanded player: cover, title, seek bar, current / total
-   time, stop (pause) and previous / next. The panel ✕ collapses
-   the player back into the floating logo. The logo itself can
-   be DISMISSED (owner rule 2026-11-16): its ✕ badge, a drag
-   onto the ✕ drop zone, or the panel's ⏹ Stop button all run
-   pubMiniStopAll — the song pauses, rewinds, and the floating
-   logo disappears completely instead of staying stuck on
-   screen. Otherwise playback is never touched by any of this —
-   the feed's own <audio> element keeps playing; the
-   mini-player only mirrors and controls it. */
+/* ===== Pinned now-playing player (owner rule 2026-11-16) =====
+   The song player NEVER scrolls away (owner rule): while a
+   song is loaded — from the Public feed, History, Playlist or
+   Create results, all of which route through pubMiniSet — the
+   player panel stays FIXED at the bottom of the screen: cover,
+   title, Play/Pause, seek bar, current / total time and
+   previous / next, always visible no matter how far the user
+   scrolls or which view they open. It leaves only when the
+   song is STOPPED: the panel's ⏹ button or its ✕ both run
+   pubMiniStopAll — the song pauses, rewinds, and the bar
+   disappears completely instead of staying stuck on screen.
+   Otherwise playback is never touched by any of this — the
+   song's own <audio> element keeps playing; the pinned player
+   only mirrors and controls it. (The older floating-logo
+   machinery below is kept intact but no longer shown: the
+   pinned bar replaces it, one player always in reach.) */
 var pubMini={au:null,it:null,open:false,timer:null,logoId:null,panelId:null,suppressClick:0,list:null};
 function pubMiniSet(au,it,list){
   if(!au||!it)return;
@@ -8177,38 +8242,26 @@ function pubMiniSync(){
     return;
   }
   var playing=!au.paused&&!au.ended;
-  /* Expanded player open → the panel shows, the logo hides. */
-  panel.style.display=pubMini.open?'block':'none';
-  var showLogo=!pubMini.open&&pubMiniAway();
-  logo.style.display=showLogo?'flex':'none';
-  if(showLogo){
-    if(pubMini.logoId!==it.id)pubMiniLogoFill();
-    logo.classList.toggle('playing',playing);
-    var st=logo.querySelector('.mini-logo-state');
-    if(st){
-      var want=playing?'pause':'play';
-      if(st.getAttribute('data-s')!==want){
-        st.setAttribute('data-s',want);
-        st.innerHTML=playing
-          ?'<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/></svg>'
-          :'<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>';
-      }
-    }
+  /* PINNED (owner rule 2026-11-16): the panel is the now-playing
+     player and it is ALWAYS on screen while a song is loaded —
+     position:fixed, so scrolling the feed (or switching views)
+     can never carry it away. The floating logo stays hidden:
+     one pinned player, always in reach. */
+  pubMini.open=true;
+  panel.style.display='block';
+  logo.style.display='none';
+  if(pubMini.panelId!==it.id)pubMiniPanelFill();
+  var pb=document.getElementById('miniPlayBtn');
+  if(pb){
+    var pw=playing?'pause':'play';
+    if(pb.getAttribute('data-s')!==pw){pb.setAttribute('data-s',pw);pb.innerHTML=playing?pubPauseSvg():pubPlaySvg();}
   }
-  if(pubMini.open){
-    if(pubMini.panelId!==it.id)pubMiniPanelFill();
-    var pb=document.getElementById('miniPlayBtn');
-    if(pb){
-      var pw=playing?'pause':'play';
-      if(pb.getAttribute('data-s')!==pw){pb.setAttribute('data-s',pw);pb.innerHTML=playing?pubPauseSvg():pubPlaySvg();}
-    }
-    var d=au.duration,has=isFinite(d)&&d>0;
-    var cur=document.getElementById('miniCur'),tot=document.getElementById('miniTot'),fill=document.getElementById('miniFill');
-    var ct=histFmtTime(au.currentTime||0),tt=has?histFmtTime(d):((it.duration&&it.duration>0)?histFmtTime(it.duration):'0:00');
-    if(cur&&cur.textContent!==ct)cur.textContent=ct;
-    if(tot&&tot.textContent!==tt)tot.textContent=tt;
-    if(fill)fill.style.width=(has?(au.currentTime/d*100):0)+'%';
-  }
+  var d=au.duration,has=isFinite(d)&&d>0;
+  var cur=document.getElementById('miniCur'),tot=document.getElementById('miniTot'),fill=document.getElementById('miniFill');
+  var ct=histFmtTime(au.currentTime||0),tt=has?histFmtTime(d):((it.duration&&it.duration>0)?histFmtTime(it.duration):'0:00');
+  if(cur&&cur.textContent!==ct)cur.textContent=ct;
+  if(tot&&tot.textContent!==tt)tot.textContent=tt;
+  if(fill)fill.style.width=(has?(au.currentTime/d*100):0)+'%';
 }
 function pubMiniTick(){
   var au=pubMini.au;
@@ -8333,7 +8386,7 @@ function pubMiniStopAll(){
     if(pubMini.suppressClick&&Date.now()-pubMini.suppressClick<400)return;
     pubMiniOpenPanel();
   });
-  var xc=document.getElementById('miniClose');if(xc)xc.addEventListener('click',pubMiniClosePanel);
+  var xc=document.getElementById('miniClose');if(xc)xc.addEventListener('click',pubMiniStopAll);
   var sb=document.getElementById('miniStop');if(sb)sb.addEventListener('click',pubMiniStopAll);
   var pb=document.getElementById('miniPlayBtn');if(pb)pb.addEventListener('click',pubMiniTogglePlay);
   var pv=document.getElementById('miniPrev');if(pv)pv.addEventListener('click',function(){pubMiniStep(-1);});
@@ -8399,6 +8452,12 @@ function pubSongRowEl(it){
   sh.setAttribute('aria-label',tx('pubShare'));
   sh.addEventListener('click',function(){pubSharePost(it,sh);});
   acts.appendChild(sh);
+  var rdl=document.createElement('button');
+  rdl.type='button';rdl.className='pub-act';
+  rdl.innerHTML=pubDlSvg()+'<span data-pub-downloads="'+escHtml(it.id)+'">'+acctFmtBal(it.downloads)+'</span>';
+  rdl.setAttribute('aria-label',tx('histDownload'));
+  rdl.addEventListener('click',function(){pubDownloadPost(it,rdl);});
+  acts.appendChild(rdl);
   acts.appendChild(plPillBtn({url:it.url,title:it.title||'',image:it.image||'',name:pubDisplayName(it)}));
   main.appendChild(acts);
   var au=document.createElement('audio');
@@ -8440,6 +8499,19 @@ function pubRenderSongs(box,songs){
   });
   ordered.forEach(function(it,i){it._dispRank=i+1;});
   if(!ordered.length)return;
+  /* Free-download quota note (owner rule): a user WITHOUT a
+     Song package sees exactly how many free song downloads
+     remain at the top of the Songs feed — the total out of 4
+     with the Suno 2 + Magic Hour 2 split — and every download
+     refreshes the line in place (pubDlNoteRefresh). Package
+     holders download without limit, so they see no note. */
+  if(!pubHasSongPlan()){
+    var dnote=document.createElement('p');
+    dnote.className='pub-dl-note';
+    dnote.setAttribute('data-pub-dlnote','');
+    dnote.textContent=pubDlNoteText();
+    box.appendChild(dnote);
+  }
   /* Carousel (owner rule 2026-11-16): EVERY slide is a full
      BIG card — the newest song (#1) first, the older songs
      after it at the same big size, like a photo gallery.
@@ -8657,12 +8729,13 @@ function pubCardEl(it){
     }
     card.appendChild(trow);
     /* Compact action row (owner layout, annotated mock): Like /
-       Dislike / Share as SMALL buttons in ONE row immediately
-       under the title, BEFORE the progress bar — they used to
-       sit at the very bottom of the card. No Download button:
-       a Public post belongs to its poster, so viewers cannot
-       download it (owner rule). Views are NOT repeated here —
-       the count beside the title is the only one on the card. */
+       Dislike / Share / Download as SMALL buttons in ONE row
+       immediately under the title, BEFORE the progress bar —
+       they used to sit at the very bottom of the card. The
+       Download pill carries the post's download count, and
+       every tap counts +1 on the server (pubCountDownload).
+       Views are NOT repeated here — the count beside the title
+       is the only one on the card. */
     var arow=document.createElement('div');
     arow.className='pub-acts';
     var alk=document.createElement('button');
@@ -8685,6 +8758,12 @@ function pubCardEl(it){
     ash.setAttribute('aria-label',tx('pubShare'));
     ash.addEventListener('click',function(){pubSharePost(it,ash);});
     arow.appendChild(ash);
+    var adl=document.createElement('button');
+    adl.type='button';adl.className='pub-pill';
+    adl.innerHTML=pubDlSvg()+'<span>'+escHtml(tx('histDownload'))+'</span><span data-pub-downloads="'+escHtml(it.id)+'">'+acctFmtBal(it.downloads)+'</span>';
+    adl.setAttribute('aria-label',tx('histDownload'));
+    adl.addEventListener('click',function(){pubDownloadPost(it,adl);});
+    arow.appendChild(adl);
     arow.appendChild(plPillBtn({url:it.url,title:it.title||'',image:it.image||'',name:pubDisplayName(it)}));
     card.appendChild(arow);
     /* Custom player (Music Library style): the big round accent
@@ -8884,6 +8963,12 @@ function pubCardEl(it){
   sh.setAttribute('aria-label',tx('pubShare'));
   sh.addEventListener('click',function(){pubSharePost(it,sh);});
   foot.appendChild(sh);
+  var fdl=document.createElement('button');
+  fdl.type='button';fdl.className='pub-act pub-dl';
+  fdl.innerHTML=pubDlSvg()+'<span>'+escHtml(tx('histDownload'))+'</span><span data-pub-downloads="'+escHtml(it.id)+'">'+acctFmtBal(it.downloads)+'</span>';
+  fdl.setAttribute('aria-label',tx('histDownload'));
+  fdl.addEventListener('click',function(){pubDownloadPost(it,fdl);});
+  foot.appendChild(fdl);
   card.appendChild(foot);
   }
   return card;
@@ -9007,76 +9092,136 @@ function pubCopySongLink(it,btn){
    Downloads happen FROM MovAi itself (owner rule): the file's
    bytes are fetched here and saved straight from this page under
    the name the poster gave the post — never a hand-off to an
-   outside download site. (If a provider blocks the byte fetch,
-   the browser's own save of that same file is the last resort,
-   exactly like the History downloads.) */
+   outside download site, never a new tab. (If a provider blocks
+   the direct byte fetch, dlSave fetches through the server proxy
+   and still saves from this page, exactly like the History
+   downloads — the tab never navigates to the provider URL.) */
 function pubDlName(it){
-  var base=(it.title||'').trim()||('movai-'+it.type+'-'+String(it.id).slice(0,8));
-  base=base.replace(/[\\/:*?"<>|]+/g,' ').replace(/\s+/g,' ').trim().slice(0,80)||'movai';
-  var m=/\.([a-z0-9]{2,5})(\?|#|$)/i.exec(it.url||'');
-  var ext=m?('.'+m[1].toLowerCase()):(it.type==='song'?'.mp3':it.type==='video'?'.mp4':it.type==='image'?'.jpg':'.glb');
-  return base+ext;
+  return dlNameFor(it.title,it.url,it.type,'movai-'+it.type+'-'+String(it.id).slice(0,8));
 }
 async function pubDownloadFile(it){
-  var src=it.url;if(!src)return;
-  var fname=pubDlName(it);
-  if(src.indexOf('data:')===0||src.indexOf('blob:')===0){
-    var a=document.createElement('a');a.href=src;a.download=fname;document.body.appendChild(a);a.click();a.remove();return;
-  }
-  try{
-    var r=await fetch(src);if(!r.ok)throw new Error('http '+r.status);
-    var b=await r.blob();var u=URL.createObjectURL(b);
-    var a2=document.createElement('a');a2.href=u;a2.download=fname;document.body.appendChild(a2);a2.click();a2.remove();
-    setTimeout(function(){try{URL.revokeObjectURL(u);}catch(e){}},4000);
-  }catch(e){window.open(src,'_blank');}
+  if(!it||!it.url)return;
+  await dlSave(it.url,pubDlName(it));
 }
-/* Free song-download quota (owner rule): a user WITHOUT an active
-   Song package gets 2 free song downloads from Public in total —
-   the count lives on their account record (or a guest counter on
-   this device). Past 2 they must buy a Song package: the tap
-   explains and opens the Packages panel on the Songs tab. Song
-   package holders download without limit. Image / video / 3D
-   downloads are not quota-limited. */
-var PUB_SONG_DL_FREE=2;
+/* Free song-download quota (owner rule 2026-11-16): a user
+   WITHOUT an active Song package gets 4 free song downloads
+   from Public, SPLIT BY PROVIDER — Suno 2 + Magic Hour 2.
+   Each bucket counts on its own: using both Suno downloads
+   leaves the 2 Magic Hour ones untouched, and the other way
+   round. Past a bucket's 2, that provider's songs need a Song
+   package: the tap explains and opens the Packages panel on
+   the Songs tab. Song package holders download songs without
+   limit. Image downloads are unlimited for everyone, and
+   video downloads are unlimited too (the MovAi watermark
+   overlay stays on free videos exactly as before). The counts
+   live on the account record (or guest counters on this
+   device); the old single counter migrates into the buckets
+   (first 2 to Suno, any rest to Magic Hour) so nobody loses
+   or regains downloads in the switch. */
+var PUB_SONG_DL_FREE=2; /* per provider bucket: Suno 2 + Magic Hour 2 = 4 */
 function pubHasSongPlan(){
   try{if(typeof songPkgGet==='function'&&songPkgGet())return true;}catch(e){}
   var u=null;try{u=acctCurrent();}catch(e){}
   return !!(u&&u.songPlan&&u.songPlan.until>Date.now());
 }
-function pubSongDlCount(){
-  var u=null;try{u=acctCurrent();}catch(e){}
-  if(u)return Math.max(0,parseInt(u.pubSongDl,10)||0);
-  try{return Math.max(0,parseInt(localStorage.getItem('movai-pub-songdl')||'0',10)||0);}catch(e){return 0;}
+/* Which free bucket a Public song draws from: Magic Hour songs
+   (provider / model / file host says so) use the Magic Hour
+   bucket; everything else — Suno above all — uses the Suno
+   bucket. */
+function pubSongBucket(it){
+  var p=String((it&&(it.provider||it.model))||'').toLowerCase();
+  var u=String((it&&it.url)||'').toLowerCase();
+  if(p.indexOf('magic')>=0||u.indexOf('magichour')>=0)return 'mh';
+  return 'suno';
 }
-function pubSongDlLeft(){return Math.max(0,PUB_SONG_DL_FREE-pubSongDlCount());}
-function pubSongDlBump(){
+function pubSongBucketName(bucket){return bucket==='mh'?'Magic Hour':'Suno';}
+function pubSongDlCounts(){
+  var s=0,m=0,legacy=0;
+  var u=null;try{u=acctCurrent();}catch(e){}
+  if(u){
+    s=parseInt(u.pubSongDlSuno,10)||0;
+    m=parseInt(u.pubSongDlMh,10)||0;
+    legacy=parseInt(u.pubSongDl,10)||0;
+  }else{
+    try{
+      s=parseInt(localStorage.getItem('movai-pub-songdl-suno')||'0',10)||0;
+      m=parseInt(localStorage.getItem('movai-pub-songdl-mh')||'0',10)||0;
+      legacy=parseInt(localStorage.getItem('movai-pub-songdl')||'0',10)||0;
+    }catch(e){}
+  }
+  if(legacy>0&&s<=0&&m<=0){s=Math.min(legacy,PUB_SONG_DL_FREE);m=Math.min(Math.max(0,legacy-PUB_SONG_DL_FREE),PUB_SONG_DL_FREE);}
+  return {suno:Math.max(0,s),mh:Math.max(0,m)};
+}
+function pubSongDlLeft(bucket){
+  var c=pubSongDlCounts();
+  return Math.max(0,PUB_SONG_DL_FREE-(bucket==='mh'?c.mh:c.suno));
+}
+function pubSongDlTotalLeft(){return pubSongDlLeft('suno')+pubSongDlLeft('mh');}
+function pubSongDlBump(bucket){
   var u=null;try{u=acctCurrent();}catch(e){}
   if(u){
     var us=acctUsersGet();var rec=us[u.email];
-    if(rec){rec.pubSongDl=(parseInt(rec.pubSongDl,10)||0)+1;acctUsersSave(us);}
+    if(rec){
+      if(bucket==='mh')rec.pubSongDlMh=(parseInt(rec.pubSongDlMh,10)||0)+1;
+      else rec.pubSongDlSuno=(parseInt(rec.pubSongDlSuno,10)||0)+1;
+      acctUsersSave(us);
+    }
     return;
   }
-  try{localStorage.setItem('movai-pub-songdl',String(pubSongDlCount()+1));}catch(e){}
+  try{
+    var c=pubSongDlCounts();
+    localStorage.setItem(bucket==='mh'?'movai-pub-songdl-mh':'movai-pub-songdl-suno',String((bucket==='mh'?c.mh:c.suno)+1));
+  }catch(e){}
+}
+/* The remaining-downloads line shown at the top of the Songs
+   feed: total left out of 4, with the Suno / Magic Hour split
+   spelled out, refreshed in place after every download. */
+function pubDlNoteText(){
+  return tx('pubDlFreeLeft')
+    .replace('{n}',pubSongDlTotalLeft())
+    .replace('{s}',pubSongDlLeft('suno'))
+    .replace('{m}',pubSongDlLeft('mh'));
+}
+function pubDlNoteRefresh(){
+  var notes=document.querySelectorAll('[data-pub-dlnote]');
+  for(var i=0;i<notes.length;i++)notes[i].textContent=pubDlNoteText();
+}
+/* Every download counts (owner rule 2026-11-16): each tap on
+   Download in Public adds +1 — the count on the card rises at
+   once and the tap is reported to the server so the Admin
+   stats show it too: POST /api/public/download {postId}. The
+   report is FIRE-AND-FORGET — it is never awaited and every
+   failure is swallowed — so counting can never slow down or
+   break the download itself: if the server is asleep or the
+   network drops, the file still saves exactly as before. */
+function pubCountDownload(it){
+  if(!it||!it.id)return;
+  it.downloads=Math.max(0,Math.floor(it.downloads||0))+1;
+  pubLockTouch();
+  var els=document.querySelectorAll('[data-pub-downloads="'+CSS.escape(it.id)+'"]');
+  for(var i=0;i<els.length;i++)els[i].textContent=acctFmtBal(it.downloads);
+  try{fetch(PUB_API+'/download',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({postId:it.id,id:it.id})}).catch(function(){});}catch(e){}
 }
 function pubDownloadPost(it,btn){
   if(!it||!it.url)return;
   if(it.type==='song'&&!pubHasSongPlan()){
-    if(pubSongDlLeft()<=0){
+    var bucket=pubSongBucket(it);
+    if(pubSongDlLeft(bucket)<=0){
       if(btn){
         var sp=btn.querySelector('span:last-child');
-        if(sp){var old=sp.textContent;sp.textContent=tx('pubDlLimit');setTimeout(function(){if(sp.isConnected)sp.textContent=old;},3200);}
+        if(sp){var old=sp.textContent;sp.textContent=tx('pubDlLimit').replace('{p}',pubSongBucketName(bucket));setTimeout(function(){if(sp.isConnected)sp.textContent=old;},3200);}
       }
       try{pkgSetTab('song');}catch(e){}
       packagesShow();
       return;
     }
-    pubSongDlBump();
+    pubSongDlBump(bucket);
+    pubCountDownload(it);
     pubDownloadFile(it);
-    var left=pubSongDlLeft();
-    var notes=document.querySelectorAll('[data-pub-dlnote]');
-    for(var i=0;i<notes.length;i++)notes[i].textContent=tx('pubDlFreeLeft').replace('{n}',left);
+    pubDlNoteRefresh();
     return;
   }
+  pubCountDownload(it);
   pubDownloadFile(it);
 }
 /* Views count EVERY listen (owner rule 2026-11-16): press Play
@@ -9370,6 +9515,9 @@ function pubDoPostSend(vis,coverUrl){
   };
   if(coverUrl){payload.image=coverUrl;payload.aspect='1x1';}
   if(item.type==='song')payload.genre=pubSheetGenre;
+  /* The song's provider rides along so the feed knows which
+     free-download bucket (Suno / Magic Hour) the song uses. */
+  if(item.type==='song'&&item.provider)payload.provider=item.provider;
   fetch(PUB_API+'/post',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)})
     .then(function(r){
       if(!r||!r.ok)throw new Error('http '+(r?r.status:0));
@@ -9394,7 +9542,7 @@ function pubDoPostSend(vis,coverUrl){
           var nit=null;
           try{nit=pubNormItem((data&&(data.post||data.item))||data);}catch(e){}
           if(!nit||nit.url!==payload.url){
-            nit={id:String((data&&(data.id||data.postId))||('lock'+Date.now().toString(36))),name:payload.name||'',email:payload.email||'',premium:false,title:payload.title||'',type:payload.type,url:payload.url,aspect:payload.aspect||'',image:payload.image||'',likes:0,dislikes:0,views:0,rank:null,tier:null,liked:false,disliked:false,duration:null,model:'',genre:payload.genre||'',youtube:'',youtubeChannel:'',ts:Date.now()};
+            nit={id:String((data&&(data.id||data.postId))||('lock'+Date.now().toString(36))),name:payload.name||'',email:payload.email||'',premium:false,title:payload.title||'',type:payload.type,url:payload.url,aspect:payload.aspect||'',image:payload.image||'',likes:0,dislikes:0,views:0,downloads:0,rank:null,tier:null,liked:false,disliked:false,duration:null,model:'',provider:payload.provider||'',genre:payload.genre||'',youtube:'',youtubeChannel:'',ts:Date.now()};
           }
           if(nit.type==='song'&&payload.genre&&!nit.genre)nit.genre=payload.genre;
           if(nit.type==='song'&&payload.image&&!nit.image)nit.image=payload.image;
@@ -9699,6 +9847,7 @@ async function postFlowSubmit(){
     var payload={email:u.email,userId:acctValidUserId(u.id)?u.id:'',name:u.name||'',firstName:u.firstName||'',lastName:u.lastName||'',title:title,type:'song',url:url,image:image,visibility:'public'};
     if(postFlow.kind==='song')payload.genre=postFlow.genre;
     else payload.kind=postFlow.kind;
+    if(postFlow.histItem&&postFlow.histItem.provider)payload.provider=postFlow.histItem.provider;
     var r=await fetch(PUB_API+'/post',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
     if(!r||!r.ok)throw new Error('http '+(r?r.status:0));
     var pj=await r.json().catch(function(){return {};});
@@ -9710,7 +9859,7 @@ async function postFlowSubmit(){
       var nit2=null;
       try{nit2=pubNormItem((pj&&(pj.post||pj.item))||pj);}catch(e){}
       if(!nit2||nit2.url!==url){
-        nit2={id:String((pj&&(pj.id||pj.postId))||('lock'+Date.now().toString(36))),name:u.name||'',email:u.email||'',premium:false,title:title,type:'song',url:url,aspect:'',image:image||'',likes:0,dislikes:0,views:0,rank:null,tier:null,liked:false,disliked:false,duration:null,model:'',genre:(postFlow.kind==='song'?postFlow.genre:''),youtube:'',youtubeChannel:'',ts:Date.now()};
+        nit2={id:String((pj&&(pj.id||pj.postId))||('lock'+Date.now().toString(36))),name:u.name||'',email:u.email||'',premium:false,title:title,type:'song',url:url,aspect:'',image:image||'',likes:0,dislikes:0,views:0,downloads:0,rank:null,tier:null,liked:false,disliked:false,duration:null,model:'',provider:payload.provider||'',genre:(postFlow.kind==='song'?postFlow.genre:''),youtube:'',youtubeChannel:'',ts:Date.now()};
       }
       if(postFlow.kind==='song'&&postFlow.genre&&!nit2.genre)nit2.genre=postFlow.genre;
       pubLockAdd(nit2);
