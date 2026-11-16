@@ -3354,9 +3354,14 @@ function apiRoute(req, res, urlPath) {
     const status = (new URL(req.url, 'http://localhost').searchParams.get('status') || 'all').trim().toLowerCase();
     const reqs = loadPurchaseRequests();
     const order = { pending: 0, approved: 1, rejected: 2 };
+    const _users = loadUsers();
     const list = reqs
       .filter((r) => status === 'all' || r.status === status)
-      .sort((x, y) => ((order[x.status] ?? 3) - (order[y.status] ?? 3)) || String(y.createdAt || '').localeCompare(String(x.createdAt || '')));
+      .sort((x, y) => ((order[x.status] ?? 3) - (order[y.status] ?? 3)) || String(y.createdAt || '').localeCompare(String(x.createdAt || '')))
+      .map((r) => {
+        const _u = _users[r.email];
+        return Object.assign({}, r, { buyerId: _u && _u.id ? _u.id : '' });
+      });
     return sendJSON(res, 200, { ok: true, requests: list });
   }
   // POST /api/admin/purchase-request/approve — {id} — admin key required.
