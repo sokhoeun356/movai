@@ -4811,6 +4811,27 @@ async function dlSave(src,fname){
    Image / video / 3D downloads do not pass through here. */
 var mp3Busy=false;
 var mp3ProgEl=null,mp3ProgTimer=null,mp3ProgT0=0,mp3ProgPct=null;
+/* ===== MP3 pre-warm (owner fix 2026-11-16) =====
+   Download must be instant like the old site: the moment a song
+   is SHOWN (Create results / History / Public) or STARTS PLAYING,
+   the server is told in the background to convert that song's
+   MP3 ahead of time — GET /api/gen/song/mp3-warm?u=<audio-url>.
+   Fire-and-forget ONLY: never awaited, never shown in the UI,
+   every failure swallowed, so it can never slow down or break
+   rendering or playback. Each URL is warmed once per session
+   (mp3Warmed), so re-renders and replay taps never spam the
+   server. When the user later taps Download, dlSaveSongMp3
+   asks for the MP3 and the server already has it ready. */
+var mp3Warmed={};
+function mp3Warm(u){
+  try{
+    if(!u||!/^https?:\/\//i.test(u))return;
+    if(mp3Warmed[u])return;
+    mp3Warmed[u]=1;
+    var base=(typeof GEN_API!=='undefined'&&GEN_API)?GEN_API:'https://movai-proxy.onrender.com/api';
+    fetch(base+'/gen/song/mp3-warm?u='+encodeURIComponent(u)).catch(function(){});
+  }catch(e){}
+}
 function mp3ProgRender(){
   if(!mp3ProgEl)return;
   var sec=Math.max(0,Math.round((Date.now()-mp3ProgT0)/1000));
@@ -5622,6 +5643,7 @@ function lastSongsRestore(){
 }
 function genSongCard(song,n,it,title,prov,prompt,streaming){
   var u=song.url;
+  mp3Warm(u);
   var card=document.createElement('div');
   card.className='hist-card song-card';
   /* ONE compact row: small cover · Play · title · duration · icons.
@@ -5640,6 +5662,7 @@ function genSongCard(song,n,it,title,prov,prompt,streaming){
   au._miniKeep=true;
   au._miniIt={id:'gen:'+u,type:'song',url:u,title:title||tx('songLabelFmt').replace('{n}',n),image:(song&&song.image)||'',name:''};
   au.addEventListener('play',function(){
+    mp3Warm(u);
     try{
       var list=genSongAudios.map(function(a){return {au:a,it:a._miniIt};});
       pubMiniSet(au,au._miniIt,list);
@@ -6163,6 +6186,7 @@ document.addEventListener('keydown',function(e){if(e.key==='Escape'){fsClose();p
    (histPlayToggle / histPlayerSync, via the .hist-* classes). The
    duration is read from the file's metadata once, lightly. */
 function histSongCard(it){
+  if(it&&it.url)mp3Warm(it.url);
   var card=document.createElement('div');
   card.className='hist-card song-card';
   card.setAttribute('data-hist-id',it.id);
@@ -6461,6 +6485,7 @@ function histMiniList(){
 }
 function histCardEl(id){return document.querySelector('.hist-card[data-hist-id="'+id+'"]');}
 function histPlayToggle(it){
+  if(it&&it.url)mp3Warm(it.url);
   var au=histAudioGet();
   /* One song at a time, across sections: a History song starting
      puts the fresh-result song players to sleep. */
@@ -8022,6 +8047,7 @@ function pubAdvanceFrom(au){
 function pubWireFeedAudio(au,it,sync){
   au.loop=(pubPlayMode==='one');
   au.addEventListener('play',function(){
+    if(it&&it.url)mp3Warm(it.url);
     pubCountView(it.id);
     try{pubMiniSet(au,it);}catch(e){}
     try{
@@ -8169,6 +8195,7 @@ function plMiniList(){
 }
 function plPlay(entry){
   if(!entry||!entry.url)return;
+  mp3Warm(entry.url);
   var au=plAudioGet();
   if(plAudioUrl===entry.url){
     if(au.paused){var pr=au.play();if(pr&&pr.catch)pr.catch(function(){});}
@@ -8675,6 +8702,7 @@ function pubMiniStopAll(){
    Like / Dislike / Share as the big card — all in the normal
    vertical page scroll. */
 function pubSongRowEl(it){
+  if(it&&it.url)mp3Warm(it.url);
   var row=document.createElement('div');
   row.className='pub-songrow';
   row.setAttribute('data-pub-id',it.id);
@@ -8809,6 +8837,7 @@ function pubRenderSongs(box,songs){
   }
 }
 function pubCardEl(it){
+  if(it&&it.type==='song'&&it.url)mp3Warm(it.url);
   var card=document.createElement('div');
   card.className='pub-card';
   card.setAttribute('data-pub-id',it.id);
@@ -9123,6 +9152,7 @@ function pubCardEl(it){
       card.classList.toggle('np-glow',!au.paused);
     };
     au.addEventListener('play',function(){
+      if(it&&it.url)mp3Warm(it.url);
       pubCountView(it.id);
       try{pubMiniSet(au,it);}catch(e){}
       try{
