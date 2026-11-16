@@ -96,6 +96,7 @@ const GH_DATA_FILES = [
   'push-subs.json', 'packages.json', 'purchase-requests.json',
   'public.json', 'package-events.json', 'blocked-models.json',
   'model-logins.json', 'blocked-ips.json', 'blocked-emails.json',
+  'updates.json',
 ];
 const ghShaCache = {}; // filename -> GitHub blob sha (for PUT updates)
 function ghEnabled() { return !!GH_TOKEN; }
@@ -586,7 +587,7 @@ function addNotification(kind, email, title, text) {
     if (arr.length > NOTIFICATIONS_MAX) arr.length = NOTIFICATIONS_MAX;
     saveNotifications(arr);
   } catch (e) {}
-  if (kind === 'login' || kind === 'purchase-request' || kind === 'gift-claimed' || kind === 'security') {
+  if (kind === 'login' || kind === 'purchase-request' || kind === 'gift-claimed' || kind === 'security' || kind === 'update') {
     sendTelegramAdmin('🔔 ' + n.title + '\n' + n.text);
   }
   // Phone-native Web Push for the same event (admin devices and/or the
@@ -1008,6 +1009,161 @@ async function withProviderKeyRotation(provider, fn, reqKey, candidatesOverride)
     }
   }
   throw lastErr;
+}
+
+// ---- Auto Update Version New (top-level helpers) ----
+// Watches provider model lists for NEW models/versions (e.g. Suno v6.5).
+// When a new model appears: a pending update is created + the admin is
+// notified (Telegram + in-admin 'update' notification). The admin Approves
+// it or sets "Don't update" (blocks it forever). If Auto-Apply is ON and
+// the admin does not decide within autoApplyHours, the system applies it
+// by itself (and notifies the admin that it did). Approved models are
+// served at GET /api/public/models so the website shows new models
+// automatically with a "New" badge. Data: ./data/updates.json
+// (GitHub-backed). Only providers with a real listable endpoint are
+// auto-polled (Groq + NovAI /v1/models, Suno gateway /v1/models best
+// effort); other providers are added manually by the admin.
+const UPDATES_FILE = path.join(DATA_DIR, 'updates.json');
+const UPDATES_SEED_MODELS = {
+  groq: ['openai/gpt-oss-120b', 'llama-3.3-70b-versatile'],
+  novai: ['cogview-3-flash', 'cogvideox-flash'],
+  suno: ['v6', 'v6-wild', 'v6-mini'],
+  magichour: ['z-image-turbo', 'flux-2-klein', 'qwen-image-2.1', 'krea-2', 'gpt-image-2', 'nano-banana-2.1', 'nano-banana-pro', 'ltx-2.5', 'minimax-h3', 'kling-3.0', 'kling-4.0', 'veo-3.1', 'seedance-2.5'],
+  musicapi: ['suno-v6'],
+  tavus: [],
+  acemusic: [],
+  masterpiecex: [],
+  hunyuan3d: [],
+};
+function loadUpdates() {
+  try {
+    const j = JSON.parse(fs.readFileSync(UPDATES_FILE, 'utf8'));
+    if (j && typeof j === 'object') {
+      if (!j.knownModels || typeof j.knownModels !== 'object') j.knownModels = {};
+      if (!j.approvedModels || typeof j.approvedModels !== 'object') j.approvedModels = {};
+      if (!Array.isArray(j.blockedModels)) j.blockedModels = [];
+      if (!Array.isArray(j.updates)) j.updates = [];
+      if (!j.settings || typeof j.settings !== 'object') j.settings = {};
+      if (typeof j.settings.autoApply !== 'boolean') j.settings.autoApply = true;
+      if (typeof j.settings.autoApplyHours !== 'number' || j.settings.autoApplyHours < 1) j.settings.autoApplyHours = 24;
+      if (typeof j.settings.checkIntervalHours !== 'number' || j.settings.checkIntervalHours < 1) j.settings.checkIntervalHours = 6;
+      for (const p of Object.keys(UPDATES_SEED_MODELS)) {
+        if (!Array.isArray(j.approvedModels[p])) j.approvedModels[p] = UPDATES_SEED_MODELS[p].slice();
+        if (!Array.isArray(j.knownModels[p])) j.knownModels[p] = UPDATES_SEED_MODELS[p].slice();
+      }
+      return j;
+    }
+  } catch (e) {}
+  const d = { knownModels: {}, approvedModels: {}, blockedModels: [], updates: [], settings: { autoApply: true, autoApplyHours: 24, checkIntervalHours: 6 }, lastCheckAt: null, lastCheckResult: '' };
+  for (const p of Object.keys(UPDATES_SEED_MODELS)) { d.approvedModels[p] = UPDATES_SEED_MODELS[p].slice(); d.knownModels[p] = UPDATES_SEED_MODELS[p].slice(); }
+  return d;
+}
+function saveUpdates(u) {
+  try { fs.mkdirSync(DATA_DIR, { recursive: true }); } catch (e) {}
+  fs.writeFileSync(UPDATES_FILE, JSON.stringify(u, null, 2));
+  ghPersistFile(UPDATES_FILE);
+}
+function newUpdateId() { return 'upd_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8); }
+// Fetch a provider's model list (array of model ids) or null when the
+// provider has no listable endpoint.
+async function fetchProviderModelList(provider) {
+  const p = normProvider(provider);
+  const timeoutMs = 15000;
+  try {
+    if (p === 'groq' || p === 'novai') {
+      const url = p === 'groq' ? 'https://api.groq.com/openai/v1/models' : 'https://aiapi-pro.com/v1/models';
+      const ids = await withProviderKeyRotation(p, async (k) => {
+        const r = await fetch(url, { headers: { 'Authorization': 'Bearer ' + k }, signal: AbortSignal.timeout(timeoutMs) });
+        if (r.status !== 200) throw new Error('HTTP ' + r.status);
+        const j = await r.json();
+        const arr = Array.isArray(j && j.data) ? j.data : [];
+        return arr.map((x) => (x && typeof x.id === 'string' ? x.id.trim() : '')).filter(Boolean);
+      });
+      return ids;
+    }
+    if (p === 'suno') {
+      const list = adminProviderKeyList('suno');
+      const ep = list.length && typeof list[0].endpoint === 'string' ? list[0].endpoint.replace(/\/+$/, '') : '';
+      if (!ep) return null;
+      const key = list[0].key;
+      for (const suffix of ['/v1/models', '/api/models']) {
+        try {
+          const r = await fetch(ep + suffix, { headers: { 'Authorization': 'Bearer ' + key }, signal: AbortSignal.timeout(timeoutMs) });
+          if (r.status !== 200) continue;
+          const j = await r.json();
+          const arr = Array.isArray(j && j.data) ? j.data : (Array.isArray(j && j.models) ? j.models : []);
+          const ids = arr.map((x) => (typeof x === 'string' ? x.trim() : (x && typeof x.id === 'string' ? x.id.trim() : ''))).filter(Boolean);
+          if (ids.length) return ids;
+        } catch (e) {}
+      }
+      return null;
+    }
+  } catch (e) { return null; }
+  return null;
+}
+// One full check: poll listable providers, record any NEW model as a
+// pending update + notify the admin. Returns the number of new models.
+async function autoUpdateCheckModels() {
+  const u = loadUpdates();
+  let added = 0;
+  for (const p of ['groq', 'novai', 'suno']) {
+    const ids = await fetchProviderModelList(p);
+    if (!ids) continue;
+    if (!Array.isArray(u.knownModels[p])) u.knownModels[p] = [];
+    for (const id of ids) {
+      if (u.knownModels[p].includes(id)) continue;
+      u.knownModels[p].push(id);
+      const blockedKey = p + ':' + id;
+      if (u.blockedModels.includes(blockedKey)) continue;
+      const already = u.updates.find((x) => x.provider === p && x.model === id && (x.status === 'pending' || x.status === 'approved' || x.status === 'auto-applied'));
+      if (already) continue;
+      const rec = { id: newUpdateId(), provider: p, model: id, status: 'pending', source: 'auto-detect', detectedAt: new Date().toISOString(), decidedAt: null, decidedBy: '', note: '' };
+      u.updates.unshift(rec);
+      added++;
+      addNotification('update', '', '🆕 Model ថ្មី · ' + p + ' — ' + id, 'Provider ' + p + ' មាន model ថ្មី៖ ' + id + '។ សូម Approve ឬដាក់ "មិនចាំបាច់ Update" ក្នុង Admin → Auto Update។ បើមិនឆ្លើយក្នុង ' + u.settings.autoApplyHours + ' ម៉ោង ហើយ Auto-Apply បើក វានឹង Update ដោយខ្លួនឯង។');
+    }
+  }
+  u.lastCheckAt = new Date().toISOString();
+  u.lastCheckResult = added ? ('រកឃើញ model ថ្មី ' + added) : 'មិនមាន model ថ្មីទេ';
+  saveUpdates(u);
+  await ghFlushFile(UPDATES_FILE);
+  return added;
+}
+// Apply one update (add the model to the approved list shown on the
+// website). decidedBy: 'admin' or 'auto'.
+async function autoUpdateApplyUpdate(rec, decidedBy) {
+  const u = loadUpdates();
+  const r = u.updates.find((x) => x.id === rec.id);
+  if (!r || r.status !== 'pending') return false;
+  if (!Array.isArray(u.approvedModels[r.provider])) u.approvedModels[r.provider] = [];
+  if (!u.approvedModels[r.provider].includes(r.model)) u.approvedModels[r.provider].push(r.model);
+  r.status = decidedBy === 'auto' ? 'auto-applied' : 'approved';
+  r.decidedAt = new Date().toISOString();
+  r.decidedBy = decidedBy;
+  saveUpdates(u);
+  await ghFlushFile(UPDATES_FILE);
+  const who = decidedBy === 'auto' ? 'ប្រព័ន្ធ Auto-Apply' : 'Admin';
+  addNotification('update', '', '✅ Model ថ្មីបាន Update · ' + r.provider + ' — ' + r.model, who + ' បានអនុម័ត model ថ្មី៖ ' + r.model + '។ វាបង្ហាញក្នុង website ហើយ (New)។');
+  return true;
+}
+// Hourly sweep: auto-apply pending updates older than autoApplyHours
+// (when Auto-Apply is ON), then run a model check when due.
+async function autoUpdateSweep() {
+  try {
+    const u = loadUpdates();
+    if (u.settings.autoApply) {
+      const now = Date.now();
+      const cutoff = u.settings.autoApplyHours * 3600 * 1000;
+      const due = u.updates.filter((x) => x.status === 'pending' && x.detectedAt && (now - new Date(x.detectedAt).getTime()) >= cutoff);
+      for (const rec of due) {
+        await autoUpdateApplyUpdate(rec, 'auto');
+      }
+    }
+    const last = u.lastCheckAt ? new Date(u.lastCheckAt).getTime() : 0;
+    if (Date.now() - last >= u.settings.checkIntervalHours * 3600 * 1000) {
+      await autoUpdateCheckModels();
+    }
+  } catch (e) {}
 }
 
 /* --------------------------------- api ------------------------------------- */
@@ -2393,6 +2549,113 @@ function apiRoute(req, res, urlPath) {
     const s = loadSettings();
     return sendJSON(res, 200, { ok: true, providers: s.providers || { image: null, video: null, song: null } });
   }
+  // ---- Auto Update Version New (endpoints) ----
+  // GET /api/admin/updates — admin key required. Lists updates + settings.
+  if (req.method === 'GET' && urlPath === '/api/admin/updates') {
+    const a = adminKeyOk(req);
+    if (!a.ok) return sendJSON(res, 200, { ok: false, error: a.error });
+    const u = loadUpdates();
+    return sendJSON(res, 200, { ok: true, updates: u.updates, settings: u.settings, lastCheckAt: u.lastCheckAt, lastCheckResult: u.lastCheckResult, approvedModels: u.approvedModels, blockedModels: u.blockedModels });
+  }
+  // POST /api/admin/updates/check — admin key required. Run a check now.
+  if (req.method === 'POST' && urlPath === '/api/admin/updates/check') {
+    const a = adminKeyOk(req);
+    if (!a.ok) return sendJSON(res, 200, { ok: false, error: a.error });
+    (async () => {
+      const n = await autoUpdateCheckModels();
+      return sendJSON(res, 200, { ok: true, newCount: n });
+    })().catch(() => sendJSON(res, 200, { ok: false, error: 'ពិនិត្យមិនបានទេ' }));
+    return;
+  }
+  // POST /api/admin/updates/approve — {updateId} — admin key required.
+  if (req.method === 'POST' && urlPath === '/api/admin/updates/approve') {
+    const a = adminKeyOk(req);
+    if (!a.ok) return sendJSON(res, 200, { ok: false, error: a.error });
+    readJSONBody(req, 64 * 1024).then(async (body) => {
+      const id = typeof body.updateId === 'string' ? body.updateId.trim() : '';
+      const u = loadUpdates();
+      const rec = u.updates.find((x) => x.id === id);
+      if (!rec) return sendJSON(res, 200, { ok: false, error: 'រក update នេះមិនឃើញទេ' });
+      const ok2 = await autoUpdateApplyUpdate(rec, 'admin');
+      return sendJSON(res, 200, { ok: ok2, updates: loadUpdates().updates });
+    }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
+    return;
+  }
+  // POST /api/admin/updates/reject — {updateId} — admin key required.
+  // "Don't update": blocks the model so it is never re-detected.
+  if (req.method === 'POST' && urlPath === '/api/admin/updates/reject') {
+    const a = adminKeyOk(req);
+    if (!a.ok) return sendJSON(res, 200, { ok: false, error: a.error });
+    readJSONBody(req, 64 * 1024).then(async (body) => {
+      const id = typeof body.updateId === 'string' ? body.updateId.trim() : '';
+      const u = loadUpdates();
+      const rec = u.updates.find((x) => x.id === id);
+      if (!rec) return sendJSON(res, 200, { ok: false, error: 'រក update នេះមិនឃើញទេ' });
+      if (rec.status === 'pending') {
+        rec.status = 'rejected';
+        rec.decidedAt = new Date().toISOString();
+        rec.decidedBy = 'admin';
+        const key = rec.provider + ':' + rec.model;
+        if (!u.blockedModels.includes(key)) u.blockedModels.push(key);
+        saveUpdates(u);
+        await ghFlushFile(UPDATES_FILE);
+        addNotification('update', '', '🚫 មិន Update · ' + rec.provider + ' — ' + rec.model, 'Admin ដាក់ "មិនចាំបាច់ Update" សម្រាប់ model ' + rec.model + '។ វានឹងមិនលេចឡើងម្តងទៀតទេ។');
+      }
+      return sendJSON(res, 200, { ok: true, updates: loadUpdates().updates });
+    }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
+    return;
+  }
+  // POST /api/admin/updates/settings — {autoApply, autoApplyHours, checkIntervalHours} — admin key required.
+  if (req.method === 'POST' && urlPath === '/api/admin/updates/settings') {
+    const a = adminKeyOk(req);
+    if (!a.ok) return sendJSON(res, 200, { ok: false, error: a.error });
+    readJSONBody(req, 64 * 1024).then(async (body) => {
+      const u = loadUpdates();
+      if (typeof body.autoApply === 'boolean') u.settings.autoApply = body.autoApply;
+      if (typeof body.autoApplyHours === 'number' && body.autoApplyHours >= 1 && body.autoApplyHours <= 720) u.settings.autoApplyHours = Math.round(body.autoApplyHours);
+      if (typeof body.checkIntervalHours === 'number' && body.checkIntervalHours >= 1 && body.checkIntervalHours <= 168) u.settings.checkIntervalHours = Math.round(body.checkIntervalHours);
+      saveUpdates(u);
+      await ghFlushFile(UPDATES_FILE);
+      return sendJSON(res, 200, { ok: true, settings: u.settings });
+    }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
+    return;
+  }
+  // POST /api/admin/updates/add — {provider, model, note} — admin key
+  // required. Manually register a new model (e.g. Suno v6.5 announced on
+  // their blog — no API to detect it). Creates a pending update.
+  if (req.method === 'POST' && urlPath === '/api/admin/updates/add') {
+    const a = adminKeyOk(req);
+    if (!a.ok) return sendJSON(res, 200, { ok: false, error: a.error });
+    readJSONBody(req, 64 * 1024).then(async (body) => {
+      const provider = normProvider(body && body.provider);
+      const model = typeof body.model === 'string' ? body.model.trim().slice(0, 100) : '';
+      if (!provider || !model) return sendJSON(res, 200, { ok: false, error: 'សូមដាក់ provider និង model' });
+      const u = loadUpdates();
+      if (!Array.isArray(u.knownModels[provider])) u.knownModels[provider] = [];
+      if (!u.knownModels[provider].includes(model)) u.knownModels[provider].push(model);
+      const dup = u.updates.find((x) => x.provider === provider && x.model === model && x.status === 'pending');
+      if (dup) return sendJSON(res, 200, { ok: false, error: 'Model នេះមានក្នុងបញ្ជីរង់ចាំហើយ' });
+      const rec = { id: newUpdateId(), provider, model, status: 'pending', source: 'manual', detectedAt: new Date().toISOString(), decidedAt: null, decidedBy: '', note: typeof body.note === 'string' ? body.note.slice(0, 200) : '' };
+      u.updates.unshift(rec);
+      saveUpdates(u);
+      await ghFlushFile(UPDATES_FILE);
+      addNotification('update', '', '🆕 Model ថ្មី (Manual) · ' + provider + ' — ' + model, 'Admin បន្ថែម model ថ្មី៖ ' + model + '។ សូម Approve ឬដាក់ "មិនចាំបាច់ Update"។');
+      return sendJSON(res, 200, { ok: true, updates: u.updates });
+    }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
+    return;
+  }
+  // GET /api/public/models — PUBLIC (no admin key). The MovAi website
+  // reads it to show the approved model list; models approved within the
+  // last 7 days are flagged "new" so the website can show a New badge.
+  if (req.method === 'GET' && urlPath === '/api/public/models') {
+    const u = loadUpdates();
+    const weekAgo = Date.now() - 7 * 24 * 3600 * 1000;
+    const newModels = [];
+    for (const r of u.updates) {
+      if ((r.status === 'approved' || r.status === 'auto-applied') && r.decidedAt && new Date(r.decidedAt).getTime() >= weekAgo) newModels.push(r.provider + ':' + r.model);
+    }
+    return sendJSON(res, 200, { ok: true, models: u.approvedModels, newModels });
+  }
   // ---- Purchase requests (Buy → admin approval) ----
   // The MovAi website's Buy button sends ONLY {email, packageId, plan,
   // amount} — no credit amount. The server is the truth for what a package
@@ -2847,16 +3110,20 @@ function apiRoute(req, res, urlPath) {
   }
   // GET /uploads/<name> — serve an uploaded MP3/cover. Name is basename-only
   // (no path traversal); unknown extension or missing file -> 404.
+  // CORS is sent on every response so the website (another origin) can
+  // load the audio with crossOrigin='anonymous' and feed it to a Web
+  // Audio Analyser — without this the visualizer gets no data and stays
+  // still even while the song plays.
   if (req.method === 'GET' && urlPath.startsWith('/uploads/')) {
     const name = path.basename(urlPath.slice('/uploads/'.length)).split('?')[0];
     const ext = '.' + String(name).toLowerCase().split('.').pop();
     const mime = UPLOAD_MIME[ext];
-    if (!mime || !/^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(name)) { res.writeHead(404); res.end('Not found'); return; }
+    if (!mime || !/^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(name)) { res.writeHead(404, { 'Access-Control-Allow-Origin': '*' }); res.end('Not found'); return; }
     try {
       const buf = fs.readFileSync(path.join(UPLOADS_DIR, name));
-      res.writeHead(200, { 'Content-Type': mime, 'Content-Length': buf.length, 'Cache-Control': 'public, max-age=86400' });
+      res.writeHead(200, { 'Content-Type': mime, 'Content-Length': buf.length, 'Cache-Control': 'public, max-age=86400', 'Access-Control-Allow-Origin': '*' });
       res.end(buf);
-    } catch (e) { res.writeHead(404); res.end('Not found'); }
+    } catch (e) { res.writeHead(404, { 'Access-Control-Allow-Origin': '*' }); res.end('Not found'); }
     return;
   }
   // POST /api/public/post — PUBLIC. {email, name, userId?, mode, title, url, cover?, visibility?}
@@ -3068,7 +3335,13 @@ if (require.main === module) {
   // Restore persistent data from GitHub first (no-op without a token),
   // so the server starts with the true data, then listen.
   ghRestoreAll().catch(() => {}).finally(() => {
-    server.listen(PORT, () => console.log('MovAi Gen live on port ' + PORT));
+    server.listen(PORT, () => {
+      console.log('MovAi Gen live on port ' + PORT);
+      // Auto Update Version New: hourly sweep (auto-apply due updates +
+      // model check when due) + a first sweep 5 min after startup.
+      setTimeout(() => { autoUpdateSweep(); }, 5 * 60 * 1000);
+      setInterval(() => { autoUpdateSweep(); }, 60 * 60 * 1000);
+    });
   });
 }
 module.exports = { server };
