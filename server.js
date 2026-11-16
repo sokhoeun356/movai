@@ -1746,8 +1746,11 @@ function apiRoute(req, res, urlPath) {
         // - Suno: 12 Song Credits per generation (flat, 2 songs).
         // - Magic Hour: 60 per minute = 1 per second, by duration
         //   (2 min = 120, 3.5 min = 210). Variable, NOT flat.
+        //   Deducts from the IMAGE.VIDEO (media) pool, NOT the song pool,
+        //   because Magic Hour is a media provider.
         // - MusicAPI: 20 Song Credits per generation (flat, 2 songs).
         let SONG_COST = 12;
+        let SONG_POOL = 'song';
         if (provider === 'musicapi') {
           SONG_COST = 20;
         } else if (provider === 'magichour') {
@@ -1756,13 +1759,16 @@ function apiRoute(req, res, urlPath) {
           if (_d > 0 && _d <= 5) _secs = Math.round(_d * 60);
           else if (_d >= 15 && _d <= 300) _secs = Math.round(_d);
           SONG_COST = Math.max(15, Math.min(300, _secs));
+          SONG_POOL = 'media';
         }
         const _songEm = normEmail(body.email);
         if (_songEm) {
           const _songUsers = loadUsers();
           const _songU = _songUsers[_songEm];
-          if (_songU && Math.floor(numOr(_songU.songCredits, 0)) < SONG_COST) {
-            return sendJSON(res, 200, { ok: false, error: 'Song Credit មិនគ្រប់ទេ · Not enough Song Credits — សូមទិញ Credit បន្ថែម', needBuy: true, kind: 'song', balance: Math.floor(numOr(_songU.songCredits, 0)), cost: SONG_COST });
+          const _bal = SONG_POOL === 'media' ? Math.floor(numOr(_songU.credits, 0)) : Math.floor(numOr(_songU.songCredits, 0));
+          if (_songU && _bal < SONG_COST) {
+            const _err = SONG_POOL === 'media' ? 'Image.Video Credit មិនគ្រប់ទេ · Not enough Image/Video Credits — សូមទិញ Credit បន្ថែម' : 'Song Credit មិនគ្រប់ទេ · Not enough Song Credits — សូមទិញ Credit បន្ថែម';
+            return sendJSON(res, 200, { ok: false, error: _err, needBuy: true, kind: SONG_POOL, balance: _bal, cost: SONG_COST });
           }
         }
         if (provider === 'musicapi') {
@@ -1803,7 +1809,7 @@ function apiRoute(req, res, urlPath) {
             if (e && e.noKey) return sendJSON(res, 200, { ok: false, error: 'Admin មិនទាន់ដាក់ MusicAPI Key ទេ' });
             return sendJSON(res, 200, { ok: false, error: (e && e.message) || 'MusicAPI: request failed' });
           }
-          const _ded = await deductForGeneration(body.email, 0, SONG_COST, 'song:' + provider);
+          const _ded = await deductForGeneration(body.email, SONG_POOL === 'media' ? SONG_COST : 0, SONG_POOL === 'media' ? 0 : SONG_COST, 'song:' + provider);
           return sendJSON(res, 200, { ok: true, jobId: out.jobId, credits: _ded.credits, songCredits: _ded.songCredits });
         }
         if (provider === 'suno') {
@@ -1844,7 +1850,7 @@ function apiRoute(req, res, urlPath) {
           } catch (e) {
             return sendJSON(res, 200, { ok: false, error: (e && e.message) || 'Suno: request failed' });
           }
-          const _ded = await deductForGeneration(body.email, 0, SONG_COST, 'song:' + provider);
+          const _ded = await deductForGeneration(body.email, SONG_POOL === 'media' ? SONG_COST : 0, SONG_POOL === 'media' ? 0 : SONG_COST, 'song:' + provider);
           return sendJSON(res, 200, { ok: true, jobId: out.jobId, credits: _ded.credits, songCredits: _ded.songCredits });
         }
         if (provider === 'magichour') {
@@ -1891,7 +1897,7 @@ function apiRoute(req, res, urlPath) {
             if (e && e.noKey) return sendJSON(res, 200, { ok: false, error: 'Admin មិនទាន់ដាក់ Magic Hour Key ទេ' });
             return sendJSON(res, 200, { ok: false, error: (e && e.message) || 'Magic Hour: request failed' });
           }
-          const _ded = await deductForGeneration(body.email, 0, SONG_COST, 'song:' + provider);
+          const _ded = await deductForGeneration(body.email, SONG_POOL === 'media' ? SONG_COST : 0, SONG_POOL === 'media' ? 0 : SONG_COST, 'song:' + provider);
           return sendJSON(res, 200, { ok: true, jobId: out.jobId, credits: _ded.credits, songCredits: _ded.songCredits });
         }
         return sendJSON(res, 200, { ok: false, error: 'Provider មិនស្គាល់ទេ' });
