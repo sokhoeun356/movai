@@ -2503,7 +2503,7 @@ function apiRoute(req, res, urlPath) {
     fetch(target.toString(), { signal: AbortSignal.timeout(300000) }).then(async (r) => {
       if (!r.ok) { res.writeHead(502); return res.end('Upstream ' + r.status); }
       const buf = Buffer.from(await r.arrayBuffer());
-      res.writeHead(200, { 'Content-Type': r.headers.get('content-type') || 'video/mp4', 'Content-Disposition': 'attachment; filename="' + safeName.replace(/"/g, '') + '"', 'Content-Length': buf.length });
+      res.writeHead(200, { 'Content-Type': r.headers.get('content-type') || 'video/mp4', 'Content-Disposition': 'attachment; filename="' + safeName.replace(/"/g, '') + '"', 'Content-Length': buf.length, 'Access-Control-Allow-Origin': '*' });
       res.end(buf);
     }).catch(() => { try { res.writeHead(502); res.end('Fetch failed'); } catch {} });
     return;
@@ -4029,14 +4029,14 @@ function apiRoute(req, res, urlPath) {
         const cachedFp = mp3CacheGet(u);
         if (cachedFp) {
           const mp3 = fs.readFileSync(cachedFp);
-          res.writeHead(200, { 'Content-Type': 'audio/mpeg', 'Content-Disposition': disp, 'Content-Length': mp3.length, 'Cache-Control': 'public, max-age=86400' });
+          res.writeHead(200, { 'Content-Type': 'audio/mpeg', 'Content-Disposition': disp, 'Content-Length': mp3.length, 'Cache-Control': 'public, max-age=86400', 'Access-Control-Allow-Origin': '*' });
           res.end(mp3);
           return;
         }
         const fname = await convertAndCacheMp3(u);
         if (!fname) return sendJSON(res, 500, { ok: false, error: 'MP3 convert failed' });
         const mp3 = fs.readFileSync(path.join(DATA_DIR, 'uploads', fname));
-        res.writeHead(200, { 'Content-Type': 'audio/mpeg', 'Content-Disposition': disp, 'Content-Length': mp3.length, 'Cache-Control': 'public, max-age=86400' });
+        res.writeHead(200, { 'Content-Type': 'audio/mpeg', 'Content-Disposition': disp, 'Content-Length': mp3.length, 'Cache-Control': 'public, max-age=86400', 'Access-Control-Allow-Origin': '*' });
         res.end(mp3);
       } catch (e) {
         try { sendJSON(res, 500, { ok: false, error: 'MP3 convert failed: ' + String((e && e.message) || e).slice(0, 200) }); } catch (e2) {}
