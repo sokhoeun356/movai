@@ -663,19 +663,25 @@ html[data-mode="light"] .btn-free{color:#63910c}
 .pub-playbtn{width:54px;height:54px;flex:0 0 auto;border-radius:50%;border:none;background:var(--accent-fill);color:#0d1005;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;padding:0;-webkit-tap-highlight-color:transparent;box-shadow:0 4px 14px rgba(var(--accent-rgb),.35)}
 .pub-playbtn:active{filter:brightness(.93)}
 .pub-play-overlay{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);z-index:3;width:58px;height:58px;box-shadow:0 6px 20px rgba(0,0,0,.5),0 0 0 5px rgba(0,0,0,.18)}
-/* Visualizer (owner rule): the bars live ONLY in TWO small
-   groups pinned to the bottom-left and bottom-right corners of
-   the cover — each group is a narrow strip sitting in its own
-   corner, and the centre of the cover (logo / MovAi wordmark)
-   stays completely clear at all times. Bar heights are set
-   from REAL audio frequency data by the Web Audio analyser
-   (pubVizFrame) — no CSS bounce, no random data. */
+/* Visualizer (owner rule): the bars run along the bottom of
+   the cover across its FULL width (owner rule 2026-11-16 —
+   both sides, not one corner only); the centre of the cover
+   (logo / MovAi wordmark) stays completely clear at all times.
+   Bar heights are set from REAL audio frequency data by the
+   Web Audio analyser (pubVizFrame) — no CSS bounce, no random
+   data. */
 .pub-viz{position:absolute;left:0;right:0;bottom:0;height:38px;z-index:2;opacity:0;transition:opacity .25s;pointer-events:none}
 .pub-cover-wrap.playing .pub-viz{opacity:1}
 .pub-viz-side{position:absolute;bottom:7px;display:flex;align-items:flex-end;gap:2px;height:28px}
 .pub-viz-side:first-child{left:8px}
 .pub-viz-side:last-child{right:8px}
 .pub-viz i{flex:0 0 auto;width:4px;height:12%;min-height:3px;border-radius:2px;background:var(--accent-fill);transition:height .07s linear}
+/* Full-width visualizer (owner rule 2026-11-16): the bars span
+   the WHOLE bottom of the cover, left edge to right edge — not
+   only one corner. The single wide group sits in both corners
+   at once (left + right offsets) and spreads its bars evenly
+   across the full width. */
+.pub-viz-side.pub-viz-wide{left:8px;right:8px;justify-content:space-between}
 @media (prefers-reduced-motion:reduce){.pub-viz i{transition:none}}
 .pub-prog{position:relative;flex:1 1 auto;height:22px;display:flex;align-items:center;cursor:pointer;touch-action:pan-y}
 .pub-prog::before{content:'';position:absolute;left:0;right:0;top:50%;transform:translateY(-50%);height:5px;border-radius:999px;background:var(--line2)}
@@ -719,9 +725,10 @@ html[data-mode="light"] .btn-free{color:#63910c}
 .pub-mode-btn:active{opacity:.8}
 .pub-mode-btn.on{background:var(--accent-fill);color:#0d1005;border-color:transparent}
 /* ===== Public song feed sections (owner layout) =====
-   Under the featured #1 card: the newest songs as compact rows
-   (title + Play + views + small Like), then the older songs in
-   a horizontally swipeable rail of mini cards. */
+   A horizontally swipeable carousel of big cards at the top
+   (newest song centred as #1), then the remaining songs as
+   compact numbered rows in the vertical scroll — see the
+   carousel / rows block below and pubRenderSongs. */
 .pub-sec-head{margin-top:18px;font-size:0.9375rem;font-weight:900}
 .pub-songrow{display:flex;align-items:center;gap:11px;background:var(--card2);border:1px solid var(--line);border-radius:12px;padding:9px 11px;margin-top:8px}
 .pub-row-play{flex:0 0 auto;width:38px;height:38px;border-radius:50%;border:none;background:var(--accent-fill);color:#0d1005;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;padding:0;-webkit-tap-highlight-color:transparent}
@@ -739,6 +746,56 @@ html[data-mode="light"] .btn-free{color:#63910c}
 .pub-mini-play{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:38px;height:38px;border-radius:50%;border:none;background:var(--accent-fill);color:#0d1005;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;padding:0;box-shadow:0 4px 12px rgba(0,0,0,.45);-webkit-tap-highlight-color:transparent}
 .pub-mini-play svg{width:16px;height:16px}
 .pub-mini-title{font-weight:800;font-size:0.75rem;line-height:1.4;margin:7px 0 0;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+/* ===== Song feed — top carousel + numbered rows (owner layout
+   2026-11-16) =====
+   The NEWEST song leads in the CENTRE as the big card; the
+   older songs sit beside it (right, then left as you swipe) in
+   a horizontally swipeable carousel — swipe right-to-left to
+   move through them. Under the carousel the remaining songs
+   are compact NUMBERED rows (#1 = the newest song overall) in
+   the normal vertical page scroll, each row carrying the same
+   views + Like + Dislike + Share as the big card. */
+.pub-carousel{display:flex;gap:12px;overflow-x:auto;scroll-snap-type:x mandatory;padding:6px 8% 10px;margin-top:2px;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+.pub-carousel::-webkit-scrollbar{display:none}
+.pub-slide{flex:0 0 100%;scroll-snap-align:center;min-width:0}
+.pub-slide .pub-card{margin-top:0}
+.pub-row-rank{flex:0 0 auto;min-width:28px;text-align:center;font-size:0.8125rem;font-weight:900;color:var(--accent-text);font-variant-numeric:tabular-nums}
+.pub-songrow{align-items:flex-start}
+.pub-row-acts{display:flex;gap:6px;margin-top:6px;align-items:center;flex-wrap:wrap}
+.pub-row-acts .pub-pill,.pub-row-acts .pub-act{flex:0 0 auto;min-height:28px;padding:4px 10px;font-size:0.6875rem;gap:5px;border-width:1px}
+/* ===== Floating mini-player (owner rule 2026-11-16) =====
+   While a Public song plays, if the user taps away — another
+   view, the Create page, Packages, or simply scrolls the song
+   card out of sight — a round floating logo (the song's cover)
+   appears, exactly like the chat button: it can be DRAGGED
+   anywhere on the screen and the song keeps playing untouched
+   underneath whatever the user does. Tapping the logo opens
+   the expanded player (cover, title, seek bar, time, stop /
+   previous / next); its ✕ collapses it back into the logo. */
+.mini-logo{position:fixed;right:16px;bottom:calc(100px + env(safe-area-inset-bottom,0px));z-index:56;width:56px;height:56px;border-radius:50%;border:2px solid rgba(var(--accent-rgb),.65);background:var(--card);color:var(--accent-text);padding:0;cursor:pointer;overflow:hidden;box-shadow:0 10px 26px rgba(0,0,0,.45);-webkit-tap-highlight-color:transparent;touch-action:none;align-items:center;justify-content:center}
+.mini-logo img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block}
+.mini-logo-fallback{display:flex;align-items:center;justify-content:center;width:100%;height:100%;background:var(--accent-fill);color:#0d1005}
+.mini-logo-state{position:absolute;right:0;bottom:0;width:20px;height:20px;border-radius:50%;background:rgba(0,0,0,.72);color:#fff;display:flex;align-items:center;justify-content:center;pointer-events:none}
+.mini-logo-state svg{width:11px;height:11px;display:block}
+.mini-logo.playing::after{content:'';position:absolute;inset:-2px;border-radius:50%;border:2px solid rgba(var(--accent-rgb),.55);animation:miniPulse 1.6s ease-out infinite;pointer-events:none}
+@keyframes miniPulse{0%{transform:scale(.92);opacity:.9}70%{transform:scale(1.18);opacity:0}100%{transform:scale(1.18);opacity:0}}
+@media (prefers-reduced-motion:reduce){.mini-logo.playing::after{animation:none}}
+.mini-panel{position:fixed;left:12px;right:12px;bottom:calc(92px + env(safe-area-inset-bottom,0px));z-index:58;max-width:460px;margin:0 auto;background:var(--card);border:1px solid var(--line2);border-radius:18px;padding:13px 14px;box-shadow:0 18px 44px rgba(0,0,0,.5);color:var(--text)}
+.mini-head{display:flex;align-items:center;gap:11px}
+.mini-thumb{width:48px;height:48px;border-radius:10px;object-fit:cover;flex:0 0 auto;background:#000}
+.mini-thumb-none{display:flex;align-items:center;justify-content:center;background:var(--card2);border:1px solid var(--line);color:var(--accent-text)}
+.mini-main{flex:1 1 auto;min-width:0}
+.mini-title{font-weight:800;font-size:0.9375rem;line-height:1.4;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mini-sub{font-size:0.75rem;font-weight:700;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:1px}
+.mini-x{flex:0 0 auto;width:34px;height:34px;border-radius:50%;border:1px solid var(--line2);background:transparent;color:var(--text);font-size:0.9375rem;line-height:1;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;padding:0}
+.mini-x:active{opacity:.75}
+.mini-prow{display:flex;align-items:center;gap:10px;margin-top:10px}
+.mini-controls{display:flex;align-items:center;justify-content:center;gap:14px;margin-top:8px}
+.mini-cbtn{width:42px;height:42px;border-radius:50%;border:1px solid var(--line2);background:transparent;color:var(--text);display:inline-flex;align-items:center;justify-content:center;cursor:pointer;padding:0}
+.mini-cbtn:active{opacity:.75}
+.mini-cbtn svg{width:19px;height:19px;display:block}
+.mini-play{width:54px;height:54px;border:none;background:var(--accent-fill);color:#0d1005;box-shadow:0 4px 14px rgba(var(--accent-rgb),.35)}
+.mini-play svg{width:24px;height:24px}
 /* Log in sheet: the single Google connect option. The button follows
    the app accent/theme colour (the App Color the user picks in
    Settings) — like the other primary buttons, NOT a fixed white.
@@ -1619,6 +1676,34 @@ html[data-smooth="1"] .brand-frame,html[data-smooth="1"] .acct-chip,html[data-sm
   <button type="button" class="dock-item" id="dockPackages" onclick="dockGo('packages')" aria-label="Packages · កញ្ចប់សេវាកម្ម"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="8" width="18" height="4" rx="1"/><path d="M12 8v13"/><path d="M19 12v7a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-7"/><path d="M7.5 8a2.5 2.5 0 0 1 0-5C11 3 12 8 12 8s1-5 4.5-5a2.5 2.5 0 0 1 0 5"/></svg></button>
   <button type="button" class="dock-item" id="dockNotif" onclick="dockGo('notif')" aria-label="Notifications · ដំណឹង"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg><span class="dock-badge" id="dockNotifBadge" style="display:none">0</span></button>
 </nav>
+<!-- Floating mini-player (owner rule 2026-11-16): while a Public
+     song plays and its card is out of sight (another view, or
+     scrolled away), this round logo floats like the chat button
+     and can be dragged anywhere; tapping it opens the expanded
+     player below; the ✕ collapses the player back to the logo.
+     The song itself never stops while the user works elsewhere. -->
+<button type="button" class="mini-logo" id="miniLogo" style="display:none" aria-label="បទកំពុងចាក់ · Now playing"></button>
+<div class="mini-panel" id="miniPanel" style="display:none" role="dialog" aria-label="កម្មវិធីចាក់បទ · Song player">
+  <div class="mini-head">
+    <span id="miniThumbWrap" style="display:contents"></span>
+    <div class="mini-main">
+      <div class="mini-title" id="miniTitle"></div>
+      <div class="mini-sub" id="miniSub"></div>
+    </div>
+    <button type="button" class="mini-x" id="miniClose" aria-label="បិទ · Close">✕</button>
+  </div>
+  <div class="mini-prow">
+    <div class="pub-prog" id="miniProg" role="slider" aria-label="Seek" style="flex:1 1 auto">
+      <div class="pub-prog-fill" id="miniFill"><span class="pub-prog-knob"></span></div>
+    </div>
+    <span class="pub-time"><span id="miniCur">0:00</span> / <span id="miniTot">0:00</span></span>
+  </div>
+  <div class="mini-controls">
+    <button type="button" class="mini-cbtn" id="miniPrev" aria-label="បទមុន · Previous"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M6.5 5h2.4v14H6.5z"/><path d="M18.8 5.3v13.4c0 .72-.8 1.17-1.42.79L9.6 12.8a1.04 1.04 0 0 1 0-1.6l7.78-6.69c.62-.38 1.42.07 1.42.79z"/></svg></button>
+    <button type="button" class="mini-cbtn mini-play" id="miniPlayBtn" aria-label="Play / Pause"></button>
+    <button type="button" class="mini-cbtn" id="miniNext" aria-label="បទបន្ទាប់ · Next"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M15.1 5h2.4v14h-2.4z"/><path d="M5.2 5.3v13.4c0 .72.8 1.17 1.42.79l7.78-6.69a1.04 1.04 0 0 0 0-1.6L6.62 4.51A1.02 1.02 0 0 0 5.2 5.3z"/></svg></button>
+  </div>
+</div>
 <button type="button" class="chat-fab" id="chatFab" onclick="aiChatToggle()" aria-label="AI Chat · ឆាតជាមួយ AI" aria-expanded="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 7V3"/><circle cx="12" cy="2.4" r="0.6" fill="currentColor"/><rect x="4.5" y="7" width="15" height="11.5" rx="3.5"/><path d="M2.5 12.5v2"/><path d="M21.5 12.5v2"/><circle class="chat-fab-eye" cx="9.3" cy="12.3" r="0.4" fill="currentColor"/><circle class="chat-fab-eye" cx="14.7" cy="12.3" r="0.4" fill="currentColor"/><path d="M9.8 15.6c.7.6 1.4.9 2.2.9s1.5-.3 2.2-.9"/></svg></button>
 <div id="chatBackdrop" class="chat-backdrop" onclick="aiChatClose()" aria-hidden="true"></div>
 <div id="chatPanel" class="chat-panel" role="dialog" aria-modal="true" aria-label="AI Chat">
@@ -6021,10 +6106,14 @@ function closeFab(){
    - Feed: GET https://movai-proxy.onrender.com/api/public/feed
      (viewer email / userId are attached when signed in, so the
      server can mark which posts this viewer already liked).
-   - RANKING IS BY VIEWS (owner rule): whoever has the most views
-     is #1. The client sorts by views first — the Like (heart) is
-     an ordinary secondary button and never decides the ranking.
-     The view count is the big prominent stat on every card.
+   - RANKING IS BY VIEWS (owner rule): the client sorts by views
+     first — the Like (heart) is an ordinary secondary button and
+     never decides the ranking, and the views order decides each
+     post's tier and server rank. The view count is the big
+     prominent stat on every card. The SONG feed's DISPLAY order
+     is the exception (owner rule 2026-11-16): songs show NEWEST
+     FIRST, the newest song is #1 in the top carousel, and every
+     listen counts a view (see pubCountView).
    - Tiers come from the server (tier 1 = Top 50, 2 = middle,
      3 = lower); when a post carries no tier, its tier is derived
      from its view-ranking position (top 50 → Tier 1).
@@ -6192,7 +6281,7 @@ function pubSetFilter(f){
     armed=false;
     if(!e.touches||e.touches.length!==1)return;
     var t=e.target;
-    if(t&&t.closest&&t.closest('button,a,audio,video,input,textarea,select,.pub-prog,.pub-rail'))return;
+    if(t&&t.closest&&t.closest('button,a,audio,video,input,textarea,select,.pub-prog,.pub-rail,.pub-carousel'))return;
     sx=e.touches[0].clientX;sy=e.touches[0].clientY;armed=true;
   },{passive:true});
   sec.addEventListener('touchend',function(e){
@@ -6619,13 +6708,15 @@ function pubAdvanceFrom(au){
     var pr=target.play();if(pr&&pr.catch)pr.catch(function(){});
   }catch(e){}
 }
-/* Shared wiring for the small song players (newest rows + rail
-   minis): play counts the view, pauses every other feed song,
-   and the mode machinery above takes over when a song ends. */
+/* Shared wiring for the small song players (the numbered rows):
+   play counts the view, pauses every other feed song, hands the
+   song to the floating mini-player, and the mode machinery
+   above takes over when a song ends. */
 function pubWireFeedAudio(au,it,sync){
   au.loop=(pubPlayMode==='one');
   au.addEventListener('play',function(){
     pubCountView(it.id);
+    try{pubMiniSet(au,it);}catch(e){}
     try{
       var all=document.querySelectorAll('#pubFeed audio');
       for(var i=0;i<all.length;i++){if(all[i]!==au&&!all[i].paused)all[i].pause();}
@@ -6635,18 +6726,17 @@ function pubWireFeedAudio(au,it,sync){
   au.addEventListener('pause',function(){if(sync)sync();});
   au.addEventListener('ended',function(){
     if(sync)sync();
-    /* A full re-listen counts as a new view — views only go up. */
-    delete pubViewed[it.id];
     if(pubPlayMode==='loop'||pubPlayMode==='shuffle')pubAdvanceFrom(au);
   });
 }
 /* ===== Real-audio visualizer (owner rule) =====
    The big card's cover bars are driven by a Web Audio
    AnalyserNode reading the ACTUAL frequency data of the song
-   that is playing — left bar group = low/mid bins, right group
-   = mid/high bins. No random heights, no CSS bounce: if the
-   analyser has no data (a file host without CORS approval),
-   the bars stay low and steady instead of faking a dance. */
+   that is playing — the bars span the full width of the cover,
+   low bins on the left rising to high bins on the right. No
+   random heights, no CSS bounce: if the analyser has no data
+   (a file host without CORS approval), the bars stay low and
+   steady instead of faking a dance. */
 var pubAC=null;
 var pubViz={au:null,viz:null,raf:0};
 function pubVizStart(au,viz){
@@ -6690,7 +6780,10 @@ function pubVizFrame(){
     var h;
     if(reduced)h=42;
     else if(vals&&sum>0){
-      var bin=(i<6)?(2+i*2):(10+(i-6)*3);
+      /* Bars spread across the whole cover width, so their bins
+         spread across the whole spectrum: bar 0 reads the lowest
+         bin, the last bar the highest. */
+      var bin=1+Math.floor(i*(vals.length-2)/Math.max(1,bars.length));
       if(bin>=vals.length)bin=vals.length-1;
       h=7+(vals[bin]/255)*89;
     }else h=12;
@@ -6703,13 +6796,228 @@ function pubVizReset(){
   var bars=viz.querySelectorAll('i');
   for(var i=0;i<bars.length;i++)bars[i].style.height='';
 }
-/* Compact row for a NEW song (owner layout): title on one line,
-   a Play button that really plays the song, the view count and
-   a small Like — nothing else. */
+/* ===== Floating mini-player (owner rule 2026-11-16) =====
+   While a Public song is playing, the moment its card leaves
+   the user's sight — they open Create / History / Packages, or
+   just scroll past the card — the round floating logo appears
+   (the song's cover), exactly like the chat button: it can be
+   dragged anywhere and the song keeps playing underneath
+   whatever the user is doing. Tapping the logo opens the
+   expanded player: cover, title, seek bar, current / total
+   time, stop (pause) and previous / next. The ✕ collapses the
+   player back into the floating logo. Playback itself is never
+   touched by any of this — the feed's own <audio> element keeps
+   playing; the mini-player only mirrors and controls it. */
+var pubMini={au:null,it:null,open:false,timer:null,logoId:null,panelId:null,suppressClick:0};
+function pubMiniSet(au,it){
+  if(!au||!it)return;
+  pubMini.au=au;pubMini.it=it;
+  if(!pubMini.timer)pubMini.timer=setInterval(pubMiniTick,350);
+  pubMiniSync();
+}
+function pubMiniOrderedSongs(){
+  var songs=pubItems.filter(function(x){return x.type==='song';});
+  songs.sort(function(a,b){
+    var d=pubTsVal(b)-pubTsVal(a);
+    if(d)return d;
+    return a._pos-b._pos;
+  });
+  return songs;
+}
+function pubMiniAway(){
+  /* The card is "away" when another view covers the feed, the
+     Packages overlay is open, the song's element is gone, or
+     its box sits outside the visible band of the screen. */
+  if(typeof APP_VIEW!=='undefined'&&APP_VIEW!=='public')return true;
+  var pk=document.getElementById('page-packages');
+  if(pk&&pk.classList.contains('open'))return true;
+  var it=pubMini.it;if(!it)return true;
+  var host=null;
+  try{host=document.querySelector('#pubFeed [data-pub-id="'+CSS.escape(it.id)+'"]');}catch(e){}
+  if(!host)return true;
+  var r=host.getBoundingClientRect();
+  var vh=window.innerHeight||document.documentElement.clientHeight||0;
+  return r.bottom<70||r.top>vh-60;
+}
+function pubMiniLogoFill(){
+  var logo=document.getElementById('miniLogo');
+  var it=pubMini.it;if(!logo||!it)return;
+  var noteSvg='<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>';
+  var h='';
+  if(it.image&&/^https:/i.test(it.image))h+='<img src="'+escHtml(it.image)+'" alt="">';
+  else h+='<span class="mini-logo-fallback">'+noteSvg+'</span>';
+  h+='<span class="mini-logo-state"></span>';
+  logo.innerHTML=h;
+  var limg=logo.querySelector('img');
+  if(limg)limg.addEventListener('error',function(){
+    var sp=document.createElement('span');
+    sp.className='mini-logo-fallback';sp.innerHTML=noteSvg;
+    limg.replaceWith(sp);
+  });
+  pubMini.logoId=it.id;
+}
+function pubMiniPanelFill(){
+  var it=pubMini.it;if(!it)return;
+  var t=document.getElementById('miniTitle');if(t)t.textContent=it.title||'';
+  var s=document.getElementById('miniSub');if(s)s.textContent=pubDisplayName(it)||'';
+  var tw=document.getElementById('miniThumbWrap');
+  if(tw){
+    tw.innerHTML='';
+    var noteSvg='<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>';
+    if(it.image&&/^https:/i.test(it.image)){
+      var im=document.createElement('img');
+      im.className='mini-thumb';im.src=it.image;im.alt='';
+      im.addEventListener('error',function(){
+        var sp=document.createElement('span');
+        sp.className='mini-thumb mini-thumb-none';sp.innerHTML=noteSvg;
+        im.replaceWith(sp);
+      });
+      tw.appendChild(im);
+    }else{
+      var sp2=document.createElement('span');
+      sp2.className='mini-thumb mini-thumb-none';sp2.innerHTML=noteSvg;
+      tw.appendChild(sp2);
+    }
+  }
+  pubMini.panelId=it.id;
+}
+function pubMiniSync(){
+  var logo=document.getElementById('miniLogo');
+  var panel=document.getElementById('miniPanel');
+  var au=pubMini.au,it=pubMini.it;
+  if(!logo||!panel)return;
+  if(!au||!it){
+    logo.style.display='none';panel.style.display='none';
+    return;
+  }
+  var playing=!au.paused&&!au.ended;
+  /* Expanded player open → the panel shows, the logo hides. */
+  panel.style.display=pubMini.open?'block':'none';
+  var showLogo=!pubMini.open&&pubMiniAway();
+  logo.style.display=showLogo?'flex':'none';
+  if(showLogo){
+    if(pubMini.logoId!==it.id)pubMiniLogoFill();
+    logo.classList.toggle('playing',playing);
+    var st=logo.querySelector('.mini-logo-state');
+    if(st){
+      var want=playing?'pause':'play';
+      if(st.getAttribute('data-s')!==want){
+        st.setAttribute('data-s',want);
+        st.innerHTML=playing
+          ?'<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/></svg>'
+          :'<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>';
+      }
+    }
+  }
+  if(pubMini.open){
+    if(pubMini.panelId!==it.id)pubMiniPanelFill();
+    var pb=document.getElementById('miniPlayBtn');
+    if(pb){
+      var pw=playing?'pause':'play';
+      if(pb.getAttribute('data-s')!==pw){pb.setAttribute('data-s',pw);pb.innerHTML=playing?pubPauseSvg():pubPlaySvg();}
+    }
+    var d=au.duration,has=isFinite(d)&&d>0;
+    var cur=document.getElementById('miniCur'),tot=document.getElementById('miniTot'),fill=document.getElementById('miniFill');
+    var ct=histFmtTime(au.currentTime||0),tt=has?histFmtTime(d):((it.duration&&it.duration>0)?histFmtTime(it.duration):'0:00');
+    if(cur&&cur.textContent!==ct)cur.textContent=ct;
+    if(tot&&tot.textContent!==tt)tot.textContent=tt;
+    if(fill)fill.style.width=(has?(au.currentTime/d*100):0)+'%';
+  }
+}
+function pubMiniTick(){
+  var au=pubMini.au;
+  if(!au||!au.isConnected){
+    /* The feed re-rendered and this audio element is gone —
+       the mini-player lets go of it. */
+    pubMini.au=null;pubMini.it=null;pubMini.open=false;
+    if(pubMini.timer){clearInterval(pubMini.timer);pubMini.timer=null;}
+  }
+  pubMiniSync();
+}
+function pubMiniTogglePlay(){
+  var au=pubMini.au;if(!au)return;
+  if(au.paused){var pr=au.play();if(pr&&pr.catch)pr.catch(function(){});}
+  else au.pause();
+  pubMiniSync();
+}
+function pubMiniStep(dir){
+  var it=pubMini.it;if(!it)return;
+  var list=pubMiniOrderedSongs();
+  if(list.length<2)return;
+  var idx=-1;
+  for(var i=0;i<list.length;i++)if(list[i].id===it.id)idx=i;
+  if(idx<0)return;
+  var target=list[(idx+dir+list.length)%list.length];
+  if(!target||target.id===it.id)return;
+  var host=null;
+  try{host=document.querySelector('#pubFeed [data-pub-id="'+CSS.escape(target.id)+'"]');}catch(e){}
+  var au2=host?host.querySelector('audio'):null;
+  if(!au2)return;
+  try{au2.currentTime=0;}catch(e){}
+  var pr=au2.play();if(pr&&pr.catch)pr.catch(function(){});
+}
+function pubMiniOpenPanel(){pubMini.open=true;pubMiniSync();}
+function pubMiniClosePanel(){pubMini.open=false;pubMiniSync();}
+(function(){
+  var logo=document.getElementById('miniLogo');if(!logo)return;
+  var sx=0,sy=0,ox=0,oy=0,dragging=false,moved=false;
+  logo.addEventListener('pointerdown',function(e){
+    dragging=true;moved=false;
+    var r=logo.getBoundingClientRect();
+    sx=e.clientX;sy=e.clientY;ox=r.left;oy=r.top;
+    try{logo.setPointerCapture(e.pointerId);}catch(err){}
+  });
+  logo.addEventListener('pointermove',function(e){
+    if(!dragging)return;
+    var dx=e.clientX-sx,dy=e.clientY-sy;
+    if(!moved&&Math.abs(dx)+Math.abs(dy)<7)return;
+    moved=true;
+    var w=logo.offsetWidth||56,h=logo.offsetHeight||56;
+    var nx=Math.max(4,Math.min((window.innerWidth||320)-w-4,ox+dx));
+    var ny=Math.max(4,Math.min((window.innerHeight||480)-h-4,oy+dy));
+    logo.style.left=nx+'px';logo.style.top=ny+'px';
+    logo.style.right='auto';logo.style.bottom='auto';
+  });
+  function endDrag(){
+    if(!dragging)return;dragging=false;
+    if(moved)pubMini.suppressClick=Date.now();
+  }
+  logo.addEventListener('pointerup',endDrag);
+  logo.addEventListener('pointercancel',endDrag);
+  logo.addEventListener('click',function(){
+    if(pubMini.suppressClick&&Date.now()-pubMini.suppressClick<400)return;
+    pubMiniOpenPanel();
+  });
+  var xc=document.getElementById('miniClose');if(xc)xc.addEventListener('click',pubMiniClosePanel);
+  var pb=document.getElementById('miniPlayBtn');if(pb)pb.addEventListener('click',pubMiniTogglePlay);
+  var pv=document.getElementById('miniPrev');if(pv)pv.addEventListener('click',function(){pubMiniStep(-1);});
+  var nx2=document.getElementById('miniNext');if(nx2)nx2.addEventListener('click',function(){pubMiniStep(1);});
+  var prog=document.getElementById('miniProg');
+  if(prog)prog.addEventListener('click',function(ev){
+    var au=pubMini.au;if(!au)return;
+    var d=au.duration;if(!isFinite(d)||d<=0)return;
+    var r=prog.getBoundingClientRect();if(!r.width)return;
+    var ratio=Math.max(0,Math.min(1,(ev.clientX-r.left)/r.width));
+    try{au.currentTime=ratio*d;}catch(e){}
+    pubMiniSync();
+  });
+  window.addEventListener('scroll',function(){pubMiniSync();},{passive:true});
+  window.addEventListener('resize',function(){pubMiniSync();});
+})();
+/* Compact row for a song under the carousel (owner layout
+   2026-11-16): the song's NUMBER in the newest-first order
+   (#1 = the newest song), a Play button that really plays the
+   song, the title on one line, the view count, and the same
+   Like / Dislike / Share as the big card — all in the normal
+   vertical page scroll. */
 function pubSongRowEl(it){
   var row=document.createElement('div');
   row.className='pub-songrow';
   row.setAttribute('data-pub-id',it.id);
+  var rk=document.createElement('span');
+  rk.className='pub-row-rank';
+  rk.textContent='#'+(it._dispRank||it._pos||'');
+  row.appendChild(rk);
   var pb=document.createElement('button');
   pb.type='button';pb.className='pub-row-play';
   pb.setAttribute('aria-label','Play');
@@ -6723,12 +7031,29 @@ function pubSongRowEl(it){
   meta.className='pub-row-meta';
   meta.innerHTML=pubEyeSvg()+'<span data-pub-views="'+escHtml(it.id)+'">'+acctFmtBal(it.views)+'</span>';
   main.appendChild(meta);
+  var acts=document.createElement('div');
+  acts.className='pub-row-acts';
   var lk=document.createElement('button');
-  lk.type='button';lk.className='pub-like pub-row-like'+(pubLiked[it.id]?' liked':'');
+  lk.type='button';lk.className='pub-pill'+(pubLiked[it.id]?' liked':'');
   lk.setAttribute('data-pub-like',it.id);
-  lk.innerHTML=histHeartSvg(!!pubLiked[it.id])+'<span>'+acctFmtBal(it.likes)+'</span>';
+  lk.innerHTML=histHeartSvg(!!pubLiked[it.id])+'<span>'+escHtml(tx('histLike'))+'</span><span>'+acctFmtBal(it.likes)+'</span>';
   lk.setAttribute('aria-label',tx('histLike'));
   lk.addEventListener('click',function(){pubToggleLike(it.id);});
+  acts.appendChild(lk);
+  var dk=document.createElement('button');
+  dk.type='button';dk.className='pub-act'+(pubDisliked[it.id]?' disliked':'');
+  dk.setAttribute('data-pub-dislike',it.id);
+  dk.innerHTML='<span style="display:inline-flex;transform:rotate(180deg)">'+pubThumbSvg()+'</span><span>'+acctFmtBal(it.dislikes)+'</span>';
+  dk.setAttribute('aria-label',tx('pubDislike'));
+  dk.addEventListener('click',function(){pubToggleDislike(it.id);});
+  acts.appendChild(dk);
+  var sh=document.createElement('button');
+  sh.type='button';sh.className='pub-pill';
+  sh.innerHTML=pubShareSvg()+'<span>'+escHtml(tx('pubShare'))+'</span>';
+  sh.setAttribute('aria-label',tx('pubShare'));
+  sh.addEventListener('click',function(){pubSharePost(it,sh);});
+  acts.appendChild(sh);
+  main.appendChild(acts);
   var au=document.createElement('audio');
   au.src=it.url;au.preload='metadata';au.style.display='none';
   var sync=function(){
@@ -6742,7 +7067,6 @@ function pubSongRowEl(it){
   });
   row.appendChild(pb);
   row.appendChild(main);
-  row.appendChild(lk);
   row.appendChild(au);
   return row;
 }
@@ -6791,24 +7115,38 @@ function pubSongMiniEl(it){
   m.appendChild(au);
   return m;
 }
-/* Song feed layout (owner rule): the most-viewed song (#1)
-   leads as the big featured card and stays in front; directly
-   under it the NEWEST songs (newest first, up to 4) show as
-   compact rows; every older song sits in a horizontally
-   swipeable rail at the bottom. New posts never surface from
-   the bottom of the feed. */
+/* Song feed layout (owner rule 2026-11-16): the songs display
+   NEWEST FIRST. The newest song is #1 and leads in the CENTRE
+   of a horizontally swipeable carousel of big cards at the top
+   — the next-newest songs sit beside it (older ones to the
+   right; swipe right-to-left to bring each one to the centre).
+   Under the carousel, the remaining songs show as compact
+   NUMBERED rows in the normal vertical scroll: first the next
+   newest under «New», then the older ones under «More songs» —
+   every row numbered in the same newest-first order and
+   carrying views + Like + Dislike + Share like the big card.
+   (The views ranking still decides each post's tier and its
+   server rank; the song feed's display order and its # numbers
+   are the newest-first order the owner asked for.) */
 function pubRenderSongs(box,songs){
-  var featured=songs[0];
-  for(var i=1;i<songs.length;i++){
-    if(songs[i].views>featured.views||(songs[i].views===featured.views&&songs[i]._pos<featured._pos))featured=songs[i];
-  }
-  box.appendChild(pubCardEl(featured));
-  var rest=songs.filter(function(x){return x!==featured;});
-  rest.sort(function(a,b){
+  var ordered=songs.slice().sort(function(a,b){
     var d=pubTsVal(b)-pubTsVal(a);
     if(d)return d;
     return a._pos-b._pos;
   });
+  ordered.forEach(function(it,i){it._dispRank=i+1;});
+  var slides=ordered.slice(0,5);
+  var car=document.createElement('div');
+  car.className='pub-carousel';
+  car.setAttribute('aria-label','Songs');
+  slides.forEach(function(it){
+    var s=document.createElement('div');
+    s.className='pub-slide';
+    s.appendChild(pubCardEl(it));
+    car.appendChild(s);
+  });
+  box.appendChild(car);
+  var rest=ordered.slice(5);
   var fresh=rest.slice(0,4),older=rest.slice(4);
   if(fresh.length){
     var h1=document.createElement('div');
@@ -6820,10 +7158,7 @@ function pubRenderSongs(box,songs){
     var h2=document.createElement('div');
     h2.className='pub-sec-head';h2.textContent=tx('pubSecMore');
     box.appendChild(h2);
-    var rail=document.createElement('div');
-    rail.className='pub-rail';
-    older.forEach(function(it){rail.appendChild(pubSongMiniEl(it));});
-    box.appendChild(rail);
+    older.forEach(function(it){box.appendChild(pubSongRowEl(it));});
   }
 }
 function pubCardEl(it){
@@ -6834,7 +7169,10 @@ function pubCardEl(it){
   head.style.cssText='display:flex;align-items:center;gap:9px;flex-wrap:wrap';
   var rk=document.createElement('span');
   rk.className='pub-rank';
-  rk.textContent='#'+(it.rank!==null?it.rank:it._pos);
+  /* Song cards show their number in the feed's newest-first
+     display order (owner rule 2026-11-16: the newest song is
+     #1); other post types keep the views-ranking number. */
+  rk.textContent='#'+((it.type==='song'&&it._dispRank)?it._dispRank:(it.rank!==null?it.rank:it._pos));
   head.appendChild(rk);
   var dispName=pubDisplayName(it);
   if(dispName){
@@ -6942,7 +7280,12 @@ function pubCardEl(it){
     }
     var viz=document.createElement('div');
     viz.className='pub-viz';viz.setAttribute('aria-hidden','true');
-    viz.innerHTML='<span class="pub-viz-side"><i></i><i></i><i></i><i></i><i></i><i></i></span><span class="pub-viz-side"><i></i><i></i><i></i><i></i><i></i><i></i></span>';
+    /* One wide group of bars across the FULL bottom width of
+       the cover (owner rule 2026-11-16): lows on the left,
+       highs on the right, everything in between spread evenly —
+       the bars dance on both sides, never in one corner only. */
+    var vizBars='';for(var vbi=0;vbi<24;vbi++)vizBars+='<i></i>';
+    viz.innerHTML='<span class="pub-viz-side pub-viz-wide">'+vizBars+'</span>';
     coverWrap.appendChild(viz);
     /* Top links row (owner layout, annotated mock): this row sits
        at the very TOP of the song card, directly under the author /
@@ -7043,7 +7386,10 @@ function pubCardEl(it){
        working and the visualizer simply stays idle instead of
        faking data from a tainted stream. */
     try{au.crossOrigin='anonymous';}catch(e){}
-    au.src=it.url;au.preload='metadata';au.style.display='none';
+    /* The #1 (newest) song preloads its audio so pressing Play
+       starts it as fast as the connection allows; the other
+       cards keep the light metadata preload. */
+    au.src=it.url;au.preload=(it._dispRank===1)?'auto':'metadata';au.style.display='none';
     au.loop=(pubPlayMode==='one');
     au.addEventListener('error',function(){
       if(au._corsRetry||!au.crossOrigin)return;
@@ -7111,6 +7457,7 @@ function pubCardEl(it){
     };
     au.addEventListener('play',function(){
       pubCountView(it.id);
+      try{pubMiniSet(au,it);}catch(e){}
       try{
         var all=document.querySelectorAll('#pubFeed audio');
         for(var ai=0;ai<all.length;ai++){if(all[ai]!==au&&!all[ai].paused)all[ai].pause();}
@@ -7124,8 +7471,6 @@ function pubCardEl(it){
     au.addEventListener('durationchange',pubUiSync);
     au.addEventListener('ended',function(){
       pubUiSync();
-      /* A full re-listen counts as a new view — views only go up. */
-      delete pubViewed[it.id];
       if(pubPlayMode==='loop'||pubPlayMode==='shuffle')pubAdvanceFrom(au);
     });
     pbtn.addEventListener('click',function(){
@@ -7409,8 +7754,17 @@ function pubDownloadPost(it,btn){
   }
   pubDownloadFile(it);
 }
+/* Views count EVERY listen (owner rule 2026-11-16): press Play
+   once = +1 view, press it again = another +1 — for EVERY song.
+   The count is posted to the server on each listen, so it is
+   stored permanently, never resets, and rises in the Admin app
+   exactly as it rises here. The only guard is a one-second
+   debounce per song, so a single tap can never double-fire. */
+var pubViewLast={};
 function pubCountView(id){
-  if(pubViewed[id])return;
+  var now=0;try{now=Date.now();}catch(e){}
+  if(now&&pubViewLast[id]&&now-pubViewLast[id]<1000)return;
+  pubViewLast[id]=now;
   pubViewed[id]=true;
   var it=null;for(var i=0;i<pubItems.length;i++)if(pubItems[i].id===id)it=pubItems[i];
   if(it){
