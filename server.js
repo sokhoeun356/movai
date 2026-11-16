@@ -3850,11 +3850,15 @@ function apiRoute(req, res, urlPath) {
     const enc = new Mp3Encoder(pcm.channels, pcm.sampleRate, kbps || 128);
     const chunks = [];
     const BLOCK = 1152;
+    let n = 0;
     for (let i = 0; i < pcm.left.length; i += BLOCK) {
       const l = pcm.left.subarray(i, i + BLOCK);
       const r = pcm.right.subarray(i, i + BLOCK);
       const out = enc.encodeBuffer(l, r);
       if (out && out.length) chunks.push(Buffer.from(out));
+      // Yield to the event loop every 200 blocks so other requests
+      // (Admin, stats, ...) are not starved while a long song encodes.
+      if ((++n % 200) === 0) await new Promise((r2) => setImmediate(r2));
     }
     const tail = enc.flush();
     if (tail && tail.length) chunks.push(Buffer.from(tail));
