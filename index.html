@@ -96,6 +96,11 @@ main{max-width:720px;margin:0 auto;padding:calc(4.75rem + env(safe-area-inset-to
 .notif-main .nb{display:block;font-size:0.8125rem;color:var(--muted);line-height:1.55;margin-top:2px;overflow-wrap:break-word}
 .notif-main .notif-amt{font-weight:700;color:var(--text2)}
 .notif-main .ntime{display:block;font-size:0.6875rem;color:var(--muted);margin-top:4px}
+/* Full date + time line under EVERY notification (owner order
+   2026-11-16): day/month/year hour:minute:second, Phnom Penh time,
+   e.g. 16/11/2026 17:06:04 — see notifFullTimeStr. */
+.nfull{display:block;font-size:0.75rem;color:var(--muted);margin-top:6px;font-variant-numeric:tabular-nums;letter-spacing:.01em}
+.drawer .nfull{color:var(--glass-muted)}
 .notif-dot{width:8px;height:8px;border-radius:50%;background:var(--accent);flex:0 0 auto;margin-top:7px}
 /* ===== New device / New user cards — neat single-line rows =====
    «ឧបករណ៍ថ្មី · New device» and «អ្នកប្រើថ្មី · New user» notices
@@ -131,6 +136,18 @@ main{max-width:720px;margin:0 auto;padding:calc(4.75rem + env(safe-area-inset-to
 .drawer .nd-val{color:var(--glass-text2)}
 .drawer .nd-val.nd-name{color:var(--glass-text)}
 .drawer .nd-copy{border-color:var(--glass-line2)}
+/* ===== Purchase result cards (approved / rejected) =====
+   Big and clean, no wall of text: the small status header (icon +
+   approved / rejected + time, reusing the .nd-head row) over three
+   BIG lines — package name, price, Credit. The values come from
+   the notice's own pkgName / priceText / creditText fields, or are
+   parsed from its 4-line text on older notices (name / price /
+   Credit / buyer — the buyer line is never shown). */
+.notif-pkg{flex-direction:column;align-items:stretch;gap:0;overflow:hidden;max-width:100%}
+.np-name{font-size:1.375rem;font-weight:900;line-height:1.25;margin-top:8px;overflow-wrap:break-word}
+.np-price{font-size:1.75rem;font-weight:900;line-height:1.15;margin-top:3px;overflow-wrap:break-word}
+.np-credit{font-size:1.125rem;font-weight:800;line-height:1.3;margin-top:3px;color:var(--text2);overflow-wrap:break-word}
+.drawer .np-credit{color:var(--glass-text2)}
 /* ===== Web Push · ដំណឹងចេញពីទូរស័ព្ទ =====
    Pill switch in the ☰ drawer settings box. Its state always
    reflects this device's REAL push subscription: knob right +
@@ -1780,7 +1797,7 @@ html[data-smooth="1"] .brand-frame,html[data-smooth="1"] .acct-chip,html[data-sm
       <h3 data-i18n="payUsdtQrTitle">₮ USDT QR · Binance</h3>
       <button type="button" class="drawer-close" style="background:var(--card2);color:var(--text);border-color:var(--line2)" onclick="payUsdtQrClose()" aria-label="Close">✕</button>
     </div>
-    <img class="khqr-img" src="https://movai-proxy.onrender.com/uploads/mwj39vvp-279496.jpg" alt="USDT QR — Deposit USDT to Binance (TRC20)">
+    <img class="khqr-img" src="https://movai-proxy.onrender.com/uploads/mwj3uxt6-822800.jpg" alt="USDT QR — Deposit USDT to Binance (TRC20)">
     <p class="khqr-note" data-i18n="payUsdtQrNote">ស្កេន QR នេះដើម្បីបង់ USDT តាម wallet ណាក៏បាន (Binance, Trust Wallet…) — TRC20 តែប៉ុណ្ណោះ · Min &gt;0.01 USDT</p>
     <p class="khqr-note" style="margin-top:6px"><code style="font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:0.75rem;overflow-wrap:anywhere">TPHu2Z45PZ9xUB7AzqMehWKv72HysE9Vzd</code></p>
     <button type="button" class="btn btn-green btn-block" style="margin-top:14px" onclick="payUsdtQrClose()" data-i18n="payKhqrClose">បិទ · Close</button>
@@ -11161,6 +11178,12 @@ function notifNorm(raw,idx){
     ts:notifTs(tsRaw),
     read:!!(raw.read||raw.seen||raw.isRead)||!!notifReadIds[String(id)],
     media:media,song:song,pkg:String(pkg||''),
+    /* Structured package fields for the big purchase-result cards:
+       the server sends pkgName / priceText / creditText on
+       purchase-approved / purchase-rejected notices. */
+    pkgName:pick(raw.pkgName,raw.pkg_name),
+    priceText:pick(raw.priceText,raw.price_text),
+    creditText:pick(raw.creditText,raw.credit_text),
     dName:dName,dEmail:dEmail,dId:dId,dIp:dIp,dModel:dModel
   };
 }
@@ -11204,6 +11227,23 @@ function notifTimeStr(ts){
   if(diff<86400000)return tx('notifHourAgo').replace('{n}',String(Math.floor(diff/3600000)));
   if(diff<7*86400000)return tx('notifDayAgo').replace('{n}',String(Math.floor(diff/86400000)));
   try{return new Date(ts).toLocaleDateString();}catch(e){return '';}
+}
+/* Full date + time for EVERY notification (owner order 2026-11-16):
+   day/month/year hour:minute:second — 16/11/2026 17:06:04 — in
+   Phnom Penh time, from the notice's own server timestamp (n.ts,
+   normalized from at / createdAt in notifNorm). Shown as its own
+   line under each notification card, alongside the relative time. */
+function notifFullTimeStr(ts){
+  if(!ts)return '';
+  var d=new Date(ts);if(isNaN(d.getTime()))return '';
+  try{
+    var parts=new Intl.DateTimeFormat('en-GB',{timeZone:'Asia/Phnom_Penh',day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit',second:'2-digit',hourCycle:'h23'}).formatToParts(d),o={};
+    for(var i=0;i<parts.length;i++)o[parts[i].type]=parts[i].value;
+    if(o.day&&o.month&&o.year&&o.hour!=null)return o.day+'/'+o.month+'/'+o.year+' '+o.hour+':'+o.minute+':'+o.second;
+  }catch(e){}
+  /* Fallback: Phnom Penh is UTC+7 year-round (no DST). */
+  var u=new Date(ts+7*3600000),p=function(x){return (x<10?'0':'')+x;};
+  return p(u.getUTCDate())+'/'+p(u.getUTCMonth()+1)+'/'+u.getUTCFullYear()+' '+p(u.getUTCHours())+':'+p(u.getUTCMinutes())+':'+p(u.getUTCSeconds());
 }
 /* ===== New device / New user cards: exactly 5 rows =====
    A notice is one of these cards when it is a sign-in notice
@@ -11304,7 +11344,10 @@ function notifDevItemHtml(n,i,noIp){
     if(!noIp)h+=notifDevRow(f.ip,'','ip',i);
     h+=notifDevRow(f.model,'','',i);
   }
-  h+='</div></div>';
+  h+='</div>';
+  var ftD=notifFullTimeStr(n.ts);
+  if(ftD)h+='<div class="nfull">'+escHtml(ftD)+'</div>';
+  h+='</div>';
   return h;
 }
 function notifCopyField(ev,btn,i,field){
@@ -11317,11 +11360,62 @@ function notifCopyField(ev,btn,i,field){
   if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(v).then(done).catch(function(){profileCopyIdFallback(v);done();});}
   else{profileCopyIdFallback(v);done();}
 }
+/* ===== Purchase result cards: package name / price / Credit =====
+   Values come from the notice's structured fields first
+   (pkgName / priceText / creditText, normalized in notifNorm).
+   Older notices carry no fields: their text is 4 lines — package
+   name / price / Credit / buyer — so the first three lines are
+   read positionally; with fewer lines, the price ($…) and Credit
+   amounts are hunted by shape. The buyer line is never shown. */
+function notifPkgInfo(n){
+  var info={name:'',price:'',credit:''};
+  if(n.pkgName)info.name=String(n.pkgName).trim();
+  if(n.priceText)info.price=String(n.priceText).trim();
+  if(n.creditText)info.credit=String(n.creditText).trim();
+  if(info.name&&info.price&&info.credit)return info;
+  var lines=String(n.body||'').split(/\n+/),clean=[],i,s;
+  for(i=0;i<lines.length;i++){s=lines[i].trim();if(s)clean.push(s);}
+  if(clean.length>=3){
+    if(!info.name)info.name=clean[0];
+    if(!info.price)info.price=clean[1];
+    if(!info.credit)info.credit=clean[2];
+    return info;
+  }
+  var all=((n.title||'')+' '+String(n.body||'')).replace(/\s+/g,' ');
+  if(!info.price){var pm=all.match(/\$[\d][\d.,]*\s*(?:\/\s*(?:month|mo|ខែ))?/i);if(pm)info.price=pm[0].trim();}
+  if(!info.credit){var cm=all.match(/[\d][\d,]*\s*Credit[^\s·•|]*/i);if(cm)info.credit=cm[0].trim();}
+  if(!info.name&&n.pkg)info.name=String(n.pkg).trim();
+  return info;
+}
+function notifPkgItemHtml(n,i){
+  var info=notifPkgInfo(n);
+  var col=(n.type==='approved')?'#4ade80':'#f87171';
+  var h='<div class="notif-item notif-pkg'+(n.read?'':' unread')+'" onclick="notifItemClick('+i+')">';
+  h+='<div class="nd-head">'+notifIcon(n)+'<span class="nd-title">'+escHtml(n.title||notifDefTitle(n))+'</span>';
+  if(!n.read)h+='<span class="notif-dot" aria-hidden="true"></span>';
+  var t=notifTimeStr(n.ts);
+  if(t)h+='<span class="nd-time">'+escHtml(t)+'</span>';
+  h+='</div>';
+  if(info.name)h+='<div class="np-name">'+escHtml(info.name)+'</div>';
+  if(info.price)h+='<div class="np-price" style="color:'+col+'">'+escHtml(info.price)+'</div>';
+  if(info.credit)h+='<div class="np-credit">'+escHtml(info.credit)+'</div>';
+  var ftP=notifFullTimeStr(n.ts);
+  if(ftP)h+='<div class="nfull">'+escHtml(ftP)+'</div>';
+  h+='</div>';
+  return h;
+}
 function notifItemHtml(n,i){
   /* noIp is ALWAYS on (owner order 2026-11-16): no notification
      card anywhere shows an IP row — the user's IP lives only in
      the account / Profile box and the Settings box. */
   if(notifIsDevCard(n))return notifDevItemHtml(n,i,true);
+  /* Purchase approved / rejected: the big clean package card —
+     name, price, Credit, nothing else (owner order 2026-11-16).
+     Falls back to the plain card when no package info exists. */
+  if(n.type==='approved'||n.type==='rejected'){
+    var pi=notifPkgInfo(n);
+    if(pi.name||pi.price||pi.credit)return notifPkgItemHtml(n,i);
+  }
   var h='<button type="button" class="notif-item'+(n.read?'':' unread')+'" onclick="notifItemClick('+i+')">';
   h+=notifIcon(n);
   h+='<span class="notif-main"><span class="nt">'+escHtml(n.title||notifDefTitle(n))+'</span>';
@@ -11332,6 +11426,8 @@ function notifItemHtml(n,i){
   if(amt){var amtC=(n.type==='deduct')?'#f87171':((n.type==='grant'||n.type==='gift'||n.type==='approved')?'#4ade80':'');h+='<span class="nb notif-amt"'+(amtC?' style="color:'+amtC+';font-weight:800"':'')+'>'+escHtml(amt)+'</span>';}
   var t=notifTimeStr(n.ts);
   if(t)h+='<span class="ntime">'+escHtml(t)+'</span>';
+  var ft=notifFullTimeStr(n.ts);
+  if(ft)h+='<span class="nfull">'+escHtml(ft)+'</span>';
   h+='</span>';
   if(!n.read)h+='<span class="notif-dot" aria-hidden="true"></span>';
   h+='</button>';
