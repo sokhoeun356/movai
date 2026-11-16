@@ -243,6 +243,7 @@ textarea.input{resize:vertical}
 .composer #genMhModelWrap{position:relative;flex:1 1 210px;min-width:190px}
 .composer #genMhVidModelWrap{position:relative;flex:1 1 210px;min-width:190px}
 .composer #genSunoModelWrap{position:relative;flex:1 1 210px;min-width:190px}
+.composer #genNovaiModelWrap{position:relative;flex:1 1 210px;min-width:190px}
 .composer #genProviderField{background:var(--card);min-height:42px;padding:10px 14px;border-radius:999px}
 .tool-group{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 .tool-group>div{display:flex;gap:6px;flex-wrap:wrap}
@@ -417,6 +418,7 @@ img.hist-media,.d3-preview{cursor:zoom-in}
 .dd-opt-status{font-size:0.75rem;font-weight:700;white-space:nowrap}
 .dd-opt-right{display:flex;align-items:center;gap:8px;flex:0 1 auto;min-width:0;font-size:0.75rem;color:#9a9ea6}
 .dd-lock{font-size:0.6875rem;font-weight:800;color:#fbbf24;border:1px solid rgba(251,191,36,.5);border-radius:999px;padding:2px 8px;white-space:nowrap}
+.dd-new{font-size:0.625rem;font-weight:900;color:#0A0B0D;background:#ADDC29;border-radius:999px;padding:2px 7px;white-space:nowrap;letter-spacing:.02em;flex:0 0 auto}
 .dd-locknote{color:#fbbf24;font-weight:700;text-align:right}
 html[data-mode="light"] .dd-opt{color:var(--text);border-top-color:rgba(20,22,30,.08)}
 html[data-mode="light"] .dd-opt-right{color:#5f646e}
@@ -651,12 +653,12 @@ html[data-mode="light"] .btn-free{color:#63910c}
    inside the bottom of the cover. The accent is the app lime
    green, so the «green» of the design follows the user's chosen
    App Color like everything else. */
-.pub-cover-wrap{position:relative;width:min(64%,280px);margin:10px auto 0;border-radius:14px;cursor:pointer;-webkit-tap-highlight-color:transparent}
+.pub-cover-wrap{position:relative;width:min(56%,240px);margin:6px auto 0;border-radius:14px;cursor:pointer;-webkit-tap-highlight-color:transparent}
 .pub-cover-wrap .pub-song-cover{width:100%;margin:0}
-.pub-song-cover{display:block;width:min(64%,280px);aspect-ratio:1/1;object-fit:cover;margin:10px auto 0;border-radius:14px;background:#000}
+.pub-song-cover{display:block;width:min(56%,240px);aspect-ratio:1/1;object-fit:cover;margin:6px auto 0;border-radius:14px;background:#000}
 .pub-song-cover-none{display:flex;align-items:center;justify-content:center;background:var(--card);border:1px solid var(--line);color:var(--accent-text)}
 .pub-song-title{font-weight:800;font-size:1rem;line-height:1.45;margin:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1 1 auto;min-width:0}
-.pub-player{display:flex;align-items:center;gap:12px;margin-top:10px}
+.pub-player{display:flex;align-items:center;gap:10px;margin-top:6px}
 .pub-playbtn{width:54px;height:54px;flex:0 0 auto;border-radius:50%;border:none;background:var(--accent-fill);color:#0d1005;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;padding:0;-webkit-tap-highlight-color:transparent;box-shadow:0 4px 14px rgba(var(--accent-rgb),.35)}
 .pub-playbtn:active{filter:brightness(.93)}
 .pub-play-overlay{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);z-index:3;width:58px;height:58px;box-shadow:0 6px 20px rgba(0,0,0,.5),0 0 0 5px rgba(0,0,0,.18)}
@@ -675,7 +677,7 @@ html[data-mode="light"] .btn-free{color:#63910c}
 .pub-prog-fill{position:relative;height:5px;border-radius:999px;background:var(--accent-fill);width:0%;z-index:1}
 .pub-prog-knob{position:absolute;right:-8px;top:50%;transform:translateY(-50%);width:16px;height:16px;border-radius:50%;background:var(--accent-fill);box-shadow:0 1px 5px rgba(0,0,0,.45)}
 .pub-time{flex:0 0 auto;font-size:0.8125rem;font-weight:700;color:var(--text2);font-variant-numeric:tabular-nums;white-space:nowrap}
-.pub-pills{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}
+.pub-pills{display:flex;gap:8px;margin-top:6px;flex-wrap:wrap}
 .pub-pill{flex:1 1 0;display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:7px 10px;border-radius:999px;border:1.5px solid var(--accent);background:transparent;color:var(--accent-text);font-family:inherit;font-size:0.8125rem;font-weight:800;cursor:pointer;min-height:36px;font-variant-numeric:tabular-nums;white-space:nowrap}
 .pub-pill:active{opacity:.8}
 .pub-pill.liked{background:rgba(var(--accent-rgb),.14)}
@@ -684,17 +686,19 @@ html[data-mode="light"] .btn-free{color:#63910c}
    «Song Link» and the YouTube logo button sit at the very TOP of
    the card; the title stays on ONE line with the view count on
    the same line right after it; the three playback-mode buttons
-   (Loop / Repeat One / Shuffle-Next) sit in a row just above the
+   (Loop / Repeat One / Shuffle-Next) sit in a row just BELOW the
    progress bar. Like / Share / Views / Dislike stay in their
-   action rows below, exactly as before. */
-.pub-toplinks{display:flex;align-items:center;gap:8px;margin-top:10px;flex-wrap:wrap}
+   action rows below, exactly as before. The card is compact:
+   tight margins keep cover, title, progress, modes and pills
+   close together with no excess gaps. */
+.pub-toplinks{display:flex;align-items:center;gap:8px;margin-top:6px;flex-wrap:wrap}
 .pub-toplinks .pub-songlink{margin-top:0}
 .pub-yt-logo{display:inline-flex;align-items:center;justify-content:center;width:38px;height:38px;border-radius:999px;border:1px solid rgba(255,77,77,.55);background:rgba(255,0,51,.10);cursor:pointer;text-decoration:none}
 .pub-yt-logo:active{opacity:.8}
-.pub-song-titlerow{display:flex;align-items:center;gap:10px;margin-top:10px}
+.pub-song-titlerow{display:flex;align-items:center;gap:10px;margin-top:6px}
 .pub-song-views{flex:0 0 auto;display:inline-flex;align-items:center;gap:5px;font-size:0.875rem;font-weight:900;color:var(--accent-text);font-variant-numeric:tabular-nums}
 .pub-song-views svg{width:17px;height:17px}
-.pub-modes{display:flex;gap:6px;margin-top:10px;justify-content:flex-end;flex-wrap:wrap}
+.pub-modes{display:flex;gap:6px;margin-top:6px;justify-content:flex-end;flex-wrap:wrap}
 .pub-mode-btn{display:inline-flex;align-items:center;gap:5px;padding:6px 10px;border-radius:999px;border:1px solid var(--line2);background:transparent;color:var(--muted);font-family:inherit;font-size:0.6875rem;font-weight:800;cursor:pointer;min-height:32px;white-space:nowrap}
 .pub-mode-btn:active{opacity:.8}
 .pub-mode-btn.on{background:var(--accent-fill);color:#0d1005;border-color:transparent}
@@ -1258,21 +1262,28 @@ html[data-smooth="1"] .brand-frame,html[data-smooth="1"] .acct-chip,html[data-sm
         </div>
         <div id="genMhModelWrap" style="display:none">
           <button type="button" class="input" id="genMhModelField" onclick="genToggleMhModels()" style="display:none;justify-content:space-between;align-items:center;gap:10px;cursor:pointer;text-align:left;width:100%" aria-label="Magic Hour image model">
-            <span id="genMhModelFieldName" style="font-weight:700">Z-Image Turbo</span>
+            <span style="display:flex;align-items:center;gap:8px;min-width:0"><span id="genMhModelFieldName" style="font-weight:700">Z-Image Turbo</span><span id="genMhModelFieldNew"></span></span>
             <span style="display:flex;align-items:center;gap:8px;flex:0 0 auto"><span id="genMhModelFieldCost" style="font-size:0.75rem;color:#9a9ea6;white-space:nowrap">5 Credit/រូប</span><span style="font-size:0.75rem;color:#9a9ea6">▼</span></span>
           </button>
           <div id="genMhModelDrop" style="display:none;position:absolute;left:0;right:0;top:100%;z-index:30;background:#1a1c21;border:1px solid rgba(255,255,255,.12);border-radius:12px;margin-top:6px;overflow-y:auto;max-height:11.25rem;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;touch-action:pan-y;box-shadow:0 16px 40px rgba(0,0,0,.5)"></div>
         </div>
         <div id="genMhVidModelWrap" style="display:none">
           <button type="button" class="input" id="genMhVidModelField" onclick="genToggleMhVidModels()" style="display:none;justify-content:space-between;align-items:center;gap:10px;cursor:pointer;text-align:left;width:100%" aria-label="Magic Hour video model">
-            <span id="genMhVidModelFieldName" style="font-weight:700">Default</span>
+            <span style="display:flex;align-items:center;gap:8px;min-width:0"><span id="genMhVidModelFieldName" style="font-weight:700">Default</span><span id="genMhVidModelFieldNew"></span></span>
             <span style="display:flex;align-items:center;gap:8px;flex:0 0 auto"><span id="genMhVidModelFieldTag" style="font-size:0.75rem;color:#9a9ea6;white-space:nowrap"></span><span style="font-size:0.75rem;color:#9a9ea6">▼</span></span>
           </button>
           <div id="genMhVidModelDrop" style="display:none;position:absolute;left:0;right:0;top:100%;z-index:30;background:#1a1c21;border:1px solid rgba(255,255,255,.12);border-radius:12px;margin-top:6px;overflow-y:auto;max-height:11.25rem;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;touch-action:pan-y;box-shadow:0 16px 40px rgba(0,0,0,.5)"></div>
         </div>
+        <div id="genNovaiModelWrap" style="display:none">
+          <button type="button" class="input" id="genNovaiModelField" onclick="genToggleNovaiModels()" style="display:none;justify-content:space-between;align-items:center;gap:10px;cursor:pointer;text-align:left;width:100%" aria-label="NovAI model">
+            <span style="display:flex;align-items:center;gap:8px;min-width:0"><span id="genNovaiModelFieldName" style="font-weight:700">cogview-3-flash</span><span id="genNovaiModelFieldNew"></span></span>
+            <span style="display:flex;align-items:center;gap:8px;flex:0 0 auto"><span style="font-size:0.75rem;color:#9a9ea6">▼</span></span>
+          </button>
+          <div id="genNovaiModelDrop" style="display:none;position:absolute;left:0;right:0;top:100%;z-index:30;background:#1a1c21;border:1px solid rgba(255,255,255,.12);border-radius:12px;margin-top:6px;overflow-y:auto;max-height:11.25rem;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;touch-action:pan-y;box-shadow:0 16px 40px rgba(0,0,0,.5)"></div>
+        </div>
         <div id="genSunoModelWrap" style="display:none">
           <button type="button" class="input" id="genSunoModelField" onclick="genToggleSunoModels()" style="display:none;justify-content:space-between;align-items:center;gap:10px;cursor:pointer;text-align:left;width:100%" aria-label="MovAi model">
-            <span id="genSunoModelFieldName" style="font-weight:700"><span class="sm-v">v</span><span class="sm-6">6</span></span>
+            <span style="display:flex;align-items:center;gap:8px;min-width:0"><span id="genSunoModelFieldName" style="font-weight:700"><span class="sm-v">v</span><span class="sm-6">6</span></span><span id="genSunoModelFieldNew"></span></span>
             <span style="display:flex;align-items:center;gap:8px;flex:0 0 auto"><span id="genSunoModelFieldTag" style="font-size:0.75rem;color:#9a9ea6;white-space:nowrap"></span><span style="font-size:0.75rem;color:#9a9ea6">▼</span></span>
           </button>
           <div id="genSunoModelDrop" style="display:none;position:absolute;left:0;right:0;top:100%;z-index:30;background:#1a1c21;border:1px solid rgba(255,255,255,.12);border-radius:12px;margin-top:6px;overflow-y:auto;max-height:11.25rem;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;touch-action:pan-y;box-shadow:0 16px 40px rgba(0,0,0,.5)"></div>
@@ -2374,17 +2385,19 @@ function genRenderMhModels(){
   var cur=mhModelEff();
   var f=document.getElementById('genMhModelField');if(f)f.style.display='flex';
   var nm=document.getElementById('genMhModelFieldName');if(nm)nm.textContent=cur.name;
-  var cs=document.getElementById('genMhModelFieldCost');if(cs)cs.textContent=cur.credits+' '+tx('mhPerImg');
+  var fn=document.getElementById('genMhModelFieldNew');if(fn)fn.innerHTML=modelNewBadge('magichour',cur.id);
+  var cs=document.getElementById('genMhModelFieldCost');if(cs)cs.textContent=cur.credits?String(cur.credits)+' '+tx('mhPerImg'):'';
   var drop=document.getElementById('genMhModelDrop');
   if(drop){
     drop.innerHTML=MH_IMG_MODELS.map(function(m){
       var al=mhModelAdminLocked(m);
       var h='<button type="button" class="dd-opt'+(m.id===cur.id?' on':'')+(al?' off':'')+'"'+(al?' aria-disabled="true"':' onclick="genSetMhModel(\''+m.id+'\')"')+'>';
-      h+='<span class="dd-opt-main"><span>'+escHtml(m.name)+'</span></span>';
+      h+='<span class="dd-opt-main"><span>'+escHtml(m.name)+'</span>'+modelNewBadge('magichour',m.id)+'</span>';
       h+='<span class="dd-opt-right">';
       if(al)h+='<span class="dd-lock">'+escHtml(tx('adminLock'))+'</span>';
       else if(m.premium)h+='<span class="dd-lock">🔐 '+escHtml(tx('pkgPremium'))+'</span>';
-      h+='<span style="white-space:nowrap">'+m.credits+' '+escHtml(tx('mhPerImg'))+'</span></span></button>';
+      if(m.credits)h+='<span style="white-space:nowrap">'+m.credits+' '+escHtml(tx('mhPerImg'))+'</span>';
+      h+='</span></button>';
       return h;
     }).join('');
   }
@@ -2439,13 +2452,14 @@ function genRenderMhVidModels(){
   var cur=mhVidModelEff();
   var f=document.getElementById('genMhVidModelField');if(f)f.style.display='flex';
   var nm=document.getElementById('genMhVidModelFieldName');if(nm)nm.textContent=cur.name;
+  var fn=document.getElementById('genMhVidModelFieldNew');if(fn)fn.innerHTML=modelNewBadge('magichour',cur.id==='veo3.1'?'veo-3.1':cur.id);
   var tg=document.getElementById('genMhVidModelFieldTag');if(tg)tg.textContent=cur.perSec?(cur.perSec+' '+tx('mhPerSec')):'';
   var drop=document.getElementById('genMhVidModelDrop');
   if(drop){
     drop.innerHTML=MH_VID_MODELS.map(function(m){
       var al=mhVidModelAdminLocked(m);
       var h='<button type="button" class="dd-opt'+(m.id===cur.id?' on':'')+(al?' off':'')+'"'+(al?' aria-disabled="true"':' onclick="genSetMhVidModel(\''+m.id+'\')"')+'>';
-      h+='<span class="dd-opt-main"><span>'+escHtml(m.name)+'</span></span>';
+      h+='<span class="dd-opt-main"><span>'+escHtml(m.name)+'</span>'+modelNewBadge('magichour',m.id==='veo3.1'?'veo-3.1':m.id)+'</span>';
       h+='<span class="dd-opt-right">';
       if(al)h+='<span class="dd-lock">'+escHtml(tx('adminLock'))+'</span>';
       else if(m.premium)h+='<span class="dd-lock">🔐 '+escHtml(tx('pkgPremium'))+'</span>';
@@ -2490,6 +2504,172 @@ function sunoModelCur(){
   for(var i=0;i<SUNO_MODELS.length;i++)if(SUNO_MODELS[i].id===gen.sunoModel)return SUNO_MODELS[i];
   return SUNO_MODELS[0];
 }
+/* ================= Auto Update — live approved model list =================
+   The MovAi server publishes the Admin-approved model list at
+   GET https://movai-proxy.onrender.com/api/public/models (public,
+   no key): {ok, models:{groq:[], novai:[], suno:[], magichour:[],
+   musicapi:[], ...}, newModels:['provider:model', ...]} — newModels
+   are the models approved within the last 7 days and get a lime
+   «New» pill in the dropdowns. The list is fetched on load, every
+   5 minutes, and whenever the page becomes visible again. ANY
+   failure (offline, server asleep, bad shape) keeps the built-in
+   hardcoded lists above exactly as they are — the UI never breaks.
+   The hardcoded entries keep their display names, descriptions,
+   credit costs and premium flags; a server id the page does not
+   know yet is appended with its id as the label. NovAI's single
+   list is split by id: an id containing «video» is a video model,
+   every other id is an image model (cogview-3-flash = image,
+   cogvideox-flash = video). Groq chat models are NOT touched —
+   the chat keeps its own gpt-oss-120b + llama fallback logic. */
+var MODELS_LIVE_URL='https://movai-proxy.onrender.com/api/public/models';
+var MODELS_LIVE_NEW={}; /* 'provider:id' -> true, from newModels */
+function modelIsNew(provider,id){return !!MODELS_LIVE_NEW[provider+':'+id];}
+function modelNewBadge(provider,id){return modelIsNew(provider,id)?'<span class="dd-new">New</span>':'';}
+function modelsLiveMerge(list,ids,provider,make){
+  if(!Array.isArray(ids))return;
+  for(var i=0;i<ids.length;i++){
+    var id=String(ids[i]||'').trim();
+    if(!id)continue;
+    var found=false;
+    for(var j=0;j<list.length;j++)if(list[j].id===id){found=true;break;}
+    if(!found)list.push(make(id));
+  }
+}
+function modelsLiveApply(j){
+  if(!j||typeof j!=='object'||!j.models||typeof j.models!=='object')return;
+  var m=j.models;
+  MODELS_LIVE_NEW={};
+  if(Array.isArray(j.newModels)){
+    for(var n=0;n<j.newModels.length;n++){
+      var s=String(j.newModels[n]||'');
+      if(s.indexOf(':')>0)MODELS_LIVE_NEW[s]=true;
+    }
+  }
+  /* Song (Suno/MovAi) models — unknown ids show their id as label. */
+  modelsLiveMerge(SUNO_MODELS,m.suno,'suno',function(id){return {id:id,name:id,tag:{km:'',en:''},auto:true};});
+  /* NovAI image + video models (one server list, split by id). */
+  if(Array.isArray(m.novai)){
+    var imgIds=[],vidIds=[];
+    for(var k=0;k<m.novai.length;k++){
+      var nid=String(m.novai[k]||'').trim();if(!nid)continue;
+      if(nid.toLowerCase().indexOf('video')>=0)vidIds.push(nid);else imgIds.push(nid);
+    }
+    modelsLiveMerge(NOVAI_IMG_MODELS,imgIds,'novai',function(id){return {id:id,name:id,auto:true};});
+    modelsLiveMerge(NOVAI_VID_MODELS,vidIds,'novai',function(id){return {id:id,name:id,auto:true};});
+  }
+  /* Magic Hour models — the server sends ONE flat list, so each id
+     is routed to its own kind by the page's known entries: an id
+     already in the image list stays image-only, an id already in
+     the video list stays video-only, and a brand-new unknown id is
+     an image model unless its id names a video model family (ltx,
+     minimax, kling, veo, seedance, sora, runway, pika, hailuo,
+     wan). «veo-3.1» on the server is the page's «veo3.1» entry. */
+  if(Array.isArray(m.magichour)){
+    for(var q=0;q<m.magichour.length;q++){
+      var mid=String(m.magichour[q]||'').trim();if(!mid)continue;
+      if(mid==='veo-3.1')mid='veo3.1';
+      var inImg=false,inVid=false,qi;
+      for(qi=0;qi<MH_IMG_MODELS.length;qi++)if(MH_IMG_MODELS[qi].id===mid)inImg=true;
+      for(qi=0;qi<MH_VID_MODELS.length;qi++)if(MH_VID_MODELS[qi].id===mid)inVid=true;
+      if(inImg&&!inVid)continue; /* known image model — already listed */
+      if(inVid&&!inImg)continue; /* known video model — already listed */
+      var low=mid.toLowerCase();
+      var vidFam=/(ltx|minimax|kling|veo|seedance|sora|runway|pika|hailuo|wan|video)/.test(low);
+      if(vidFam)MH_VID_MODELS.push({id:mid,name:mid,maxSec:60,auto:true});
+      else MH_IMG_MODELS.push({id:mid,name:mid,credits:0,auto:true});
+    }
+  }
+  try{genRenderProviders();}catch(e){}
+  try{genRenderOptions();}catch(e){}
+}
+function modelsLiveLoad(){
+  try{
+    var ctrl=('AbortController' in window)?new AbortController():null;
+    var to=null,opts={method:'GET'};
+    if(ctrl){opts.signal=ctrl.signal;to=setTimeout(function(){try{ctrl.abort();}catch(e){}},9000);}
+    fetch(MODELS_LIVE_URL,opts).then(function(r){
+      if(to)clearTimeout(to);
+      if(!r.ok)throw new Error('HTTP '+r.status);
+      return r.json();
+    }).then(function(j){modelsLiveApply(j);}).catch(function(){if(to)clearTimeout(to);});
+  }catch(e){}
+}
+/* Refresh the approved model list whenever the page comes back
+   into view (the 5-minute interval + first load are wired in the
+   init block next to pkgPricesLoad). */
+document.addEventListener('visibilitychange',function(){if(document.visibilityState==='visible')modelsLiveLoad();});
+/* NovAI models — the page's built-in defaults are the free models
+   the generation calls have always used (image cogview-3-flash,
+   video cogvideox-flash); the Auto Update list above can append
+   newly approved NovAI models, and the user picks one in the same
+   style of dropdown as the Magic Hour / MovAi model pickers. The
+   dropdown shows only in image/video mode while NovAI is the
+   selected provider. */
+var NOVAI_IMG_MODELS=[
+ {id:'cogview-3-flash',name:'cogview-3-flash'}
+];
+var NOVAI_VID_MODELS=[
+ {id:'cogvideox-flash',name:'cogvideox-flash'}
+];
+function novaiImgModelCur(){
+  for(var i=0;i<NOVAI_IMG_MODELS.length;i++)if(NOVAI_IMG_MODELS[i].id===gen.novaiImgModel)return NOVAI_IMG_MODELS[i];
+  return NOVAI_IMG_MODELS[0];
+}
+function novaiVidModelCur(){
+  for(var i=0;i<NOVAI_VID_MODELS.length;i++)if(NOVAI_VID_MODELS[i].id===gen.novaiVidModel)return NOVAI_VID_MODELS[i];
+  return NOVAI_VID_MODELS[0];
+}
+function novaiModelAdminLocked(m){return adminIsLocked(m.id)||adminIsLocked(m.name);}
+function novaiModelEff(){
+  var imgMode=gen.mode!=='video';
+  var cur=imgMode?novaiImgModelCur():novaiVidModelCur();
+  if(!novaiModelAdminLocked(cur))return cur;
+  var list=imgMode?NOVAI_IMG_MODELS:NOVAI_VID_MODELS;
+  for(var i=0;i<list.length;i++)if(!novaiModelAdminLocked(list[i]))return list[i];
+  return cur;
+}
+function genRenderNovaiModels(){
+  var wrap=document.getElementById('genNovaiModelWrap');if(!wrap)return;
+  var show=(gen.mode==='image'||gen.mode==='video')&&gen.provider==='novai';
+  wrap.style.display=show?'block':'none';
+  if(!show){genCloseNovaiModels();return;}
+  var list=gen.mode==='video'?NOVAI_VID_MODELS:NOVAI_IMG_MODELS;
+  var cur=novaiModelEff();
+  var f=document.getElementById('genNovaiModelField');if(f)f.style.display='flex';
+  var nm=document.getElementById('genNovaiModelFieldName');if(nm)nm.textContent=cur.name;
+  var fn=document.getElementById('genNovaiModelFieldNew');if(fn)fn.innerHTML=modelNewBadge('novai',cur.id);
+  var drop=document.getElementById('genNovaiModelDrop');
+  if(drop){
+    drop.innerHTML=list.map(function(m){
+      var al=novaiModelAdminLocked(m);
+      var h='<button type="button" class="dd-opt'+(m.id===cur.id?' on':'')+(al?' off':'')+'"'+(al?' aria-disabled="true"':' onclick="genSetNovaiModel(\''+m.id+'\')"')+'>';
+      h+='<span class="dd-opt-main"><span>'+escHtml(m.name)+'</span>'+modelNewBadge('novai',m.id)+'</span>';
+      h+='<span class="dd-opt-right">';
+      if(al)h+='<span class="dd-lock">'+escHtml(tx('adminLock'))+'</span>';
+      h+='</span></button>';
+      return h;
+    }).join('');
+  }
+}
+function genToggleNovaiModels(){
+  var d=document.getElementById('genNovaiModelDrop');if(!d)return;
+  d.style.display=d.style.display==='block'?'none':'block';
+}
+function genCloseNovaiModels(){
+  var d=document.getElementById('genNovaiModelDrop');if(d)d.style.display='none';
+}
+function genSetNovaiModel(id){
+  if(gen.mode==='video'){
+    for(var i=0;i<NOVAI_VID_MODELS.length;i++)if(NOVAI_VID_MODELS[i].id===id&&novaiModelAdminLocked(NOVAI_VID_MODELS[i])){genCloseNovaiModels();return;}
+    gen.novaiVidModel=id;
+    try{localStorage.setItem('movai-novai-vid-model',id);}catch(e){}
+  }else{
+    for(var j=0;j<NOVAI_IMG_MODELS.length;j++)if(NOVAI_IMG_MODELS[j].id===id&&novaiModelAdminLocked(NOVAI_IMG_MODELS[j])){genCloseNovaiModels();return;}
+    gen.novaiImgModel=id;
+    try{localStorage.setItem('movai-novai-img-model',id);}catch(e){}
+  }
+  genRenderNovaiModels();genCloseNovaiModels();
+}
 /* Two-tone model name, coloured like the MovAi wordmark: «v» white,
    «6» lime #ADDC29, any «-wild» / «-mini» suffix white. Used for BOTH
    the dropdown options and the selected field value. */
@@ -2522,13 +2702,14 @@ function genRenderSunoModels(){
   var cur=sunoModelEff();
   var f=document.getElementById('genSunoModelField');if(f)f.style.display='flex';
   var nm=document.getElementById('genSunoModelFieldName');if(nm)nm.innerHTML=sunoNameHtml(cur.name);
+  var fn=document.getElementById('genSunoModelFieldNew');if(fn)fn.innerHTML=modelNewBadge('suno',cur.id);
   var tg=document.getElementById('genSunoModelFieldTag');if(tg)tg.textContent=loc(cur.tag);
   var drop=document.getElementById('genSunoModelDrop');
   if(drop){
     drop.innerHTML=SUNO_MODELS.map(function(m){
       var al=sunoModelAdminLocked(m);
       var h='<button type="button" class="dd-opt'+(m.id===cur.id?' on':'')+(al?' off':'')+'"'+(al?' aria-disabled="true"':' onclick="genSetSunoModel(\''+m.id+'\')"')+'>';
-      h+='<span class="dd-opt-main"><span>'+sunoNameHtml(escHtml(m.name))+'</span></span>';
+      h+='<span class="dd-opt-main"><span>'+sunoNameHtml(escHtml(m.name))+'</span>'+modelNewBadge('suno',m.id)+'</span>';
       h+='<span class="dd-opt-right">';
       if(al)h+='<span class="dd-lock">'+escHtml(tx('adminLock'))+'</span>';
       else if(loc(m.tag))h+='<span>'+escHtml(loc(m.tag))+'</span>';
@@ -3044,10 +3225,12 @@ var GEN_KEY_PROVIDERS=[
  {id:'masterpiecex',name:'Masterpiece X',limit:{km:'3D តែប៉ុណ្ណោះ · ហ្វ្រី 250 credits',en:'3D only · Free 250 credits'},url:'https://www.masterpiecex.com',fields:[{k:'key',ph:'API Key'}],hint:{km:'សម្រាប់រូប 3D Design តែប៉ុណ្ណោះ — យក API Key ពី masterpiecex.com ក្រោយចុះឈ្មោះ (ហ្វ្រី 250 credits = 5 models)។',en:'For 3D Design only — get an API key from masterpiecex.com after signing up (free 250 credits = 5 models).'}},
  {id:'hunyuan3d',name:'Hunyuan3D',limit:{km:'3D តែប៉ុណ្ណោះ · ហ្វ្រី 200 credits',en:'3D only · Free 200 credits'},url:'https://cloud.tencent.com',fields:[{k:'secretId',ph:'Secret ID'},{k:'secretKey',ph:'Secret Key'}],hint:{km:'សម្រាប់រូប 3D Design តែប៉ុណ្ណោះ — យក Secret ID + Secret Key ពី Tencent Cloud (ហ្វ្រី 200 credits)។',en:'For 3D Design only — get a Secret ID + Secret Key from Tencent Cloud (free 200 credits).'}}
 ];
-var gen={mode:'image',provider:'pollinations',aspect:'16:9',duration:5,res:720,songDur:3,songVoice:'random',progTimer:null,progSec:0,progPct:0,keyIdx:{},lastImg:null,lastVideo:null,lastSongs:null,mhModel:'z-image-turbo',mhVidModel:'default',sunoModel:'v6'};
+var gen={mode:'image',provider:'pollinations',aspect:'16:9',duration:5,res:720,songDur:3,songVoice:'random',progTimer:null,progSec:0,progPct:0,keyIdx:{},lastImg:null,lastVideo:null,lastSongs:null,mhModel:'z-image-turbo',mhVidModel:'default',sunoModel:'v6',novaiImgModel:'cogview-3-flash',novaiVidModel:'cogvideox-flash'};
 try{var _mhm=localStorage.getItem('movai-mh-img-model');if(_mhm)gen.mhModel=_mhm;}catch(e){}
 try{var _mhv=localStorage.getItem('movai-mh-vid-model');if(_mhv)gen.mhVidModel=_mhv;}catch(e){}
 try{var _snm=localStorage.getItem('movai-suno-model');if(_snm)gen.sunoModel=_snm;}catch(e){}
+try{var _nim=localStorage.getItem('movai-novai-img-model');if(_nim)gen.novaiImgModel=_nim;}catch(e){}
+try{var _nvm=localStorage.getItem('movai-novai-vid-model');if(_nvm)gen.novaiVidModel=_nvm;}catch(e){}
 var genAnyBusy=false;
 var story={count:20,episodes:[]};
 var genKeyOpen={};
@@ -3308,7 +3491,7 @@ function genRenderProviders(){
       return h;
     }).join('');
   }
-  genRenderMhModels();genRenderMhVidModels();genRenderSunoModels();
+  genRenderMhModels();genRenderMhVidModels();genRenderSunoModels();genRenderNovaiModels();
 }
 
 function genToggleProviders(){
@@ -3322,6 +3505,7 @@ function genCloseProviders(){
   genCloseMhModels();
   genCloseMhVidModels();
   genCloseSunoModels();
+  genCloseNovaiModels();
 }
 function genSetProvider(id){
   var list=gen.mode==='video'?GEN_VID_PROVIDERS:(gen.mode==='song'?GEN_SONG_PROVIDERS:GEN_IMG_PROVIDERS);
@@ -3343,6 +3527,7 @@ function genRenderOptions(){
   genRenderMhModels();
   genRenderMhVidModels();
   genRenderSunoModels();
+  genRenderNovaiModels();
   storyUpdateTotal();
 }
 function genSetAspect(a){gen.aspect=a;genRenderOptions();genNote();}
@@ -3658,7 +3843,7 @@ async function genDoImage(p,prompt,key){
        negative prompt are added so the picture follows the prompt
        more faithfully. If the gateway rejects the negative_prompt
        field itself (HTTP 400), retry once without it. */
-    var nbody={model:'cogview-3-flash',prompt:genEnhanceImgPrompt(prompt),negative_prompt:GEN_IMG_NEGATIVE,size:szMap[gen.aspect]||'1024x1024'};
+    var nbody={model:novaiImgModelCur().id,prompt:genEnhanceImgPrompt(prompt),negative_prompt:GEN_IMG_NEGATIVE,size:szMap[gen.aspect]||'1024x1024'};
     var novaiImgHeaders={'Authorization':'Bearer '+key,'Content-Type':'application/json'};
     var rni=await fetch('https://aiapi-pro.com/v1/images/generations',{method:'POST',headers:novaiImgHeaders,body:JSON.stringify(nbody)});
     if(rni.status===400){
@@ -3775,7 +3960,7 @@ async function genDoVideo(p,prompt,key){
   var a=GEN_ASPECTS[gen.aspect];
   var jobId=null;
   if(p.id==='novai'){
-    var rn=await fetch('https://aiapi-pro.com/v1/video/generations',{method:'POST',headers:{'Authorization':'Bearer '+key,'Content-Type':'application/json'},body:JSON.stringify({model:'cogvideox-flash',prompt:prompt})});
+    var rn=await fetch('https://aiapi-pro.com/v1/video/generations',{method:'POST',headers:{'Authorization':'Bearer '+key,'Content-Type':'application/json'},body:JSON.stringify({model:novaiVidModelCur().id,prompt:prompt})});
     var jn=await rn.json().catch(function(){return null;});
     if(jn&&jn.id)jobId=jn.id;else throw new Error('NovAI: '+genErrText(jn,'HTTP '+rn.status));
   }
@@ -6451,12 +6636,18 @@ var pubViz={au:null,viz:null,raf:0};
 function pubVizStart(au,viz){
   pubViz.au=au;pubViz.viz=viz;
   try{
-    if(!au._noAn&&!au._anTried){
-      au._anTried=true;
+    if(!au._noAn&&!au._anSrc){
       var AC=window.AudioContext||window.webkitAudioContext;
       if(AC){
         if(!pubAC)pubAC=new AC();
+        /* MediaElementSource → AnalyserNode → destination: the
+           song stays audible AND the analyser reads its real
+           frequency data. _anSrc is set the moment the source
+           node exists (it can only ever be created once per
+           element); if anything before that throws, the next
+           play retries instead of giving up forever. */
         var srcNode=pubAC.createMediaElementSource(au);
+        au._anSrc=true;
         var an=pubAC.createAnalyser();
         an.fftSize=128;an.smoothingTimeConstant=0.72;
         srcNode.connect(an);an.connect(pubAC.destination);
@@ -6828,7 +7019,7 @@ function pubCardEl(it){
     pl.appendChild(ptm);
     pl.appendChild(au);
     /* Playback-mode row (owner layout): three small buttons in
-       a row just above the progress bar — Loop (play through
+       a row just BELOW the progress bar — Loop (play through
        every song, wrapping around), Repeat One (the same song
        again and again) and Shuffle / Next (switch to another
        song when one ends). Tapping the armed button again
@@ -6846,8 +7037,8 @@ function pubCardEl(it){
       mb.addEventListener('click',function(){pubSetPlayMode(md[0]);});
       mrow.appendChild(mb);
     });
-    card.appendChild(mrow);
     card.appendChild(pl);
+    card.appendChild(mrow);
     var pubUiSync=function(){
       var d=au.duration;
       var has=isFinite(d)&&d>0;
@@ -6880,12 +7071,19 @@ function pubCardEl(it){
       if(pubPlayMode==='loop'||pubPlayMode==='shuffle')pubAdvanceFrom(au);
     });
     pbtn.addEventListener('click',function(){
-      if(au.paused){var pr=au.play();if(pr&&pr.catch)pr.catch(function(){});}
+      if(au.paused){
+        /* Create + resume the visualizer's AudioContext INSIDE
+           this tap (a real user gesture): mobile browsers keep
+           a context created later — e.g. in the async 'play'
+           event — suspended, which leaves the bars frozen. */
+        pubVizStart(au,viz);
+        var pr=au.play();if(pr&&pr.catch)pr.catch(function(){});
+      }
       else au.pause();
     });
     coverWrap.addEventListener('click',function(ev){
       if(ev.target&&ev.target.closest&&ev.target.closest('button'))return;
-      if(au.paused){var pr2=au.play();if(pr2&&pr2.catch)pr2.catch(function(){});}
+      if(au.paused){pubVizStart(au,viz);var pr2=au.play();if(pr2&&pr2.catch)pr2.catch(function(){});}
       else au.pause();
     });
     prog.addEventListener('click',function(ev){
@@ -6908,7 +7106,7 @@ function pubCardEl(it){
     function pubAddLink(el){
       if(!linksRow){
         linksRow=document.createElement('div');
-        linksRow.style.cssText='display:flex;flex-wrap:wrap;gap:8px;margin-top:10px';
+        linksRow.style.cssText='display:flex;flex-wrap:wrap;gap:8px;margin-top:6px';
         songExtra.appendChild(linksRow);
       }
       el.style.marginTop='0';
@@ -6951,7 +7149,7 @@ function pubCardEl(it){
        collected earlier. */
     var srow=document.createElement('div');
     srow.className='pub-foot';
-    srow.style.marginTop='10px';
+    srow.style.marginTop='6px';
     var svw=document.createElement('span');
     svw.className='pub-views';
     svw.innerHTML=pubEyeSvg()+'<span data-pub-views="'+escHtml(it.id)+'">'+acctFmtBal(it.views)+'</span><small>'+escHtml(tx('pubViews'))+'</small>';
@@ -9260,6 +9458,7 @@ function genInit(){
   try{pushInit();}catch(e){}
   try{adminLoadSettings();}catch(e){}
   try{pkgPricesLoad();}catch(e){}
+  try{modelsLiveLoad();setInterval(modelsLiveLoad,5*60*1000);}catch(e){}
   histWatchInit();
   animWatchScan();
   if(window.puter){genPuterStatus();}
@@ -9276,6 +9475,9 @@ function genInit(){
     var sw=document.getElementById('genSunoModelWrap');
     var sd=document.getElementById('genSunoModelDrop');
     if(sw&&sd&&!sw.contains(e.target))sd.style.display='none';
+    var nw=document.getElementById('genNovaiModelWrap');
+    var nd=document.getElementById('genNovaiModelDrop');
+    if(nw&&nd&&!nw.contains(e.target))nd.style.display='none';
     var fw=document.getElementById('fabWrap');
     var fp=document.getElementById('fabPanel');
     if(fw&&fp&&fp.classList.contains('open')&&!fw.contains(e.target))closeFab();
