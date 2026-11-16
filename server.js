@@ -1742,7 +1742,21 @@ function apiRoute(req, res, urlPath) {
         // user cannot pay, fail BEFORE calling the provider (so the admin's
         // provider account is never charged for a song the user cannot afford).
         // needBuy tells the website to offer buying more credit.
-        const SONG_COST = 12;
+        // Song cost by provider (MovAi user credits):
+        // - Suno: 12 Song Credits per generation (flat, 2 songs).
+        // - Magic Hour: 60 per minute = 1 per second, by duration
+        //   (2 min = 120, 3.5 min = 210). Variable, NOT flat.
+        // - MusicAPI: 20 Song Credits per generation (flat, 2 songs).
+        let SONG_COST = 12;
+        if (provider === 'musicapi') {
+          SONG_COST = 20;
+        } else if (provider === 'magichour') {
+          const _d = numOr(body.duration, 0) || numOr(body.durationSeconds, 0) || numOr(body.duration_seconds, 0) || 0;
+          let _secs = 120;
+          if (_d > 0 && _d <= 5) _secs = Math.round(_d * 60);
+          else if (_d >= 15 && _d <= 300) _secs = Math.round(_d);
+          SONG_COST = Math.max(15, Math.min(300, _secs));
+        }
         const _songEm = normEmail(body.email);
         if (_songEm) {
           const _songUsers = loadUsers();
