@@ -621,6 +621,20 @@ html[data-mode="light"] .btn-free{color:#63910c}
 .pub-filters{display:flex;gap:8px;margin-top:14px;flex-wrap:wrap}
 .pub-fchip{flex:1 1 0;min-width:64px;padding:10px 6px;border-radius:999px;border:1px solid var(--line2);background:transparent;color:var(--muted);font-family:inherit;font-size:0.8125rem;font-weight:800;cursor:pointer;min-height:42px;white-space:nowrap}
 .pub-fchip.on{background:var(--accent-fill);color:#0d1005;border-color:transparent}
+/* ===== Song style / genre filter row (Public, songs only) =====
+   A horizontally scrollable row of style chips under the category
+   chips: «All» shows every song mixed together; a style chip shows
+   only songs posted with that style. */
+.pub-gfilters{display:flex;gap:8px;margin-top:10px;overflow-x:auto;flex-wrap:nowrap;padding-bottom:2px;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+.pub-gfilters::-webkit-scrollbar{display:none}
+.pub-gchip{flex:0 0 auto;padding:8px 14px;border-radius:999px;border:1px solid var(--line2);background:transparent;color:var(--muted);font-family:inherit;font-size:0.8125rem;font-weight:800;cursor:pointer;min-height:38px;white-space:nowrap}
+.pub-gchip.on{background:var(--accent-fill);color:#0d1005;border-color:transparent}
+.pub-genre-badge{flex:0 0 auto;font-size:0.6875rem;font-weight:800;color:var(--accent-text);border:1px solid var(--line2);border-radius:999px;padding:3px 9px;white-space:nowrap}
+/* Style picker inside the Post-to-Public sheet (songs): one style
+   must be chosen before the song can be posted to Public. */
+.pub-genre-pick{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px}
+.pub-genre-opt{padding:8px 13px;border-radius:999px;border:1px solid var(--line2);background:transparent;color:var(--muted);font-family:inherit;font-size:0.8125rem;font-weight:800;cursor:pointer;min-height:38px;white-space:nowrap}
+.pub-genre-opt.on{background:var(--accent-fill);color:#0d1005;border-color:transparent}
 /* ===== Public Follow — inside the Admin's post cards =====
    There is NO floating follow circle in the Public panel (owner
    rule). Instead, every Admin post card carries a Follow pill
@@ -759,6 +773,8 @@ html[data-mode="light"] .btn-free{color:#63910c}
 .pub-carousel::-webkit-scrollbar{display:none}
 .pub-slide{flex:0 0 100%;scroll-snap-align:center;min-width:0}
 .pub-slide .pub-card{margin-top:0}
+/* Small side cards in the carousel, beside the one big #1 card */
+.pub-slide-mini{flex:0 0 auto;scroll-snap-align:center;align-self:flex-start;min-width:0}
 .pub-row-rank{flex:0 0 auto;min-width:28px;text-align:center;font-size:0.8125rem;font-weight:900;color:var(--accent-text);font-variant-numeric:tabular-nums}
 .pub-songrow{align-items:flex-start}
 .pub-row-acts{display:flex;gap:6px;margin-top:6px;align-items:center;flex-wrap:wrap}
@@ -1306,6 +1322,7 @@ html[data-smooth="1"] .brand-frame,html[data-smooth="1"] .acct-chip,html[data-sm
       <button type="button" class="pub-fchip" id="pubFchip-video" onclick="pubSetFilter('video')" data-i18n="pubCatVideo">វីដេអូ</button>
       <button type="button" class="pub-fchip" id="pubFchip-3d" onclick="pubSetFilter('3d')">3D</button>
     </div>
+    <div class="pub-gfilters" id="pubGenreRow" style="display:none" role="group" aria-label="Song style · ស្ទាយបទ"></div>
     <div id="pubFeed"></div>
   </div>
 </section>
@@ -1783,9 +1800,10 @@ km:{
  pubCatAll:'ទាំងអស់',pubCatSong:'បទចម្រៀង',pubCatImage:'រូបភាព',pubCatVideo:'វីដេអូ',
  pubEmptyCat:'មិនទាន់មានផុសប្រភេទនេះនៅឡើយទេ',
  pubShare:'ស៊ែរ',pubDislike:'មិនចូលចិត្ត',pubShared:'បានចម្លង link ហើយ ✓',
- pubYtChannel:'YouTube Channel',pubSongLink:'Song Link',pubLinkCopied:'បានចម្លង Link ✓',pubYtOpen:'បើក YouTube',pubModeLoop:'Loop · វិលជុំ',pubModeOne:'Repeat 1 · ម្ដងទៀត',pubModeShuffle:'Shuffle · ប្ដូរបទ',pubSecNew:'ថ្មីៗ · New',pubSecMore:'បទផ្សេងៗ · More songs',
+ pubYtChannel:'YouTube Channel',pubSongLink:'Song Link',pubLinkCopied:'បានចម្លង Link ✓',pubYtOpen:'បើក YouTube',pubModeLoop:'Loop · វិលជុំ',pubModeOne:'Repeat 1 · ម្ដងទៀត',pubModeShuffle:'Shuffle · ប្ដូរបទ',pubModeOff:'បិទ · Off',pubSecNew:'ថ្មីៗ · New',pubSecMore:'បទផ្សេងៗ · More songs',
  pubTypeSong:'បទចម្រៀង',pubTypeImage:'រូបភាព',pubTypeVideo:'វីដេអូ',pubType3d:'3D',
  pubSongId:'ID បទចម្រៀង',pubDuration:'រយៈពេល',pubModel:'Model',pubPostedDate:'ថ្ងៃផុស',pubPostedBy:'អ្នកផុស',pubGenre:'ប្រភេទ',
+ pubGenreAll:'ទាំងអស់ · All',pubGenrePick:'ជ្រើសរើសស្ទាយបទ · Style',pubGenreNeed:'សូមជ្រើសរើសស្ទាយបទជាមុនសិន ទើបផុសទៅ Public បាន',
  pubDlFreeLeft:'ទាញយកបទចម្រៀងហ្វ្រីនៅសល់ {n} ដង',
  pubDlLimit:'អ្នកបានប្រើអស់ការទាញយកបទចម្រៀងហ្វ្រី 2 ដងហើយ — សូមទិញកញ្ចប់សេវាកម្មបទចម្រៀង ដើម្បីទាញយកបន្ត',
  acctGotFree:'អបអរសាទរ! អ្នកទទួលបាន Credit ហ្វ្រី — Image.Video Credit 250 និង Song Credit 24 ក្នុងគណនីរបស់អ្នកហើយ',
@@ -1968,9 +1986,10 @@ en:{
  pubCatAll:'All',pubCatSong:'Songs',pubCatImage:'Images',pubCatVideo:'Videos',
  pubEmptyCat:'Nothing of this type has been posted yet',
  pubShare:'Share',pubDislike:'Dislike',pubShared:'Link copied ✓',
- pubYtChannel:'YouTube Channel',pubSongLink:'Song Link',pubLinkCopied:'Link copied ✓',pubYtOpen:'Open YouTube',pubModeLoop:'Loop',pubModeOne:'Repeat 1',pubModeShuffle:'Shuffle · Next',pubSecNew:'New · ថ្មីៗ',pubSecMore:'More songs · បទផ្សេងៗ',
+ pubYtChannel:'YouTube Channel',pubSongLink:'Song Link',pubLinkCopied:'Link copied ✓',pubYtOpen:'Open YouTube',pubModeLoop:'Loop',pubModeOne:'Repeat 1',pubModeShuffle:'Shuffle · Next',pubModeOff:'Off · បិទ',pubSecNew:'New · ថ្មីៗ',pubSecMore:'More songs · បទផ្សេងៗ',
  pubTypeSong:'Song',pubTypeImage:'Image',pubTypeVideo:'Video',pubType3d:'3D',
  pubSongId:'Song ID',pubDuration:'Duration',pubModel:'Model',pubPostedDate:'Posted',pubPostedBy:'Posted by',pubGenre:'Genre',
+ pubGenreAll:'All · ទាំងអស់',pubGenrePick:'Choose a style · ស្ទាយបទ',pubGenreNeed:'Please choose a song style first before posting to Public',
  pubDlFreeLeft:'{n} free song downloads left',
  pubDlLimit:'You have used your 2 free song downloads — please buy a Song package to keep downloading',
  acctGotFree:'Welcome! You received free credits — 250 Image.Video Credit and 24 Song Credit in your account',
@@ -6138,6 +6157,81 @@ function closeFab(){
 var PUB_API='https://movai-proxy.onrender.com/api/public';
 var APP_VIEW='public';
 var pubItems=[];
+/* ===== Song style / genre (owner rule 2026-11-16) =====
+   ONE shared style list, used in exactly three places so every
+   poster and every listener sees the same styles:
+   (1) the Post-to-Public sheet — a song poster (a user OR the
+       Admin, who posts through this same sheet) MUST pick one
+       style, and it rides to the server as the post's `genre`;
+   (2) the style chips row at the top of the Public Songs feed —
+       «All» shows every song mixed, a style chip shows only the
+       songs posted with that style;
+   (3) a small badge on the song card itself.
+   Older posts may carry a free-text style from generation (the
+   server sends it as genre/style); pubGenreKey maps any such
+   text onto the canonical entry so old songs still land under
+   the right chip. */
+var PUB_GENRES=['Hip Hop','Rock','Pop','R&B','EDM','Sad · សេដ','Romantix · រ៉ូម៉ាន់ទិក','Khmer Traditional · ខ្មែរបុរាណ','Country','Other'];
+var pubGenreFilter='all';
+var pubSheetGenre='';
+function pubGenreKey(raw){
+  var s=String(raw||'').trim().toLowerCase();
+  if(!s)return '';
+  for(var i=0;i<PUB_GENRES.length;i++){
+    var g=PUB_GENRES[i];
+    var en=g.split(' · ')[0].toLowerCase();
+    var km=g.split(' · ')[1]||'';
+    if(s===en||s.indexOf(en)>=0)return g;
+    if(km&&(s===km||s.indexOf(km)>=0))return g;
+  }
+  if(s.indexOf('hip')>=0||s.indexOf('rap')>=0)return 'Hip Hop';
+  if(s.indexOf('romant')>=0||s.indexOf('love')>=0)return 'Romantix · រ៉ូម៉ាន់ទិក';
+  if(s.indexOf('rnb')>=0||s.indexOf('rhythm')>=0)return 'R&B';
+  if(s.indexOf('electronic')>=0||s.indexOf('dance')>=0)return 'EDM';
+  if(s.indexOf('sad')>=0)return 'Sad · សេដ';
+  return '';
+}
+/* Compact view count (owner rule 2026-11-16): under 1,000 the
+   plain number; from 1,000 up it shortens — 1,000 → «1K»,
+   1,500 → «1.5K», 999,999 → «999K», 1,000,000 → «1M». Used for
+   VIEW counts only; likes / dislikes keep the full number. */
+function fmtCount(n){
+  n=Math.max(0,Math.floor(Number(n)||0));
+  if(n<1000)return String(n);
+  if(n<1000000){var v=n/1000;return (v>=100?String(Math.floor(v)):(String(Math.round(v*10)/10)))+'K';}
+  var m=n/1000000;return (m>=100?String(Math.floor(m)):(String(Math.round(m*10)/10)))+'M';
+}
+function pubSetGenreFilter(g){
+  pubGenreFilter=(g&&g!=='all')?String(g):'all';
+  pubGenreRowRender();
+  pubRender();
+}
+/* Builds the style chips row under the category chips. Visible
+   only on the Songs category and only while the feed holds at
+   least one song; the chips are «All» plus every style that a
+   song in the feed actually carries (canonical order). */
+function pubGenreRowRender(){
+  var row=document.getElementById('pubGenreRow');if(!row)return;
+  var songs=(pubFilter==='song')?pubItems.filter(function(x){return x.type==='song';}):[];
+  if(!songs.length){row.style.display='none';row.innerHTML='';return;}
+  var present=[];
+  songs.forEach(function(it){var k=pubGenreKey(it.genre);if(k&&present.indexOf(k)<0)present.push(k);});
+  present.sort(function(a,b){return PUB_GENRES.indexOf(a)-PUB_GENRES.indexOf(b);});
+  if(pubGenreFilter!=='all'&&present.indexOf(pubGenreFilter)<0)present.push(pubGenreFilter);
+  row.style.display='';
+  row.innerHTML='';
+  var mk=function(val,label){
+    var b=document.createElement('button');
+    b.type='button';
+    b.className='pub-gchip'+(pubGenreFilter===val?' on':'');
+    b.textContent=label;
+    b.setAttribute('aria-pressed',pubGenreFilter===val?'true':'false');
+    b.addEventListener('click',function(){pubSetGenreFilter(val);});
+    row.appendChild(b);
+  };
+  mk('all',tx('pubGenreAll'));
+  present.forEach(function(g){mk(g,g);});
+}
 var pubLoaded=false;
 var pubLoading=false;
 var pubLiked={};
@@ -6315,6 +6409,10 @@ function appSetView(v){
   else{try{pubAutoStop();}catch(e){}try{histRender();}catch(e){}}
   if(changed)window.scrollTo(0,0);
   try{dockSync();}catch(e){}
+  /* The floating song logo reacts to the view switch at once —
+     it must be up the moment the user lands on Create / History,
+     not whenever the mini-player's next timer tick happens. */
+  try{pubMiniSync();}catch(e){}
 }
 function pubSrvNum(v){
   if(typeof v==='number'&&isFinite(v))return v;
@@ -6466,7 +6564,7 @@ function pubLoadFeed(force){
 function pubFeedSig(items){
   try{
     return (items||[]).map(function(it){
-      return [it.id,it.type,it.url,it.title||'',it.name||'',it.email||'',it.views,it.likes,it.dislikes,it.tier,it.rank,it.image||'',it.aspect||'',it.youtube||'',it.youtubeChannel||''].join('|');
+      return [it.id,it.type,it.url,it.title||'',it.name||'',it.email||'',it.views,it.likes,it.dislikes,it.tier,it.rank,it.image||'',it.aspect||'',it.genre||'',it.youtube||'',it.youtubeChannel||''].join('|');
     }).join(';;');
   }catch(e){return '';}
 }
@@ -6577,6 +6675,22 @@ function pubSongCoverFallback(it){
 }
 function pubRender(){
   var box=document.getElementById('pubFeed');if(!box)return;
+  try{pubGenreRowRender();}catch(e){}
+  /* NEVER destroy a live player (owner rule 2026-11-16): while
+     the floating mini-player holds a song that has actually
+     started — playing now, or paused part-way through —
+     rebuilding the feed would delete its <audio> element: the
+     song vanishes (back to 0:00, stopped) and the floating logo
+     can never appear, because the mini-player's state points at
+     a dead element. Every path that re-renders the feed (coming
+     back to the Public tab, a category / style switch, a silent
+     refresh) therefore WAITS while a song is live; the rebuild
+     happens on the next render after the song ends. The genre
+     chips above still refresh so the row never looks stale. */
+  try{
+    var mau=pubMini&&pubMini.au;
+    if(mau&&mau.isConnected&&!mau.ended&&(!mau.paused||mau.currentTime>0))return;
+  }catch(e){}
   box.innerHTML='';
   if(!pubItems.length){
     var p=document.createElement('p');
@@ -6588,6 +6702,13 @@ function pubRender(){
   /* Strict type separation: with a category chosen, ONLY posts of
      that type are rendered — never mixed with the other types. */
   var shown=pubItems.filter(function(x){return x.type===pubFilter;});
+  /* Style filter (songs only): with a style chip chosen, only
+     songs posted with that style show — in the carousel AND in
+     the numbered rows below it (pubRenderSongs gets the already
+     filtered list). «All» leaves the list untouched (mixed). */
+  if(pubFilter==='song'&&pubGenreFilter!=='all'){
+    shown=shown.filter(function(x){return pubGenreKey(x.genre)===pubGenreFilter;});
+  }
   if(!shown.length){
     var pe=document.createElement('p');
     pe.style.cssText='color:var(--muted);font-size:0.875rem;line-height:1.7;padding:10px 0';
@@ -6657,14 +6778,14 @@ function pubNameHtml(it){
   return pubIsAdmin(it)?'<span class="pub-admin-name">'+escHtml(dn)+'</span>':escHtml(dn);
 }
 /* ===== Public song playback modes (owner rule) =====
-   Three modes, armed from the mode row on the big song card:
+   Three modes, armed from the ONE mode button on the big song
+   card (each tap cycles off → loop → one → shuffle → off):
    'loop' — when a song ends, the NEXT song in the feed starts,
    wrapping from the last back to the first; 'one' — the same
    song repeats (the audio element's own loop flag); 'shuffle' —
    when a song ends, a RANDOM other song in the feed starts.
-   Tapping the armed mode's button again turns modes off. The
-   state is shared by every song player in the feed (the big
-   card, the newest rows and the rail minis). */
+   The state is shared by every song player in the feed (the big
+   card, the numbered rows and the carousel minis). */
 var pubPlayMode='off';
 function pubLoopSvg(){
   return '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 2l4 4-4 4"/><path d="M3 11v-1a4 4 0 0 1 4-4h14"/><path d="M7 22l-4-4 4-4"/><path d="M21 13v1a4 4 0 0 1-4 4H3"/></svg>';
@@ -6675,18 +6796,42 @@ function pubRepeatOneSvg(){
 function pubShuffleSvg(){
   return '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 3h5v5"/><path d="M4 20L21 3"/><path d="M21 16v5h-5"/><path d="M15 15l6 6"/><path d="M4 4l5 5"/></svg>';
 }
-function pubSetPlayMode(m){
-  pubPlayMode=(pubPlayMode===m)?'off':m;
+/* ONE mode button (owner rule 2026-11-16): the three separate
+   Loop / Repeat 1 / Shuffle buttons are gone. A single button
+   shows ONLY the current mode, and each tap steps to the next
+   one — off → Loop → Repeat 1 → Shuffle·Next → off again. */
+var PUB_MODE_ORDER=['off','loop','one','shuffle'];
+function pubModeMeta(m){
+  if(m==='loop')return [pubLoopSvg(),tx('pubModeLoop')];
+  if(m==='one')return [pubRepeatOneSvg(),tx('pubModeOne')];
+  if(m==='shuffle')return [pubShuffleSvg(),tx('pubModeShuffle')];
+  return [pubLoopSvg(),tx('pubModeOff')];
+}
+function pubModeBtnSync(){
   try{
+    var meta=pubModeMeta(pubPlayMode);
     var btns=document.querySelectorAll('#pubFeed .pub-mode-btn');
     for(var i=0;i<btns.length;i++){
-      var on=btns[i].getAttribute('data-mode')===pubPlayMode;
-      btns[i].classList.toggle('on',on);
-      btns[i].setAttribute('aria-pressed',on?'true':'false');
+      btns[i].className='pub-mode-btn'+(pubPlayMode!=='off'?' on':'');
+      btns[i].setAttribute('data-mode',pubPlayMode);
+      btns[i].setAttribute('aria-pressed',pubPlayMode!=='off'?'true':'false');
+      btns[i].setAttribute('aria-label',meta[1]);
+      btns[i].innerHTML=meta[0]+'<span>'+escHtml(meta[1])+'</span>';
     }
     var all=document.querySelectorAll('#pubFeed audio');
     for(var j=0;j<all.length;j++)all[j].loop=(pubPlayMode==='one');
   }catch(e){}
+}
+function pubSetPlayMode(m){
+  if(m&&PUB_MODE_ORDER.indexOf(m)>=0){
+    /* Direct set (kept for compatibility): asking for the armed
+       mode again turns modes off, as before. */
+    pubPlayMode=(pubPlayMode===m)?'off':m;
+  }else{
+    var i=PUB_MODE_ORDER.indexOf(pubPlayMode);if(i<0)i=0;
+    pubPlayMode=PUB_MODE_ORDER[(i+1)%PUB_MODE_ORDER.length];
+  }
+  pubModeBtnSync();
 }
 function pubAdvanceFrom(au){
   try{
@@ -6926,9 +7071,13 @@ function pubMiniSync(){
 }
 function pubMiniTick(){
   var au=pubMini.au;
-  if(!au||!au.isConnected){
-    /* The feed re-rendered and this audio element is gone —
-       the mini-player lets go of it. */
+  if(!au||(au.isConnected===false&&au.paused)){
+    /* The element is gone AND silent — nothing is playing any
+       more, so the mini-player lets go of it. An element that
+       left the DOM but is STILL PLAYING is kept: a detached
+       <audio> keeps sounding, and the floating logo must stay
+       up and keep controlling it — the song never just
+       disappears on the user. */
     pubMini.au=null;pubMini.it=null;pubMini.open=false;
     if(pubMini.timer){clearInterval(pubMini.timer);pubMini.timer=null;}
   }
@@ -7029,7 +7178,7 @@ function pubSongRowEl(it){
   main.appendChild(tt);
   var meta=document.createElement('span');
   meta.className='pub-row-meta';
-  meta.innerHTML=pubEyeSvg()+'<span data-pub-views="'+escHtml(it.id)+'">'+acctFmtBal(it.views)+'</span>';
+  meta.innerHTML=pubEyeSvg()+'<span data-pub-views="'+escHtml(it.id)+'">'+fmtCount(it.views)+'</span>';
   main.appendChild(meta);
   var acts=document.createElement('div');
   acts.className='pub-row-acts';
@@ -7097,7 +7246,7 @@ function pubSongMiniEl(it){
   m.appendChild(tt);
   var meta=document.createElement('span');
   meta.className='pub-row-meta';
-  meta.innerHTML=pubEyeSvg()+'<span data-pub-views="'+escHtml(it.id)+'">'+acctFmtBal(it.views)+'</span>';
+  meta.innerHTML=pubEyeSvg()+'<span data-pub-views="'+escHtml(it.id)+'">'+fmtCount(it.views)+'</span>';
   m.appendChild(meta);
   var au=document.createElement('audio');
   au.src=it.url;au.preload='metadata';au.style.display='none';
@@ -7116,12 +7265,11 @@ function pubSongMiniEl(it){
   return m;
 }
 /* Song feed layout (owner rule 2026-11-16): the songs display
-   NEWEST FIRST. The newest song is #1 and leads in the CENTRE
-   of a horizontally swipeable carousel of big cards at the top
-   — the next-newest songs sit beside it (older ones to the
-   right; swipe right-to-left to bring each one to the centre).
-   Under the carousel, the remaining songs show as compact
-   NUMBERED rows in the normal vertical scroll: first the next
+   NEWEST FIRST. ONLY the newest song (#1) is a big card, in the
+   centre of the top carousel; the next songs sit beside it as
+   SMALL cards in the same swipeable strip. Under the carousel,
+   EVERY remaining song (#2, #3, ...) shows as a compact
+   NUMBERED row in the normal vertical scroll: first the next
    newest under «New», then the older ones under «More songs» —
    every row numbered in the same newest-first order and
    carrying views + Like + Dislike + Share like the big card.
@@ -7135,18 +7283,28 @@ function pubRenderSongs(box,songs){
     return a._pos-b._pos;
   });
   ordered.forEach(function(it,i){it._dispRank=i+1;});
-  var slides=ordered.slice(0,5);
+  if(!ordered.length)return;
+  /* Carousel (owner rule 2026-11-16): ONLY the newest song (#1)
+     is the big card, in the centre; the next songs sit beside
+     it as SMALL cards in the same swipeable strip. EVERY other
+     song (#2, #3, ...) ALSO appears as a numbered row below —
+     the rows must never vanish just because the songs fit in
+     the carousel. */
   var car=document.createElement('div');
   car.className='pub-carousel';
   car.setAttribute('aria-label','Songs');
-  slides.forEach(function(it){
-    var s=document.createElement('div');
-    s.className='pub-slide';
-    s.appendChild(pubCardEl(it));
-    car.appendChild(s);
+  var s=document.createElement('div');
+  s.className='pub-slide';
+  s.appendChild(pubCardEl(ordered[0]));
+  car.appendChild(s);
+  ordered.slice(1,5).forEach(function(it){
+    var w=document.createElement('div');
+    w.className='pub-slide-mini';
+    w.appendChild(pubSongMiniEl(it));
+    car.appendChild(w);
   });
   box.appendChild(car);
-  var rest=ordered.slice(5);
+  var rest=ordered.slice(1);
   var fresh=rest.slice(0,4),older=rest.slice(4);
   if(fresh.length){
     var h1=document.createElement('div');
@@ -7333,8 +7491,18 @@ function pubCardEl(it){
     }
     var tvw=document.createElement('span');
     tvw.className='pub-song-views';
-    tvw.innerHTML=pubEyeSvg()+'<span data-pub-views="'+escHtml(it.id)+'">'+acctFmtBal(it.views)+'</span>';
+    tvw.innerHTML=pubEyeSvg()+'<span data-pub-views="'+escHtml(it.id)+'">'+fmtCount(it.views)+'</span>';
     trow.appendChild(tvw);
+    /* Style badge: the style the poster chose when posting,
+       shown small on the same title line (when the post
+       carries one). */
+    var gk=pubGenreKey(it.genre);
+    if(gk){
+      var gb=document.createElement('span');
+      gb.className='pub-genre-badge';
+      gb.textContent=gk;
+      trow.appendChild(gb);
+    }
     card.appendChild(trow);
     /* Compact action row (owner layout, annotated mock): Like /
        Dislike / Share as SMALL buttons in ONE row immediately
@@ -7422,25 +7590,24 @@ function pubCardEl(it){
     pl.appendChild(prog);
     pl.appendChild(ptm);
     pl.appendChild(au);
-    /* Playback-mode row (owner layout): three small buttons in
-       a row just BELOW the progress bar — Loop (play through
-       every song, wrapping around), Repeat One (the same song
-       again and again) and Shuffle / Next (switch to another
-       song when one ends). Tapping the armed button again
-       turns the mode off; the modes are mutually exclusive. */
+    /* Playback-mode row (owner layout): ONE small button just
+       BELOW the progress bar showing only the current mode.
+       Each tap cycles to the next mode — off → Loop (play
+       through every song, wrapping around) → Repeat 1 (the same
+       song again and again) → Shuffle·Next (switch to another
+       song when one ends) → off. */
     var mrow=document.createElement('div');
     mrow.className='pub-modes';
-    [['loop',pubLoopSvg(),tx('pubModeLoop')],['one',pubRepeatOneSvg(),tx('pubModeOne')],['shuffle',pubShuffleSvg(),tx('pubModeShuffle')]].forEach(function(md){
-      var mb=document.createElement('button');
-      mb.type='button';
-      mb.className='pub-mode-btn'+(pubPlayMode===md[0]?' on':'');
-      mb.setAttribute('data-mode',md[0]);
-      mb.setAttribute('aria-pressed',pubPlayMode===md[0]?'true':'false');
-      mb.setAttribute('aria-label',md[2]);
-      mb.innerHTML=md[1]+'<span>'+escHtml(md[2])+'</span>';
-      mb.addEventListener('click',function(){pubSetPlayMode(md[0]);});
-      mrow.appendChild(mb);
-    });
+    var mb=document.createElement('button');
+    mb.type='button';
+    mb.className='pub-mode-btn'+(pubPlayMode!=='off'?' on':'');
+    mb.setAttribute('data-mode',pubPlayMode);
+    mb.setAttribute('aria-pressed',pubPlayMode!=='off'?'true':'false');
+    var mmeta=pubModeMeta(pubPlayMode);
+    mb.setAttribute('aria-label',mmeta[1]);
+    mb.innerHTML=mmeta[0]+'<span>'+escHtml(mmeta[1])+'</span>';
+    mb.addEventListener('click',function(){pubSetPlayMode();});
+    mrow.appendChild(mb);
     card.appendChild(pl);
     card.appendChild(mrow);
     var pubUiSync=function(){
@@ -7539,7 +7706,7 @@ function pubCardEl(it){
   foot.className='pub-foot';
   var vw=document.createElement('span');
   vw.className='pub-views';
-  vw.innerHTML=pubEyeSvg()+'<span data-pub-views="'+escHtml(it.id)+'">'+acctFmtBal(it.views)+'</span><small>'+escHtml(tx('pubViews'))+'</small>';
+  vw.innerHTML=pubEyeSvg()+'<span data-pub-views="'+escHtml(it.id)+'">'+fmtCount(it.views)+'</span><small>'+escHtml(tx('pubViews'))+'</small>';
   foot.appendChild(vw);
   var lk=document.createElement('button');
   lk.type='button';lk.className='pub-like'+(pubLiked[it.id]?' liked':'');
@@ -7772,7 +7939,7 @@ function pubCountView(id){
     /* Every place the count is shown (title line, action row,
        compact row, rail mini) refreshes together. */
     var els=document.querySelectorAll('[data-pub-views="'+CSS.escape(id)+'"]');
-    for(var vi=0;vi<els.length;vi++)els[vi].textContent=acctFmtBal(it.views);
+    for(var vi=0;vi<els.length;vi++)els[vi].textContent=fmtCount(it.views);
   }
   try{fetch(PUB_API+'/view',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:id})}).catch(function(){});}catch(e){}
 }
@@ -7782,9 +7949,19 @@ function pubOptBtnsHtml(){
   return '<button type="button" class="kbtn kbtn-black" style="width:100%" onclick="pubDoPost(\'public\')">'+escHtml(tx('pubOptPublic'))+'</button>'
     +'<button type="button" class="kbtn kbtn-white" style="width:100%;margin-top:8px" onclick="pubDoPost(\'private\')">'+escHtml(tx('pubOptPrivate'))+'</button>';
 }
+function pubSheetGenreSync(){
+  var box=document.getElementById('pubGenrePick');if(!box)return;
+  var chips=box.querySelectorAll('[data-genre]');
+  for(var i=0;i<chips.length;i++){
+    var on=chips[i].getAttribute('data-genre')===pubSheetGenre;
+    chips[i].className='pub-genre-opt'+(on?' on':'');
+    chips[i].setAttribute('aria-pressed',on?'true':'false');
+  }
+}
 function pubOpenSheet(item){
   if(!item)return;
   pubSheetItem=item;
+  pubSheetGenre='';
   var u=null;try{u=acctCurrent();}catch(e){}
   var t=document.getElementById('pubSheetItemTitle');
   if(t)t.textContent=item.title||item.prompt||'';
@@ -7797,10 +7974,37 @@ function pubOpenSheet(item){
     h+='<p style="font-size:0.875rem;line-height:1.7;color:var(--muted)">'+escHtml(tx('pubNoLink'))+'</p>';
   }else{
     if(item.pubPost==='public')h+='<p style="font-size:0.875rem;font-weight:700;color:var(--accent-text);margin-bottom:10px">'+escHtml(tx('pubPostedAlready'))+'</p>';
+    if(item.type==='song'){
+      /* Style picker (owner rule): whoever posts a song — a user
+         or the Admin through this same sheet — MUST choose the
+         song's style; it is sent as the post's genre and drives
+         the Public style chips + the card badge. A style the
+         song already carries (e.g. picked at generation time)
+         starts pre-selected. */
+      pubSheetGenre=pubGenreKey(item.genre||item.style||'');
+      h+='<p style="font-size:0.8125rem;font-weight:800;margin:2px 0 8px">'+escHtml(tx('pubGenrePick'))+'</p>';
+      h+='<div class="pub-genre-pick" id="pubGenrePick" role="group" aria-label="'+escHtml(tx('pubGenrePick'))+'">';
+      PUB_GENRES.forEach(function(g){
+        h+='<button type="button" class="pub-genre-opt'+(g===pubSheetGenre?' on':'')+'" data-genre="'+escHtml(g)+'" aria-pressed="'+(g===pubSheetGenre?'true':'false')+'">'+escHtml(g)+'</button>';
+      });
+      h+='</div>';
+    }
     h+=pubOptBtnsHtml();
   }
   h+='<p id="pubSheetMsg" style="font-size:0.8125rem;margin-top:10px;min-height:16px;line-height:1.6"></p>';
   body.innerHTML=h;
+  var gp=document.getElementById('pubGenrePick');
+  if(gp){
+    var gcs=gp.querySelectorAll('[data-genre]');
+    for(var gi=0;gi<gcs.length;gi++){
+      gcs[gi].addEventListener('click',function(){
+        pubSheetGenre=this.getAttribute('data-genre')||'';
+        pubSheetGenreSync();
+        var m2=document.getElementById('pubSheetMsg');
+        if(m2&&pubSheetGenre)m2.textContent='';
+      });
+    }
+  }
   var s=document.getElementById('pubSheet');if(s)sheetShowAnim(s);
 }
 function pubDoPost(vis){
@@ -7808,6 +8012,13 @@ function pubDoPost(vis){
   var u=null;try{u=acctCurrent();}catch(e){}
   if(!u){pubSheetClose();loginSheetOpen();return;}
   var msg=document.getElementById('pubSheetMsg');
+  /* A song posted to Public MUST carry its style (owner rule) —
+     without one chosen in the sheet, ask for it instead of
+     posting a style-less song. */
+  if(item.type==='song'&&vis==='public'&&!pubSheetGenre){
+    if(msg){msg.textContent=tx('pubGenreNeed');msg.style.color='#f87171';}
+    return;
+  }
   if(msg){msg.textContent=tx('pubPosting');msg.style.color='var(--muted)';}
   var payload={
     email:u.email,
@@ -7821,6 +8032,7 @@ function pubDoPost(vis){
     image:item.image||(item.type==='image'?item.url:''),
     visibility:vis
   };
+  if(item.type==='song')payload.genre=pubSheetGenre;
   fetch(PUB_API+'/post',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)})
     .then(function(r){
       if(!r||!r.ok)throw new Error('http '+(r?r.status:0));
