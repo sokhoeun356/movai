@@ -2323,16 +2323,19 @@ function apiRoute(req, res, urlPath) {
     }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
     return;
   }
-  // GET /api/gen/video/file?u=<encoded provider URL> — proxy download (CORS workaround)
+  // GET /api/gen/video/file?u=<encoded provider URL>&name=<optional filename> — proxy download (CORS workaround)
   if (req.method === 'GET' && urlPath === '/api/gen/video/file') {
-    const u = new URL(req.url, 'http://localhost').searchParams.get('u') || '';
+    const qp = new URL(req.url, 'http://localhost').searchParams;
+    const u = qp.get('u') || '';
     let target;
     try { target = new URL(u); } catch { res.writeHead(400); return res.end('Bad url'); }
     if (target.protocol !== 'http:' && target.protocol !== 'https:') { res.writeHead(400); return res.end('Bad url'); }
+    const rawName = (qp.get('name') || '').slice(0, 120);
+    const safeName = rawName.replace(/[^A-Za-z0-9 ._-]/g, '_').replace(/\s+/g, ' ').trim() || 'movai-video.mp4';
     fetch(target.toString(), { signal: AbortSignal.timeout(300000) }).then(async (r) => {
       if (!r.ok) { res.writeHead(502); return res.end('Upstream ' + r.status); }
       const buf = Buffer.from(await r.arrayBuffer());
-      res.writeHead(200, { 'Content-Type': r.headers.get('content-type') || 'video/mp4', 'Content-Disposition': 'attachment; filename="movai-video.mp4"', 'Content-Length': buf.length });
+      res.writeHead(200, { 'Content-Type': r.headers.get('content-type') || 'video/mp4', 'Content-Disposition': 'attachment; filename="' + safeName.replace(/"/g, '') + '"', 'Content-Length': buf.length });
       res.end(buf);
     }).catch(() => { try { res.writeHead(502); res.end('Fetch failed'); } catch {} });
     return;
