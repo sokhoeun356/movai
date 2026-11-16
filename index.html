@@ -2194,6 +2194,9 @@ km:{
  mp3Converting:'កំពុងបម្លែងទៅជា MP3…',
  mp3FailNet:'ទាញយកបទមិនបានទេ — បញ្ហាបណ្ដាញ ឬ server មិនឆ្លើយ សូមព្យាយាមម្ដងទៀត',
  mp3FailServer:'បម្លែងទៅជា MP3 មិនបានទេ — server បរាជ័យ សូមព្យាយាមម្ដងទៀត',
+ mp3FailOffline:'ទូរស័ព្ទអត់មានអ៊ីនធឺណិត · សូមពិនិត្យ WiFi/4G សិន',
+ mp3FailSlow:'បណ្ដាញយឺតពេក · Download មិនទាន់ទេ — សូមព្យាយាមម្ដងទៀតពេលបណ្ដាញល្អ',
+ mp3FailServerDown:'Server មិនឆ្លើយ · វាអាចកំពុង restart — សូមព្យាយាមម្ដងទៀត 1 នាទីក្រោយ',
  puterRetry:'Puter.js មិនទាន់ផ្ទុកទេ — សូមព្យាយាមម្ដងទៀត',
  puterNoImg:'Puter: មិនបានរូបភាពទេ',puterNoVid:'Puter: មិនបានវីដេអូទេ',
  novaiAcc:'គណនី NovAI',novaiBalanceNote:'Balance នេះប្រើសម្រាប់ model បង់លុយតែប៉ុណ្ណោះ — វីដេអូហ្វ្រីមិនកាត់លុយទេ',
@@ -2419,6 +2422,9 @@ en:{
  mp3Converting:'Converting to MP3…',
  mp3FailNet:'Could not fetch the song — network problem or the server did not answer, please try again',
  mp3FailServer:'Could not convert to MP3 — the server failed, please try again',
+ mp3FailOffline:'No internet on your phone — please check WiFi/4G first',
+ mp3FailSlow:'Network too slow — the download timed out, please try again when the connection is better',
+ mp3FailServerDown:'Server not responding — it may be restarting, please try again in 1 minute',
  puterRetry:'Puter.js has not loaded yet — please try again',
  puterNoImg:'Puter: no image returned',puterNoVid:'Puter: no video returned',
  novaiAcc:'NovAI Account',novaiBalanceNote:'This balance is used for paid models only — free videos do not deduct money',
@@ -4899,8 +4905,21 @@ async function dlSaveSongMp3(src,title,fallback){
   mp3Busy=true;
   var fname=dlCleanName(title,fallback||'movai-song')+'.mp3';
   mp3ProgStart();
+  /* REAL-ERROR REPORTING (owner order 2026-11-17): when a download
+     fails, show the SPECIFIC reason — offline phone, too-slow
+     network, server down/restarting, or the server's own message —
+     never a generic "Server unreachable". */
+  function mp3IsOffline(){ return typeof navigator!=='undefined'&&navigator.onLine===false; }
+  function mp3FailReal(errMsg){
+    mp3ProgDone();
+    if(mp3IsOffline()){ mp3FailShow('mp3FailOffline'); return; }
+    var em=String(errMsg||'');
+    if(/abort|timeout/i.test(em)){ mp3FailShow('mp3FailSlow'); return; }
+    mp3FailText(tx('mp3FailNet')+(em?' — '+em:''));
+  }
   try{
-    var rp=null;
+    if(mp3IsOffline()){ mp3ProgDone(); mp3FailShow('mp3FailOffline'); return; }
+    var rp=null, directErr='';
     /* FAST PATH (owner order 2026-11-16): the audio is already an MP3
        (Public feed songs, uploads/*.mp3) — download it DIRECTLY from
        the browser, no server conversion, no waiting for the server to
@@ -4916,25 +4935,42 @@ async function dlSaveSongMp3(src,title,fallback){
           var dblob=await dr.blob();
           if(dblob&&dblob.size){ mp3ProgSet(100); dlBlobSave(dblob,fname); mp3ProgDone(); return; }
         }
-      }catch(e){}
+      }catch(e){ directErr=String((e&&e.message)||e||''); }
     }
     /* Server conversion (WAV → MP3, or CORS-blocked MP3): wake the
        server first (Render free tier sleeps after 15 min idle) — a
        light request that absorbs the ~40s cold start — then retry the
        conversion on network failure. The server caches/queues
-       conversions, so a retry never converts twice. */
-    try{ await fetch(GEN_API+'/public/vapid-key'); }catch(e){}
-    var attempt=0;
+       conversions, so a retry never converts twice. If the wake
+       request itself fails, the server is down/restarting — say so
+       clearly instead of running 3 doomed conversion attempts. */
+    var wakeOk=false, wakeErr='';
+    try{
+      var wctrl=new AbortController();
+      var wt=setTimeout(function(){wctrl.abort();},60000);
+      var wk=await fetch(GEN_API+'/public/vapid-key',{signal:wctrl.signal});
+      clearTimeout(wt);
+      wakeOk=!!(wk&&wk.ok);
+    }catch(e){ wakeErr=String((e&&e.message)||e||''); }
+    if(!wakeOk){
+      if(mp3IsOffline()){ mp3ProgDone(); mp3FailShow('mp3FailOffline'); return; }
+      mp3ProgDone();
+      if(/abort|timeout/i.test(wakeErr)) mp3FailShow('mp3FailSlow');
+      else mp3FailText(tx('mp3FailServerDown')+(wakeErr?' — '+wakeErr:''));
+      return;
+    }
+    var attempt=0, lastErr='';
     while(attempt<3&&!rp){
       attempt++;
       try{
         rp=await fetch(GEN_API+'/gen/song/mp3?u='+encodeURIComponent(src)+'&name='+encodeURIComponent(fname));
       }catch(fe){
         rp=null;
+        lastErr=String((fe&&fe.message)||fe||'');
         if(attempt<3) await new Promise(function(r){setTimeout(r,5000);});
       }
     }
-    if(!rp){mp3ProgDone();mp3FailShow('mp3FailNet');return;}
+    if(!rp){ mp3FailReal(lastErr||directErr); return; }
     if(!rp.ok){
       /* Server failed — surface its REAL reason (JSON error or
          plain text) and save NOTHING (never the big WAV). */
@@ -4958,7 +4994,7 @@ async function dlSaveSongMp3(src,title,fallback){
     dlBlobSave(blob,fname);
     mp3ProgDone();
   }catch(e){
-    mp3ProgDone();mp3FailShow('mp3FailNet');
+    mp3FailReal(String((e&&e.message)||e||''));
   }finally{mp3Busy=false;}
 }
 async function genDownload(){
@@ -13120,10 +13156,10 @@ function offlineShow(kind){
   offlineKind=kind;
   if(kind==='offline'){
     e.title.textContent='អត់មានអ៊ីនធឺណិត · No internet';
-    e.body.textContent='សូមពិនិត្យអ៊ីនធឺណិតរបស់អ្នក រួចព្យាយាមម្ដងទៀត';
+    e.body.textContent='ទូរស័ព្ទអត់មានអ៊ីនធឺណិត ឬបណ្ដាញយឺតពេក — សូមពិនិត្យ WiFi/4G រួចព្យាយាមម្ដងទៀត';
   }else{
     e.title.textContent='Server មិនឆ្លើយ · Server unreachable';
-    e.body.textContent='server កំពុងដេក/មិនឆ្លើយ · Server unreachable — សូមរង់ចាំបន្តិច';
+    e.body.textContent='អ៊ីនធឺណិតទូរស័ព្ទដំណើរការ តែ server មិនឆ្លើយ — វាអាចកំពុង restart សូមព្យាយាមម្ដងទៀត 1 នាទីក្រោយ';
   }
   if(!offlineDismissed){
     /* Animate in (blur → clear) only on the hidden → shown
@@ -13194,6 +13230,32 @@ function offlineHide(){
     celebrate();
   }
 }
+/* Probe an independent, tiny endpoint (Google generate_204) to tell
+   "phone has no/slow internet" apart from "server is really down"
+   (owner order 2026-11-17: show the REAL problem, never blame the
+   server when the phone network is the fault). Resolves 'online' if
+   the phone reaches the internet, 'offline' otherwise. no-cors mode:
+   any response — even opaque — proves the phone is online. */
+function netProbe(){
+  return new Promise(function(resolve){
+    var done=false;
+    var finish=function(v){ if(!done){done=true;resolve(v);} };
+    var ctrl=null, timer=null;
+    try{
+      if(window.AbortController){
+        ctrl=new AbortController();
+        timer=setTimeout(function(){try{ctrl.abort();}catch(e){}},5000);
+      }
+    }catch(e){}
+    var opts={method:'GET',mode:'no-cors',cache:'no-store'};
+    if(ctrl)opts.signal=ctrl.signal;
+    fetch('https://www.google.com/generate_204',opts).then(function(){
+      if(timer)clearTimeout(timer); finish('online');
+    }).catch(function(){
+      if(timer)clearTimeout(timer); finish('offline');
+    });
+  });
+}
 function offlineFetch(){
   return new Promise(function(resolve){
     var ctrl=null,timer=null;
@@ -13221,7 +13283,18 @@ function offlineCheck(){
     offlineBusy=false;
     if(ok){offlineFailCount=0;if(offlineKind)offlineHide();}
     else if(!navigator.onLine){offlineShow('offline');}
-    else{offlineFailCount++;if(offlineFailCount>=2)offlineShow('server');}
+    else{
+      offlineFailCount++;
+      if(offlineFailCount>=2){
+        /* Heartbeat failed twice — but don't blame the server yet.
+           If the phone can't reach the independent probe either,
+           the fault is the phone's network, not the server. */
+        netProbe().then(function(probe){
+          if(probe==='offline') offlineShow('offline');
+          else offlineShow('server');
+        });
+      }
+    }
   });
 }
 function offlineRetry(){
@@ -13243,8 +13316,12 @@ function offlineRetry(){
     if(ok){offlineHide();}
     else{
       offlineFailCount=2;
-      offlineShow(navigator.onLine?'server':'offline');
-      if(e.msg)e.msg.textContent='នៅមិនទាន់ភ្ជាប់បានទេ · Still not connected';
+      /* Same distinction as offlineCheck: don't blame the server
+         when the phone itself can't reach the internet. */
+      netProbe().then(function(probe){
+        offlineShow(probe==='offline'?'offline':'server');
+        if(e.msg)e.msg.textContent='នៅមិនទាន់ភ្ជាប់បានទេ · Still not connected';
+      });
     }
   });
 }
