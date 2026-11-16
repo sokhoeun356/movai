@@ -1865,6 +1865,7 @@ km:{
  histSong:'បង្កើតបទចម្រៀង',histGift:'កាដូពី Admin · អ្នកប្រើថ្មី',histTopup:'បញ្ចូល Credit · ពី Admin/កញ្ចប់',histAdminDeduct:'Admin កាត់ Credit',
  histBalanceAfter:'នៅសល់',histBuyMore:'ទិញបន្ថែម',
  creditNotEnoughFmt:'Credit មិនគ្រប់ទេ — បទនេះត្រូវការ {c} Song Credit តែសមតុល្យរបស់អ្នកមាន {b} ប៉ុណ្ណោះ។ សូមទិញ Credit បន្ថែម។',
+ creditNotEnoughMediaFmt:'Credit មិនគ្រប់ទេ — បទនេះត្រូវការ {c} Image.Video Credit តែសមតុល្យរបស់អ្នកមាន {b} ប៉ុណ្ណោះ។ សូមទិញ Credit បន្ថែម។',
  profileTitle:'ប្រូហ្វាល់របស់ខ្ញុំ',profileBalance:'សមតុល្យ Credit',profileAccount:'គណនី',profileEmail:'Gmail',
  profilePlan:'កញ្ចប់សេវាកម្ម',profileFree:'ឥតគិតថ្លៃ (Free)',profileSince:'សមាជិកតាំងពី',profileLabel:'ប្រូហ្វាល់',
  profileUserId:'លេខសម្គាល់ (ID)',profileCopy:'ចម្លង',profileCopied:'បានចម្លង ✓',acctFirstName:'នាម · First name',acctLastName:'គោត្តនាម · Last name',
@@ -1925,7 +1926,7 @@ km:{
  msgEnterLyrics:'សូមសរសេរអត្ថបទចម្រៀងជាមុនសិន',
  promptLabelSong:'Prompt · អត្ថបទបទចម្រៀង / Lyrics',promptPhSong:'ឧ. សរសេរអត្ថបទបទចម្រៀង (lyrics) របស់អ្នកនៅទីនេះ...',
  songCostSuno:'MovAi · កាត់ 12 Credit ក្នុងមួយដង · បាន 2 បទ · Model v6',
- songCostMhFmt:'Magic Hour · កាត់តាមរយៈពេលបទ · 60 Credit/នាទី (1 Credit/វិនាទី) · បាន 1 បទ',
+ songCostMhFmt:'Magic Hour · កាត់តាមរយៈពេលបទ · 60 Credit/នាទី (1 Credit/វិនាទី) · កាត់ពី Image.Video Credit · បាន 1 បទ',
  songCostAce:'ACE Music · ហ្វ្រីរហូត · អត់កាត់ Credit ទេ · Model ACE-Step 1.5',
  songCostMusicApi:'MusicAPI · កាត់ 20 Credit/ដង · បាន 2 បទ · ហ្វ្រី 75 Credit ពេលចុះឈ្មោះ (ប្រហែល 6 បទ ម្ដងគត់) · Model MovAi v6',
  dlSong:'ទាញយកបទចម្រៀង',songLabelFmt:'បទទី {n}',songCreating:'Creating...',
@@ -2068,6 +2069,7 @@ en:{
  histSong:'Song generation',histGift:'Admin gift · New user bonus',histTopup:'Credit top-up · Admin/package',histAdminDeduct:'Admin deducted credit',
  histBalanceAfter:'Balance',histBuyMore:'Buy more',
  creditNotEnoughFmt:'Not enough credit — this song needs {c} Song Credit but your balance is {b}. Please buy more credits.',
+ creditNotEnoughMediaFmt:'Not enough credit — this song needs {c} Image.Video Credit but your balance is {b}. Please buy more credits.',
  profileTitle:'My Profile',profileBalance:'Credit balance',profileAccount:'Account',profileEmail:'Gmail',
  profilePlan:'Package',profileFree:'Free',profileSince:'Member since',profileLabel:'Profile',
  profileUserId:'User ID',profileCopy:'Copy',profileCopied:'Copied ✓',acctFirstName:'First name · នាម',acctLastName:'Last name · គោត្តនាម',
@@ -2128,7 +2130,7 @@ en:{
  msgEnterLyrics:'Please write the song lyrics first',
  promptLabelSong:'Prompt · Song lyrics',promptPhSong:'e.g. Write your song lyrics here...',
  songCostSuno:'MovAi · 12 credits per generation · 2 songs · Model v6',
- songCostMhFmt:'Magic Hour · charged by song length · 60 credits/minute (1 credit/second) · 1 song',
+ songCostMhFmt:'Magic Hour · charged by song length · 60 credits/minute (1 credit/second) · charged from Image.Video Credit · 1 song',
  songCostAce:'ACE Music · Free forever · No credits charged · ACE-Step 1.5 model',
  songCostMusicApi:'MusicAPI · 20 credits per generation · 2 songs · 75 free credits on signup (about 6 songs, one-time only) · MovAi v6 model',
  dlSong:'Download Song',songLabelFmt:'Song {n}',songCreating:'Creating...',
@@ -3446,7 +3448,7 @@ var GEN_VID_PROVIDERS=[
 ];
 var GEN_SONG_PROVIDERS=[
  {id:'suno',name:'MovAi',limit:{km:'កាត់ 12 Credit/ដង · បាន 2 បទ',en:'12 credits per generation · 2 songs'},key:'suno',note:{km:'Model v6 — ច្រៀងខ្មែរច្បាស់ជាងគេ។ MovAi មិនមាន API ផ្លូវការសាធារណៈទេ — ប្រើ API Key + Endpoint ដែលអ្នកដាក់ក្នុង ☰ → API Keys (កាត MovAi)។ កាត់ 12 Credit ក្នុងមួយដង បាន 2 បទ។',en:'Model v6 — sings Khmer the clearest. MovAi has no official public API — uses the API key + endpoint you add in ☰ → API Keys (MovAi card). 12 credits per generation, 2 songs.'}},
- {id:'magichour',name:'Magic Hour',glow:'green',limit:{km:'កាត់តាមរយៈពេល · 60 Credit/នាទី · បាន 1 បទ',en:'Charged by length · 60 credits/min · 1 song'},key:'magichour',note:{km:'កាត់តាមរយៈពេលបទ — 60 Credit ក្នុង 1 នាទី (1 Credit/វិនាទី)៖ បទ 1 នាទី = 60 · 2 នាទី = 120 · 3.5 នាទី = 210 · 5 នាទី = 300។ ប្រើ Magic Hour API Key ដែលមានស្រាប់។',en:'Charged by song length — 60 credits per minute (1 credit/second): 1 min = 60 · 2 min = 120 · 3.5 min = 210 · 5 min = 300. Uses your existing Magic Hour API key.'}},
+ {id:'magichour',name:'Magic Hour',glow:'green',limit:{km:'កាត់តាមរយៈពេល · 60 Credit/នាទី · ពី Image.Video Credit · បាន 1 បទ',en:'Charged by length · 60 credits/min · from Image.Video Credit · 1 song'},key:'magichour',note:{km:'កាត់តាមរយៈពេលបទ ពី Image.Video Credit (មិនមែន Song Credit ទេ) — 60 Credit ក្នុង 1 នាទី (1 Credit/វិនាទី)៖ បទ 1 នាទី = 60 · 2 នាទី = 120 · 3.5 នាទី = 210 · 5 នាទី = 300។ ប្រើ Magic Hour API Key ដែលមានស្រាប់។',en:'Charged by song length from Image.Video Credit (not Song Credit) — 60 credits per minute (1 credit/second): 1 min = 60 · 2 min = 120 · 3.5 min = 210 · 5 min = 300. Uses your existing Magic Hour API key.'}},
  {id:'acemusic',name:'ACE Music',locked:true,lockNote:{km:'ចាក់សោរ · មិនទាន់ដំណើរការ',en:'Locked · Not yet available'},limit:{km:'ហ្វ្រីរហូត · អត់កាត់ Credit',en:'Free forever · No credits charged'},key:'acemusic',note:{km:'ហ្វ្រីរហូត អត់កាត់ quota/Credit ទេ — បង្កើតបទមានសំឡេងច្រៀងបាន (Model ACE-Step 1.5)។ ត្រូវដាក់ API Key របស់អ្នកផ្ទាល់ក្នុង ☰ → API Keys (កាត ACE Music) — ចុះឈ្មោះយក Key ហ្វ្រីនៅ acemusic.ai អត់ត្រូវកាត។ MovAi មិនយក Key ឲ្យអ្នកដោយអូតូទេ។',en:'Free forever, no quota or credits charged — creates songs with vocals (ACE-Step 1.5 model). Add your own API key in ☰ → API Keys (ACE Music card) — sign up for a free key at acemusic.ai, no card needed. MovAi never fetches a key for you automatically.'}},
  {id:'musicapi',name:'MusicAPI',limit:{km:'កាត់ 20 Credit/ដង · ហ្វ្រី 75 Credit',en:'20 credits/generation · 75 free credits'},key:'musicapi',note:{km:'API ពិត — បង្កើតបទមានសំឡេងច្រៀង (MovAi models v6)។ កាត់ 20 Credit ក្នុងមួយដង បាន 2 បទ។ ចុះឈ្មោះហ្វ្រីនៅ musicapi.ai បាន 75 Credit អត់ត្រូវកាត — តែបានប្រហែល 6 បទម្ដងគត់ប៉ុណ្ណោះ បន្ទាប់មកត្រូវបង់លុយ។ ត្រូវដាក់ API Key របស់អ្នកផ្ទាល់ក្នុង ☰ → API Keys (កាត MusicAPI) — MovAi មិនយក Key ឲ្យអ្នកដោយអូតូទេ។',en:'Real API — creates songs with vocals (MovAi v6 models). 20 credits per generation, 2 songs. Free signup at musicapi.ai gives 75 credits, no card needed — but only about 6 songs, one-time only, then it is paid. Add your own API key in ☰ → API Keys (MusicAPI card) — MovAi never fetches a key for you automatically.'}}
 ];
@@ -3998,18 +4000,23 @@ async function genGenerate(){
     }else{
       if(gen.mode==='song'){
         /* REAL credit charge (owner rule): the song's price is
-           checked against the account's Song Credit BEFORE
+           checked against the account's credit pool BEFORE
            generating — not enough means NO generation and the
-           Packages sheet opens on the Song tab so the user can
-           buy more right there. Enough means the exact cost is
-           deducted from the account the moment the finished
-           songs arrive (never for a failed generation). */
+           Packages sheet opens on the tab of the pool that is
+           short so the user can buy more right there. Enough
+           means the exact cost is deducted from the account the
+           moment the finished songs arrive (never for a failed
+           generation). The POOL depends on the provider (owner
+           rule 2026-11-16): Magic Hour is a media provider, so
+           its songs check + deduct the Image.Video Credit pool;
+           Suno and MusicAPI check + deduct Song Credit. */
         var sCost=creditSongCost(cfg.provider);
-        var sBal=creditPoolBalance('song');
+        var sPool=creditSongPool(cfg.provider);
+        var sBal=creditPoolBalance(sPool);
         if(sCost>0&&sBal<sCost){
           creditBlocked=true;
-          genMsg(tx('creditNotEnoughFmt').replace('{c}',String(sCost)).replace('{b}',String(sBal)));
-          try{pkgSetTab('song');packagesShow();}catch(e){}
+          genMsg(tx(sPool==='media'?'creditNotEnoughMediaFmt':'creditNotEnoughFmt').replace('{c}',String(sCost)).replace('{b}',String(sBal)));
+          try{pkgSetTab(sPool==='media'?'media':'song');packagesShow();}catch(e){}
         }else{
           /* Pending cards match what the provider actually returns
              from ONE generation: Suno / MusicAPI return 2 songs,
@@ -4018,7 +4025,7 @@ async function genGenerate(){
           var pendId=/suno/i.test(cfg.provider||'')?'suno':(/musicapi/i.test(cfg.provider||'')?'musicapi':'magichour');
           genSongPending({id:pendId,name:''});
           await genDoSongServer(cfg,prompt);
-          if(sCost>0)doneNote=creditChargePool('song',sCost,creditSongProvName(cfg.provider));
+          if(sCost>0)doneNote=creditChargePool(sPool,sCost,creditSongProvName(cfg.provider));
         }
       }else if(gen.mode==='video'){
         var busyT0=Date.now();
@@ -4336,7 +4343,8 @@ async function genDownloadVideo(src){
      (☰ → API Keys), using the common Suno gateway shape:
      POST {endpoint}/api/generate, then poll GET {endpoint}/api/get?ids=.
    - Magic Hour: charged BY LENGTH — 60 credits per minute
-     (1 credit per second of the picked duration) — via
+     (1 credit per second of the picked duration), paid from the
+     Image.Video Credit (media) pool, NOT Song Credit — via
      POST /v1/ai-music-generator (duration in seconds), polled on
      GET /v1/audio-projects/{id}, using the existing Magic Hour key.
    - ACE Music: free forever, no quota/credits charged (ACE-Step 1.5).
@@ -4396,7 +4404,12 @@ function songRenderOpts(){
   var showDur=gen.provider==='magichour';
   var dg=document.getElementById('songDurGroup');
   if(dg)dg.style.display=showDur?'flex':'none';
-  var flatKey=gen.provider==='suno'?'songCostSuno':(gen.provider==='musicapi'?'songCostMusicApi':null);
+  /* The price line shows for every provider: the flat price for
+     Suno / MusicAPI, and for Magic Hour the by-length price —
+     which states it is charged from Image.Video Credit, because
+     Magic Hour songs are paid from the media pool, not Song
+     Credit (owner rule 2026-11-16). */
+  var flatKey=gen.provider==='suno'?'songCostSuno':(gen.provider==='musicapi'?'songCostMusicApi':(gen.provider==='magichour'?'songCostMhFmt':null));
   var fg=document.getElementById('songFlatGroup');
   if(fg){
     fg.style.display=flatKey?'flex':'none';
@@ -8950,12 +8963,14 @@ function acctCurrent(){
    (localStorage 'movai-credit-hist-<email>'), shown in the
    Profile sheet. The history survives log out / log in: it is
    keyed by the account email, never by the session.
-   Song prices (MovAi Credit, the same prices the Create panel
-   advertises): MovAi (Suno) 12 per generation · MusicAPI 20 per
-   generation · Magic Hour charged BY LENGTH — 60 per minute
-   (1 Credit per second of the picked duration) · ACE Music free
-   (0). A failed generation is never charged: the
-   charge runs only after the finished songs are in hand. */
+   Song prices (the same prices the Create panel advertises):
+   MovAi (Suno) 12 Song Credit per generation · MusicAPI 20 Song
+   Credit per generation · Magic Hour charged BY LENGTH — 60 per
+   minute (1 Credit per second of the picked duration) from the
+   Image.Video Credit (media) pool, because Magic Hour is a media
+   provider · ACE Music free (0). A failed generation is never
+   charged: the charge runs only after the finished songs are in
+   hand. */
 function creditHistKey(email){return 'movai-credit-hist-'+String(email||'').trim().toLowerCase();}
 function creditHistGet(email){
   try{var a=JSON.parse(localStorage.getItem(creditHistKey(email))||'[]');return Array.isArray(a)?a:[];}catch(e){return [];}
@@ -8984,12 +8999,27 @@ function creditSongCost(provider){
   if(p.indexOf('suno')>=0)return 12;
   if(p.indexOf('musicapi')>=0)return 20;
   /* Magic Hour charges BY LENGTH (owner rule, reconfirmed
-     2026-11-16): 60 Song Credits per minute = 1 Credit per second
+     2026-11-16): 60 Credits per minute = 1 Credit per second
      of the picked duration — 1 min = 60, 2 min = 120, 3.5 min =
      210, 5 min = 300. gen.songDur is in minutes, so the cost is
-     the duration in seconds. */
+     the duration in seconds. The AMOUNT is the same as before,
+     but the POOL is different — see creditSongPool: Magic Hour
+     is a media provider, so its songs are paid from the
+     Image.Video Credit (media) pool, NOT Song Credit. */
   if(p.indexOf('magic')>=0)return Math.round((gen.songDur||3)*60);
   return 0;
+}
+/* Which credit pool a song generation is paid from (owner rule
+   2026-11-16): Magic Hour is a MEDIA provider, so its songs are
+   checked against and deducted from the Image.Video Credit pool
+   (the 250 pool — a 3.5-minute song costs 210, leaving 40).
+   Suno (12/generation) and MusicAPI (20/generation) keep paying
+   from the Song Credit pool, exactly as before. The server now
+   deducts by the same rule. */
+function creditSongPool(provider){
+  var p=String(provider||'').toLowerCase();
+  if(p.indexOf('magic')>=0)return 'media';
+  return 'song';
 }
 function creditSongProvName(provider){
   var p=String(provider||'');
