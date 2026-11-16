@@ -1149,14 +1149,19 @@ button{min-width:0}
 #genProviderFieldLimit{white-space:normal !important;text-align:right;overflow-wrap:break-word}
 img,video{max-width:100%}
 /* ===== Bottom dock (iPhone home-screen style, icons only) =====
-   A wide glass dock stretched across the bottom of the page with
-   five icon destinations: Public, Create, History, Packages,
-   Notifications. It NEVER reaches either floating corner button:
-   its left edge stops to the RIGHT of the AI chat robot (which
-   occupies the 16px–74px lane at bottom-left) and its right edge
-   stops to the LEFT of the quick-settings FAB (the 16px–70px lane
-   at bottom-right), leaving a clear ~18px gap on each side, so
-   both buttons stay fully visible and tappable at all times.
+   A wide glass dock stretched across the FULL width of the bottom
+   of the page (owner order 2026-11-16) with six icon destinations:
+   Public, Create, History, Playlist, Packages, Notifications. The
+   quick-settings FAB that used to sit at bottom-right was removed,
+   so the dock no longer stops short of either edge: it runs from a
+   small 12px margin on the left to a small 12px margin on the
+   right (still capped at 860px wide and centred on wide screens),
+   and its icons spread evenly across that full width (each
+   .dock-item is flex:1). On narrow screens the AI chat robot
+   (bottom-left, 16px–74px lane, untouched) overlaps the dock's
+   left end, so extra left padding inside the dock keeps the first
+   icon clear of the robot while the glass bar itself reaches the
+   left edge (see the max-width media query under the .dock rule).
    z-index 35 keeps the dock under the drawer backdrop (40), the
    drawer (50) and EVERY bottom sheet — Packages (85), the modal
    sheets (95), the name sheet (120) — so a sheet always opens
@@ -1165,13 +1170,19 @@ img,video{max-width:100%}
    lifts its bottom edge clear above the dock (see #page-packages
    .panel). Main content carries extra bottom padding so the dock
    never covers the end of the page. */
-.dock{position:fixed;bottom:calc(12px + env(safe-area-inset-bottom,0px));left:max(92px,calc(50% - 430px));right:max(88px,calc(50% - 430px));z-index:35;display:flex;align-items:stretch;justify-content:space-between;gap:2px;padding:9px 10px;border-radius:28px;background:linear-gradient(160deg,rgba(255,255,255,calc(.03 + var(--glass-shine,.55)*.32)),rgba(255,255,255,calc(var(--glass-shine,.55)*.08)) 36%,rgba(190,198,212,calc(var(--glass-frost,.65)*.22)) 74%,rgba(var(--glass-tint),.42));background-color:rgba(var(--glass-tint),var(--glass-alpha,.5));-webkit-backdrop-filter:blur(var(--glass-blur,18px)) saturate(170%);backdrop-filter:blur(var(--glass-blur,18px)) saturate(170%);border:1px solid rgba(var(--glass-text-rgb),calc(.14 + var(--glass-shine,.55)*.2));box-shadow:0 16px 38px rgba(0,0,0,.4),inset 0 1px 0 rgba(255,255,255,calc(.08 + var(--glass-shine,.55)*.5));color:var(--glass-text)}
+.dock{position:fixed;bottom:calc(12px + env(safe-area-inset-bottom,0px));left:max(12px,calc(50% - 430px));right:max(12px,calc(50% - 430px));z-index:35;display:flex;align-items:stretch;justify-content:space-between;gap:2px;padding:9px 10px;border-radius:28px;background:linear-gradient(160deg,rgba(255,255,255,calc(.03 + var(--glass-shine,.55)*.32)),rgba(255,255,255,calc(var(--glass-shine,.55)*.08)) 36%,rgba(190,198,212,calc(var(--glass-frost,.65)*.22)) 74%,rgba(var(--glass-tint),.42));background-color:rgba(var(--glass-tint),var(--glass-alpha,.5));-webkit-backdrop-filter:blur(var(--glass-blur,18px)) saturate(170%);backdrop-filter:blur(var(--glass-blur,18px)) saturate(170%);border:1px solid rgba(var(--glass-text-rgb),calc(.14 + var(--glass-shine,.55)*.2));box-shadow:0 16px 38px rgba(0,0,0,.4),inset 0 1px 0 rgba(255,255,255,calc(.08 + var(--glass-shine,.55)*.5));color:var(--glass-text)}
 .dock-item{flex:1 1 0;min-width:0;display:flex;align-items:center;justify-content:center;height:50px;border:none;background:transparent;color:inherit;border-radius:18px;cursor:pointer;padding:0;position:relative;-webkit-tap-highlight-color:transparent;font-family:inherit}
 .dock-item svg{width:27px;height:27px;display:block}
 .dock-item.on{background:rgba(var(--accent-rgb),.25);color:var(--accent-text)}
 .dock-item:active{filter:brightness(1.25)}
 .dock-badge{position:absolute;top:4px;right:calc(50% - 20px);min-width:19px;height:19px;padding:0 5px;border-radius:999px;background:#e02424;color:#fff;font-size:0.625rem;font-weight:900;line-height:19px;text-align:center;box-shadow:0 2px 8px rgba(0,0,0,.4)}
 html[data-smooth="1"] .dock{background-color:rgba(var(--glass-tint),.96)}
+/* Narrow screens: the dock's glass now reaches the left edge, where
+   the AI chat robot floats (16px–74px). Reserve that lane INSIDE
+   the dock as left padding so the first icon starts clear to the
+   right of the robot; the robot button itself is unchanged and
+   paints above the dock's left end. */
+@media (max-width:884px){.dock{padding-left:72px}}
 /* ===== AI Chat — floating robot button (bottom-LEFT) + chat panel =====
    The robot button is fixed in the BOTTOM-LEFT corner with safe-area
    padding, mirroring the quick-settings FAB on the bottom-right —
