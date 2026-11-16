@@ -1369,6 +1369,25 @@ function apiRoute(req, res, urlPath) {
         const prompt = body.prompt.trim().slice(0, 2000);
         const width = Math.max(64, Math.min(2048, Number(body.width) || 768));
         const height = Math.max(64, Math.min(2048, Number(body.height) || 768));
+        // Server-side credit check (image): Magic Hour costs by model
+        // (media credits). NovAI is free. Cloudflare/Gemini use the
+        // user's own key, so no MovAi credit is charged.
+        const IMAGE_COSTS = { 'z-image-turbo': 5, 'flux-2-klein': 5, 'qwen-image-2.1': 10, 'krea-2': 10, 'gpt-image-2': 50, 'nano-banana-2.1': 50, 'nano-banana-pro': 150 };
+        let imgCost = 0;
+        if (provider === 'magichour') {
+          const _m = typeof body.model === 'string' ? body.model.trim() : '';
+          imgCost = IMAGE_COSTS[_m] || 5;
+        }
+        if (imgCost > 0) {
+          const _imgEm = normEmail(body.email);
+          if (_imgEm) {
+            const _imgUsers = loadUsers();
+            const _imgU = _imgUsers[_imgEm];
+            if (_imgU && Math.floor(numOr(_imgU.credits, 0)) < imgCost) {
+              return sendJSON(res, 200, { ok: false, error: 'Image.Video Credit មិនគ្រប់ទេ · Not enough Image/Video Credits — សូមទិញ Credit បន្ថែម', needBuy: true, kind: 'media', balance: Math.floor(numOr(_imgU.credits, 0)), cost: imgCost });
+            }
+          }
+        }
         if (provider === 'magichour') {
           // Magic Hour image via the admin-stored keys (browser sends no
           // key). Rotates to the next key when one is exhausted.
@@ -1386,7 +1405,8 @@ function apiRoute(req, res, urlPath) {
             if (e && e.noKey) return sendJSON(res, 200, { ok: false, error: 'Admin មិនទាន់ដាក់ Magic Hour Key ទេ' });
             return sendJSON(res, 200, { ok: false, error: (e && e.message) || 'Magic Hour: request failed' });
           }
-          return sendJSON(res, 200, { ok: true, jobId: out.jobId });
+          const _dedImg = await deductForGeneration(body.email, imgCost, 0, 'image:magichour:' + model);
+          return sendJSON(res, 200, { ok: true, jobId: out.jobId, credits: _dedImg.credits, songCredits: _dedImg.songCredits });
         }
         if (provider === 'novai') {
           // NovAI image via the admin-stored keys (browser sends no key).
@@ -1509,6 +1529,21 @@ function apiRoute(req, res, urlPath) {
         const reqKey = typeof body.key === 'string' ? body.key : '';
         const prompt = body.prompt.trim().slice(0, 4000);
         const duration = [5, 10].includes(Number(body.duration)) ? Number(body.duration) : 5;
+        // Server-side credit check (video): Magic Hour costs 10 media
+        // credits per second. NovAI is free. Tavus/HF are not charged
+        // here (Tavus removed from the website; HF uses the user's key).
+        let vidCost = 0;
+        if (provider === 'magichour') vidCost = 10 * duration;
+        if (vidCost > 0) {
+          const _vidEm = normEmail(body.email);
+          if (_vidEm) {
+            const _vidUsers = loadUsers();
+            const _vidU = _vidUsers[_vidEm];
+            if (_vidU && Math.floor(numOr(_vidU.credits, 0)) < vidCost) {
+              return sendJSON(res, 200, { ok: false, error: 'Image.Video Credit មិនគ្រប់ទេ · Not enough Image/Video Credits — សូមទិញ Credit បន្ថែម', needBuy: true, kind: 'media', balance: Math.floor(numOr(_vidU.credits, 0)), cost: vidCost });
+            }
+          }
+        }
         // No key at all (no request key and no admin key for this
         // provider): same message as before. Rotation happens per branch.
         if (!reqKey.trim() && !adminProviderKeyList(provider).length) {
@@ -1548,7 +1583,8 @@ function apiRoute(req, res, urlPath) {
             if (e && e.noKey) return sendJSON(res, 200, { ok: false, error: 'Admin មិនទាន់ដាក់ Magic Hour Key ទេ' });
             return sendJSON(res, 200, { ok: false, error: (e && e.message) || 'Magic Hour: request failed' });
           }
-          return sendJSON(res, 200, { ok: true, jobId: out.jobId });
+          const _dedVid = await deductForGeneration(body.email, vidCost, 0, 'video:magichour:' + duration + 's');
+          return sendJSON(res, 200, { ok: true, jobId: out.jobId, credits: _dedVid.credits, songCredits: _dedVid.songCredits });
         }
         if (provider === 'tavus') {
           const replicaId = String(body.replicaId || '').trim();
