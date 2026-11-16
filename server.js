@@ -74,7 +74,7 @@ const FREE_SONG_CREDITS = 24;
 
 /* ---------------- GitHub-backed persistent storage ----------------- */
 // Render free disk is ephemeral — ./data/*.json is wiped on restart, so
-// posts, credits and users vanish. When MOVAI_GITHUB_TOKEN is set, the 15
+// posts, credits and users vanish. When MOVAI_GITHUB_TOKEN is set, the 17
 // JSON data files are ALSO stored in a private GitHub repo (branch main,
 // repo root, same filenames). On startup the server pulls each file from
 // GitHub into the local ./data/ cache (overwriting local); on every local
@@ -93,7 +93,7 @@ const GH_DATA_FILES = [
   'activity.json', 'followers.json', 'notifications.json', 'vapid.json',
   'push-subs.json', 'packages.json', 'purchase-requests.json',
   'public.json', 'package-events.json', 'blocked-models.json',
-  'model-logins.json',
+  'model-logins.json', 'blocked-ips.json', 'blocked-emails.json',
 ];
 const ghShaCache = {}; // filename -> GitHub blob sha (for PUT updates)
 function ghEnabled() { return !!GH_TOKEN; }
@@ -214,13 +214,59 @@ async function ghRestoreAll() {
   }));
 }
 
+// Failed admin-key attempts (attack detection) — in-memory ONLY, never
+// persisted to a file. Map: client IP -> {count, firstAt, model}.
+// AUTO-BLOCK (attack only): 5 failed admin-key attempts from one IP
+// within 10 minutes auto-blocks that IP at once (added to
+// blocked-ips.json + a 'security' admin notification). A correct admin
+// key always wins over an IP block (the key IS the admin identity), so
+// the real admin can never lock themselves out — a successful call with
+// the right key clears the failure counter for that IP. A NEW or changed
+// IP is NEVER blocked here — it only raises a 'new device' notification
+// on sync for the admin to review; IP blocking itself is MANUAL.
+const FAILED_ADMIN_MAX = 5;
+const FAILED_ADMIN_WINDOW_MS = 10 * 60 * 1000;
+const failedAdminAttempts = new Map();
+function recordFailedAdminAttempt(req, ip) {
+  try {
+    if (!ip) return;
+    const now = Date.now();
+    let rec = failedAdminAttempts.get(ip);
+    if (!rec || (now - rec.firstAt) > FAILED_ADMIN_WINDOW_MS) rec = { count: 0, firstAt: now, model: '' };
+    rec.count += 1;
+    const model = modelFromUA(req.headers && req.headers['user-agent']);
+    if (model) rec.model = model;
+    failedAdminAttempts.set(ip, rec);
+    if (rec.count >= FAILED_ADMIN_MAX) {
+      failedAdminAttempts.delete(ip);
+      const blocked = loadBlockedIps();
+      if (!blocked.some((b) => b === ip)) {
+        blocked.push(ip);
+        saveBlockedIps(blocked);
+        ghFlushFile(BLOCKED_IPS_FILE).catch(() => {});
+        addNotification('security', '', '🚫 វាយប្រហារ · Auto-blocked attack', 'IP ' + ip + (rec.model ? ' (' + rec.model + ')' : '') + ' ព្យាយាមចូល Admin ដោយ key ខុស ' + rec.count + ' ដងក្នុង 10 នាទី — ត្រូវបានប្លុកដោយអូតូ');
+      }
+    }
+  } catch (e) {}
+}
 function adminKeyOk(req) {
   const k = process.env.MOVAI_ADMIN_KEY;
   if (!k) return { ok: false, error: 'Admin key not configured on server' };
   const h = String(req.headers['authorization'] || '');
   const m = /^Bearer\s+(.+)$/.exec(h);
-  if (!m || m[1] !== k) return { ok: false, error: 'Admin key មិនត្រឹមត្រូវទេ' };
-  return { ok: true };
+  if (m && m[1] === k) {
+    // Correct key proves the admin — clear any failed attempts from
+    // this IP (a typo storm is forgiven once the right key arrives).
+    try { failedAdminAttempts.delete(getClientIp(req)); } catch (e) {}
+    return { ok: true };
+  }
+  // Wrong or missing key. An auto/manual-blocked IP stays blocked.
+  const ip = getClientIp(req);
+  if (ip && loadBlockedIps().some((b) => b === ip)) {
+    return { ok: false, error: 'គណនីនេះត្រូវបានប្លុក · This account is blocked' };
+  }
+  recordFailedAdminAttempt(req, ip);
+  return { ok: false, error: 'Admin key មិនត្រឹមត្រូវទេ' };
 }
 function normEmail(v) {
   if (typeof v !== 'string') return '';
@@ -309,6 +355,33 @@ function saveBlockedModels(arr) {
   fs.writeFileSync(BLOCKED_MODELS_FILE, JSON.stringify(arr, null, 2));
   ghPersistFile(BLOCKED_MODELS_FILE);
 }
+// Blocked IPs (./data/blocked-ips.json) + blocked Gmails
+// (./data/blocked-emails.json) — MANUAL blocks by the admin only. The
+// admin reviews the Security section and decides; a new or changed IP is
+// NEVER auto-blocked — it only raises a 'new device' notification. The
+// ONLY auto-block is the attack rule in recordFailedAdminAttempt (5 failed
+// admin-key attempts in 10 minutes). Both files are GitHub-backed like
+// the other data files.
+const BLOCKED_IPS_FILE = path.join(DATA_DIR, 'blocked-ips.json');
+function loadBlockedIps() {
+  try { const j = JSON.parse(fs.readFileSync(BLOCKED_IPS_FILE, 'utf8')); if (Array.isArray(j)) return j.filter((x) => typeof x === 'string'); } catch (e) {}
+  return [];
+}
+function saveBlockedIps(arr) {
+  try { fs.mkdirSync(DATA_DIR, { recursive: true }); } catch (e) {}
+  fs.writeFileSync(BLOCKED_IPS_FILE, JSON.stringify(arr, null, 2));
+  ghPersistFile(BLOCKED_IPS_FILE);
+}
+const BLOCKED_EMAILS_FILE = path.join(DATA_DIR, 'blocked-emails.json');
+function loadBlockedEmails() {
+  try { const j = JSON.parse(fs.readFileSync(BLOCKED_EMAILS_FILE, 'utf8')); if (Array.isArray(j)) return j.filter((x) => typeof x === 'string'); } catch (e) {}
+  return [];
+}
+function saveBlockedEmails(arr) {
+  try { fs.mkdirSync(DATA_DIR, { recursive: true }); } catch (e) {}
+  fs.writeFileSync(BLOCKED_EMAILS_FILE, JSON.stringify(arr, null, 2));
+  ghPersistFile(BLOCKED_EMAILS_FILE);
+}
 // Login count per device model (./data/model-logins.json) — a map
 // model code -> number of syncs (logins) from that model. Incremented on
 // every /api/admin/sync that carries a model. GitHub-backed.
@@ -328,10 +401,11 @@ function saveModelLogins(m) {
 // a NEW device (raises a 'security' alert, unless this is the very first
 // sync / account creation, when the first device is recorded silently).
 const KNOWN_DEVICES_MAX = 20;
-function trackKnownDevice(u, model, device, ip, now) {
+function trackKnownDevice(u, model, device, ip, now, country) {
   const m = typeof model === 'string' ? model : '';
   const d = typeof device === 'string' ? device : '';
   const i = typeof ip === 'string' ? ip : '';
+  const c = typeof country === 'string' ? country : '';
   if (!m && !d && !i) return { isNew: false };
   if (!Array.isArray(u.knownDevices)) u.knownDevices = [];
   const idx = u.knownDevices.findIndex((x) => x && x.model === m && x.ip === i);
@@ -339,19 +413,45 @@ function trackKnownDevice(u, model, device, ip, now) {
     const e = u.knownDevices[idx];
     e.lastSeen = now;
     if (d && !e.device) e.device = d;
+    if (c && !e.country) e.country = c;
     u.knownDevices.splice(idx, 1);
     u.knownDevices.unshift(e);
     return { isNew: false };
   }
-  u.knownDevices.unshift({ model: m, device: d, ip: i, firstSeen: now, lastSeen: now });
+  u.knownDevices.unshift({ model: m, device: d, ip: i, country: c, firstSeen: now, lastSeen: now });
   if (u.knownDevices.length > KNOWN_DEVICES_MAX) u.knownDevices.length = KNOWN_DEVICES_MAX;
   return { isNew: true };
+}
+// IP country lookup (lightweight, fire-and-forget): ipapi.co, 3s timeout.
+// Never blocks a sync — when the country arrives it is patched into the
+// user record + the knownDevices entry for that IP in the background; on
+// failure (or when the service is unreachable) the country stays '' and
+// the sync still succeeds. No dependency.
+function lookupIpCountryAsync(email, ip) {
+  if (!email || !ip) return;
+  fetch('https://ipapi.co/' + encodeURIComponent(ip) + '/country_name/', { signal: AbortSignal.timeout(3000) })
+    .then((r) => (r.ok ? r.text() : ''))
+    .then((t) => {
+      const country = typeof t === 'string' ? t.trim().slice(0, 100) : '';
+      if (!country) return;
+      try {
+        const users = loadUsers();
+        const u = users[email];
+        if (!u || u.country === country) return;
+        u.country = country;
+        if (Array.isArray(u.knownDevices)) {
+          for (const e of u.knownDevices) { if (e && e.ip === ip && !e.country) e.country = country; }
+        }
+        saveUsers(users);
+      } catch (e) {}
+    })
+    .catch(() => {});
 }
 function pubUser(u, modelLogins) {
   const map = modelLogins || loadModelLogins();
   const model = u.model || '';
   const count = model && map && typeof map === 'object' ? (Number(map[model]) || 0) : 0;
-  return { id: u.id || '', email: u.email, name: u.name || '', firstName: u.firstName || '', lastName: u.lastName || '', credits: u.credits, songCredits: u.songCredits, plan: u.plan || '', songPlan: u.songPlan || '', createdAt: u.createdAt, updatedAt: u.updatedAt, lastIp: u.lastIp || '', device: u.device || '', model, modelLogins: count, lastSeen: u.lastSeen || '', knownDevices: Array.isArray(u.knownDevices) ? u.knownDevices : [] };
+  return { id: u.id || '', email: u.email, name: u.name || '', firstName: u.firstName || '', lastName: u.lastName || '', credits: u.credits, songCredits: u.songCredits, plan: u.plan || '', songPlan: u.songPlan || '', createdAt: u.createdAt, updatedAt: u.updatedAt, lastIp: u.lastIp || '', country: u.country || '', device: u.device || '', model, modelLogins: count, lastSeen: u.lastSeen || '', knownDevices: Array.isArray(u.knownDevices) ? u.knownDevices : [] };
 }
 function logGrant(entry) {
   try {
@@ -756,9 +856,9 @@ function publicSettings(s) {
 // providers so the browser never holds a key. Key VALUES are never returned
 // by any endpoint and never go into git — only the file on this server.
 // Providers: novai, magichour, masterpiecex, hunyuan3d, suno, acemusic,
-// musicapi (tavus kept for the legacy proxy branch).
+// musicapi, groq (the AI chat key), tavus kept for the legacy proxy branch).
 const ADMIN_KEYS_FILE = path.join(DATA_DIR, 'admin-keys.json');
-const KNOWN_KEY_PROVIDERS = ['novai', 'magichour', 'masterpiecex', 'hunyuan3d', 'suno', 'acemusic', 'musicapi', 'tavus'];
+const KNOWN_KEY_PROVIDERS = ['novai', 'magichour', 'masterpiecex', 'hunyuan3d', 'suno', 'acemusic', 'musicapi', 'tavus', 'groq'];
 function normProvider(v) {
   if (typeof v !== 'string') return '';
   let p = v.trim().toLowerCase().replace(/[\s_-]+/g, '');
@@ -1193,6 +1293,108 @@ function apiRoute(req, res, urlPath) {
     }).catch(() => { try { res.writeHead(502); res.end('Fetch failed'); } catch {} });
     return;
   }
+  // ---- AI Chat (MovAi assistant) ----
+  // 5-stage pipeline, each stage a named helper so the flow is visible:
+  // (1) chatLeaderValidate — leader/orchestrator: validate the message.
+  // (2) chatReceiverContext — receiver: gather live server context.
+  // (3) chatThinkerCallGroq — thinker: ask the Groq model (live, never canned).
+  // (4) chatDirectReply — direct answer: return the model's raw reply.
+  // (5) CHAT_SYSTEM_PROMPT — helper knowledge: the facts the model may use.
+  // The AI NEVER uses pre-prepared answers — every reply is generated live
+  // by the model from this prompt + the live context. The Groq key is the
+  // ADMIN-STORED key (provider 'groq' in admin-keys.json); its value is
+  // never logged and never returned by any endpoint.
+  const CHAT_SYSTEM_PROMPT = [
+    'You are the MovAi assistant — a helpful AI chat inside the MovAi website.',
+    'MovAi is an image/video/3D/song generation website.',
+    'Login is Google account ONLY — there is no other login method.',
+    'New users get FREE 250 Image/Video Credit + 24 Song Credit via a gift CLAIM popup after first login (they must tap CLAIM, otherwise they stay at 0).',
+    'Media packages (purple): Monthly $25 = 11,000 Credit/month, Yearly $18/month billed $216/year = 140,000 Credit/year.',
+    'Song packages (orange): Free 24 Credit/month, Trial $5 = 750 Credit, Popular $10 = 1,500 Credit, Pro $22 = 3,750 Credit (12 Credit per song generation = 2 songs).',
+    'FREE download limit: a free user can download songs 2 times for free — after 2 downloads they must buy a song package; package buyers can download freely (unlimited).',
+    'Providers: Magic Hour, NovAI, MusicAPI, MovAi (Suno v6). ACE Music is LOCKED (no new API keys).',
+    'The creator/admin is YEM SOKHOEUN, phone 081 914 728, Gmail sokhoeun7788@gmail.com, Telegram @yemsokhoeun_9999. For problems the user can contact the admin on Telegram @yemsokhoeun_9999.',
+    'RULES: Answer DIRECTLY and appropriately in the language the user writes (Khmer if they write Khmer, English if they write English). NEVER use pre-prepared or canned answers — every reply must be generated live from this prompt and the live context. NEVER invent prices, limits or features that are not in this prompt. If asked whether the system is down, slow or broken, use the live context (server uptime and provider status) to answer honestly and tell the user what is wrong.',
+  ].join('\n');
+  function chatLeaderValidate(body) {
+    if (!body || typeof body !== 'object') return { ok: false, error: 'សូមសរសេរសំណួរជាមុនសិន · Please write a message first' };
+    const message = typeof body.message === 'string' ? body.message.trim() : '';
+    if (!message) return { ok: false, error: 'សូមសរសេរសំណួរជាមុនសិន · Please write a message first' };
+    if (message.length > 2000) return { ok: false, error: 'សារវែងពេក (អតិបរមា 2000 តួអក្សរ) · Message too long (max 2000 characters)' };
+    return { ok: true, message };
+  }
+  function chatReceiverContext(email) {
+    const s = loadSettings();
+    const providers = (s && s.providers && typeof s.providers === 'object') ? s.providers : {};
+    const fmtMode = (mode) => {
+      const p = providers[mode];
+      if (!p || !p.provider) return mode + ': not set by admin yet';
+      return mode + ': ' + p.provider + (p.model ? ' (' + p.model + ')' : '');
+    };
+    const uptimeSec = Math.floor(process.uptime());
+    const uptimeText = uptimeSec < 60 ? uptimeSec + 's' : uptimeSec < 3600 ? Math.floor(uptimeSec / 60) + 'm ' + (uptimeSec % 60) + 's' : Math.floor(uptimeSec / 3600) + 'h ' + Math.floor((uptimeSec % 3600) / 60) + 'm';
+    let userText = 'guest (no Gmail given)';
+    if (email) {
+      const u = loadUsers()[email];
+      if (u) userText = email + ' — Image/Video Credit ' + Math.max(0, Math.floor(numOr(u.credits, 0))) + ', Song Credit ' + Math.max(0, Math.floor(numOr(u.songCredits, 0))) + ', media plan ' + (u.plan || 'free') + ', song plan ' + (u.songPlan || 'free');
+      else userText = email + ' — no account on this server yet';
+    }
+    const gk = adminProviderKey('groq');
+    const groqConfigured = !!(gk && gk.key);
+    return [
+      'LIVE CONTEXT (use this for status questions; never invent status):',
+      'Server uptime: ' + uptimeText + ' (server is running).',
+      'Active providers — ' + fmtMode('image') + ' | ' + fmtMode('video') + ' | ' + fmtMode('song') + '.',
+      'Groq AI chat key configured: ' + (groqConfigured ? 'yes' : 'no') + '.',
+      'User: ' + userText + '.',
+    ].join('\n');
+  }
+  function chatThinkerCallGroq(systemPrompt, history, message, key) {
+    const messages = [{ role: 'system', content: systemPrompt }];
+    if (Array.isArray(history)) {
+      for (const h of history.slice(-10)) {
+        if (!h || typeof h !== 'object') continue;
+        const role = h.role === 'assistant' ? 'assistant' : (h.role === 'user' ? 'user' : null);
+        if (!role || typeof h.content !== 'string' || !h.content.trim()) continue;
+        messages.push({ role, content: h.content.trim().slice(0, 2000) });
+      }
+    }
+    messages.push({ role: 'user', content: message });
+    return fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + key, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model: 'openai/gpt-oss-120b', temperature: 0.7, max_tokens: 800, messages }),
+      signal: AbortSignal.timeout(25000),
+    }).then(async (r) => {
+      const j = await r.json().catch(() => null);
+      if (!r.ok) {
+        const em = (j && j.error && typeof j.error.message === 'string' && j.error.message) ? j.error.message : ('Groq HTTP ' + r.status);
+        return { ok: false, error: 'Groq: ' + String(em).slice(0, 300) };
+      }
+      const content = j && j.choices && j.choices[0] && j.choices[0].message && typeof j.choices[0].message.content === 'string' ? j.choices[0].message.content : '';
+      if (!content.trim()) return { ok: false, error: 'Groq: empty reply' };
+      return { ok: true, reply: content.trim() };
+    }).catch((e) => ({ ok: false, error: 'Groq: ' + (e && e.message ? e.message : 'request failed') }));
+  }
+  function chatDirectReply(text) { return String(text || '').trim(); }
+  // POST /api/chat — {email?, message, history?} — PUBLIC (no admin key).
+  // Runs the 5-stage pipeline above and returns {ok:true, reply}.
+  if (req.method === 'POST' && urlPath === '/api/chat') {
+    readJSONBody(req, 64 * 1024).then(async (body) => {
+      const email = normEmail(body && body.email);
+      logActivity({ at: new Date().toISOString(), mode: 'chat', email: email || '' });
+      const v = chatLeaderValidate(body);
+      if (!v.ok) return sendJSON(res, 200, { ok: false, error: v.error });
+      const reqKey = body && typeof body.key === 'string' ? body.key : '';
+      const groqKey = resolveProviderKey(reqKey, 'groq');
+      if (!groqKey) return sendJSON(res, 200, { ok: false, error: 'Admin មិនទាន់ដាក់ Groq API Key ទេ · Admin has not set a Groq API Key yet' });
+      const context = chatReceiverContext(email);
+      const result = await chatThinkerCallGroq(CHAT_SYSTEM_PROMPT + '\n\n' + context, body && body.history, v.message, groqKey);
+      if (!result.ok) return sendJSON(res, 200, { ok: false, error: result.error });
+      return sendJSON(res, 200, { ok: true, reply: chatDirectReply(result.reply) });
+    }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
+    return;
+  }
   // ---- MovAi Admin API ----
   // POST /api/admin/sync — {email, name, credits, songCredits, plan, songPlan}
   // Called by the MovAi website (no admin key). Creates the user on first
@@ -1203,6 +1405,19 @@ function apiRoute(req, res, urlPath) {
     readJSONBody(req, 64 * 1024).then(async (body) => {
       const email = normEmail(body && body.email);
       if (!email) return sendJSON(res, 200, { ok: false, error: 'សូមដាក់ Gmail ត្រឹមត្រូវ' });
+      // Blocked IP or blocked Gmail (MANUAL blocks by the admin): refuse
+      // the sync entirely — no user is created/updated, no credits
+      // granted. A NEW or changed IP is never blocked here — it only
+      // raises a 'new device' notification for the admin to review.
+      const _cip0 = getClientIp(req);
+      if (_cip0 && loadBlockedIps().some((b) => b === _cip0)) {
+        addNotification('security', email, '🚫 គណនី/IP ត្រូវបានប្លុកព្យាយាមចូល · Blocked account/IP login attempt', email + ' tried to log in from blocked IP ' + _cip0 + ' · IP ' + _cip0);
+        return sendJSON(res, 200, { ok: false, error: 'គណនីនេះត្រូវបានប្លុក · This account is blocked' });
+      }
+      if (loadBlockedEmails().some((b) => b === email)) {
+        addNotification('security', email, '🚫 គណនី/IP ត្រូវបានប្លុកព្យាយាមចូល · Blocked account/IP login attempt', email + ' tried to log in from blocked email ' + email + ' · IP ' + (_cip0 || '—'));
+        return sendJSON(res, 200, { ok: false, error: 'គណនីនេះត្រូវបានប្លុក · This account is blocked' });
+      }
       // Blocked device model: refuse the sync entirely — no user is
       // created/updated and no credits are granted.
       const _model = modelFromUA(req.headers && req.headers['user-agent']);
@@ -1255,7 +1470,10 @@ function apiRoute(req, res, urlPath) {
       // never seen before for this user is a NEW device (alerted below),
       // except on the very first sync (account creation).
       const _hadKnownDevices = Array.isArray(u.knownDevices) && u.knownDevices.length > 0;
-      const _deviceTrack = trackKnownDevice(u, _model || '', _dev || '', _cip || '', now);
+      const _deviceTrack = trackKnownDevice(u, _model || '', _dev || '', _cip || '', now, u.country || '');
+      // IP country: fill it in the background (never blocks this sync).
+      const _kdEntry = Array.isArray(u.knownDevices) ? u.knownDevices.find((x) => x && x.ip === _cip) : null;
+      if (_cip && (!_kdEntry || !_kdEntry.country)) lookupIpCountryAsync(email, _cip);
       const _isNewDevice = _deviceTrack.isNew && _hadKnownDevices;
       // Count this login against the device model.
       let _modelLogins = null;
@@ -1391,6 +1609,81 @@ function apiRoute(req, res, urlPath) {
     const a = adminKeyOk(req);
     if (!a.ok) return sendJSON(res, 200, { ok: false, error: a.error });
     return sendJSON(res, 200, { ok: true, blocked: loadBlockedModels() });
+  }
+  // POST /api/admin/block-ip — {ip} — admin key required. MANUAL block:
+  // the admin reviews the Security section and decides. A blocked IP
+  // cannot sync (and cannot call admin endpoints with a wrong key).
+  if (req.method === 'POST' && urlPath === '/api/admin/block-ip') {
+    const a = adminKeyOk(req);
+    if (!a.ok) return sendJSON(res, 200, { ok: false, error: a.error });
+    readJSONBody(req, 64 * 1024).then(async (body) => {
+      const ip = typeof body && typeof body.ip === 'string' ? body.ip.trim().slice(0, 64) : '';
+      if (!ip || !/^[0-9a-zA-Z:.\-]+$/.test(ip)) return sendJSON(res, 200, { ok: false, error: 'សូមដាក់ IP ត្រឹមត្រូវ' });
+      const blocked = loadBlockedIps();
+      if (!blocked.some((b) => b === ip)) blocked.push(ip);
+      saveBlockedIps(blocked);
+      await ghFlushFile(BLOCKED_IPS_FILE);
+      return sendJSON(res, 200, { ok: true, blocked });
+    }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
+    return;
+  }
+  // POST /api/admin/unblock-ip — {ip} — admin key required. Removes an IP
+  // from the blocked list so it can sync again.
+  if (req.method === 'POST' && urlPath === '/api/admin/unblock-ip') {
+    const a = adminKeyOk(req);
+    if (!a.ok) return sendJSON(res, 200, { ok: false, error: a.error });
+    readJSONBody(req, 64 * 1024).then(async (body) => {
+      const ip = typeof body && typeof body.ip === 'string' ? body.ip.trim().slice(0, 64) : '';
+      if (!ip) return sendJSON(res, 200, { ok: false, error: 'សូមដាក់ IP ត្រឹមត្រូវ' });
+      const blocked = loadBlockedIps().filter((b) => b !== ip);
+      saveBlockedIps(blocked);
+      await ghFlushFile(BLOCKED_IPS_FILE);
+      return sendJSON(res, 200, { ok: true, blocked });
+    }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
+    return;
+  }
+  // GET /api/admin/blocked-ips — admin key required. Lists blocked IPs.
+  if (req.method === 'GET' && urlPath === '/api/admin/blocked-ips') {
+    const a = adminKeyOk(req);
+    if (!a.ok) return sendJSON(res, 200, { ok: false, error: a.error });
+    return sendJSON(res, 200, { ok: true, blocked: loadBlockedIps() });
+  }
+  // POST /api/admin/block-email — {email} — admin key required. MANUAL
+  // block: a blocked Gmail cannot sync at all.
+  if (req.method === 'POST' && urlPath === '/api/admin/block-email') {
+    const a = adminKeyOk(req);
+    if (!a.ok) return sendJSON(res, 200, { ok: false, error: a.error });
+    readJSONBody(req, 64 * 1024).then(async (body) => {
+      const email = normEmail(body && body.email);
+      if (!email) return sendJSON(res, 200, { ok: false, error: 'សូមដាក់ Gmail ត្រឹមត្រូវ' });
+      const blocked = loadBlockedEmails();
+      if (!blocked.some((b) => b === email)) blocked.push(email);
+      saveBlockedEmails(blocked);
+      await ghFlushFile(BLOCKED_EMAILS_FILE);
+      return sendJSON(res, 200, { ok: true, blocked });
+    }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
+    return;
+  }
+  // POST /api/admin/unblock-email — {email} — admin key required. Removes
+  // a Gmail from the blocked list so it can sync again.
+  if (req.method === 'POST' && urlPath === '/api/admin/unblock-email') {
+    const a = adminKeyOk(req);
+    if (!a.ok) return sendJSON(res, 200, { ok: false, error: a.error });
+    readJSONBody(req, 64 * 1024).then(async (body) => {
+      const email = normEmail(body && body.email);
+      if (!email) return sendJSON(res, 200, { ok: false, error: 'សូមដាក់ Gmail ត្រឹមត្រូវ' });
+      const blocked = loadBlockedEmails().filter((b) => b !== email);
+      saveBlockedEmails(blocked);
+      await ghFlushFile(BLOCKED_EMAILS_FILE);
+      return sendJSON(res, 200, { ok: true, blocked });
+    }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
+    return;
+  }
+  // GET /api/admin/blocked-emails — admin key required. Lists blocked Gmails.
+  if (req.method === 'GET' && urlPath === '/api/admin/blocked-emails') {
+    const a = adminKeyOk(req);
+    if (!a.ok) return sendJSON(res, 200, { ok: false, error: a.error });
+    return sendJSON(res, 200, { ok: true, blocked: loadBlockedEmails() });
   }
   // GET /api/admin/settings — PUBLIC (no admin key). The MovAi website reads
   // it on load to know whether the admin turned Smooth mode Auto on.
