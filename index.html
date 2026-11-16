@@ -10086,24 +10086,30 @@ document.addEventListener('keydown',function(e){
    Owner order 2026-11-16: every AI answer can be LISTENED to. The
    «🔊 ស្ដាប់» button speaks the answer with the REAL Microsoft Edge
    voices — Piseth (ប្រុស) / Sreymom (ស្រី) — called DIRECTLY from
-   the phone's own browser over a WebSocket to Microsoft's Edge
-   read-aloud endpoint. The MovAi server is NOT involved: Microsoft
-   blocks that endpoint from datacenter IPs (403), which is why the
-   old server path produced silence, but a phone's own connection
-   is accepted (the same route the SOKHOEUN app uses) — provided
-   the handshake also carries Microsoft's Sec-MS-GEC proof token,
-   computed on the phone by aiChatEdgeGec; without it Microsoft
-   refuses the socket (403) before it ever opens, on any IP. If the Edge
-   call fails for any reason (no network, socket error, no audio),
-   the button falls back to the browser's own speechSynthesis,
-   which prefers a Khmer (km) voice when the phone has one; if the
+   the phone's own browser over ONE WebSocket to Microsoft's Edge
+   read-aloud endpoint: connect once, send the text, and the voice
+   streams straight back (no API key — just Edge's public
+   TrustedClientToken plus the Sec-MS-GEC proof token computed on
+   the phone by aiChatEdgeGec; without that token, or with a stale
+   client-version string, Microsoft refuses the socket (403)
+   before it ever opens). The MovAi server is NOT involved:
+   Microsoft blocks that endpoint from datacenter IPs (403), which
+   is why the old server path produced silence, while a phone's
+   own connection is accepted (the same route the SOKHOEUN app
+   uses). If a socket dies with no audio, ONE fresh retry is made
+   (new proof token + connection id); if Edge still fails, the
+   button falls back to the browser's own speechSynthesis, which
+   prefers a Khmer (km) voice when the phone has one; if the
    answer is Khmer and the phone has NO Khmer voice, a clear note
-   says so under the answer instead of a stuck button. The button
-   ALWAYS returns to «🔊 ស្ដាប់»: playback end/error reset it, and
-   watchdogs (silence detection + a length-based cap) reset it even
-   when no event ever fires. The ប្រុស/ស្រី toggle under the chat
-   header is remembered in localStorage ('movai-chat-voice'). Only
-   one answer plays at a time; tapping the playing button stops. */
+   says so under the answer instead of a long silent wait. Per the
+   owner's order the button shows NO timer / percentage /
+   «connecting…» text — while busy it simply reads «⏹ ឈប់», and
+   it ALWAYS returns to «🔊 ស្ដាប់»: playback end/error reset it,
+   and watchdogs (playhead + silence detection + a length-based
+   cap) reset it within seconds even when no event ever fires.
+   The ប្រុស/ស្រី toggle under the chat header is remembered in
+   localStorage ('movai-chat-voice'). Only one answer plays at a
+   time; tapping the playing button stops. */
 var aiChatVoice='male';
 try{var _savedVoice=localStorage.getItem('movai-chat-voice');if(_savedVoice==='male'||_savedVoice==='female')aiChatVoice=_savedVoice;}catch(e){}
 var aiChatSpeakBtn=null;
@@ -10115,15 +10121,13 @@ var aiChatEdgeWs=null;
 var aiChatEdgeAudio=null;
 var aiChatEdgeObjUrl=null;
 var aiChatEdgePrimed=null;
-/* Live progress on the listen button (owner rule: a waiting UI
-   must show it is working, never a static «please wait») — while
-   connecting / synthesising, the button shows «⏳ កំពុងភ្ជាប់…
-   Ns» with the seconds ticking up; while the Edge MP3 plays, it
-   shows the played percentage; the browser-voice fallback shows
-   the elapsed seconds. */
-var aiChatSpeakPhase='wait';
-var aiChatSpeakT0=0;
-var aiChatLabelTimer=null;
+/* Button label while a listen is in flight (owner order
+   2026-11-16, replacing the earlier live-progress label): NO
+   timer, NO percentage, NO «connecting…» text on the button —
+   the tap either produces the voice within a few seconds or the
+   button quietly returns to «🔊 ស្ដាប់». While sound is being
+   fetched or played the button simply reads «⏹ ឈប់» (tap again
+   to stop). */
 function aiChatEdgeCleanup(){
   if(aiChatEdgeWs){var w=aiChatEdgeWs;aiChatEdgeWs=null;try{w.onopen=w.onmessage=w.onerror=w.onclose=null;w.close();}catch(e){}}
   if(aiChatEdgeAudio){var a=aiChatEdgeAudio;aiChatEdgeAudio=null;try{a.onended=null;a.onerror=null;a.pause();a.removeAttribute('src');}catch(e){}}
@@ -10146,28 +10150,9 @@ function aiChatResetSpeakBtn(){
   aiChatSpeakBtn=null;
 }
 function aiChatSpeakWatchdogClear(){if(aiChatWatchdog){try{clearInterval(aiChatWatchdog);}catch(e){}aiChatWatchdog=null;}}
-function aiChatLabelStop(){if(aiChatLabelTimer){try{clearInterval(aiChatLabelTimer);}catch(e){}aiChatLabelTimer=null;}}
-function aiChatLabelTick(){
-  var btn=aiChatSpeakBtn;if(!btn||!btn.isConnected)return;
-  var s=Math.max(0,Math.floor((Date.now()-aiChatSpeakT0)/1000));
-  if(aiChatSpeakPhase==='play'){
-    var au=aiChatEdgeAudio,pct=-1;
-    if(au&&au.duration&&isFinite(au.duration)&&au.duration>0)pct=Math.min(100,Math.floor((au.currentTime||0)/au.duration*100));
-    btn.textContent=pct>=0?('⏹ កំពុងចាក់… '+pct+'%'):('⏹ កំពុងចាក់… '+s+'s');
-  }else{
-    btn.textContent='⏳ កំពុងភ្ជាប់ Microsoft… '+s+'s';
-  }
-}
-function aiChatLabelStart(){
-  aiChatLabelStop();
-  aiChatSpeakT0=Date.now();
-  aiChatLabelTick();
-  aiChatLabelTimer=setInterval(aiChatLabelTick,500);
-}
 function aiChatStopSpeak(){
   aiChatSpeakToken++;
   aiChatSpeakWatchdogClear();
-  aiChatLabelStop();
   aiChatEdgeCleanup();
   try{if('speechSynthesis' in window)speechSynthesis.cancel();}catch(e){}
   aiChatResetSpeakBtn();
@@ -10175,7 +10160,6 @@ function aiChatStopSpeak(){
 function aiChatSpeakDone(token){
   if(token!==aiChatSpeakToken)return;
   aiChatSpeakWatchdogClear();
-  aiChatLabelStop();
   aiChatResetSpeakBtn();
 }
 function aiChatHasKhmer(t){return /[\u1780-\u17FF]/.test(String(t||''));}
@@ -10231,6 +10215,14 @@ function aiChatEdgeGec(cb){
     },function(){cb('');});
   }catch(e){cb('');}
 }
+function aiChatEdgeTs(){
+  /* The X-Timestamp format real Edge sends: UTC, e.g.
+     «Mon Nov 16 2026 03:56:00 GMT+0000 (Coordinated Universal
+     Time)» — not the phone's local-timezone Date string. */
+  var d=new Date(),days=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'],mons=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  function p2(n){return (n<10?'0':'')+n;}
+  return days[d.getUTCDay()]+' '+mons[d.getUTCMonth()]+' '+p2(d.getUTCDate())+' '+d.getUTCFullYear()+' '+p2(d.getUTCHours())+':'+p2(d.getUTCMinutes())+':'+p2(d.getUTCSeconds())+' GMT+0000 (Coordinated Universal Time)';
+}
 function aiChatSpeakEdge(text,btn,token){
   /* Speak with Microsoft Edge TTS called DIRECTLY from this phone's
      browser (WebSocket to the Edge read-aloud endpoint with Edge's
@@ -10238,99 +10230,123 @@ function aiChatSpeakEdge(text,btn,token){
      aiChatEdgeGec) — real km-KH voices: Piseth (male) / Sreymom
      (female) per the toggle. No MovAi server is involved:
      Microsoft blocks this endpoint from server IPs (403) but a
-     phone's own connection is accepted. ANY failure — socket
-     error, timeout, empty audio, playback error — falls back to
-     the browser voice (aiChatSpeakBrowser). */
-  var settled=false;
-  function fallback(){
-    if(settled)return;settled=true;
-    try{clearTimeout(connTimer);}catch(e){}
-    try{clearTimeout(synthTimer);}catch(e){}
-    aiChatEdgeCleanup();
+     phone's own connection is accepted. The whole request is ONE
+     socket: connect, send the text, the MP3 streams straight
+     back — a short answer is speaking within a few seconds. If
+     the first socket dies with no audio (a transient refusal or
+     a dropped connection), ONE fresh retry is made with a new
+     proof token + connection id; only if that also fails does
+     the browser voice take over (aiChatSpeakBrowser). */
+  var voice=(aiChatVoice==='female')?'km-KH-SreymomNeural':'km-KH-PisethNeural';
+  var attempts=0;
+  function giveUp(){
     if(token!==aiChatSpeakToken)return;
+    aiChatEdgeCleanup();
     aiChatSpeakBrowser(text,btn,token);
   }
-  if(typeof WebSocket==='undefined'||typeof TextDecoder==='undefined'){fallback();return;}
-  var voice=(aiChatVoice==='female')?'km-KH-SreymomNeural':'km-KH-PisethNeural';
-  var ws=null;
-  /* Compute the Sec-MS-GEC proof token on the phone first, THEN
-     open the socket with it — connecting without it is refused
-     (403) before the socket ever opens. */
-  aiChatEdgeGec(function(gec){
-    if(settled||token!==aiChatSpeakToken)return;
-    var url='wss://speech.platform.bing.com/consumer/speech/synthesize/readaloud/edge/v1?TrustedClientToken=6A5AA1D4EAFF4E9FB37E23D68491D6F4';
-    if(gec)url+='&Sec-MS-GEC='+gec+'&Sec-MS-GEC-Version=1-130.0.2849.68';
-    url+='&ConnectionId='+aiChatEdgeGenId();
-    try{ws=new WebSocket(url);}
-    catch(e){fallback();return;}
-    aiChatEdgeWs=ws;
-    try{ws.binaryType='arraybuffer';}catch(e){}
-    wireSocket();
-  });
-  var chunks=[];
-  /* If no audio byte arrives within 9s, the route is dead — fall
-     back instead of leaving the button on «កំពុងចាក់…». */
-  var connTimer=setTimeout(function(){if(!chunks.length)fallback();},9000);
-  /* Hard cap on the whole synthesis phase: play whatever arrived,
-     or fall back if nothing did. */
-  var synthTimer=setTimeout(function(){
-    if(settled)return;
-    if(chunks.length)playChunks();else fallback();
-  },45000);
-  function playChunks(){
-    if(settled)return;settled=true;
-    try{clearTimeout(connTimer);}catch(e){}
-    try{clearTimeout(synthTimer);}catch(e){}
-    try{ws.onopen=ws.onmessage=ws.onerror=ws.onclose=null;ws.close();}catch(e){}
-    if(aiChatEdgeWs===ws)aiChatEdgeWs=null;
+  function attempt(){
+    attempts++;
     if(token!==aiChatSpeakToken)return;
-    aiChatEdgePlay(chunks,text,btn,token);
-  }
-  function wireSocket(){
-  ws.onopen=function(){
-    if(token!==aiChatSpeakToken){try{ws.close();}catch(e){}return;}
-    var ts=new Date().toString();
-    try{
-      ws.send('X-Timestamp:'+ts+'\r\nContent-Type:application/json; charset=utf-8\r\nPath:speech.config\r\n\r\n{"context":{"synthesis":{"audio":{"metadataoptions":{"sentenceBoundaryEnabled":"false","wordBoundaryEnabled":"false"},"outputFormat":"audio-24khz-48kbitrate-mono-mp3"}}}}');
-      var esc=String(text||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-      var ssml="<speak version='1.0' xmlns='http://www.w3.org/2001/10/synthesis' xml:lang='km-KH'><voice name='"+voice+"'><prosody pitch='+0Hz' rate='+0%'>"+esc+"</prosody></voice></speak>";
-      ws.send('X-RequestId:'+aiChatEdgeGenId()+'\r\nContent-Type:application/ssml+xml\r\nX-Timestamp:'+ts+'\r\nPath:ssml\r\n\r\n'+ssml);
-    }catch(e){fallback();}
-  };
-  ws.onmessage=function(ev){
-    if(token!==aiChatSpeakToken||settled)return;
-    if(typeof ev.data==='string'){
-      if(ev.data.indexOf('Path:turn.end')!==-1){
-        if(chunks.length)playChunks();else fallback();
-      }
-      return;
+    if(typeof WebSocket==='undefined'||typeof TextDecoder==='undefined'){giveUp();return;}
+    var settled=false;
+    var ws=null;
+    var chunks=[];
+    var connTimer=null,synthTimer=null;
+    function fail(){
+      if(settled)return;settled=true;
+      try{clearTimeout(connTimer);}catch(e){}
+      try{clearTimeout(synthTimer);}catch(e){}
+      try{if(ws){ws.onopen=ws.onmessage=ws.onerror=ws.onclose=null;ws.close();}}catch(e){}
+      if(aiChatEdgeWs===ws)aiChatEdgeWs=null;
+      if(token!==aiChatSpeakToken)return;
+      if(attempts<2)attempt();else giveUp();
     }
-    /* Binary frame: 2-byte big-endian header length, the header
-       text, then the MP3 bytes. Only «Path:audio» frames carry
-       sound. */
-    try{
-      var buf=new Uint8Array(ev.data);
-      if(buf.length<2)return;
-      var hlen=(buf[0]<<8)|buf[1];
-      if(2+hlen>buf.length)return;
-      var header=new TextDecoder('utf-8').decode(buf.subarray(2,2+hlen));
-      if(header.indexOf('Path:audio')===-1)return;
-      var part=buf.subarray(2+hlen);
-      if(part.length)chunks.push(part.slice());
-    }catch(e){}
-  };
-  ws.onerror=function(){if(!chunks.length)fallback();};
-  ws.onclose=function(){
-    if(settled||token!==aiChatSpeakToken)return;
-    if(chunks.length)playChunks();else fallback();
-  };
+    function playChunks(){
+      if(settled)return;settled=true;
+      try{clearTimeout(connTimer);}catch(e){}
+      try{clearTimeout(synthTimer);}catch(e){}
+      try{if(ws){ws.onopen=ws.onmessage=ws.onerror=ws.onclose=null;ws.close();}}catch(e){}
+      if(aiChatEdgeWs===ws)aiChatEdgeWs=null;
+      if(token!==aiChatSpeakToken)return;
+      aiChatEdgePlay(chunks,text,btn,token);
+    }
+    /* Compute the Sec-MS-GEC proof token on the phone first, THEN
+       open the socket with it — connecting without it is refused
+       (403) before the socket ever opens. The client-version
+       string must be a CURRENT Edge version: Microsoft rejects
+       handshakes that name an old one, which is why the version
+       below tracks the shipping Edge release. */
+    aiChatEdgeGec(function(gec){
+      if(settled||token!==aiChatSpeakToken)return;
+      var url='wss://speech.platform.bing.com/consumer/speech/synthesize/readaloud/edge/v1?TrustedClientToken=6A5AA1D4EAFF4E9FB37E23D68491D6F4';
+      if(gec)url+='&Sec-MS-GEC='+gec+'&Sec-MS-GEC-Version=1-143.0.3650.75';
+      url+='&ConnectionId='+aiChatEdgeGenId();
+      try{ws=new WebSocket(url);}
+      catch(e){fail();return;}
+      aiChatEdgeWs=ws;
+      try{ws.binaryType='arraybuffer';}catch(e){}
+      /* If no audio byte arrives within 6s, this attempt is dead —
+         retry fresh / fall back instead of leaving the user
+         waiting in silence. */
+      connTimer=setTimeout(function(){if(!chunks.length)fail();},6000);
+      /* Hard cap on the whole synthesis phase: play whatever
+         arrived, or fail if nothing did. */
+      synthTimer=setTimeout(function(){
+        if(settled)return;
+        if(chunks.length)playChunks();else fail();
+      },25000);
+      ws.onopen=function(){
+        if(token!==aiChatSpeakToken){try{ws.close();}catch(e){}return;}
+        var ts=aiChatEdgeTs();
+        try{
+          ws.send('X-Timestamp:'+ts+'\r\nContent-Type:application/json; charset=utf-8\r\nPath:speech.config\r\n\r\n{"context":{"synthesis":{"audio":{"metadataoptions":{"sentenceBoundaryEnabled":"false","wordBoundaryEnabled":"false"},"outputFormat":"audio-24khz-48kbitrate-mono-mp3"}}}}');
+          var esc=String(text||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&apos;');
+          var ssml="<speak version='1.0' xmlns='http://www.w3.org/2001/10/synthesis' xmlns:mstts='https://www.w3.org/2001/mstts' xml:lang='km-KH'><voice name='"+voice+"'><prosody pitch='+0Hz' rate='+0%' volume='+0%'>"+esc+"</prosody></voice></speak>";
+          ws.send('X-RequestId:'+aiChatEdgeGenId()+'\r\nContent-Type:application/ssml+xml\r\nX-Timestamp:'+ts+'\r\nPath:ssml\r\n\r\n'+ssml);
+        }catch(e){fail();}
+      };
+      ws.onmessage=function(ev){
+        if(token!==aiChatSpeakToken||settled)return;
+        if(typeof ev.data==='string'){
+          if(ev.data.indexOf('Path:turn.end')!==-1){
+            if(chunks.length)playChunks();else fail();
+          }
+          return;
+        }
+        /* Binary frame: 2-byte big-endian header length, the
+           header text, then the MP3 bytes. Only «Path:audio»
+           frames carry sound («Path:audio.metadata» frames are
+           timing data, not sound). */
+        try{
+          var buf=new Uint8Array(ev.data);
+          if(buf.length<2)return;
+          var hlen=(buf[0]<<8)|buf[1];
+          if(2+hlen>buf.length)return;
+          var header=new TextDecoder('utf-8').decode(buf.subarray(2,2+hlen));
+          if(header.indexOf('Path:audio')===-1||header.indexOf('Path:audio.metadata')!==-1)return;
+          var part=buf.subarray(2+hlen);
+          if(part.length)chunks.push(part.slice());
+        }catch(e){}
+      };
+      ws.onerror=function(){if(!chunks.length)fail();};
+      ws.onclose=function(){
+        if(settled||token!==aiChatSpeakToken)return;
+        if(chunks.length)playChunks();else fail();
+      };
+    });
   }
+  attempt();
 }
 function aiChatEdgePlay(chunks,text,btn,token){
-  /* Play the collected Edge MP3. End / error reset the button; a
-     playback error before any sound falls back to the browser
-     voice. The watchdog (silence detection + length-based cap)
-     guarantees the button NEVER stays on «កំពុងចាក់…». */
+  /* Play the collected Edge MP3. End / error reset the button.
+     The watchdog watches the PLAYHEAD, not just timers: if the
+     element never actually starts (playhead still at 0 a few
+     seconds after play() — the silent hang the owner reported,
+     where the old watchdog only noticed via a 25s cap because a
+     paused element never counted as «stalled»), play() is
+     retried once and then the browser voice takes over; a
+     mid-play freeze ends the listen cleanly. The button ALWAYS
+     returns to «🔊 ស្ដាប់» within seconds. */
   try{
     var blob=new Blob(chunks,{type:'audio/mpeg'});
     var url=URL.createObjectURL(blob);
@@ -10341,10 +10357,10 @@ function aiChatEdgePlay(chunks,text,btn,token){
     var au=aiChatEdgePrimed||new Audio();
     aiChatEdgePrimed=null;
     aiChatEdgeAudio=au;
-    aiChatSpeakPhase='play';
     au.src=url;
+    try{au.load();}catch(e){}
     var startedAt=Date.now();
-    var cap=Math.min(240000,Math.max(25000,String(text||'').length*130+8000));
+    var cap=Math.min(240000,Math.max(20000,String(text||'').length*130+8000));
     au.onended=function(){aiChatEdgeCleanup();aiChatSpeakDone(token);};
     au.onerror=function(){
       aiChatEdgeCleanup();
@@ -10359,16 +10375,40 @@ function aiChatEdgePlay(chunks,text,btn,token){
       aiChatSpeakBrowser(text,btn,token);
     });
     aiChatSpeakWatchdogClear();
-    var lastT=-1,stall=0;
+    var lastT=-1,stall=0,replayed=false;
     aiChatWatchdog=setInterval(function(){
       if(token!==aiChatSpeakToken){aiChatSpeakWatchdogClear();return;}
       if(!aiChatEdgeAudio||aiChatEdgeAudio!==au)return;
       if(au.ended){aiChatSpeakDone(token);return;}
       var ct=0;try{ct=au.currentTime||0;}catch(e){}
-      if(ct===lastT&&!au.paused){stall++;}else{stall=0;}
-      lastT=ct;
-      if(stall>=6){try{au.pause();}catch(e){}aiChatEdgeCleanup();aiChatSpeakDone(token);return;}
-      if(Date.now()-startedAt>cap){try{au.pause();}catch(e){}aiChatEdgeCleanup();aiChatSpeakDone(token);}
+      var now=Date.now();
+      if(ct>lastT){stall=0;lastT=ct;}
+      else if(now-startedAt>2500){
+        /* No playhead movement: frozen mid-play, or never
+           started at all. */
+        stall++;
+        if(stall>=5){
+          if(ct===0&&!replayed){
+            /* Never started — one more explicit play() now the
+               element is fully loaded; if it still will not
+               move, the browser voice takes over instead of
+               silence. */
+            replayed=true;stall=0;startedAt=now;
+            var pr2=null;try{pr2=au.play();}catch(e){}
+            if(pr2&&pr2.catch)pr2.catch(function(){
+              aiChatEdgeCleanup();
+              if(token===aiChatSpeakToken)aiChatSpeakBrowser(text,btn,token);
+            });
+            return;
+          }
+          try{au.pause();}catch(e){}
+          aiChatEdgeCleanup();
+          if(ct===0&&token===aiChatSpeakToken)aiChatSpeakBrowser(text,btn,token);
+          else aiChatSpeakDone(token);
+          return;
+        }
+      }
+      if(now-startedAt>cap){try{au.pause();}catch(e){}aiChatEdgeCleanup();aiChatSpeakDone(token);}
     },500);
   }catch(e){
     aiChatEdgeCleanup();
@@ -10399,9 +10439,11 @@ function aiChatSpeakBrowser(text,btn,token){
 function aiChatSpeakNow(text,btn,token,vs){
   try{
     var km=aiChatKmVoice(vs);
-    if(aiChatHasKhmer(text)&&vs.length&&!km){
-      /* The phone HAS voices but none of them is Khmer: a foreign
-         voice reading Khmer — or total silence — helps no one.
+    if(aiChatHasKhmer(text)&&!km){
+      /* No Khmer voice on this phone (including a voice list that
+         stayed empty after the waits): a foreign voice reading
+         Khmer — or total silence while the button sits «busy»
+         for ~20s, the hang the owner reported — helps no one.
          Say clearly that there is no Khmer voice, and reset. */
       aiChatSpeakDone(token);
       aiChatSpeakNote(btn,(typeof LANG!=='undefined'&&LANG==='en')?'⚠ No Khmer voice on this phone — install a Khmer voice in the phone\u2019s Text-to-speech settings to listen':'⚠ ទូរស័ព្ទនេះគ្មានសំឡេងខ្មែរទេ — សូមដំឡើងសំឡេងខ្មែរក្នុងការកំណត់ Text-to-speech របស់ទូរស័ព្ទ ទើបអាចស្ដាប់បាន');
@@ -10411,12 +10453,11 @@ function aiChatSpeakNow(text,btn,token,vs){
     var u=new SpeechSynthesisUtterance(String(text||''));
     if(km){u.voice=km;u.lang=km.lang;}
     else if(aiChatHasKhmer(text)){try{u.lang='km-KH';}catch(e){}}
-    aiChatSpeakPhase='play';
-    if(aiChatSpeakBtn===btn)btn.textContent='⏹ កំពុងចាក់…';
+    if(aiChatSpeakBtn===btn)btn.textContent='⏹ ឈប់';
     u.onend=function(){aiChatSpeakDone(token);};
     u.onerror=function(){aiChatSpeakDone(token);};
     speechSynthesis.speak(u);
-    /* Watchdog — the button must NEVER stay stuck on «កំពុងចាក់…»:
+    /* Watchdog — the button must NEVER stay stuck on «⏹ ឈប់»:
        some phones never fire onend (long text, a voice that fails
        silently). While the browser reports it is speaking, leave
        it playing — the tick also calls resume(), which unsticks
@@ -10424,7 +10465,7 @@ function aiChatSpeakNow(text,btn,token,vs){
        silence twice in a row, or a generous cap for the text
        length passes, stop everything and reset the button. */
     var started=Date.now();
-    var cap=Math.min(180000,Math.max(20000,String(text||'').length*110));
+    var cap=Math.min(180000,Math.max(15000,String(text||'').length*110));
     var silent=0;
     aiChatSpeakWatchdogClear();
     aiChatWatchdog=setInterval(function(){
@@ -10442,8 +10483,7 @@ function aiChatSpeak(text,btn){
   var token=aiChatSpeakToken;
   aiChatSpeakBtn=btn;
   btn.classList.add('playing');
-  aiChatSpeakPhase='wait';
-  aiChatLabelStart();
+  btn.textContent='⏹ ឈប់';
   /* Prime an <audio> element INSIDE this tap: Android Chrome can
      refuse sound from an element first played long after the tap,
      and the Edge MP3 only arrives after a network round-trip — an
