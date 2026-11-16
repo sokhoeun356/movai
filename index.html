@@ -22,7 +22,7 @@ html[data-mode="light"]{color-scheme:light;--accent-soft:rgba(20,22,30,.07);--bg
 html{background:#0A0B0D;background:var(--bg);min-height:100vh;min-height:100dvh}
 body{font-family:"Kantumruy Pro","Nunito",sans-serif;background:#0A0B0D;background:var(--bg);color:var(--text);min-height:100vh;min-height:100dvh;text-shadow:var(--tshadow,none);-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
 button{font-family:inherit;cursor:pointer}
-main{max-width:720px;margin:0 auto;padding:calc(4.75rem + env(safe-area-inset-top,0px)) 18px calc(48px + env(safe-area-inset-bottom,0px))}
+main{max-width:720px;margin:0 auto;padding:calc(4.75rem + env(safe-area-inset-top,0px)) 18px calc(106px + env(safe-area-inset-bottom,0px))}
 .menuwrap{position:fixed;top:calc(12px + env(safe-area-inset-top,0px));left:max(18px,calc(50% - 342px));z-index:30;display:flex}
 /* ===== Header: NO backing strip =====
    The header has no solid strip behind it — the ☰ + MovAi brand
@@ -401,7 +401,7 @@ html[data-mode="light"] #genSunoModelDrop .dd-opt{color:#fff;border-top-color:rg
    list scrolls inside the panel. */
 #page-packages{position:fixed;left:0;right:0;bottom:0;z-index:85;transform:translateY(105%);transition:transform .34s cubic-bezier(.22,.8,.3,1);max-height:72vh;display:flex;flex-direction:column;pointer-events:none}
 #page-packages.open{transform:translateY(0);pointer-events:auto}
-#page-packages .panel{margin:0 auto 12px;width:calc(100% - 20px);max-width:700px;max-height:72vh;overflow-y:auto;border-radius:22px;box-shadow:0 -18px 50px rgba(0,0,0,.5);-webkit-overflow-scrolling:touch;overscroll-behavior:contain}
+#page-packages .panel{margin:0 auto calc(92px + env(safe-area-inset-bottom,0px));width:calc(100% - 20px);max-width:700px;max-height:72vh;overflow-y:auto;border-radius:22px;box-shadow:0 -18px 50px rgba(0,0,0,.5);-webkit-overflow-scrolling:touch;overscroll-behavior:contain}
 #pkgBackdrop{position:fixed;inset:0;z-index:84;background:rgba(0,0,0,.62);display:none}
 #pkgBackdrop.open{display:block}
 /* Package type tabs (owner order 2026-11-15 18:11): the two names
@@ -783,6 +783,30 @@ img,video{max-width:100%}
 .fab-dot{width:23px;height:23px;border-radius:50%;background:rgba(var(--glass-text-rgb),.28);border:3px solid rgba(var(--glass-text-rgb),.92);box-sizing:border-box}
 .fab-panel{display:none;width:min(86vw,308px);max-height:min(72vh,580px);overflow-y:auto;border-radius:18px;padding:16px 14px 18px;color:var(--glass-text);text-shadow:0 1px 2px rgba(var(--glass-shadow-rgb),.25);background:linear-gradient(160deg,rgba(255,255,255,calc(.03 + var(--glass-shine,.55)*.32)),rgba(255,255,255,calc(var(--glass-shine,.55)*.08)) 36%,rgba(190,198,212,calc(var(--glass-frost,.65)*.22)) 74%,rgba(var(--glass-tint),.42));background-color:rgba(var(--glass-tint),var(--glass-alpha,.5));-webkit-backdrop-filter:blur(var(--glass-blur,18px)) saturate(170%);backdrop-filter:blur(var(--glass-blur,18px)) saturate(170%);border:1px solid rgba(var(--glass-text-rgb),calc(.14 + var(--glass-shine,.55)*.2));box-shadow:0 18px 44px rgba(0,0,0,.35)}
 .fab-panel.open{display:block}
+/* ===== Bottom dock (iPhone home-screen style, icons only) =====
+   A wide glass dock stretched across the bottom of the page with
+   five icon destinations: Public, Create, History, Packages,
+   Notifications. It NEVER reaches either floating corner button:
+   its left edge stops to the RIGHT of the AI chat robot (which
+   occupies the 16px–74px lane at bottom-left) and its right edge
+   stops to the LEFT of the quick-settings FAB (the 16px–70px lane
+   at bottom-right), leaving a clear ~18px gap on each side, so
+   both buttons stay fully visible and tappable at all times.
+   z-index 35 keeps the dock under the drawer backdrop (40), the
+   drawer (50) and EVERY bottom sheet — Packages (85), the modal
+   sheets (95), the name sheet (120) — so a sheet always opens
+   OVER the dock and the dock can never cover a sheet or its
+   buttons. The Packages panel also gets a bottom margin that
+   lifts its bottom edge clear above the dock (see #page-packages
+   .panel). Main content carries extra bottom padding so the dock
+   never covers the end of the page. */
+.dock{position:fixed;bottom:calc(12px + env(safe-area-inset-bottom,0px));left:max(92px,calc(50% - 430px));right:max(88px,calc(50% - 430px));z-index:35;display:flex;align-items:stretch;justify-content:space-between;gap:2px;padding:9px 10px;border-radius:28px;background:linear-gradient(160deg,rgba(255,255,255,calc(.03 + var(--glass-shine,.55)*.32)),rgba(255,255,255,calc(var(--glass-shine,.55)*.08)) 36%,rgba(190,198,212,calc(var(--glass-frost,.65)*.22)) 74%,rgba(var(--glass-tint),.42));background-color:rgba(var(--glass-tint),var(--glass-alpha,.5));-webkit-backdrop-filter:blur(var(--glass-blur,18px)) saturate(170%);backdrop-filter:blur(var(--glass-blur,18px)) saturate(170%);border:1px solid rgba(var(--glass-text-rgb),calc(.14 + var(--glass-shine,.55)*.2));box-shadow:0 16px 38px rgba(0,0,0,.4),inset 0 1px 0 rgba(255,255,255,calc(.08 + var(--glass-shine,.55)*.5));color:var(--glass-text)}
+.dock-item{flex:1 1 0;min-width:0;display:flex;align-items:center;justify-content:center;height:50px;border:none;background:transparent;color:inherit;border-radius:18px;cursor:pointer;padding:0;position:relative;-webkit-tap-highlight-color:transparent;font-family:inherit}
+.dock-item svg{width:27px;height:27px;display:block}
+.dock-item.on{background:rgba(var(--accent-rgb),.25);color:var(--accent-text)}
+.dock-item:active{filter:brightness(1.25)}
+.dock-badge{position:absolute;top:4px;right:calc(50% - 20px);min-width:19px;height:19px;padding:0 5px;border-radius:999px;background:#e02424;color:#fff;font-size:0.625rem;font-weight:900;line-height:19px;text-align:center;box-shadow:0 2px 8px rgba(0,0,0,.4)}
+html[data-smooth="1"] .dock{background-color:rgba(var(--glass-tint),.96)}
 /* ===== AI Chat — floating robot button (bottom-LEFT) + chat panel =====
    The robot button is fixed in the BOTTOM-LEFT corner with safe-area
    padding, mirroring the quick-settings FAB on the bottom-right —
@@ -790,7 +814,7 @@ img,video{max-width:100%}
    Chat is login-only: guests are sent to the log-in sheet instead
    (see aiChatOpen in the script). Every reply comes live from the
    MovAi proxy server (POST /api/chat) — nothing is pre-written. */
-.chat-fab{position:fixed;left:16px;bottom:calc(16px + env(safe-area-inset-bottom,0px));z-index:60;width:58px;height:58px;border-radius:50%;border:1px solid rgba(0,0,0,.18);background:var(--accent-fill);color:#0d1005;display:flex;align-items:center;justify-content:center;cursor:pointer;padding:0;box-shadow:0 10px 26px rgba(0,0,0,.4),inset 0 1px 0 rgba(255,255,255,.35);-webkit-tap-highlight-color:transparent}
+.chat-fab{position:fixed;left:16px;bottom:calc(16px + env(safe-area-inset-bottom,0px));z-index:90;transform:translateZ(0);width:58px;height:58px;border-radius:50%;border:1px solid rgba(0,0,0,.18);background:var(--accent-fill);color:#0d1005;display:flex;align-items:center;justify-content:center;cursor:pointer;padding:0;box-shadow:0 10px 26px rgba(0,0,0,.4),inset 0 1px 0 rgba(255,255,255,.35);-webkit-tap-highlight-color:transparent}
 .chat-fab svg{width:32px;height:32px;display:block}
 .chat-fab:active{filter:brightness(.93)}
 .chat-fab .chat-fab-eye{animation:chatBlink 4.6s ease-in-out infinite;transform-origin:center;transform-box:fill-box}
@@ -1355,6 +1379,13 @@ html[data-smooth="1"] .brand-frame,html[data-smooth="1"] .acct-chip,html[data-sm
   </div>
   <button class="fab-btn" id="fabBtn" onclick="toggleFab()" aria-label="ការកំណត់រហ័ស" aria-expanded="false"><span class="fab-dot"></span></button>
 </div>
+<nav class="dock" id="dockBar" aria-label="Dock">
+  <button type="button" class="dock-item on" id="dockPublic" onclick="dockGo('public')" aria-label="Public · សាធារណៈ"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.6 3.9 5.7 3.9 9S14.5 18.4 12 21c-2.5-2.6-3.9-5.7-3.9-9S9.5 5.6 12 3z"/></svg></button>
+  <button type="button" class="dock-item" id="dockCreate" onclick="dockGo('create')" aria-label="Create · បង្កើត"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button>
+  <button type="button" class="dock-item" id="dockHistory" onclick="dockGo('history')" aria-label="History · ប្រវត្តិ"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/><path d="M12 7v5l3 3"/></svg></button>
+  <button type="button" class="dock-item" id="dockPackages" onclick="dockGo('packages')" aria-label="Packages · កញ្ចប់សេវាកម្ម"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="8" width="18" height="4" rx="1"/><path d="M12 8v13"/><path d="M19 12v7a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-7"/><path d="M7.5 8a2.5 2.5 0 0 1 0-5C11 3 12 8 12 8s1-5 4.5-5a2.5 2.5 0 0 1 0 5"/></svg></button>
+  <button type="button" class="dock-item" id="dockNotif" onclick="dockGo('notif')" aria-label="Notifications · ដំណឹង"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg><span class="dock-badge" id="dockNotifBadge" style="display:none">0</span></button>
+</nav>
 <button type="button" class="chat-fab" id="chatFab" onclick="aiChatToggle()" aria-label="AI Chat · ឆាតជាមួយ AI" aria-expanded="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 7V3"/><circle cx="12" cy="2.4" r="0.6" fill="currentColor"/><rect x="4.5" y="7" width="15" height="11.5" rx="3.5"/><path d="M2.5 12.5v2"/><path d="M21.5 12.5v2"/><circle class="chat-fab-eye" cx="9.3" cy="12.3" r="0.4" fill="currentColor"/><circle class="chat-fab-eye" cx="14.7" cy="12.3" r="0.4" fill="currentColor"/><path d="M9.8 15.6c.7.6 1.4.9 2.2.9s1.5-.3 2.2-.9"/></svg></button>
 <div id="chatPanel" class="chat-panel" role="dialog" aria-modal="false" aria-label="AI Chat">
   <div class="chat-head">
@@ -5399,6 +5430,7 @@ function openMenu(){
   try{pushRefreshToggle();}catch(e){}
   d.classList.add('open');if(b)b.classList.add('open');
   document.body.style.overflow='hidden';
+  try{chatFabShow();}catch(e){}
   requestAnimationFrame(function(){requestAnimationFrame(function(){
     d.classList.add('shown');if(b)b.classList.add('shown');
   });});
@@ -5408,8 +5440,10 @@ function closeMenu(){
   var b=document.getElementById('drawerBackdrop');
   d.classList.remove('shown');if(b)b.classList.remove('shown');
   document.body.style.overflow='';
+  try{chatFabShow();}catch(e){}
   setTimeout(function(){
     if(!d.classList.contains('shown')){d.classList.remove('open');if(b)b.classList.remove('open');}
+    try{chatFabShow();}catch(e){}
   },300);
 }
 /* Packages show ONLY on demand: packagesShow() reveals the section
@@ -5463,6 +5497,45 @@ function menuGo(id,mode){
   packagesHide();
   appSetView('create');
   var el=document.getElementById(id);if(el)el.scrollIntoView({behavior:'smooth',block:'start'});
+}
+/* ===== Bottom dock navigation =====
+   Public → the Public tab; Create → the Create panel; History →
+   the History page (inside the Create view, scrolled into place,
+   same as the drawer «History» item); Packages → the Packages
+   sheet; Notifications → the notifications sheet (guests get the
+   log-in sheet instead, exactly like the header bell). */
+function dockGo(dest){
+  try{closeFab();}catch(e){}
+  if(dest==='packages'){packagesShow();dockSync();return;}
+  if(dest==='notif'){notifBellClick();dockSync();return;}
+  packagesHide();
+  if(dest==='history'){
+    appSetView('create');
+    var el=document.getElementById('sec-history');if(el)el.scrollIntoView({behavior:'smooth',block:'start'});
+    dockSync('history');
+    return;
+  }
+  appSetView(dest==='create'?'create':'public');
+  window.scrollTo(0,0);
+  dockSync();
+}
+function dockSync(force){
+  var pub=document.getElementById('dockPublic'),cre=document.getElementById('dockCreate'),his=document.getElementById('dockHistory');
+  var onPub=(typeof APP_VIEW==='undefined'||APP_VIEW!=='create');
+  if(pub)pub.classList.toggle('on',onPub);
+  if(cre)cre.classList.toggle('on',!onPub&&force!=='history');
+  if(his)his.classList.toggle('on',force==='history');
+}
+/* The AI chat robot button must ALWAYS stay visible and tappable —
+   while the ☰ drawer is open and after it closes. openMenu and
+   closeMenu call this so no inline hiding can ever be left on it:
+   the button can never stay gone. (Its layer is also kept above
+   the drawer in CSS — see .chat-fab z-index.) */
+function chatFabShow(){
+  var f=document.getElementById('chatFab');if(!f)return;
+  if(f.style.display==='none')f.style.display='';
+  f.style.visibility='';
+  f.style.opacity='';
 }
 var fabAnimTimer=null;
 function toggleFab(){
@@ -5708,6 +5781,7 @@ function appSetView(v){
   if(onPub){pubLoadFeed(false);try{pubFollowLoad();}catch(e){}try{pubAutoStart();}catch(e){}}
   else{try{pubAutoStop();}catch(e){}try{histRender();}catch(e){}}
   if(changed)window.scrollTo(0,0);
+  try{dockSync();}catch(e){}
 }
 function pubSrvNum(v){
   if(typeof v==='number'&&isFinite(v))return v;
@@ -6829,23 +6903,42 @@ function acctAdminSync(){
   try{adminLoadSettings();}catch(e){}
   acctSyncBusy=true;
   var done=function(){acctSyncBusy=false;};
-  var ctrl=null,timer=null;
+  var send=function(model){
+    var ctrl=null,timer=null;
+    try{
+      if(window.AbortController){ctrl=new AbortController();timer=setTimeout(function(){try{ctrl.abort();}catch(e){}},30000);}
+    }catch(e){ctrl=null;}
+    var pl=acctAdminPayload(u);
+    pl.model=model||'';
+    var opts={method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(pl)};
+    if(ctrl)opts.signal=ctrl.signal;
+    fetch(ACCT_SYNC_URL,opts).then(function(r){
+      if(timer)clearTimeout(timer);
+      if(!r||!r.ok){done();return null;}
+      return r.json().catch(function(){return null;});
+    }).then(function(data){
+      done();
+      if(data){try{acctApplyServerData(data);}catch(e){}}
+    }).catch(function(){
+      if(timer)clearTimeout(timer);
+      done();
+    });
+  };
+  /* Real device model via User-Agent Client Hints: modern Chrome hides
+     the model in the plain User-Agent (sends «K» instead), so ask for the
+     high-entropy value; fall back to '' when unavailable or on failure,
+     and never send the placeholder «K». */
+  var proceeded=false;
+  var proceed=function(m){if(proceeded)return;proceeded=true;send(m);};
   try{
-    if(window.AbortController){ctrl=new AbortController();timer=setTimeout(function(){try{ctrl.abort();}catch(e){}},30000);}
-  }catch(e){ctrl=null;}
-  var opts={method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(acctAdminPayload(u))};
-  if(ctrl)opts.signal=ctrl.signal;
-  fetch(ACCT_SYNC_URL,opts).then(function(r){
-    if(timer)clearTimeout(timer);
-    if(!r||!r.ok){done();return null;}
-    return r.json().catch(function(){return null;});
-  }).then(function(data){
-    done();
-    if(data){try{acctApplyServerData(data);}catch(e){}}
-  }).catch(function(){
-    if(timer)clearTimeout(timer);
-    done();
-  });
+    if(navigator.userAgentData&&typeof navigator.userAgentData.getHighEntropyValues==='function'){
+      navigator.userAgentData.getHighEntropyValues(['model']).then(function(v){
+        var m=(v&&typeof v.model==='string')?v.model.trim():'';
+        if(m==='K')m='';
+        proceed(m);
+      }).catch(function(){proceed('');});
+    }else{proceed('');}
+  }catch(e){proceed('');}
 }
 /* ===== No Admin inside this website =====
    Admin lives ONLY in the separate Admin app (movai-admin, entered
@@ -7417,6 +7510,8 @@ function notifRenderAll(){
   if(b){if(u&&c>0){b.style.display='';b.textContent=label;}else b.style.display='none';}
   var db=document.getElementById('notifDrawerBadge');
   if(db){if(u&&c>0){db.style.display='';db.textContent=label;}else db.style.display='none';}
+  var kb=document.getElementById('dockNotifBadge');
+  if(kb){if(u&&c>0){kb.style.display='';kb.textContent=label;}else kb.style.display='none';}
   var html;
   if(!u)html='<p class="notif-note">'+escHtml(tx('notifGuest'))+'</p>';
   else if(!notifItems.length)html='<p class="notif-note">'+escHtml(tx(notifLoaded?'notifEmpty':'notifLoading'))+'</p>';
