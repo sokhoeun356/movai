@@ -13,7 +13,6 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Kantumruy+Pro:wght@400;700;900&family=Nunito:wght@700;900&display=swap" rel="stylesheet">
 <script src="https://js.puter.com/v2/" defer></script>
-<script src="https://cdn.jsdelivr.net/npm/lamejs@1.2.1/lame.min.js" defer></script>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <script>try{var _de=document.documentElement;var _th=[['#addc29','173,220,41','#63910c'],['#ff2e88','255,46,136','#d6006d'],['#ff6a00','255,106,0','#cf5200'],['#ffe600','255,230,0','#857200'],['#00e5ff','0,229,255','#007d99'],['#b537f2','181,55,242','#8f27c9']];var _ti=parseInt(localStorage.getItem('movai-theme')||'0',10)||0;if(_ti<0||_ti>6)_ti=0;var _md=localStorage.getItem('movai-mode')||'dark';var _dark=_md==='dark'||(_md==='auto'&&window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches);_de.setAttribute('data-mode',_dark?'dark':'light');if(_ti===6){_de.style.setProperty('--accent','#b537f2');_de.style.setProperty('--accent-rgb','181,55,242');_de.style.setProperty('--accent-fill','linear-gradient(100deg,#ff2e88,#b537f2 52%,#00e5ff)');_de.style.setProperty('--accent-text',_dark?'#b537f2':'#8f27c9');}else{var _tt=_th[_ti];_de.style.setProperty('--accent',_tt[0]);_de.style.setProperty('--accent-rgb',_tt[1]);_de.style.setProperty('--accent-text',_dark?_tt[0]:_tt[2]);}function _gv(k,d){var x=parseInt(localStorage.getItem(k),10);if(isNaN(x))return d;if(x<0)x=0;if(x>100)x=100;return x;}var _leg=null;['movai-glass-fab','movai-glass-drawer','movai-glass-brand','movai-glass'].forEach(function(k){if(_leg===null){var t=parseInt(localStorage.getItem(k),10);if(!isNaN(t))_leg=t;}});var _gc=_gv('movai-glass-clear',_leg===null?45:100-_leg);var _gb=_gv('movai-glass-blur',_leg===null?65:_leg);var _gsh=_gv('movai-glass-shine',55);_de.style.setProperty('--glass-alpha',(0.75+((100-_gc)/100)*0.23).toFixed(3));_de.style.setProperty('--glass-blur',((_gb/100)*28).toFixed(1)+'px');_de.style.setProperty('--glass-shine',(_gsh/100).toFixed(3));_de.style.setProperty('--glass-frost',(_gb/100).toFixed(3));var _tbv=_gv('movai-txtblur',0);_de.style.setProperty('--txtblur',((_tbv/100)*16).toFixed(1)+'px');var _bgv=_gv('movai-bgb',50);var _base=_dark?[10,11,13]:[243,244,246];var _bc;if(_bgv<=50){var _f1=1-((50-_bgv)/50)*0.9;_bc=_base.map(function(c){return Math.round(c*_f1);});}else{var _f2=(_bgv-50)/50;_bc=_base.map(function(c){return Math.round(c+(255-c)*_f2*0.95);});}var _bgs='rgb('+_bc.join(',')+')';_de.style.setProperty('--bg',_bgs);_de.style.setProperty('--bg1',_bgs);_de.style.setProperty('--bg2',_bgs);var _tsv=localStorage.getItem('movai-tshadow');if(_tsv&&_tsv!=='none')_de.style.setProperty('--tshadow',_tsv);var _bfx=localStorage.getItem('movai-brandfx');if(_bfx)_de.setAttribute('data-brandfx',_bfx);var _smv=localStorage.getItem('movai-smooth');if(_smv==='1')_de.setAttribute('data-smooth','1');var _fv=parseInt(localStorage.getItem('movai-font')||'50',10);if(isNaN(_fv))_fv=50;if(_fv<0)_fv=0;if(_fv>100)_fv=100;var _ff=_fv<=50?0.6+(_fv/50)*0.4:1+((_fv-50)/50)*1.2;_de.style.fontSize=(16*_ff)+'px';}catch(e){}</script>
 <style>
@@ -2194,8 +2193,7 @@ km:{
  dlFailed:'ទាញយកមិនបានទេ — សូមព្យាយាមម្ដងទៀត',
  mp3Converting:'កំពុងបម្លែងទៅជា MP3…',
  mp3FailNet:'ទាញយកបទមិនបានទេ — បញ្ហាបណ្ដាញ ឬ server មិនឆ្លើយ សូមព្យាយាមម្ដងទៀត',
- mp3FailDecode:'បម្លែងទៅជា MP3 មិនបានទេ — អានឯកសារសំឡេងនេះមិនបាន',
- mp3FailEncoder:'បម្លែងទៅជា MP3 មិនបានទេ — MP3 encoder ផ្ទុកមិនបាន សូមព្យាយាមម្ដងទៀត',
+ mp3FailServer:'បម្លែងទៅជា MP3 មិនបានទេ — server បរាជ័យ សូមព្យាយាមម្ដងទៀត',
  puterRetry:'Puter.js មិនទាន់ផ្ទុកទេ — សូមព្យាយាមម្ដងទៀត',
  puterNoImg:'Puter: មិនបានរូបភាពទេ',puterNoVid:'Puter: មិនបានវីដេអូទេ',
  novaiAcc:'គណនី NovAI',novaiBalanceNote:'Balance នេះប្រើសម្រាប់ model បង់លុយតែប៉ុណ្ណោះ — វីដេអូហ្វ្រីមិនកាត់លុយទេ',
@@ -2420,8 +2418,7 @@ en:{
  dlFailed:'Download failed — please try again',
  mp3Converting:'Converting to MP3…',
  mp3FailNet:'Could not fetch the song — network problem or the server did not answer, please try again',
- mp3FailDecode:'Could not convert to MP3 — this audio file could not be read',
- mp3FailEncoder:'Could not convert to MP3 — the MP3 encoder failed to load, please try again',
+ mp3FailServer:'Could not convert to MP3 — the server failed, please try again',
  puterRetry:'Puter.js has not loaded yet — please try again',
  puterNoImg:'Puter: no image returned',puterNoVid:'Puter: no video returned',
  novaiAcc:'NovAI Account',novaiBalanceNote:'This balance is used for paid models only — free videos do not deduct money',
@@ -4800,18 +4797,18 @@ async function dlSave(src,fname){
 /* ===== Song downloads are ALWAYS MP3 (owner rule 2026-11-16) =====
    Providers (Magic Hour above all) hand back WAV — a 3:30 song
    arrives as a ~40 MB .wav. A song Download NEVER saves that:
-   the bytes are fetched here (direct, or through the server
-   proxy when CORS blocks the direct fetch — same routes as
-   dlSave), decoded with the Web Audio API and re-encoded IN
-   THIS BROWSER with lamejs at 128 kbps, then saved under the
-   song's own title + .mp3 (~3–5 MB for a 3:30 song). A source
-   that already IS MP3 (Suno) is saved as-is — no pointless
-   re-encode. While it works, a progress pill shows
+   the conversion now happens ON THE SERVER — dlSaveSongMp3 calls
+   PUB_API + '/gen/song/mp3?u=<src>&name=<fname>', the server
+   fetches the audio and converts WAV→MP3 at 128 kbps in a couple
+   of seconds, and the browser only saves the small .mp3 it gets
+   back (~3–5 MB for a 3–5 minute song). A source that already IS
+   MP3 is sent back by the server unchanged. (The old in-browser
+   lamejs + Web Audio encode was removed — on an old phone it
+   took 118s+.) While it works, a progress pill shows
    «កំពុងបម្លែងទៅជា MP3…» with a live % and ticking seconds.
-   If anything fails, the pill says the REAL reason and NOTHING
+   If the server fails, the pill says the REAL reason and NOTHING
    is saved — the big WAV is never quietly downloaded instead.
    Image / video / 3D downloads do not pass through here. */
-var MP3_BITRATE=128;
 var mp3Busy=false;
 var mp3ProgEl=null,mp3ProgTimer=null,mp3ProgT0=0,mp3ProgPct=null;
 function mp3ProgRender(){
@@ -4857,69 +4854,41 @@ function mp3FailShow(key){
     mp3FailTimer=setTimeout(function(){t.style.display='none';t.classList.remove('blur-out');},260);
   },4500);
 }
-function mp3EncoderReady(){
-  return new Promise(function(res){
-    if(window.lamejs&&lamejs.Mp3Encoder)return res(true);
-    var s=document.createElement('script');
-    s.src='https://cdn.jsdelivr.net/npm/lamejs@1.2.1/lame.min.js';
-    s.onload=function(){res(!!(window.lamejs&&lamejs.Mp3Encoder));};
-    s.onerror=function(){res(false);};
-    document.head.appendChild(s);
-  });
+/* Show a raw failure message (the server's own reason) in the
+   same toast mp3FailShow uses for translated keys. */
+function mp3FailText(msg){
+  var t=document.getElementById('mp3FailToast');
+  if(!t){
+    t=document.createElement('div');
+    t.id='mp3FailToast';t.className='dl-fail-toast';t.setAttribute('role','alert');
+    document.body.appendChild(t);
+  }
+  t.textContent=String(msg||'').slice(0,300)||tx('mp3FailServer');
+  t.style.display='block';
+  t.classList.remove('blur-out');t.classList.add('blur-in');
+  if(mp3FailTimer)clearTimeout(mp3FailTimer);
+  mp3FailTimer=setTimeout(function(){
+    t.classList.remove('blur-in');t.classList.add('blur-out');
+    mp3FailTimer=setTimeout(function(){t.style.display='none';t.classList.remove('blur-out');},260);
+  },6000);
 }
-async function dlFetchBytes(src){
-  try{
-    var r=await fetch(src);if(!r.ok)throw new Error('http '+r.status);
-    return await r.blob();
-  }catch(e){/* direct fetch blocked (CORS) — the server proxy route, same as dlSave */}
-  var rp=await fetch(PUB_API+'/gen/video/file?u='+encodeURIComponent(src));
-  if(!rp.ok)throw new Error('http '+rp.status);
-  return await rp.blob();
-}
-function mp3LooksMp3(blob,head){
-  var t=(blob.type||'').toLowerCase();
-  if(t.indexOf('mpeg')>=0||t.indexOf('mp3')>=0)return true;
-  if(head&&head.length>=3&&head[0]===0x49&&head[1]===0x44&&head[2]===0x33)return true; /* "ID3" tag */
-  if(head&&head.length>=2&&head[0]===0xFF&&(head[1]&0xE0)===0xE0)return true; /* MPEG frame sync */
-  return false;
-}
-function mp3Encode(audio){
-  return new Promise(function(resolve){
-    try{
-      var chs=Math.min(2,audio.numberOfChannels||1);
-      var enc=new lamejs.Mp3Encoder(chs,audio.sampleRate,MP3_BITRATE);
-      var left=audio.getChannelData(0);
-      var right=chs>1?audio.getChannelData(1):left;
-      var total=left.length,block=1152,parts=[],done=0;
-      function f2i(f,out,n,off){
-        for(var j=0;j<n;j++){
-          var v=f[off+j];
-          out[j]=v<0?Math.max(-32768,Math.round(v*32768)):Math.min(32767,Math.round(v*32767));
-        }
-      }
-      function step(){
-        try{
-          var end=Math.min(done+block*400,total);
-          for(var i=done;i<end;i+=block){
-            var n=Math.min(block,total-i);
-            var lb=new Int16Array(n);
-            f2i(left,lb,n,i);
-            var out;
-            if(chs>1){var rb=new Int16Array(n);f2i(right,rb,n,i);out=enc.encodeBuffer(lb,rb);}
-            else out=enc.encodeBuffer(lb);
-            if(out&&out.length)parts.push(out);
-          }
-          done=end;
-          mp3ProgSet(Math.round(done/total*100));
-          if(done<total){setTimeout(step,0);return;}
-          var tail=enc.flush();
-          if(tail&&tail.length)parts.push(tail);
-          resolve(new Blob(parts,{type:'audio/mpeg'}));
-        }catch(e){resolve(null);}
-      }
-      step();
-    }catch(e){resolve(null);}
-  });
+/* Read a fetch Response body with live % progress (uses
+   Content-Length when the server sends it; otherwise the pill
+   just ticks seconds like before). */
+async function mp3ReadBody(rp){
+  var total=parseInt(rp.headers.get('Content-Length')||'',10)||0;
+  if(rp.body&&rp.body.getReader){
+    var reader=rp.body.getReader(),chunks=[],got=0;
+    for(;;){
+      var step=await reader.read();
+      if(step.done)break;
+      chunks.push(step.value);got+=step.value.length;
+      if(total>0)mp3ProgSet(Math.min(99,Math.round(got/total*100)));
+    }
+    return new Blob(chunks,{type:'audio/mpeg'});
+  }
+  var b=await rp.blob();
+  return new Blob([b],{type:'audio/mpeg'});
 }
 async function dlSaveSongMp3(src,title,fallback){
   if(!src||mp3Busy)return;
@@ -4927,31 +4896,34 @@ async function dlSaveSongMp3(src,title,fallback){
   var fname=dlCleanName(title,fallback||'movai-song')+'.mp3';
   mp3ProgStart();
   try{
-    var blob;
-    try{blob=await dlFetchBytes(src);}
-    catch(fe){mp3ProgDone();mp3FailShow('mp3FailNet');return;}
-    var buf=await blob.arrayBuffer();
-    var head=new Uint8Array(buf.slice(0,4));
-    if(mp3LooksMp3(blob,head)){
-      dlBlobSave(new Blob([buf],{type:'audio/mpeg'}),fname);
+    var rp;
+    try{
+      rp=await fetch(PUB_API+'/gen/song/mp3?u='+encodeURIComponent(src)+'&name='+encodeURIComponent(fname));
+    }catch(fe){mp3ProgDone();mp3FailShow('mp3FailNet');return;}
+    if(!rp.ok){
+      /* Server failed — surface its REAL reason (JSON error or
+         plain text) and save NOTHING (never the big WAV). */
+      var reason='';
+      try{
+        var ct=rp.headers.get('Content-Type')||'';
+        if(ct.indexOf('json')>=0){
+          var ej=await rp.json().catch(function(){return null;});
+          if(ej)reason=String(ej.error||ej.message||'');
+        }
+        if(!reason)reason=(await rp.text().catch(function(){return '';})||'').trim();
+      }catch(e){}
       mp3ProgDone();
+      if(reason)mp3FailText(tx('mp3FailServer')+' — '+reason);
+      else mp3FailShow('mp3FailServer');
       return;
     }
-    if(!await mp3EncoderReady()){mp3ProgDone();mp3FailShow('mp3FailEncoder');return;}
-    var AC=window.AudioContext||window.webkitAudioContext;
-    if(!AC){mp3ProgDone();mp3FailShow('mp3FailDecode');return;}
-    var actx=new AC();
-    var audio=null;
-    try{audio=await actx.decodeAudioData(buf.slice(0));}
-    catch(de){audio=null;}
-    try{actx.close();}catch(e){}
-    if(!audio){mp3ProgDone();mp3FailShow('mp3FailDecode');return;}
-    var mp3blob=await mp3Encode(audio);
-    if(!mp3blob){mp3ProgDone();mp3FailShow('mp3FailDecode');return;}
-    dlBlobSave(mp3blob,fname);
+    var blob=await mp3ReadBody(rp);
+    if(!blob||!blob.size){mp3ProgDone();mp3FailShow('mp3FailServer');return;}
+    mp3ProgSet(100);
+    dlBlobSave(blob,fname);
     mp3ProgDone();
   }catch(e){
-    mp3ProgDone();mp3FailShow('mp3FailDecode');
+    mp3ProgDone();mp3FailShow('mp3FailNet');
   }finally{mp3Busy=false;}
 }
 async function genDownload(){
@@ -5762,7 +5734,7 @@ async function genDownloadSong(src,n,title){
   if(!src)return;
   /* The saved file carries the SONG'S OWN title (owner rule) and
      is ALWAYS an MP3 (owner rule 2026-11-16): a WAV source is
-     converted in the browser first — see dlSaveSongMp3. «Song 1»
+     converted on the server first — see dlSaveSongMp3. «Song 1»
      style names only when the song has no title. */
   await dlSaveSongMp3(src,title,'movai-song-'+(n||1));
 }
@@ -9389,8 +9361,8 @@ function pubDlName(it){
 async function pubDownloadFile(it){
   if(!it||!it.url)return;
   /* Songs save as MP3 under the song's own title (owner rule
-     2026-11-16) — converted in the browser when the source is
-     WAV; images / videos keep the plain dlSave path untouched. */
+     2026-11-16) — converted ON THE SERVER via dlSaveSongMp3;
+     images / videos keep the plain dlSave path untouched. */
   if(it.type==='song'){await dlSaveSongMp3(it.url,it.title,'movai-song-'+String(it.id).slice(0,8));return;}
   await dlSave(it.url,pubDlName(it));
 }
