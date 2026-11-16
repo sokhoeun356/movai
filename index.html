@@ -918,12 +918,18 @@ html[data-mode="light"] .btn-free{color:#63910c}
    right, on the same level. Scoped to #loginSheet only — the main
    header, package cards and the free-video watermark cover are
    untouched. */
-#loginSheet .login-brand{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px;padding-bottom:12px;border-bottom:1px solid var(--line)}
-#loginSheet .login-brand-name{font-size:1.75rem;font-weight:900;letter-spacing:-.02em;line-height:1;color:var(--text);white-space:nowrap}
-#loginSheet .login-brand-name span{color:var(--accent-text)}
-#loginSheet .login-brand-credit{text-align:right;line-height:1.3;min-width:0}
-#loginSheet .login-brand-credit b{display:block;font-size:0.75rem;font-weight:800;letter-spacing:.04em;color:var(--text);white-space:nowrap}
-#loginSheet .login-brand-credit i{display:block;font-style:normal;font-size:0.6875rem;font-weight:600;color:var(--muted);white-space:nowrap}
+#loginSheet .login-brand,#verifySheet .login-brand{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px;padding-bottom:12px;border-bottom:1px solid var(--line)}
+#loginSheet .login-brand-name,#verifySheet .login-brand-name{font-size:1.75rem;font-weight:900;letter-spacing:-.02em;line-height:1;color:var(--text);white-space:nowrap}
+#loginSheet .login-brand-name span,#verifySheet .login-brand-name span{color:var(--accent-text)}
+#loginSheet .login-brand-credit,#verifySheet .login-brand-credit{text-align:right;line-height:1.3;min-width:0}
+#loginSheet .login-brand-credit b,#verifySheet .login-brand-credit b{display:block;font-size:0.75rem;font-weight:800;letter-spacing:.04em;color:var(--text);white-space:nowrap}
+#loginSheet .login-brand-credit i,#verifySheet .login-brand-credit i{display:block;font-style:normal;font-size:0.6875rem;font-weight:600;color:var(--muted);white-space:nowrap}
+/* Verify sheet (email code at log in): same full-background blur as
+   the log in sheet; the 6-digit code input is centred, large and
+   widely spaced so the code is easy to read back from the email. */
+#verifySheet{-webkit-backdrop-filter:blur(16px) saturate(130%);backdrop-filter:blur(16px) saturate(130%)}
+#verifySheet .verify-code-input{text-align:center;font-size:1.5rem;font-weight:800;letter-spacing:.4em;text-indent:.4em}
+#verifySheet .verify-count{font-variant-numeric:tabular-nums}
 /* Google sign-in loading spinner — shown in the login sheet while
    Google is opening, INSTEAD of any «Opening Google…» text (owner
    rule: a spinning indicator only, no waiting words). */
@@ -1783,6 +1789,24 @@ html[data-smooth="1"] .brand-frame,html[data-smooth="1"] .acct-chip,html[data-sm
     </div>
   </div>
 </div>
+<div id="verifySheet" class="pkg-sheet" style="display:none" role="dialog" aria-modal="true" onclick="if(event.target===this)verifyCancel()">
+  <div class="pkg-sheet-card">
+    <div class="login-brand" aria-hidden="true"><span class="login-brand-name">Mov<span>Ai</span></span><span class="login-brand-credit"><b>YEM SOKHOEUN</b><i>Create by Owner</i></span></div>
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:10px">
+      <h3 style="font-size:1.0625rem;font-weight:800" data-i18n="verifyTitle">ផ្ទៀងផ្ទាត់ Gmail របស់អ្នក</h3>
+      <button type="button" class="drawer-close" style="background:var(--card2);color:var(--text);border-color:var(--line2)" onclick="verifyCancel()" aria-label="Close">✕</button>
+    </div>
+    <p style="font-size:0.875rem;color:var(--muted);line-height:1.7;margin-top:10px" data-i18n="verifyNote">យើងបានផ្ញើលេខកូដ 6 ខ្ទង់ និង Link verify ទៅ Gmail ខាងក្រោម។ សូមបញ្ចូលលេខកូដ ឬចុច Link ក្នុង email ដើម្បីចូលប្រើ។</p>
+    <p id="verifyEmail" style="font-size:0.9375rem;font-weight:800;margin-top:8px;overflow-wrap:break-word"></p>
+    <p id="verifyCount" class="verify-count" style="font-size:0.8125rem;color:var(--muted);margin-top:4px;min-height:16px"></p>
+    <input class="input verify-code-input" id="verifyCodeInput" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="6" style="margin-top:12px" data-i18n-ph="verifyCodePh" placeholder="លេខកូដ 6 ខ្ទង់" oninput="this.value=this.value.replace(/\D/g,'').slice(0,6)" onkeydown="if(event.key==='Enter')verifySubmit()">
+    <button type="button" class="kbtn kbtn-black" id="verifyBtn" style="margin-top:14px;width:100%" onclick="verifySubmit()" data-i18n="verifyBtn">ផ្ទៀងផ្ទាត់ · Verify</button>
+    <button type="button" class="kbtn kbtn-white" id="verifyResendBtn" style="margin-top:10px;width:100%" onclick="verifyResend()" data-i18n="verifyResend">ផ្ញើលេខកូដម្ដងទៀត · Resend</button>
+    <p style="font-size:0.8125rem;color:var(--muted);line-height:1.6;margin-top:12px" data-i18n="verifyLinkNote">ឬចុច Link ក្នុង email ដើម្បី verify ក៏បាន — មិនបាច់បញ្ចូលលេខកូដទេ</p>
+    <p id="verifyMsg" style="font-size:0.8125rem;margin-top:8px;min-height:16px;line-height:1.6"></p>
+    <button type="button" class="kbtn kbtn-white" style="margin-top:6px;width:100%" onclick="verifyCancel()" data-i18n="verifyBack">ត្រឡប់ទៅ Log in</button>
+  </div>
+</div>
 <div id="nameSheet" class="pkg-sheet" style="display:none" role="dialog" aria-modal="true" aria-labelledby="nameGateTitle">
   <div class="pkg-sheet-card">
     <h3 id="nameGateTitle" style="font-size:1.125rem;font-weight:900" data-i18n="nameGateTitle">បំពេញឈ្មោះរបស់អ្នក</h3>
@@ -1972,6 +1996,20 @@ km:{
  loginGoogleLive:'Google Sign-In ដំណើរការតែលើ live site ប៉ុណ្ណោះ — Origin នេះមិនទាន់បាន authorize ក្នុង Google ទេ។ សូមបើក https://movai-1.onrender.com រួចចុច «Connect account Google» នៅទីនោះដើម្បី Log in ជាមួយ Google ពិត។',
  loginGoogleFail:'ភ្ជាប់ Google មិនបានទេ — សូមព្យាយាមម្ដងទៀត',
  loginGoogleNoEmail:'Google មិនបានផ្ដល់ Gmail មកទេ — សូមព្យាយាមម្ដងទៀត',
+ verifyTitle:'ផ្ទៀងផ្ទាត់ Gmail របស់អ្នក',
+ verifyNote:'យើងបានផ្ញើលេខកូដ 6 ខ្ទង់ និង Link verify ទៅ Gmail ខាងក្រោម។ សូមបញ្ចូលលេខកូដ ឬចុច Link ក្នុង email ដើម្បីចូលប្រើ។',
+ verifyExpiresFmt:'លេខកូដផុតកំណត់ក្នុង {t}',verifyExpired:'លេខកូដផុតកំណត់ហើយ — សូមចុច «ផ្ញើលេខកូដម្ដងទៀត» ដើម្បីយកលេខកូដថ្មី',
+ verifyCodePh:'លេខកូដ 6 ខ្ទង់',verifyBtn:'ផ្ទៀងផ្ទាត់ · Verify',
+ verifyResend:'ផ្ញើលេខកូដម្ដងទៀត · Resend',verifyResendWaitFmt:'ផ្ញើម្ដងទៀតក្នុង {s} វិនាទី',
+ verifyLinkNote:'ឬចុច Link ក្នុង email ដើម្បី verify ក៏បាន — មិនបាច់បញ្ចូលលេខកូដទេ',
+ verifySending:'កំពុងផ្ញើលេខកូដទៅ Gmail…',verifySent:'បានផ្ញើលេខកូដថ្មីទៅ Gmail របស់អ្នកហើយ ✓',
+ verifyChecking:'កំពុងផ្ទៀងផ្ទាត់…',
+ verifyErrCode:'សូមបញ្ចូលលេខកូដ 6 ខ្ទង់ឲ្យគ្រប់',
+ verifyErrBad:'លេខកូដមិនត្រឹមត្រូវ ឬផុតកំណត់ហើយ — សូមព្យាយាមម្ដងទៀត',
+ verifyErrSend:'ផ្ញើលេខកូដមិនបានទេ — សូមចុច «ផ្ញើលេខកូដម្ដងទៀត»',
+ verifyErrNet:'ភ្ជាប់ទៅ server មិនបានទេ — សូមព្យាយាមម្ដងទៀត',
+ verifyTokenBad:'Link verify នេះមិនត្រឹមត្រូវ ឬផុតកំណត់ហើយ — សូម Log in ម្ដងទៀត',
+ verifyBack:'ត្រឡប់ទៅ Log in',
  acctNameTitle:'ដាក់ឈ្មោះរបស់អ្នក',acctNameNote:'អ្នកបានចូលគណនីហើយ — សូមដាក់នាម និងគោត្តនាមរបស់អ្នក (ខ្មែរ ឬអង់គ្លេសក៏បាន)',
  acctNameSave:'រក្សាទុកឈ្មោះ',acctNameErr:'សូមដាក់ទាំងនាម និងគោត្តនាម',
  nameGateTitle:'បំពេញឈ្មោះរបស់អ្នក',nameGateNote:'គណនី Google នេះមិនទាន់មានឈ្មោះទេ។ សូមបំពេញនាម និងគោត្តនាមជាមុនសិន — ត្រូវបំពេញឲ្យរួចរាល់ទើបអាចចូលប្រើ MovAi បាន។ បើគណនីធ្លាប់មានឈ្មោះហើយ ឈ្មោះនឹងបង្ហាញដោយស្វ័យប្រវត្តិ មិនបាច់បំពេញទេ។',
@@ -2176,6 +2214,20 @@ en:{
  loginGoogleLive:'Google Sign-In works on the live site only — this origin is not authorized in Google yet. Please open https://movai-1.onrender.com and tap “Connect account Google” there to sign in with real Google.',
  loginGoogleFail:'Could not connect to Google — please try again',
  loginGoogleNoEmail:'Google did not return a Gmail — please try again',
+ verifyTitle:'Verify your Gmail',
+ verifyNote:'We sent a 6-digit code and a verification link to the Gmail below. Enter the code, or tap the link in the email, to continue.',
+ verifyExpiresFmt:'Code expires in {t}',verifyExpired:'The code has expired — tap “Resend code” for a new one',
+ verifyCodePh:'6-digit code',verifyBtn:'Verify · ផ្ទៀងផ្ទាត់',
+ verifyResend:'Resend code · ផ្ញើម្ដងទៀត',verifyResendWaitFmt:'Resend in {s}s',
+ verifyLinkNote:'Or tap the link in the email to verify — no code needed',
+ verifySending:'Sending the code to your Gmail…',verifySent:'A new code was sent to your Gmail ✓',
+ verifyChecking:'Verifying…',
+ verifyErrCode:'Please enter all 6 digits of the code',
+ verifyErrBad:'That code is incorrect or expired — please try again',
+ verifyErrSend:'Could not send the code — tap “Resend code” to try again',
+ verifyErrNet:'Could not reach the server — please try again',
+ verifyTokenBad:'That verification link is invalid or expired — please log in again',
+ verifyBack:'Back to Log in',
  acctNameTitle:'Add your name',acctNameNote:'You are signed in — please add your first name and last name (Khmer or English is fine)',
  acctNameSave:'Save name',acctNameErr:'Please enter both a first name and a last name',
  nameGateTitle:'Complete your name',nameGateNote:'This Google account has no name yet. Please enter your first name and last name first — you must complete this before you can use MovAi. If the account already has a name, it appears automatically and there is nothing to fill in.',
@@ -9993,7 +10045,7 @@ function acctBlockedEnforce(reason){
   try{closeMenu();}catch(e){}
   try{packagesHide();}catch(e){}
   try{profileClose();}catch(e){}
-  ['loginSheet','nameSheet','giftSheet','pushSheet','notifSheet','pubSheet','postSheet','pkgSheet'].forEach(function(id){
+  ['loginSheet','verifySheet','nameSheet','giftSheet','pushSheet','notifSheet','pubSheet','postSheet','pkgSheet'].forEach(function(id){
     var s=document.getElementById(id);if(s&&s.style.display!=='none'){try{sheetHideAnim(s);}catch(e){s.style.display='none';}}
   });
   try{acctRender();}catch(e){}
@@ -10188,7 +10240,7 @@ function gisOnCredential(resp){
   if(!p||!p.email){loginMsg(tx('loginGoogleNoEmail'),false);return;}
   var email=String(p.email).trim().toLowerCase();
   if(email.indexOf('@')<0){loginMsg(tx('loginGoogleNoEmail'),false);return;}
-  gisFinishLogin({
+  verifyGateStart({
     email:email,
     name:(typeof p.name==='string'?p.name:'').trim(),
     firstName:(typeof p.given_name==='string'?p.given_name:'').trim(),
@@ -10244,6 +10296,257 @@ function gisFinishLogin(prof){
   if(isNew)giftSchedule();
   try{pushMaybeAsk();}catch(e){}
   try{pushEnsureSubscribed();}catch(e){}
+}
+/* ===== Log in email verification · verify រាល់ពេល Log in =====
+   gisOnCredential no longer signs in directly: it hands the
+   Google profile to verifyGateStart, and gisFinishLogin (the
+   ONLY place a session is created) runs only after verification
+   — or at once when verification is not configured (fallback).
+   Owner rule: verification is required on EVERY log in — even
+   right after a Log out, a fresh code / link is sent; there is
+   NO «remember this device» anywhere.
+   1. GET /api/auth/email-status — verification is enforced ONLY
+      when the server positively answers {configured:true}.
+      configured:false (Admin has not set up email yet), an
+      endpoint the server does not know, or any network failure
+      falls back to the normal direct log in, so an unconfigured
+      server can never lock anyone out.
+   2. POST /api/auth/send-verification {email} mails a 6-digit
+      code AND a verify link to that Gmail. The verify sheet
+      shows the Gmail, a live countdown of the code's 10-minute
+      validity, a Resend button (30-second cooldown counted down
+      on the button itself) and the note that tapping the link in
+      the email verifies too.
+   3. Verify button → POST /api/auth/verify-code {email, code}.
+      Opening the site with ?verify=TOKEN in the URL → POST
+      /api/auth/verify-token {token} (checked once in genInit;
+      the token is stripped from the URL at once). Only a
+      verified answer proceeds to gisFinishLogin. */
+var AUTH_API='https://movai-proxy.onrender.com';
+var gisPendingProf=null;
+var verifyTimerInt=null;
+var verifyResendInt=null;
+/* Small JSON fetch for the auth endpoints: the body is parsed on
+   EVERY status (a refusal carries its reason in the body), and
+   any failure resolves to null instead of throwing. */
+function authFetchJson(path,method,body,timeoutMs){
+  return new Promise(function(resolve){
+    if(typeof fetch!=='function'){resolve(null);return;}
+    var ctrl=null,timer=null;
+    try{
+      if(window.AbortController){ctrl=new AbortController();timer=setTimeout(function(){try{ctrl.abort();}catch(e){}},timeoutMs||20000);}
+    }catch(e){ctrl=null;}
+    var opts={method:method||'GET',headers:{'Content-Type':'application/json'}};
+    if(body)opts.body=JSON.stringify(body);
+    if(ctrl)opts.signal=ctrl.signal;
+    fetch(AUTH_API+path,opts).then(function(r){
+      if(timer)clearTimeout(timer);
+      if(!r){resolve(null);return null;}
+      return r.json().catch(function(){return null;});
+    }).then(function(j){resolve(j||null);}).catch(function(){
+      if(timer)clearTimeout(timer);
+      resolve(null);
+    });
+  });
+}
+function authOk(data){
+  if(!data||typeof data!=='object')return false;
+  return data.ok===true||data.verified===true||data.success===true;
+}
+/* A refusal that means «email is not set up on the server» (the
+   endpoint is unknown there, or the body says so) — the caller
+   falls back to a direct log in instead of trapping the user. */
+function authNotConfigured(data){
+  if(!data||typeof data!=='object')return false;
+  if(data.error==='not_found')return true;
+  var t='';
+  if(typeof data.error==='string')t+=data.error+' ';
+  if(typeof data.message==='string')t+=data.message;
+  else if(data.message&&typeof data.message==='object')t+=(data.message.en||'')+' '+(data.message.km||'');
+  return /not.?configured|app password|មិនទាន់ដាក់|មិនទាន់មាន/i.test(t);
+}
+/* Best human-readable reason out of a server refusal body:
+   {message:{km,en}} first, then a plain message / error string,
+   then the caller's own fallback wording. */
+function authErrText(data,fallbackKey){
+  if(data&&typeof data==='object'){
+    if(data.message&&typeof data.message==='object'){
+      var m=data.message[LANG]||data.message.en||data.message.km;
+      if(typeof m==='string'&&m)return m;
+    }
+    if(typeof data.message==='string'&&data.message)return data.message;
+    if(typeof data.error==='string'&&data.error&&data.error!=='not_found')return data.error;
+  }
+  return tx(fallbackKey);
+}
+function verifyGateStart(prof){
+  /* The login sheet's spinner runs while the server is asked
+     whether email verification is configured at all. */
+  loginBusy(true);
+  authFetchJson('/api/auth/email-status','GET',null,20000).then(function(st){
+    loginBusy(false);
+    if(!st||st.configured!==true){gisFinishLogin(prof);return;}
+    gisPendingProf=prof;
+    loginSheetClose();
+    verifySheetShow(prof.email);
+    verifySendCode(prof.email,false);
+  });
+}
+function verifySheetShow(email){
+  var e=document.getElementById('verifyEmail');if(e)e.textContent=email||'';
+  var inp=document.getElementById('verifyCodeInput');if(inp)inp.value='';
+  verifyMsg('',true);
+  var c=document.getElementById('verifyCount');if(c)c.textContent='';
+  var s=document.getElementById('verifySheet');if(s)sheetShowAnim(s);
+  setTimeout(function(){var i=document.getElementById('verifyCodeInput');if(i){try{i.focus();}catch(e){}}},380);
+}
+function verifySheetHide(){
+  var s=document.getElementById('verifySheet');if(s)sheetHideAnim(s);
+}
+function verifyMsg(t,ok){
+  var m=document.getElementById('verifyMsg');
+  if(m){m.textContent=t;m.style.color=ok?'var(--accent-text)':'#f87171';}
+}
+function verifySendCode(email,isResend){
+  verifyMsg(tx('verifySending'),true);
+  authFetchJson('/api/auth/send-verification','POST',{email:email},30000).then(function(data){
+    if(authNotConfigured(data)){
+      /* The server lost (or never had) its email setup between
+         the status check and the send — fall back to a direct
+         log in rather than trapping the user on this sheet. */
+      var p=gisPendingProf;gisPendingProf=null;
+      verifyStopCountdowns();verifySheetHide();
+      if(p)gisFinishLogin(p);
+      return;
+    }
+    if(data&&data.ok===false){
+      verifyMsg(authErrText(data,'verifyErrSend'),false);
+      return;
+    }
+    if(!data){verifyMsg(tx('verifyErrNet'),false);return;}
+    verifyStartCountdowns();
+    verifyMsg(isResend?tx('verifySent'):'',true);
+  });
+}
+function verifyResend(){
+  var p=gisPendingProf;if(!p||!p.email)return;
+  var rb=document.getElementById('verifyResendBtn');if(rb&&rb.disabled)return;
+  verifySendCode(p.email,true);
+}
+/* Live countdowns on the verify sheet: the code's remaining
+   validity (10:00 → 0:00, tabular numbers) and the Resend
+   cooldown (30 s, counted down on the button itself, which
+   stays disabled until it reaches zero). */
+function verifyStartCountdowns(){
+  verifyStopCountdowns();
+  var left=600;
+  var cd=document.getElementById('verifyCount');
+  var tick=function(){
+    if(cd){var m=Math.floor(left/60),s=left%60;cd.textContent=tx('verifyExpiresFmt').replace('{t}',m+':'+(s<10?'0':'')+s);}
+    if(left<=0){
+      if(verifyTimerInt){clearInterval(verifyTimerInt);verifyTimerInt=null;}
+      if(cd)cd.textContent='';
+      verifyMsg(tx('verifyExpired'),false);
+      return;
+    }
+    left--;
+  };
+  tick();
+  verifyTimerInt=setInterval(tick,1000);
+  var rl=30;
+  var rb=document.getElementById('verifyResendBtn');
+  var rtick=function(){
+    if(rb){
+      if(rl>0){rb.disabled=true;rb.textContent=tx('verifyResendWaitFmt').replace('{s}',String(rl));}
+      else{
+        rb.disabled=false;rb.textContent=tx('verifyResend');
+        if(verifyResendInt){clearInterval(verifyResendInt);verifyResendInt=null;}
+        return;
+      }
+    }
+    rl--;
+  };
+  rtick();
+  verifyResendInt=setInterval(rtick,1000);
+}
+function verifyStopCountdowns(){
+  if(verifyTimerInt){clearInterval(verifyTimerInt);verifyTimerInt=null;}
+  if(verifyResendInt){clearInterval(verifyResendInt);verifyResendInt=null;}
+  var rb=document.getElementById('verifyResendBtn');
+  if(rb){rb.disabled=false;rb.textContent=tx('verifyResend');}
+}
+function verifySubmit(){
+  var p=gisPendingProf;
+  if(!p||!p.email){verifyStopCountdowns();verifySheetHide();loginSheetOpen();return;}
+  var inp=document.getElementById('verifyCodeInput');
+  var code=inp?String(inp.value||'').replace(/\D/g,''):'';
+  if(code.length!==6){verifyMsg(tx('verifyErrCode'),false);return;}
+  var btn=document.getElementById('verifyBtn');if(btn)btn.disabled=true;
+  verifyMsg(tx('verifyChecking'),true);
+  authFetchJson('/api/auth/verify-code','POST',{email:p.email,code:code},30000).then(function(data){
+    if(btn)btn.disabled=false;
+    if(authOk(data)){
+      gisPendingProf=null;
+      verifyStopCountdowns();
+      verifySheetHide();
+      gisFinishLogin(p);
+      return;
+    }
+    if(!data){verifyMsg(tx('verifyErrNet'),false);return;}
+    verifyMsg(authErrText(data,'verifyErrBad'),false);
+  });
+}
+/* Back / ✕ / backdrop on the verify sheet: the pending Google
+   profile is dropped (nothing was signed in) and the log in
+   sheet returns — verifying later means a fresh code. */
+function verifyCancel(){
+  gisPendingProf=null;
+  verifyStopCountdowns();
+  verifySheetHide();
+  loginSheetOpen();
+}
+/* The email's verify link lands back here as ?verify=TOKEN: the
+   token is stripped from the URL at once (so a reload never
+   replays it), checked with the server, and only a verified
+   answer signs in — with the profile fields the server returns
+   (or the pending Google profile when it is the same Gmail).
+   A bad / expired token says so on the log in sheet. */
+function verifyTokenFromUrl(){
+  var tok='';
+  try{
+    var q=new URLSearchParams(location.search||'');
+    tok=q.get('verify')||'';
+    if(tok){
+      q['delete']('verify');
+      var qs=q.toString();
+      history.replaceState(null,'',location.pathname+(qs?'?'+qs:'')+location.hash);
+    }
+  }catch(e){}
+  if(!tok)return;
+  authFetchJson('/api/auth/verify-token','POST',{token:tok},30000).then(function(data){
+    if(authOk(data)){
+      var em=(typeof data.email==='string')?data.email.trim().toLowerCase():'';
+      if(!em&&gisPendingProf)em=gisPendingProf.email;
+      if(em){
+        var prof;
+        if(gisPendingProf&&gisPendingProf.email===em){prof=gisPendingProf;}
+        else{
+          prof={email:em,
+            name:(typeof data.name==='string'?data.name:''),
+            firstName:(typeof data.firstName==='string'?data.firstName:(typeof data.given_name==='string'?data.given_name:'')),
+            lastName:(typeof data.lastName==='string'?data.lastName:(typeof data.family_name==='string'?data.family_name:'')),
+            picture:(typeof data.picture==='string'?data.picture:'')};
+        }
+        gisPendingProf=null;
+        verifyStopCountdowns();
+        verifySheetHide();
+        gisFinishLogin(prof);
+        return;
+      }
+    }
+    loginSheetOpen();
+    loginMsg(tx('verifyTokenBad'),false);
+  });
 }
 /* ===== New-user welcome gift (owner rule) =====
    A brand-new account starts with NO credits (0 / 0). About
@@ -11910,6 +12213,7 @@ function genInit(){
   histRender();
   d3SetProvider('hunyuan3d');
   uiInit();
+  try{verifyTokenFromUrl();}catch(e){}
   try{acctAdminSync();}catch(e){}
   /* Block re-check while the app stays open: if the Admin blocks
      this Gmail / IP / model mid-session, the next sync (≤60 s)
