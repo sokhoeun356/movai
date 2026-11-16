@@ -3873,6 +3873,34 @@ function apiRoute(req, res, urlPath) {
     }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
     return;
   }
+  // POST /api/public/cover — PUBLIC (no admin key). A logged-in user
+  // uploads a cover image for their own song post. JSON {email, filename,
+  // data (base64)}. No size limit (cover rule: any size). Saved under
+  // ./data/uploads/ with a 'cover-' prefix and backed up to GitHub.
+  if (req.method === 'POST' && urlPath === '/api/public/cover') {
+    readJSONBody(req, 30 * 1024 * 1024).then(async (body) => {
+      const email = normEmail(body && body.email);
+      if (!email) return sendJSON(res, 200, { ok: false, error: 'សូមចូលគណនេយ្យជាមុនសិន · Please sign in first', needLogin: true });
+      const ext = uploadSafeExt('image', body.filename);
+      if (!ext) return sendJSON(res, 200, { ok: false, error: 'សូមជ្រើសរូបភាព (JPG/PNG/WebP)' });
+      const b64 = typeof body.data === 'string' ? body.data.replace(/\s/g, '') : '';
+      if (!b64 || !/^[A-Za-z0-9+/=]+$/.test(b64)) return sendJSON(res, 200, { ok: false, error: 'ទិន្នន័យរូបភាពមិនត្រឹមត្រូវទេ' });
+      const buf = Buffer.from(b64, 'base64');
+      if (!buf.length) return sendJSON(res, 200, { ok: false, error: 'រូបភាពទទេ' });
+      try {
+        fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+        const name = 'cover-' + Date.now().toString(36) + '-' + crypto.randomInt(100000, 999999) + ext;
+        fs.writeFileSync(path.join(UPLOADS_DIR, name), buf);
+        const proto = req.headers && req.headers['x-forwarded-proto'] === 'http' ? 'http' : 'https';
+        const host = (req.headers && req.headers.host) || 'movai-proxy.onrender.com';
+        await ghPutUpload(name, b64);
+        return sendJSON(res, 200, { ok: true, url: proto + '://' + host + '/uploads/' + name, name, kind: 'image', size: buf.length });
+      } catch (e) {
+        return sendJSON(res, 200, { ok: false, error: 'រក្សាទុករូបភាពបរាជ័យ' });
+      }
+    }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
+    return;
+  }
   // POST /api/public/purchase-receipt — PUBLIC (no admin key). The website
   // uploads a payment-receipt screenshot (image only, max 5 MB) and gets
   // back a public URL, which it then sends with the purchase request as
