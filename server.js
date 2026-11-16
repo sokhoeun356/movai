@@ -2303,6 +2303,7 @@ function apiRoute(req, res, urlPath) {
           }
           const cb = sunoCallbacks.get(jobId);
           if (cb && cb.status === 'SUCCESS' && cb.songs && cb.songs.length) {
+            warmMp3ForSongs(cb.songs);
             return sendJSON(res, 200, { ok: true, status: 'done', songs: cb.songs });
           }
           if (cb && cb.status === 'FIRST_SUCCESS' && cb.preview) {
@@ -2333,6 +2334,7 @@ function apiRoute(req, res, urlPath) {
           } catch (e) {
             return sendJSON(res, 200, { ok: false, error: (e && e.message) || 'Suno: request failed' });
           }
+          if (out && out.status === 'done' && Array.isArray(out.songs)) warmMp3ForSongs(out.songs);
           return sendJSON(res, 200, Object.assign({ ok: true }, out));
         }
         if (provider === 'musicapi') {
@@ -2380,6 +2382,7 @@ function apiRoute(req, res, urlPath) {
             if (e && e.noKey) return sendJSON(res, 200, { ok: false, error: 'Admin មិនទាន់ដាក់ MusicAPI Key ទេ' });
             return sendJSON(res, 200, { ok: false, error: (e && e.message) || 'MusicAPI: request failed' });
           }
+          if (out && out.status === 'done' && Array.isArray(out.songs)) warmMp3ForSongs(out.songs);
           return sendJSON(res, 200, Object.assign({ ok: true }, out));
         }
         if (provider === 'magichour') {
@@ -2406,6 +2409,7 @@ function apiRoute(req, res, urlPath) {
             if (e && e.noKey) return sendJSON(res, 200, { ok: false, error: 'Admin មិនទាន់ដាក់ Magic Hour Key ទេ' });
             return sendJSON(res, 200, { ok: false, error: (e && e.message) || 'Magic Hour: request failed' });
           }
+          if (out && out.status === 'done' && Array.isArray(out.songs)) warmMp3ForSongs(out.songs);
           return sendJSON(res, 200, Object.assign({ ok: true }, out));
         }
         return sendJSON(res, 200, { ok: false, error: 'Provider មិនស្គាល់ទេ' });
@@ -3861,6 +3865,68 @@ function apiRoute(req, res, urlPath) {
     if (buf.toString('ascii', 0, 3) === 'ID3') return true;
     return buf[0] === 0xFF && (buf[1] & 0xE0) === 0xE0;
   }
+  // ---- MP3 cache (converted once, served instantly afterwards) ----
+  const MP3_CACHE_FILE = path.join(DATA_DIR, 'mp3cache.json');
+  let _mp3Cache = {};
+  try { const _mc = JSON.parse(fs.readFileSync(MP3_CACHE_FILE, 'utf8')); if (_mc && typeof _mc === 'object') _mp3Cache = _mc; } catch (e) {}
+  function mp3CacheSave() {
+    try { fs.mkdirSync(DATA_DIR, { recursive: true }); fs.writeFileSync(MP3_CACHE_FILE, JSON.stringify(_mp3Cache, null, 2)); ghPersistFile(MP3_CACHE_FILE); } catch (e) {}
+  }
+  function mp3CacheKey(u) {
+    return require('crypto').createHash('sha1').update(String(u)).digest('hex').slice(0, 16);
+  }
+  function mp3CacheGet(u) {
+    const k = mp3CacheKey(u);
+    const f = _mp3Cache[k];
+    if (!f) return null;
+    const fp = path.join(DATA_DIR, 'uploads', f);
+    try { if (fs.existsSync(fp) && fs.statSync(fp).size > 1000) return fp; } catch (e) {}
+    return null;
+  }
+  // Kick off background MP3 pre-conversion for a songs array (fire and
+  // forget — never blocks the response). So the MP3 is usually cached
+  // before the user taps Download. Accepts url/audioUrl/audio_url/streamUrl.
+  function warmMp3ForSongs(songs) {
+    try {
+      if (!Array.isArray(songs)) return;
+      for (const s of songs) {
+        const u = s && (s.url || s.audioUrl || s.audio_url || s.streamUrl);
+        if (typeof u === 'string' && u.startsWith('http')) convertAndCacheMp3(u).catch(() => {});
+      }
+    } catch (e) {}
+  }
+  // Convert a source audio URL to MP3 128kbps, cache it in uploads/, and
+  // return the cached filename. Returns null on failure. If already cached
+  // returns the cached filename immediately (no re-convert).
+  const _mp3Converting = new Map();
+  async function convertAndCacheMp3(u) {
+    const cached = mp3CacheGet(u);
+    if (cached) return path.basename(cached);
+    if (_mp3Converting.has(u)) return _mp3Converting.get(u);
+    const p = (async () => {
+      try {
+        const ctrl = new AbortController();
+        const t = setTimeout(() => ctrl.abort(), 180000);
+        const r = await fetch(u, { signal: ctrl.signal, headers: { 'User-Agent': 'MovAi/1.0' } });
+        clearTimeout(t);
+        if (!r.ok) return null;
+        const buf = Buffer.from(await r.arrayBuffer());
+        let mp3;
+        if (isMp3Bytes(buf)) mp3 = buf;
+        else if (buf.toString('ascii', 0, 4) === 'RIFF') { const pcm = wavParsePcm(buf); mp3 = await pcmToMp3(pcm, 128); }
+        else return null;
+        const fname = 'mp3-' + mp3CacheKey(u) + '.mp3';
+        fs.mkdirSync(path.join(DATA_DIR, 'uploads'), { recursive: true });
+        fs.writeFileSync(path.join(DATA_DIR, 'uploads', fname), mp3);
+        ghPersistFile(path.join(DATA_DIR, 'uploads', fname));
+        _mp3Cache[mp3CacheKey(u)] = fname;
+        mp3CacheSave();
+        return fname;
+      } catch (e) { return null; }
+    })();
+    _mp3Converting.set(u, p);
+    try { return await p; } finally { _mp3Converting.delete(u); }
+  }
   if (req.method === 'GET' && urlPath === '/api/gen/song/mp3') {
     // Handler is NOT async — run the async work in an IIFE (same pattern
     // as /api/gen/video/file).
@@ -3871,22 +3937,17 @@ function apiRoute(req, res, urlPath) {
       const name = (qp.get('name') || 'song').replace(/[\\/:*?"<>|]/g, '_').replace(/\.mp3$/i, '') + '.mp3';
       if (!u) return sendJSON(res, 400, { ok: false, error: 'missing u' });
       try {
-        const ctrl = new AbortController();
-        const t = setTimeout(() => ctrl.abort(), 120000);
-        const r = await fetch(u, { signal: ctrl.signal, headers: { 'User-Agent': 'MovAi/1.0' } });
-        clearTimeout(t);
-        if (!r.ok) return sendJSON(res, 502, { ok: false, error: 'audio fetch failed: ' + r.status });
-        const ab = await r.arrayBuffer();
-        const buf = Buffer.from(ab);
-        let mp3;
-        if (isMp3Bytes(buf)) {
-          mp3 = buf;
-        } else if (buf.toString('ascii', 0, 4) === 'RIFF') {
-          const pcm = wavParsePcm(buf);
-          mp3 = await pcmToMp3(pcm, 128);
-        } else {
-          return sendJSON(res, 415, { ok: false, error: 'audio format not supported (need MP3 or WAV)' });
+        // Cached MP3? Serve it instantly (no re-fetch, no re-encode).
+        const cachedFp = mp3CacheGet(u);
+        if (cachedFp) {
+          const mp3 = fs.readFileSync(cachedFp);
+          res.writeHead(200, { 'Content-Type': 'audio/mpeg', 'Content-Disposition': 'attachment; filename="' + name.replace(/"/g, '') + '"', 'Content-Length': mp3.length, 'Cache-Control': 'public, max-age=86400' });
+          res.end(mp3);
+          return;
         }
+        const fname = await convertAndCacheMp3(u);
+        if (!fname) return sendJSON(res, 500, { ok: false, error: 'MP3 convert failed' });
+        const mp3 = fs.readFileSync(path.join(DATA_DIR, 'uploads', fname));
         res.writeHead(200, { 'Content-Type': 'audio/mpeg', 'Content-Disposition': 'attachment; filename="' + name.replace(/"/g, '') + '"', 'Content-Length': mp3.length, 'Cache-Control': 'public, max-age=86400' });
         res.end(mp3);
       } catch (e) {
@@ -3977,7 +4038,7 @@ function apiRoute(req, res, urlPath) {
   }
   async function ghRestoreUploads() {
     if (!ghEnabled()) return;
-    try { fs.mkdirSync(UPLOADS_DIR, { recursive: true }); } catch (e) {}
+    try { fs.mkdirSync(path.join(DATA_DIR, 'uploads'), { recursive: true }); } catch (e) {}
     const names = await ghListUploads();
     await Promise.all(names.map(async (name) => {
       try {
@@ -4008,7 +4069,7 @@ function apiRoute(req, res, urlPath) {
       if (!buf.length) return sendJSON(res, 200, { ok: false, error: 'ឯកសារទទេ' });
       if (kind === 'audio' && buf.length > 15 * 1024 * 1024) return sendJSON(res, 200, { ok: false, error: 'MP3 ធំពេក (អតិបរមា 15 MB)' });
       try {
-        fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+        fs.mkdirSync(path.join(DATA_DIR, 'uploads'), { recursive: true });
         const name = Date.now().toString(36) + '-' + crypto.randomInt(100000, 999999) + ext;
         fs.writeFileSync(path.join(UPLOADS_DIR, name), buf);
         const proto = req.headers && req.headers['x-forwarded-proto'] === 'http' ? 'http' : 'https';
@@ -4040,7 +4101,7 @@ function apiRoute(req, res, urlPath) {
       const buf = Buffer.from(b64, 'base64');
       if (!buf.length) return sendJSON(res, 200, { ok: false, error: 'រូបភាពទទេ' });
       try {
-        fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+        fs.mkdirSync(path.join(DATA_DIR, 'uploads'), { recursive: true });
         const name = 'cover-' + Date.now().toString(36) + '-' + crypto.randomInt(100000, 999999) + ext;
         fs.writeFileSync(path.join(UPLOADS_DIR, name), buf);
         const proto = req.headers && req.headers['x-forwarded-proto'] === 'http' ? 'http' : 'https';
@@ -4071,7 +4132,7 @@ function apiRoute(req, res, urlPath) {
       const buf = Buffer.from(b64, 'base64');
       if (!buf.length || buf.length > 5 * 1024 * 1024) return sendJSON(res, 200, { ok: false, error: 'រូបភាពធំពេក (អតិបរមា 5 MB)' });
       try {
-        fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+        fs.mkdirSync(path.join(DATA_DIR, 'uploads'), { recursive: true });
         const name = 'rcpt-' + Date.now().toString(36) + '-' + crypto.randomInt(100000, 999999) + ext;
         fs.writeFileSync(path.join(UPLOADS_DIR, name), buf);
         const proto = req.headers && req.headers['x-forwarded-proto'] === 'http' ? 'http' : 'https';
@@ -4105,7 +4166,7 @@ function apiRoute(req, res, urlPath) {
         try {
           const gb = await ghGetUpload(name);
           if (gb && gb.length) {
-            try { fs.mkdirSync(UPLOADS_DIR, { recursive: true }); fs.writeFileSync(path.join(UPLOADS_DIR, name), gb); } catch (e) {}
+            try { fs.mkdirSync(path.join(DATA_DIR, 'uploads'), { recursive: true }); fs.writeFileSync(path.join(UPLOADS_DIR, name), gb); } catch (e) {}
             buf = gb;
           }
         } catch (e) { buf = null; }
