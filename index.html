@@ -4740,7 +4740,7 @@ function genShowImage(src,blob,remoteSrc){
    (the Suno / Magic Hour CDNs block the direct byte fetch with
    CORS all the time). So when the direct fetch fails, the bytes
    are fetched through the server proxy instead —
-   PUB_API + '/gen/video/file?u=<src>&name=<fname>' (the server
+   GEN_API + '/gen/video/file?u=<src>&name=<fname>' (the server
    sends CORS * and honours ?name= for the filename) — and saved
    through the same in-page blob anchor. If even the proxy fails,
    the tap stays on this page and shows a short notice; nothing
@@ -4787,7 +4787,7 @@ async function dlSave(src,fname){
     return;
   }catch(e){/* direct fetch blocked (CORS) — fall through to the server proxy */}
   try{
-    var rp=await fetch(PUB_API+'/gen/video/file?u='+encodeURIComponent(src)+'&name='+encodeURIComponent(fname));
+    var rp=await fetch(GEN_API+'/gen/video/file?u='+encodeURIComponent(src)+'&name='+encodeURIComponent(fname));
     if(!rp.ok)throw new Error('http '+rp.status);
     dlBlobSave(await rp.blob(),fname);
     return;
@@ -4798,7 +4798,7 @@ async function dlSave(src,fname){
    Providers (Magic Hour above all) hand back WAV — a 3:30 song
    arrives as a ~40 MB .wav. A song Download NEVER saves that:
    the conversion now happens ON THE SERVER — dlSaveSongMp3 calls
-   PUB_API + '/gen/song/mp3?u=<src>&name=<fname>', the server
+   GEN_API + '/gen/song/mp3?u=<src>&name=<fname>', the server
    fetches the audio and converts WAV→MP3 at 128 kbps in a couple
    of seconds, and the browser only saves the small .mp3 it gets
    back (~3–5 MB for a 3–5 minute song). A source that already IS
@@ -4898,7 +4898,7 @@ async function dlSaveSongMp3(src,title,fallback){
   try{
     var rp;
     try{
-      rp=await fetch(PUB_API+'/gen/song/mp3?u='+encodeURIComponent(src)+'&name='+encodeURIComponent(fname));
+      rp=await fetch(GEN_API+'/gen/song/mp3?u='+encodeURIComponent(src)+'&name='+encodeURIComponent(fname));
     }catch(fe){mp3ProgDone();mp3FailShow('mp3FailNet');return;}
     if(!rp.ok){
       /* Server failed — surface its REAL reason (JSON error or
@@ -7175,6 +7175,12 @@ function chatFabShow(){
      cards carry NO meta/details text under them (owner rule) —
      just the cover, title, player and action pills. */
 var PUB_API='https://movai-proxy.onrender.com/api/public';
+/* The /gen/* helper endpoints (song MP3 conversion, video file
+   proxy) live under /api/gen/* on the server — NOT under
+   /api/public/*. Calling them via PUB_API 404s with
+   {"error":"not_found"} (owner report 2026-11-16), so download
+   code must use this base for them. */
+var GEN_API='https://movai-proxy.onrender.com/api';
 var APP_VIEW='public';
 var pubItems=[];
 /* ===== Song style / genre (owner rule 2026-11-16) =====
