@@ -1000,11 +1000,12 @@ html[data-smooth="1"] .dock{background-color:rgba(var(--glass-tint),.96)}
 .chat-react-btn.on{background:var(--accent-fill);border-color:transparent}
 /* Listen button (owner order 2026-11-16): every AI bubble gets a
    «🔊 ស្ដាប់» button beside Copy — it plays the answer aloud with
-   the browser's own speechSynthesis (the server's Microsoft TTS
-   is blocked by Microsoft, so the browser voice is used first and
-   only; see the spoken-replies section at the end of the file).
-   While it speaks the button shows the playing state; tapping it
-   again stops, and the button always resets when speech ends. */
+   Microsoft Edge TTS called directly from the phone's browser
+   (real Piseth / Sreymom voices; the server route is blocked by
+   Microsoft), falling back to the browser's own speechSynthesis
+   (see the spoken-replies section at the end of the file). While
+   it speaks the button shows the playing state; tapping it again
+   stops, and the button always resets when speech ends. */
 .chat-listen-btn{border:1px solid var(--line2);background:transparent;color:var(--accent-text);border-radius:999px;padding:5px 13px;font-size:0.75rem;font-weight:800;font-family:inherit;cursor:pointer;line-height:1.35;min-height:32px;white-space:nowrap}
 .chat-listen-btn:active{opacity:.75}
 .chat-listen-btn.playing{color:#22c55e;border-color:rgba(34,197,94,.55);animation:chatListenPulse 1.2s ease-in-out infinite}
@@ -1222,12 +1223,10 @@ html[data-smooth="1"] .brand-frame,html[data-smooth="1"] .acct-chip,html[data-sm
 </div>
 <section id="page-public" aria-label="Public">
   <div class="panel" style="margin-top:14px">
-    <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">
-      <h2 style="font-size:1.125rem;font-weight:800" data-i18n="pubTitle">Public · សាធារណៈ</h2>
-      <button type="button" class="kbtn kbtn-white" onclick="pubLoadFeed(true)" data-i18n="pubRefresh">ផ្ទុកថ្មី</button>
-    </div>
-    <p style="font-size:0.8125rem;color:var(--muted);margin-top:8px;line-height:1.6" data-i18n="pubRankNote">រាំង (Ranking) រាប់តាមចំនួនអ្នកមើល (View) — អ្នកណា View ច្រើនជាងគេ គឺលេខ 1</p>
-    <div class="pub-filters" role="tablist" aria-label="Public category">
+    <!-- No «Public» header block (owner order 2026-11-16): the title,
+         the ranking note and the Refresh button are gone — the feed
+         still auto-refreshes every 30 seconds on its own. -->
+    <div class="pub-filters" role="tablist" aria-label="Public category" style="margin-top:0">
       <button type="button" class="pub-fchip on" id="pubFchip-song" onclick="pubSetFilter('song')" data-i18n="pubCatSong">បទចម្រៀង</button>
       <button type="button" class="pub-fchip" id="pubFchip-image" onclick="pubSetFilter('image')" data-i18n="pubCatImage">រូបភាព</button>
       <button type="button" class="pub-fchip" id="pubFchip-video" onclick="pubSetFilter('video')" data-i18n="pubCatVideo">វីដេអូ</button>
@@ -6861,10 +6860,16 @@ function pubCardEl(it){
   tch.style.cssText='margin-left:auto;font-size:0.6875rem;font-weight:800;color:var(--muted)';
   tch.textContent=tx('pubTier'+it.tier);
   head.appendChild(tch);
-  var tch2=document.createElement('span');
-  tch2.className='pub-type';
-  tch2.textContent=pubTypeLabel(it.type);
-  head.appendChild(tch2);
+  /* No type pill on a SONG card (owner order 2026-11-16): the small
+     «Song» pill under the author row is removed — the «Song Link» /
+     YouTube logo row takes that top spot instead. Other card types
+     keep their type pill. */
+  if(it.type!=='song'){
+    var tch2=document.createElement('span');
+    tch2.className='pub-type';
+    tch2.textContent=pubTypeLabel(it.type);
+    head.appendChild(tch2);
+  }
   card.appendChild(head);
   if(it.title&&it.type!=='song'){
     var tp=document.createElement('p');
@@ -6922,20 +6927,26 @@ function pubCardEl(it){
     viz.className='pub-viz';viz.setAttribute('aria-hidden','true');
     viz.innerHTML='<span class="pub-viz-side"><i></i><i></i><i></i><i></i><i></i><i></i></span><span class="pub-viz-side"><i></i><i></i><i></i><i></i><i></i><i></i></span>';
     coverWrap.appendChild(viz);
-    /* Top links row (owner layout, annotated mock): «Song Link»
-       sits at the very TOP of the song card, and when the post
-       carries a YouTube link a YouTube LOGO button sits beside
-       it — tapping the logo opens the YouTube link directly. */
+    /* Top links row (owner layout, annotated mock): this row sits
+       at the very TOP of the song card, directly under the author /
+       #rank row — where the removed «Song» pill used to be. It holds
+       the «Song Link» button, or — when the post carries a YouTube
+       link — the red YouTube LOGO instead; tapping the logo opens
+       the YouTube link directly. */
     var topLinks=document.createElement('div');
     topLinks.className='pub-toplinks';
-    if(it.url){
+    /* Owner order 2026-11-16: when the post carries a YouTube link,
+       the red YouTube logo sits at this top spot INSTEAD of the
+       «Song Link» button (the logo branch below). */
+    var hasYtTop=!!(it.youtube&&/^https?:\/\//i.test(it.youtube));
+    if(it.url&&!hasYtTop){
       var tsl=document.createElement('button');
       tsl.type='button';tsl.className='pub-songlink';
       tsl.innerHTML='<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7"/><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7"/></svg><span>'+escHtml(tx('pubSongLink'))+'</span>';
       tsl.addEventListener('click',function(){pubCopySongLink(it,tsl);});
       topLinks.appendChild(tsl);
     }
-    if(it.youtube&&/^https?:\/\//i.test(it.youtube)){
+    if(hasYtTop){
       var tyt=document.createElement('a');
       tyt.className='pub-yt-logo';
       tyt.href=it.youtube;
@@ -9900,10 +9911,10 @@ function aiChatAddBubble(role,text,isErr,opts){
     var crow=document.createElement('div');
     crow.className='chat-copy-row';
     /* Listen button beside Copy (owner order 2026-11-16): plays this
-       answer aloud with the browser's own speechSynthesis voice
-       (the server's Microsoft TTS is blocked by Microsoft — the
-       browser voice is used first and only). Same stopPropagation
-       guard as Copy so it never toggles the collapsible bubble. */
+       answer aloud with Microsoft Edge TTS from the phone itself
+       (browser speechSynthesis is the fallback). Same
+       stopPropagation guard as Copy so it never toggles the
+       collapsible bubble. */
     var lbtn=document.createElement('button');
     lbtn.type='button';
     lbtn.className='chat-listen-btn';
@@ -10057,28 +10068,40 @@ async function aiChatSend(){
 document.addEventListener('keydown',function(e){
   if(e.key==='Escape'){var p=document.getElementById('chatPanel');if(p&&p.classList.contains('open'))aiChatClose();}
 });
-/* ================= AI Chat — spoken replies (browser voice) =================
+/* ================= AI Chat — spoken replies (Edge voice) =================
    Owner order 2026-11-16: every AI answer can be LISTENED to. The
-   «🔊 ស្ដាប់» button speaks the answer with the BROWSER's own
-   speechSynthesis — FIRST and only. It used to call the server's
-   Microsoft Edge TTS endpoint first, but Microsoft blocks that
-   endpoint from the server (403), and waiting on the dead server
-   call was exactly what left the button stuck on «កំពុងចាក់…»
-   forever with no sound. The browser voice needs no server at
-   all: it prefers a Khmer (km) voice when the phone has one. If
-   the answer is Khmer and the phone has NO Khmer voice, a clear
-   note says so under the answer instead of a stuck button. The
-   button ALWAYS returns to «🔊 ស្ដាប់»: the utterance's own
-   onend/onerror reset it, and a watchdog (aiChatSpeakNow) resets
-   it even on phones that never fire those events. The ប្រុស/ស្រី
-   toggle under the chat header is remembered in localStorage
-   ('movai-chat-voice'). Only one answer plays at a time; tapping
-   the playing button again stops it. */
+   «🔊 ស្ដាប់» button speaks the answer with the REAL Microsoft Edge
+   voices — Piseth (ប្រុស) / Sreymom (ស្រី) — called DIRECTLY from
+   the phone's own browser over a WebSocket to Microsoft's Edge
+   read-aloud endpoint. The MovAi server is NOT involved: Microsoft
+   blocks that endpoint from datacenter IPs (403), which is why the
+   old server path produced silence, but a phone's own connection
+   is accepted (the same route the SOKHOEUN app uses). If the Edge
+   call fails for any reason (no network, socket error, no audio),
+   the button falls back to the browser's own speechSynthesis,
+   which prefers a Khmer (km) voice when the phone has one; if the
+   answer is Khmer and the phone has NO Khmer voice, a clear note
+   says so under the answer instead of a stuck button. The button
+   ALWAYS returns to «🔊 ស្ដាប់»: playback end/error reset it, and
+   watchdogs (silence detection + a length-based cap) reset it even
+   when no event ever fires. The ប្រុស/ស្រី toggle under the chat
+   header is remembered in localStorage ('movai-chat-voice'). Only
+   one answer plays at a time; tapping the playing button stops. */
 var aiChatVoice='male';
 try{var _savedVoice=localStorage.getItem('movai-chat-voice');if(_savedVoice==='male'||_savedVoice==='female')aiChatVoice=_savedVoice;}catch(e){}
 var aiChatSpeakBtn=null;
 var aiChatSpeakToken=0;
 var aiChatWatchdog=null;
+/* Live Microsoft Edge TTS resources (socket + playing audio), so a
+   stop / new tap can tear them down completely. */
+var aiChatEdgeWs=null;
+var aiChatEdgeAudio=null;
+var aiChatEdgeObjUrl=null;
+function aiChatEdgeCleanup(){
+  if(aiChatEdgeWs){var w=aiChatEdgeWs;aiChatEdgeWs=null;try{w.onopen=w.onmessage=w.onerror=w.onclose=null;w.close();}catch(e){}}
+  if(aiChatEdgeAudio){var a=aiChatEdgeAudio;aiChatEdgeAudio=null;try{a.onended=null;a.onerror=null;a.pause();a.removeAttribute('src');}catch(e){}}
+  if(aiChatEdgeObjUrl){var u=aiChatEdgeObjUrl;aiChatEdgeObjUrl=null;try{URL.revokeObjectURL(u);}catch(e){}}
+}
 function aiChatVoiceUI(){
   var m=document.getElementById('chatVoiceMale'),f=document.getElementById('chatVoiceFemale');
   if(m)m.classList.toggle('on',aiChatVoice==='male');
@@ -10098,6 +10121,7 @@ function aiChatSpeakWatchdogClear(){if(aiChatWatchdog){try{clearInterval(aiChatW
 function aiChatStopSpeak(){
   aiChatSpeakToken++;
   aiChatSpeakWatchdogClear();
+  aiChatEdgeCleanup();
   try{if('speechSynthesis' in window)speechSynthesis.cancel();}catch(e){}
   aiChatResetSpeakBtn();
 }
@@ -10125,6 +10149,137 @@ function aiChatSpeakNote(btn,msg){
     row.parentNode.insertBefore(note,row.nextSibling);
     setTimeout(function(){try{note.remove();}catch(e){}},5000);
   }catch(e){}
+}
+function aiChatEdgeGenId(){
+  var s='',hex='0123456789abcdef';
+  for(var i=0;i<32;i++)s+=hex.charAt(Math.floor(Math.random()*16));
+  return s;
+}
+function aiChatSpeakEdge(text,btn,token){
+  /* Speak with Microsoft Edge TTS called DIRECTLY from this phone's
+     browser (WebSocket to the Edge read-aloud endpoint with Edge's
+     public TrustedClientToken) — real km-KH voices: Piseth (male)
+     / Sreymom (female) per the toggle. No MovAi server is involved:
+     Microsoft blocks this endpoint from server IPs (403) but a
+     phone's own connection is accepted. ANY failure — socket
+     error, timeout, empty audio, playback error — falls back to
+     the browser voice (aiChatSpeakBrowser). */
+  var settled=false;
+  function fallback(){
+    if(settled)return;settled=true;
+    try{clearTimeout(connTimer);}catch(e){}
+    try{clearTimeout(synthTimer);}catch(e){}
+    aiChatEdgeCleanup();
+    if(token!==aiChatSpeakToken)return;
+    aiChatSpeakBrowser(text,btn,token);
+  }
+  if(typeof WebSocket==='undefined'||typeof TextDecoder==='undefined'){fallback();return;}
+  var voice=(aiChatVoice==='female')?'km-KH-SreymomNeural':'km-KH-PisethNeural';
+  var ws=null;
+  try{ws=new WebSocket('wss://speech.platform.bing.com/consumer/speech/synthesize/readaloud/edge/v1?TrustedClientToken=6A5AA1D4EAFF4E9FB37E23D68491D6F4');}
+  catch(e){fallback();return;}
+  aiChatEdgeWs=ws;
+  try{ws.binaryType='arraybuffer';}catch(e){}
+  var chunks=[];
+  /* If no audio byte arrives within 9s, the route is dead — fall
+     back instead of leaving the button on «កំពុងចាក់…». */
+  var connTimer=setTimeout(function(){if(!chunks.length)fallback();},9000);
+  /* Hard cap on the whole synthesis phase: play whatever arrived,
+     or fall back if nothing did. */
+  var synthTimer=setTimeout(function(){
+    if(settled)return;
+    if(chunks.length)playChunks();else fallback();
+  },45000);
+  function playChunks(){
+    if(settled)return;settled=true;
+    try{clearTimeout(connTimer);}catch(e){}
+    try{clearTimeout(synthTimer);}catch(e){}
+    try{ws.onopen=ws.onmessage=ws.onerror=ws.onclose=null;ws.close();}catch(e){}
+    if(aiChatEdgeWs===ws)aiChatEdgeWs=null;
+    if(token!==aiChatSpeakToken)return;
+    aiChatEdgePlay(chunks,text,btn,token);
+  }
+  ws.onopen=function(){
+    if(token!==aiChatSpeakToken){try{ws.close();}catch(e){}return;}
+    var ts=new Date().toString();
+    try{
+      ws.send('X-Timestamp:'+ts+'\r\nContent-Type:application/json; charset=utf-8\r\nPath:speech.config\r\n\r\n{"context":{"synthesis":{"audio":{"metadataoptions":{"sentenceBoundaryEnabled":"false","wordBoundaryEnabled":"false"},"outputFormat":"audio-24khz-48kbitrate-mono-mp3"}}}}');
+      var esc=String(text||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+      var ssml="<speak version='1.0' xmlns='http://www.w3.org/2001/10/synthesis' xml:lang='km-KH'><voice name='"+voice+"'><prosody pitch='+0Hz' rate='+0%'>"+esc+"</prosody></voice></speak>";
+      ws.send('X-RequestId:'+aiChatEdgeGenId()+'\r\nContent-Type:application/ssml+xml\r\nX-Timestamp:'+ts+'\r\nPath:ssml\r\n\r\n'+ssml);
+    }catch(e){fallback();}
+  };
+  ws.onmessage=function(ev){
+    if(token!==aiChatSpeakToken||settled)return;
+    if(typeof ev.data==='string'){
+      if(ev.data.indexOf('Path:turn.end')!==-1){
+        if(chunks.length)playChunks();else fallback();
+      }
+      return;
+    }
+    /* Binary frame: 2-byte big-endian header length, the header
+       text, then the MP3 bytes. Only «Path:audio» frames carry
+       sound. */
+    try{
+      var buf=new Uint8Array(ev.data);
+      if(buf.length<2)return;
+      var hlen=(buf[0]<<8)|buf[1];
+      if(2+hlen>buf.length)return;
+      var header=new TextDecoder('utf-8').decode(buf.subarray(2,2+hlen));
+      if(header.indexOf('Path:audio')===-1)return;
+      var part=buf.subarray(2+hlen);
+      if(part.length)chunks.push(part.slice());
+    }catch(e){}
+  };
+  ws.onerror=function(){if(!chunks.length)fallback();};
+  ws.onclose=function(){
+    if(settled||token!==aiChatSpeakToken)return;
+    if(chunks.length)playChunks();else fallback();
+  };
+}
+function aiChatEdgePlay(chunks,text,btn,token){
+  /* Play the collected Edge MP3. End / error reset the button; a
+     playback error before any sound falls back to the browser
+     voice. The watchdog (silence detection + length-based cap)
+     guarantees the button NEVER stays on «កំពុងចាក់…». */
+  try{
+    var blob=new Blob(chunks,{type:'audio/mpeg'});
+    var url=URL.createObjectURL(blob);
+    aiChatEdgeObjUrl=url;
+    var au=new Audio();
+    aiChatEdgeAudio=au;
+    au.src=url;
+    var startedAt=Date.now();
+    var cap=Math.min(240000,Math.max(25000,String(text||'').length*130+8000));
+    au.onended=function(){aiChatEdgeCleanup();aiChatSpeakDone(token);};
+    au.onerror=function(){
+      aiChatEdgeCleanup();
+      if(token!==aiChatSpeakToken)return;
+      aiChatSpeakBrowser(text,btn,token);
+    };
+    var pr=null;
+    try{pr=au.play();}catch(e){}
+    if(pr&&pr.catch)pr.catch(function(){
+      aiChatEdgeCleanup();
+      if(token!==aiChatSpeakToken)return;
+      aiChatSpeakBrowser(text,btn,token);
+    });
+    aiChatSpeakWatchdogClear();
+    var lastT=-1,stall=0;
+    aiChatWatchdog=setInterval(function(){
+      if(token!==aiChatSpeakToken){aiChatSpeakWatchdogClear();return;}
+      if(!aiChatEdgeAudio||aiChatEdgeAudio!==au)return;
+      if(au.ended){aiChatSpeakDone(token);return;}
+      var ct=0;try{ct=au.currentTime||0;}catch(e){}
+      if(ct===lastT&&!au.paused){stall++;}else{stall=0;}
+      lastT=ct;
+      if(stall>=6){try{au.pause();}catch(e){}aiChatEdgeCleanup();aiChatSpeakDone(token);return;}
+      if(Date.now()-startedAt>cap){try{au.pause();}catch(e){}aiChatEdgeCleanup();aiChatSpeakDone(token);}
+    },500);
+  }catch(e){
+    aiChatEdgeCleanup();
+    if(token===aiChatSpeakToken)aiChatSpeakBrowser(text,btn,token);
+  }
 }
 function aiChatSpeakBrowser(text,btn,token){
   /* Speak with the browser's own speech synthesis. The voice list
@@ -10193,7 +10348,9 @@ function aiChatSpeak(text,btn){
   aiChatSpeakBtn=btn;
   btn.classList.add('playing');
   btn.textContent='⏹ កំពុងចាក់…';
-  aiChatSpeakBrowser(String(text||''),btn,token);
+  /* Microsoft Edge TTS from the phone itself FIRST (real Piseth /
+     Sreymom voices); the browser voice is the fallback inside. */
+  aiChatSpeakEdge(String(text||''),btn,token);
 }
 aiChatVoiceUI();
 try{if('speechSynthesis' in window){speechSynthesis.getVoices();if(speechSynthesis.onvoiceschanged!==undefined)speechSynthesis.addEventListener('voiceschanged',function(){try{speechSynthesis.getVoices();}catch(e){}});}}catch(e){}
