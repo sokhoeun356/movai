@@ -1991,13 +1991,14 @@ html[data-smooth="1"] .brand-frame,html[data-smooth="1"] .acct-chip,html[data-sm
   <button type="button" class="dock-item" id="dockPackages" onclick="dockGo('packages')" aria-label="Packages · កញ្ចប់សេវាកម្ម"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="8" width="18" height="4" rx="1"/><path d="M12 8v13"/><path d="M19 12v7a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-7"/><path d="M7.5 8a2.5 2.5 0 0 1 0-5C11 3 12 8 12 8s1-5 4.5-5a2.5 2.5 0 0 1 0 5"/></svg></button>
   <button type="button" class="dock-item" id="dockNotif" onclick="dockGo('notif')" aria-label="Notifications · ដំណឹង"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg><span class="dock-badge" id="dockNotifBadge" style="display:none">0</span></button>
 </nav>
-<!-- Pinned now-playing player (owner rule 2026-11-16): while a
-     song is loaded, the player panel below stays FIXED at the
+<!-- Now-playing player (owner rule 2026-11-16): while a song is
+     loaded, the player panel below stays FIXED (sticky) at the
      bottom of the screen — Play/Pause, seek bar and time always
-     visible, however far the feed is scrolled. It leaves only
-     when the song is stopped (panel ⏹ or ✕). The round logo
-     element is kept in the DOM for the older drag machinery but
-     is never shown anymore: the pinned panel replaces it. -->
+     visible, however far the feed is scrolled. The panel's ✕
+     only HIDES the bar: the song keeps playing in the
+     background and the small floating logo (round button)
+     appears in its place — tap the logo to bring the panel
+     back. The song stops ONLY from ⏹ Stop or ⏸ Pause. -->
 <button type="button" class="mini-logo" id="miniLogo" style="display:none" aria-label="បទកំពុងចាក់ · Now playing"></button>
 <div class="mini-drop" id="miniDrop" style="display:none" aria-hidden="true"><span class="mini-drop-x">✕</span><span>ទម្លាក់ទីនេះដើម្បីឈប់ចាក់ · Drop here to stop</span></div>
 <div class="mini-panel" id="miniPanel" style="display:none" role="dialog" aria-label="កម្មវិធីចាក់បទ · Song player">
@@ -2007,7 +2008,7 @@ html[data-smooth="1"] .brand-frame,html[data-smooth="1"] .acct-chip,html[data-sm
       <div class="mini-title" id="miniTitle"></div>
       <div class="mini-sub" id="miniSub"></div>
     </div>
-    <button type="button" class="mini-x" id="miniClose" aria-label="ឈប់ចាក់ និងបិទ · Stop & close">✕</button>
+    <button type="button" class="mini-x" id="miniClose" aria-label="លាក់របារ · Hide player (song keeps playing)">✕</button>
   </div>
   <div class="mini-prow">
     <div class="pub-prog" id="miniProg" role="slider" aria-label="Seek" style="flex:1 1 auto">
@@ -8115,26 +8116,31 @@ function pubVizReset(){
   var bars=viz.querySelectorAll('i');
   for(var i=0;i<bars.length;i++)bars[i].style.height='';
 }
-/* ===== Pinned now-playing player (owner rule 2026-11-16) =====
-   The song player NEVER scrolls away (owner rule): while a
-   song is loaded — from the Public feed, History, Playlist or
-   Create results, all of which route through pubMiniSet — the
-   player panel stays FIXED at the bottom of the screen: cover,
-   title, Play/Pause, seek bar, current / total time and
-   previous / next, always visible no matter how far the user
-   scrolls or which view they open. It leaves only when the
-   song is STOPPED: the panel's ⏹ button or its ✕ both run
-   pubMiniStopAll — the song pauses, rewinds, and the bar
-   disappears completely instead of staying stuck on screen.
-   Otherwise playback is never touched by any of this — the
-   song's own <audio> element keeps playing; the pinned player
-   only mirrors and controls it. (The older floating-logo
-   machinery below is kept intact but no longer shown: the
-   pinned bar replaces it, one player always in reach.) */
+/* ===== Now-playing player (owner rule 2026-11-16) =====
+   While a song is loaded — from the Public feed, History,
+   Playlist or Create results, all of which route through
+   pubMiniSet — the player panel stays FIXED (sticky) at the
+   bottom of the screen: cover, title, Play/Pause, seek bar,
+   current / total time and previous / next, always visible no
+   matter how far the user scrolls or which view they open.
+   The panel's ✕ button only COLLAPSES the bar
+   (pubMiniClosePanel): playback is NOT touched — the song
+   keeps playing in the background — and the small floating
+   logo appears in the bar's place; tapping the logo brings
+   the panel back (pubMiniOpenPanel). The song stops ONLY
+   from the ⏹ Stop button (pubMiniStopAll: pause + rewind +
+   dismiss) or from ⏸ Pause. The floating logo keeps its
+   older extras: drag it around, drop it on the ✕ zone — or
+   tap its small ✕ badge — for a full stop. */
 var pubMini={au:null,it:null,open:false,timer:null,logoId:null,panelId:null,suppressClick:0,list:null};
 function pubMiniSet(au,it,list){
   if(!au||!it)return;
+  /* A song loaded from nothing starts with the panel open; a
+     song that replaces one the user had collapsed keeps the
+     bar hidden — the floating logo just retargets to it. */
+  var fresh=!pubMini.it;
   pubMini.au=au;pubMini.it=it;
+  if(fresh)pubMini.open=true;
   /* `list` is the prev/next playlist for songs that do NOT live
      in the Public feed (Create results / History): entries are
      {au, it} — or {au, it, load} when one shared element (the
@@ -8242,15 +8248,29 @@ function pubMiniSync(){
     return;
   }
   var playing=!au.paused&&!au.ended;
-  /* PINNED (owner rule 2026-11-16): the panel is the now-playing
-     player and it is ALWAYS on screen while a song is loaded —
-     position:fixed, so scrolling the feed (or switching views)
-     can never carry it away. The floating logo stays hidden:
-     one pinned player, always in reach. */
-  pubMini.open=true;
-  panel.style.display='block';
-  logo.style.display='none';
-  if(pubMini.panelId!==it.id)pubMiniPanelFill();
+  if(pubMini.open){
+    /* Panel open: the sticky bar is on screen (position:fixed,
+       so scrolling the feed or switching views can never carry
+       it away) and the floating logo stays hidden. */
+    panel.style.display='block';
+    logo.style.display='none';
+    if(pubMini.panelId!==it.id)pubMiniPanelFill();
+  }else{
+    /* Collapsed via the panel's ✕ (owner rule 2026-11-16):
+       the bar hides but playback is NEVER touched — the song
+       keeps playing in the background. The small floating logo
+       takes the bar's place, mirrors the play/pause state, and
+       tapping it brings the panel back. */
+    panel.style.display='none';
+    logo.style.display='flex';
+    if(pubMini.logoId!==it.id)pubMiniLogoFill();
+    logo.classList.toggle('playing',playing);
+    var lst=logo.querySelector('.mini-logo-state');
+    if(lst){
+      var lw=playing?'pause':'play';
+      if(lst.getAttribute('data-s')!==lw){lst.setAttribute('data-s',lw);lst.innerHTML=playing?pubPauseSvg():pubPlaySvg();}
+    }
+  }
   var pb=document.getElementById('miniPlayBtn');
   if(pb){
     var pw=playing?'pause':'play';
@@ -8386,7 +8406,7 @@ function pubMiniStopAll(){
     if(pubMini.suppressClick&&Date.now()-pubMini.suppressClick<400)return;
     pubMiniOpenPanel();
   });
-  var xc=document.getElementById('miniClose');if(xc)xc.addEventListener('click',pubMiniStopAll);
+  var xc=document.getElementById('miniClose');if(xc)xc.addEventListener('click',pubMiniClosePanel);
   var sb=document.getElementById('miniStop');if(sb)sb.addEventListener('click',pubMiniStopAll);
   var pb=document.getElementById('miniPlayBtn');if(pb)pb.addEventListener('click',pubMiniTogglePlay);
   var pv=document.getElementById('miniPrev');if(pv)pv.addEventListener('click',function(){pubMiniStep(-1);});
