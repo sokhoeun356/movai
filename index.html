@@ -475,26 +475,35 @@ html[data-mode="light"] .pkg-tab.media.on{color:#8f27c9}
    2026-11-15 orange song cards): Song packages wear a LIME GREEN
    gradient (#ADDC29, the app accent), Image & Video packages a
    PURPLE gradient — only TWO colours now, no yellow/orange left.
-   The gradients are PURE saturated colour end to end: no white
-   and no pale lavender mixed in, both card types built the same
-   way; cards sit on the plain panel with only a neutral dark
-   drop shadow. All card text is white; the Buy button is a white
-   pill whose label takes the card's own colour (dark lime on
-   song cards, purple on media cards). Colour only — prices,
-   plan names, tabs, the carousel and the Buy flow are untouched. */
-.pkg-card.song{background:linear-gradient(155deg,#c2ec4e 0%,#ADDC29 55%,#86b814 100%);color:#fff;border-radius:14px}
-.pkg-card.media{background:linear-gradient(155deg,#b537f2 0%,#9b30e8 55%,#7e1fd1 100%);color:#fff;border-radius:14px}
-.pkg-card.song,.pkg-card.media{border-color:transparent;box-shadow:0 6px 18px rgba(0,0,0,.35)}
+   READABILITY pass (owner order 2026-11-16): the old lime gradient
+   opened on a pale near-white lime tint, so the white card
+   text (price, credits, features, button label) washed out. Both
+   gradients are now DARK end to end and blend toward grey/black,
+   with NO white or pale tint mixed in anywhere, so the white text
+   keeps strong contrast on every part of every card; a soft dark
+   text-shadow backs the lettering up. The Buy button stays a white
+   pill whose label takes a DARK shade of the card's own colour
+   (dark lime on song cards, dark purple on media cards) so it
+   reads clearly on white too. Colour only — prices, plan names,
+   tabs, the carousel and the Buy flow are untouched. */
+.pkg-card.song{background:linear-gradient(155deg,#527a0b 0%,#3d5f07 52%,#191d16 100%);color:#fff;border-radius:14px}
+.pkg-card.media{background:linear-gradient(155deg,#8a2bd6 0%,#6d1cb3 52%,#1d1a24 100%);color:#fff;border-radius:14px}
+.pkg-card.song,.pkg-card.media{border-color:transparent;box-shadow:0 6px 18px rgba(0,0,0,.35);text-shadow:0 1px 3px rgba(0,0,0,.5)}
 .pkg-card.media.hot{border-color:transparent;box-shadow:0 6px 18px rgba(0,0,0,.35)}
 .pkg-card .pkg-name,.pkg-card .pkg-price{color:#fff}
-.pkg-card .pkg-price small{color:rgba(255,255,255,.85)}
+.pkg-card .pkg-price small{color:#fff}
 .pkg-card.song .pkg-credits,.pkg-card.media .pkg-credits{color:#fff}
 html[data-mode="light"] .pkg-card.song .pkg-credits,html[data-mode="light"] .pkg-card.media .pkg-credits{color:#fff}
-.pkg-card .pkg-feats{color:rgba(255,255,255,.94)}
-.pkg-card.media>p{color:rgba(255,255,255,.85) !important}
-.pkg-card .btn{background:#fff;border-color:transparent}
-.pkg-card.song .btn{color:#63910c}
-.pkg-card.media .btn{color:#8f3bf2}
+.pkg-card .pkg-feats{color:#fff}
+.pkg-card.media>p{color:rgba(255,255,255,.92) !important}
+.pkg-card .btn{background:#fff;border-color:transparent;text-shadow:none}
+.pkg-card.song .btn{color:#3d5f07}
+.pkg-card.media .btn{color:#7b21c9}
+/* Disabled buttons inside package cards (the Free plan's
+   «Automatic» pill, an active plan's Buy button) keep full
+   opacity — the global disabled fade washed their labels out
+   against the card gradient. */
+.pkg-card .btn:disabled{opacity:1}
 .btn-free{background:rgba(173,220,41,.16);color:#ADDC29;border:1px solid rgba(173,220,41,.5)}
 html[data-mode="light"] .btn-free{color:#63910c}
 /* Profile sheet: packages are NOT listed inline — one tappable row
@@ -1209,17 +1218,6 @@ html[data-smooth="1"] .brand-frame,html[data-smooth="1"] .acct-chip,html[data-sm
     </div>
     <div class="pkg-pane" id="pkgPaneMedia">
     <div class="pkg-grid">
-      <div class="pkg-card media">
-        <span class="pkg-name" data-i18n="pkgMonthly">ប្រចាំខែ</span>
-        <div class="pkg-price" id="pkgPrice-monthly">$25<small data-i18n="pkgPerMonth">/ខែ</small></div>
-        <div class="pkg-credits" data-i18n="pkgCreditsMonth">11,000 Credit/ខែ</div>
-        <div class="pkg-feats">
-          <div data-i18n="pkgFeatMedia">បង្កើតបានទាំងរូបភាព និងវីដេអូ</div>
-          <div data-i18n="pkgFeatPremium">បើក model Premium ទាំងអស់ (រូបភាព + វីដេអូ)</div>
-          <div data-i18n="pkgMediaOnlyNote">បានតែ Image.Video Credit (ពណ៌ស្វាយ) ប៉ុណ្ណោះ</div>
-        </div>
-        <button type="button" class="btn btn-green" id="pkgBuy-monthly" onclick="pkgBuyAsk('monthly')" data-i18n="pkgBuy">ទិញឥឡូវ</button>
-      </div>
       <div class="pkg-card media hot">
         <span class="pkg-name" data-i18n="pkgYearly">ប្រចាំឆ្នាំ</span>
         <div class="pkg-price" id="pkgPrice-yearly">$18<small data-i18n="pkgPerMonth">/ខែ</small></div>
@@ -1231,6 +1229,17 @@ html[data-smooth="1"] .brand-frame,html[data-smooth="1"] .acct-chip,html[data-sm
           <div data-i18n="pkgMediaOnlyNote">បានតែ Image.Video Credit (ពណ៌ស្វាយ) ប៉ុណ្ណោះ</div>
         </div>
         <button type="button" class="btn btn-green" id="pkgBuy-yearly" onclick="pkgBuyAsk('yearly')" data-i18n="pkgBuy">ទិញឥឡូវ</button>
+      </div>
+      <div class="pkg-card media">
+        <span class="pkg-name" data-i18n="pkgMonthly">ប្រចាំខែ</span>
+        <div class="pkg-price" id="pkgPrice-monthly">$25<small data-i18n="pkgPerMonth">/ខែ</small></div>
+        <div class="pkg-credits" data-i18n="pkgCreditsMonth">11,000 Credit/ខែ</div>
+        <div class="pkg-feats">
+          <div data-i18n="pkgFeatMedia">បង្កើតបានទាំងរូបភាព និងវីដេអូ</div>
+          <div data-i18n="pkgFeatPremium">បើក model Premium ទាំងអស់ (រូបភាព + វីដេអូ)</div>
+          <div data-i18n="pkgMediaOnlyNote">បានតែ Image.Video Credit (ពណ៌ស្វាយ) ប៉ុណ្ណោះ</div>
+        </div>
+        <button type="button" class="btn btn-green" id="pkgBuy-monthly" onclick="pkgBuyAsk('monthly')" data-i18n="pkgBuy">ទិញឥឡូវ</button>
       </div>
     </div>
     </div>
@@ -2343,9 +2352,12 @@ function genSetSunoModel(id){
    package credits are added to the account balance. While a package
    is active, every Premium (Creator+) model — image and video — is
    unlocked; durations of 15s+ on Magic Hour video unlock too. */
+/* Display order (owner order 2026-11-16): most expensive FIRST —
+   Yearly ($216) before Monthly ($25), matching the card order in
+   the Packages panel markup. */
 var PKG_PLANS=[
- {id:'monthly',name:{km:'ប្រចាំខែ',en:'Monthly'},price:25,priceNote:{km:'$25/ខែ',en:'$25/month'},credits:11000,days:30},
- {id:'yearly',name:{km:'ប្រចាំឆ្នាំ',en:'Yearly'},price:216,priceNote:{km:'$18/ខែ · បង់ $216/ឆ្នាំ',en:'$18/month · billed $216/year'},credits:140000,days:365}
+ {id:'yearly',name:{km:'ប្រចាំឆ្នាំ',en:'Yearly'},price:216,priceNote:{km:'$18/ខែ · បង់ $216/ឆ្នាំ',en:'$18/month · billed $216/year'},credits:140000,days:365},
+ {id:'monthly',name:{km:'ប្រចាំខែ',en:'Monthly'},price:25,priceNote:{km:'$25/ខែ',en:'$25/month'},credits:11000,days:30}
 ];
 function pkgPlanById(id){for(var i=0;i<PKG_PLANS.length;i++)if(PKG_PLANS[i].id===id)return PKG_PLANS[i];return null;}
 /* ================= Live package prices (from the server) =================
@@ -2734,11 +2746,15 @@ function pkgBuyConfirm(){
    = 1,500, Pro $22/month = 3,750. One song generation costs 12
    credits and returns 2 songs (Suno v6). The active song plan is
    saved on the account record and mirrored in 'movai-song-plan'. */
+/* Display order (owner order 2026-11-16): most expensive FIRST,
+   Free LAST — Pro ($22) → Popular ($10) → Trial ($5) → Free ($0),
+   so the priciest package is what the user sees the moment the
+   Packages panel opens and Free is reached by swiping. */
 var SONG_PKG_PLANS=[
- {id:'song-free',name:{km:'Free',en:'Free'},price:0,priceNote:{km:'ឥតគិតថ្លៃ',en:'Free'},credits:24,days:30,free:true},
- {id:'song-trial',name:{km:'Trial',en:'Trial'},price:5,priceNote:{km:'$5/ខែ',en:'$5/month'},credits:750,days:30},
+ {id:'song-pro',name:{km:'Pro',en:'Pro'},price:22,priceNote:{km:'$22/ខែ',en:'$22/month'},credits:3750,days:30},
  {id:'song-popular',name:{km:'Popular',en:'Popular'},price:10,priceNote:{km:'$10/ខែ',en:'$10/month'},credits:1500,days:30},
- {id:'song-pro',name:{km:'Pro',en:'Pro'},price:22,priceNote:{km:'$22/ខែ',en:'$22/month'},credits:3750,days:30}
+ {id:'song-trial',name:{km:'Trial',en:'Trial'},price:5,priceNote:{km:'$5/ខែ',en:'$5/month'},credits:750,days:30},
+ {id:'song-free',name:{km:'Free',en:'Free'},price:0,priceNote:{km:'ឥតគិតថ្លៃ',en:'Free'},credits:24,days:30,free:true}
 ];
 function songPkgPlanById(id){for(var i=0;i<SONG_PKG_PLANS.length;i++)if(SONG_PKG_PLANS[i].id===id)return SONG_PKG_PLANS[i];return null;}
 function songPkgGet(){
@@ -5471,6 +5487,11 @@ function packagesShow(){
     b.classList.remove('blur-in');void b.offsetWidth;b.classList.add('blur-in');
   }
   document.body.style.overflow='hidden';
+  /* Every open starts each package row back at its FIRST card —
+     the most expensive package (owner order 2026-11-16) — even if
+     the user had swiped through to Free last time. */
+  var pgrids=document.querySelectorAll('#page-packages .pkg-grid');
+  for(var pg=0;pg<pgrids.length;pg++)pgrids[pg].scrollLeft=0;
   if(!wasOpen){PKG_EVT_OPEN=true;PKG_EVT_REQUESTED=false;pkgEvent('view','');}
 }
 function packagesHide(){
