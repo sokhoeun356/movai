@@ -1310,6 +1310,22 @@ function ipRateCheck(req) {
   if (rec.count > IP_LIMIT_PER_MIN) return { ok: false, rateLimited: true, retryAfter: Math.ceil((IP_WINDOW_MS - (now - rec.windowStart)) / 1000) };
   return { ok: true };
 }
+// Block enforcement for generation (defense in depth): a blocked Gmail or
+// a blocked IP cannot generate even if they somehow hold a session (e.g.
+// they were logged in before the Admin blocked them). The website enforces
+// the block at login (sync rejection); this stops generation directly.
+// Returns an error string to send, or '' when the request may proceed.
+// The model block is enforced at sync/login only (gen requests do not
+// reliably carry the device model).
+function genBlockedCheck(email, req) {
+  try {
+    const em = normEmail(email);
+    if (em && loadBlockedEmails().some((b) => b === em)) return 'គណនីនេះត្រូវបានប្លុក · This account is blocked';
+    const ip = getClientIp(req);
+    if (ip && loadBlockedIps().some((b) => b === ip)) return 'គណនីនេះត្រូវបានប្លុក · This account is blocked';
+  } catch (e) {}
+  return '';
+}
 // Enforce the per-user generation rate limit + the per-provider create
 // throttle for one generation create. Returns an error string to send,
 // or '' when the request may proceed.
@@ -1395,6 +1411,8 @@ function apiRoute(req, res, urlPath) {
         const provider = body.provider;
         const _gateErr = await genFairnessGate(normEmail(body.email), provider);
         if (_gateErr) return sendJSON(res, 200, { ok: false, error: _gateErr });
+        const _blkErr = genBlockedCheck(normEmail(body.email), req);
+        if (_blkErr) return sendJSON(res, 200, { ok: false, error: _blkErr });
         const key = typeof body.key === 'string' ? body.key : '';
         const prompt = body.prompt.trim().slice(0, 2000);
         const width = Math.max(64, Math.min(2048, Number(body.width) || 768));
@@ -1557,6 +1575,8 @@ function apiRoute(req, res, urlPath) {
         const provider = body.provider;
         const _gateErr = await genFairnessGate(normEmail(body.email), provider);
         if (_gateErr) return sendJSON(res, 200, { ok: false, error: _gateErr });
+        const _blkErr = genBlockedCheck(normEmail(body.email), req);
+        if (_blkErr) return sendJSON(res, 200, { ok: false, error: _blkErr });
         const reqKey = typeof body.key === 'string' ? body.key : '';
         const prompt = body.prompt.trim().slice(0, 4000);
         const duration = [5, 10].includes(Number(body.duration)) ? Number(body.duration) : 5;
@@ -1762,6 +1782,8 @@ function apiRoute(req, res, urlPath) {
         const provider = body.provider;
         const _gateErr = await genFairnessGate(normEmail(body.email), provider);
         if (_gateErr) return sendJSON(res, 200, { ok: false, error: _gateErr });
+        const _blkErr = genBlockedCheck(normEmail(body.email), req);
+        if (_blkErr) return sendJSON(res, 200, { ok: false, error: _blkErr });
         const reqKey = typeof body.key === 'string' ? body.key : '';
         const title = typeof body.title === 'string' ? body.title.trim().slice(0, 200) : '';
         const lyrics = typeof body.lyrics === 'string' ? body.lyrics.trim().slice(0, 4000) : '';

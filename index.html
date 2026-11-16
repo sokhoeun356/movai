@@ -934,6 +934,15 @@ html[data-mode="light"] .btn-free{color:#63910c}
    used. An account that already has a name never sees it — the
    name arrives automatically from Google / the saved record. */
 #nameSheet{z-index:120;-webkit-backdrop-filter:blur(16px) saturate(130%);backdrop-filter:blur(16px) saturate(130%)}
+/* ===== Admin block enforcement =====
+   Shown when the server REFUSES the account sync because the
+   Admin blocked this Gmail, this IP, or this device model. It
+   sits above every sheet except the offline popup (z-index 290),
+   has NO close button and NO backdrop dismiss, and the session
+   is already cleared by the time it appears — the blocked user
+   cannot log in or use MovAi again until the Admin unblocks
+   them (unblocking takes effect on the next sync). */
+#blockedSheet{z-index:290;-webkit-backdrop-filter:blur(16px) saturate(130%);backdrop-filter:blur(16px) saturate(130%)}
 #nameSheet .name-gate-fields{display:flex;gap:8px;margin-top:12px}
 #nameSheet .name-gate-fields .input{flex:1;min-width:0}
 @media(max-width:420px){#nameSheet .name-gate-fields{flex-direction:column}}
@@ -1821,6 +1830,17 @@ html[data-smooth="1"] .brand-frame,html[data-smooth="1"] .acct-chip,html[data-sm
     <p class="offline-msg" id="offlineMsg"></p>
   </div>
 </div>
+<div id="blockedSheet" class="pkg-sheet" style="display:none" role="alertdialog" aria-modal="true" aria-labelledby="blockedTitle">
+  <div class="pkg-sheet-card" style="text-align:center">
+    <div style="width:64px;height:64px;margin:0 auto;border-radius:50%;background:rgba(229,72,77,.14);color:#e5484d;display:flex;align-items:center;justify-content:center"><svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><line x1="5.5" y1="5.5" x2="18.5" y2="18.5"/></svg></div>
+    <h3 id="blockedTitle" style="font-size:1.25rem;font-weight:900;margin-top:14px" data-i18n="blockedTitle">គណនីនេះត្រូវបានប្លុក · This account is blocked</h3>
+    <p id="blockedReason" style="display:none;font-size:0.9375rem;font-weight:800;line-height:1.65;margin-top:10px;color:#e5484d"></p>
+    <p id="blockedEmail" style="display:none;font-size:0.875rem;font-weight:700;margin-top:8px;overflow-wrap:break-word"></p>
+    <p style="font-size:0.9375rem;line-height:1.75;margin-top:10px;color:var(--muted)" data-i18n="blockedBody">Admin បានប្លុកគណនី / IP / ម៉ូឌែលឧបករណ៍នេះ ដូច្នេះអ្នកមិនអាចចូលប្រើ ឬបង្កើតអ្វីនៅក្នុង MovAi បានទេ រហូតដល់ Admin ដកប្លុកចេញ។ បើអ្នកគិតថាមានការភាន់ច្រឡំ សូមទាក់ទង Admin។</p>
+    <a class="kbtn kbtn-black" style="margin-top:20px;width:100%;text-decoration:none" href="https://t.me/yemsokhoeun_9999" target="_blank" rel="noopener" data-i18n="blockedContact">ទាក់ទង Admin តាម Telegram</a>
+    <button type="button" class="kbtn kbtn-white" style="margin-top:10px;width:100%" onclick="acctBlockedLogout()" data-i18n="blockedLogout">ចេញពីគណនី · Log out</button>
+  </div>
+</div>
 <div id="netReadyToast" class="net-ready-toast" style="display:none" role="status" aria-live="polite">
   <span class="net-ready-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.55a11 11 0 0 1 14.08 0"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><line x1="12" y1="20" x2="12.01" y2="20"/></svg><span class="net-ready-check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></span></span>
   <span>Network ready · អ៊ីនធឺណិតមកវិញហើយ</span>
@@ -1982,7 +2002,7 @@ km:{
  pubDlFreeLeft:'ទាញយកបទចម្រៀងហ្វ្រីនៅសល់ {n} ដង',
  pubDlLimit:'អ្នកបានប្រើអស់ការទាញយកបទចម្រៀងហ្វ្រី 2 ដងហើយ — សូមទិញកញ្ចប់សេវាកម្មបទចម្រៀង ដើម្បីទាញយកបន្ត',
  acctGotFree:'អបអរសាទរ! អ្នកទទួលបាន Credit ហ្វ្រី — Image.Video Credit 250 និង Song Credit 24 ក្នុងគណនីរបស់អ្នកហើយ',
- giftTitle:'កាដូពី Admin',giftBody:'Free 250 Image.Video Credit + 24 Song Credit សម្រាប់អ្នកប្រើថ្មី',giftClaim:'ទទួលយក · Claim',
+ giftTitle:'កាដូពី Admin',giftBody:'Free 250 Image.Video Credit + 24 Song Credit សម្រាប់អ្នកប្រើថ្មី',giftClaim:'ទទួលយក · Claim',blockedTitle:'គណនីនេះត្រូវបានប្លុក · This account is blocked',blockedBody:'Admin បានប្លុកគណនី / IP / ម៉ូឌែលឧបករណ៍នេះ ដូច្នេះអ្នកមិនអាចចូលប្រើ ឬបង្កើតអ្វីនៅក្នុង MovAi បានទេ រហូតដល់ Admin ដកប្លុកចេញ។ បើអ្នកគិតថាមានការភាន់ច្រឡំ សូមទាក់ទង Admin។',blockedContact:'ទាក់ទង Admin តាម Telegram',blockedLogout:'ចេញពីគណនី · Log out',
  navNotif:'ដំណឹង',notifTitle:'ដំណឹង · Notifications',notifEmpty:'មិនទាន់មានដំណឹងទេ',notifGuest:'សូម Log in ដើម្បីមើលដំណឹងរបស់អ្នក',notifLoading:'កំពុងផ្ទុក…',notifJustNow:'ទើបតែឥឡូវនេះ',notifMinAgo:'{n} នាទីមុន',notifHourAgo:'{n} ម៉ោងមុន',notifDayAgo:'{n} ថ្ងៃមុន',notifApproved:'កញ្ចប់របស់អ្នកត្រូវបានអនុម័ត ✓',notifRejected:'កញ្ចប់របស់អ្នកត្រូវបានបដិសេធ',notifLogin:'មានអ្នកប្រើថ្មី Log in',notifRequest:'មានសំណើទិញកញ្ចប់ថ្មី',notifGrant:'Admin បានបន្ថែម Credit ឲ្យអ្នក',notifDeduct:'Admin បានកាត់ Credit របស់អ្នក',notifInfo:'ដំណឹងពី MovAi',notifPost:'បានផុសថ្មីទៅ Public',notifGenCharge:'បានកាត់ Credit ពីការបង្កើត',
  pushAskTitle:'បើកដំណឹងពីទូរស័ព្ទ?',pushAskBody:'ទទួលដំណឹងពិតៗចេញពីទូរស័ព្ទរបស់អ្នកផ្ទាល់ — ពេលកញ្ចប់ត្រូវបានអនុម័ត ពេល Admin បន្ថែម ឬកាត់ Credit និងពេលមានកាដូ — ទោះបីអ្នកមិនបានបើក website ក៏ដោយ',pushAllow:'បើកដំណឹង · Enable',pushNotNow:'មិនបាច់ទេ · Not now',pushSetLabel:'ដំណឹងពីទូរស័ព្ទ · Push notifications',pushStateOn:'បើកហើយ — ដំណឹងនឹងលោតលើទូរស័ព្ទរបស់អ្នក',pushStateOff:'បិទ — បើកដើម្បីទទួលដំណឹងលើទូរស័ព្ទ',pushStateBlocked:'Browser បានបិទដំណឹងឲ្យ website នេះ — សូមបើក Notification ក្នុង Settings របស់ browser',pushStateUnsupported:'Browser នេះមិនគាំទ្រ Web Push ទេ',pushStateGuest:'សូម Log in ជាមុនសិន',pushBlockedTitle:'Browser បានបិទដំណឹង · Notifications blocked',pushBlockedBody:'អ្នកធ្លាប់ចុច «Block» ពីមុន ទើប browser លែងលោតសួរ «Allow ឬអត់» ទៀត ហើយ website ក៏សុំសិទ្ធិឡើងវិញអត់បានដែរ។ សូមបើកវាដោយខ្លួនឯងតាមជំហានខាងក្រោម — មិនដល់ ១ នាទីទេ៖',pushBlockedStep1:'ចុចរូបសោ 🔒 នៅខាងឆ្វេងអាសយដ្ឋាន website នេះ លើ address bar ខាងលើ',pushBlockedStep2:'ចុច «Site settings» (ការកំណត់គេហទំព័រ)',pushBlockedStep3:'ចុច «Notifications» (ដំណឹង) រួចជ្រើស «Allow» (អនុញ្ញាត)',pushBlockedStep4:'ត្រឡប់មក website នេះវិញ រួចបើក switch «Push notifications» ម្ដងទៀត — វានឹងដំណើរការភ្លាម',pushBlockedAlt:'រករូបសោ 🔒 អត់ឃើញ? ចុច ⋮ (ចំណុច ៣ នៅខាងលើស្ដាំនៃ browser) → Settings → Site settings → Notifications → រក website នេះក្នុងបញ្ជី «Blocked» → Allow',pushBlockedDone:'ខ្ញុំបើករួចហើយ · I turned it on',pushBlockedClose:'បិទ · Close',pushBlockedStill:'នៅតែ Block នៅឡើយ — សូមពិនិត្យជំហានខាងលើម្ដងទៀត',
  acctErrFill:'សូមបំពេញឲ្យគ្រប់ — អ៊ីមែលត្រូវមាន @ ហើយពាក្យសម្ងាត់យ៉ាងតិច 4 តួ',
@@ -2187,7 +2207,7 @@ en:{
  pubDlFreeLeft:'{n} free song downloads left',
  pubDlLimit:'You have used your 2 free song downloads — please buy a Song package to keep downloading',
  acctGotFree:'Welcome! You received free credits — 250 Image.Video Credit and 24 Song Credit in your account',
- giftTitle:'A Gift from Admin',giftBody:'Free 250 Image.Video Credit + 24 Song Credit for new users',giftClaim:'Claim · ទទួលយក',
+ giftTitle:'A Gift from Admin',giftBody:'Free 250 Image.Video Credit + 24 Song Credit for new users',giftClaim:'Claim · ទទួលយក',blockedTitle:'This account is blocked · គណនីនេះត្រូវបានប្លុក',blockedBody:'The Admin has blocked this account / IP / device model, so you cannot log in or create anything in MovAi until the Admin removes the block. If you think this is a mistake, please contact the Admin.',blockedContact:'Contact Admin on Telegram',blockedLogout:'Log out · ចេញពីគណនី',
  navNotif:'Notifications',notifTitle:'Notifications · ដំណឹង',notifEmpty:'No notifications yet',notifGuest:'Log in to see your notifications',notifLoading:'Loading…',notifJustNow:'Just now',notifMinAgo:'{n} min ago',notifHourAgo:'{n} hr ago',notifDayAgo:'{n} days ago',notifApproved:'Your package was approved ✓',notifRejected:'Your package was rejected',notifLogin:'New user signed in',notifRequest:'New package purchase request',notifGrant:'Admin added credits to your account',notifDeduct:'Admin deducted credits from your account',notifInfo:'MovAi notification',notifPost:'New post on Public',notifGenCharge:'Credit charged for a creation',
  pushAskTitle:'Turn on phone notifications?',pushAskBody:'Get real alerts on your phone — when a package is approved, when Admin adds or deducts credits, and when a gift arrives — even when the website is closed',pushAllow:'Enable · បើកដំណឹង',pushNotNow:'Not now · មិនបាច់ទេ',pushSetLabel:'Push notifications · ដំណឹងពីទូរស័ព្ទ',pushStateOn:'On — alerts will pop up on your phone',pushStateOff:'Off — turn on to get alerts on your phone',pushStateBlocked:'This browser has blocked notifications for this site — allow Notifications in the browser settings',pushStateUnsupported:'This browser does not support Web Push',pushStateGuest:'Log in first',pushBlockedTitle:'Notifications blocked · Browser បានបិទដំណឹង',pushBlockedBody:'You tapped "Block" before, so the browser no longer shows the "Allow?" prompt — and the website cannot ask again. Turn it back on yourself with the steps below; it takes under a minute:',pushBlockedStep1:'Tap the 🔒 lock icon at the left end of the address bar at the top',pushBlockedStep2:'Tap "Site settings"',pushBlockedStep3:'Tap "Notifications", then choose "Allow"',pushBlockedStep4:'Come back to this website and turn the "Push notifications" switch on again — it will work right away',pushBlockedAlt:'Cannot find the 🔒? Tap ⋮ (the 3 dots at the top right of the browser) → Settings → Site settings → Notifications → find this site under "Blocked" → Allow',pushBlockedDone:'I turned it on · ខ្ញុំបើករួចហើយ',pushBlockedClose:'Close · បិទ',pushBlockedStill:'Still blocked — please check the steps above once more',
  acctErrFill:'Please fill everything — email must contain @ and password at least 4 characters',
@@ -9770,8 +9790,23 @@ function profileBuyCredits(kind){
      account, those are adopted too — the server's ID wins.
    - If the server cannot be reached (asleep / offline), NOTHING
      changes and NOTHING is shown: the browser balance stays exactly
-     as it was, the app never blocks or errors on this, and the sync
-     simply tries again quietly on the next app open. */
+     as it was, and the sync simply tries again quietly on the next
+     app open.
+   - BLOCK ENFORCEMENT (owner fix 2026-11-16): an unreachable
+     server is NOT a block — but an explicit refusal IS. When the
+     Admin blocks a Gmail, an IP, or a device model, the server
+     still answers the sync (HTTP 200) with
+     {ok:false, error:'…blocked…'} and raises the Admin/Telegram
+     security notice. This client MUST honour that answer:
+     acctBlockDetect spots it and acctBlockedEnforce clears the
+     local session at once and raises the non-dismissible
+     #blockedSheet. Before this fix the refusal was silently
+     ignored (acctApplyServerData only reads credit fields), so a
+     «blocked» user kept their local session and used the app
+     normally — the block existed only on the server. The sync
+     also re-runs every 60 s while signed in (genInit), so a user
+     who is blocked WHILE using the app is signed out within a
+     minute, not only on the next app open. */
 var ACCT_SYNC_URL='https://movai-proxy.onrender.com/api/admin/sync';
 var acctSyncBusy=false;
 /* One-shot flag: set by giftClaim() so the sync that follows the
@@ -9875,11 +9910,17 @@ function acctAdminSync(){
     if(ctrl)opts.signal=ctrl.signal;
     fetch(ACCT_SYNC_URL,opts).then(function(r){
       if(timer)clearTimeout(timer);
-      if(!r||!r.ok){done();return null;}
+      if(!r){done();return null;}
+      /* The body is read even on an error status: a block refusal
+         must never be swallowed by the old «!r.ok → ignore» path. */
       return r.json().catch(function(){return null;});
     }).then(function(data){
       done();
-      if(data){try{acctApplyServerData(data);}catch(e){}}
+      if(data){
+        var br='';try{br=acctBlockDetect(data);}catch(e){}
+        if(br){try{acctBlockedEnforce(br);}catch(e){}return;}
+        try{acctApplyServerData(data);}catch(e){}
+      }
     }).catch(function(){
       if(timer)clearTimeout(timer);
       done();
@@ -9900,6 +9941,59 @@ function acctAdminSync(){
       }).catch(function(){proceed('');});
     }else{proceed('');}
   }catch(e){proceed('');}
+}
+/* ===== Admin block enforcement · ប្លុករបស់ Admin =====
+   The server's block lists (blocked Gmails / IPs / device models)
+   are checked on every sync; a refusal looks like
+   {ok:false, error:'គណនីនេះត្រូវបានប្លុក · This account is blocked'}
+   (or the device-model wording). acctBlockDetect returns that
+   reason string, '' for any other answer. Only an EXPLICIT
+   refusal counts — a network failure or a sleeping server
+   returns no JSON at all and never blocks anyone. */
+var acctBlockedReason='';
+function acctBlockDetect(data){
+  if(!data||typeof data!=='object'||data.ok!==false)return '';
+  var e=(typeof data.error==='string')?data.error:'';
+  if(/block|ប្លុក/i.test(e))return e;
+  return '';
+}
+/* Enforce a block the server just confirmed: remember the reason,
+   clear the session AT ONCE (the account record itself is kept —
+   if the Admin unblocks, the same Gmail signs back in with its
+   credits intact), close every open surface, and raise the
+   non-dismissible blocked sheet. requireLogin() also refuses
+   while acctBlockedReason is set, so no creation can start. */
+function acctBlockedEnforce(reason){
+  var u=null;try{u=acctCurrent();}catch(e){}
+  var em=(u&&u.email)?u.email:'';
+  acctBlockedReason=reason||tx('blockedTitle');
+  try{localStorage.removeItem('movai-session');}catch(e){}
+  if(giftTimer){try{clearTimeout(giftTimer);}catch(e){}giftTimer=null;}
+  try{closeMenu();}catch(e){}
+  try{packagesHide();}catch(e){}
+  try{profileClose();}catch(e){}
+  ['loginSheet','nameSheet','giftSheet','pushSheet','notifSheet','pubSheet','postSheet','pkgSheet'].forEach(function(id){
+    var s=document.getElementById(id);if(s&&s.style.display!=='none'){try{sheetHideAnim(s);}catch(e){s.style.display='none';}}
+  });
+  try{acctRender();}catch(e){}
+  try{histOnAccountChange();}catch(e){}
+  try{notifReset();}catch(e){}
+  var r=document.getElementById('blockedReason');
+  if(r){r.textContent=acctBlockedReason;r.style.display=acctBlockedReason?'block':'none';}
+  var e2=document.getElementById('blockedEmail');
+  if(e2){e2.textContent=em;e2.style.display=em?'block':'none';}
+  var s2=document.getElementById('blockedSheet');if(s2)sheetShowAnim(s2);
+}
+/* The blocked sheet's Log out button: the session is already
+   cleared — this just dismisses the sheet back to guest browsing.
+   Browsing Public as a guest is not «using» the blocked account;
+   signing in again with a blocked Gmail / IP / model re-runs the
+   sync and the block is enforced again immediately. */
+function acctBlockedLogout(){
+  acctBlockedReason='';
+  try{localStorage.removeItem('movai-session');}catch(e){}
+  var s=document.getElementById('blockedSheet');if(s)sheetHideAnim(s);
+  try{acctRender();}catch(e){}
 }
 /* ===== No Admin inside this website =====
    Admin lives ONLY in the separate Admin app (movai-admin, entered
@@ -9957,6 +10051,12 @@ function loginSheetClose(){var s=document.getElementById('loginSheet');sheetHide
    and nothing is created; the sheet's Cancel/✕ just returns them to
    browsing, and the next creation tap pops the sheet again. */
 function requireLogin(){
+  /* A server-confirmed block refuses creation outright — even in
+     the brief window before the blocked sheet paints. */
+  if(typeof acctBlockedReason!=='undefined'&&acctBlockedReason){
+    var bs=document.getElementById('blockedSheet');if(bs&&bs.style.display==='none')sheetShowAnim(bs);
+    return false;
+  }
   var u=null;try{u=acctCurrent();}catch(e){}
   if(u){
     /* Signed in but the mandatory name step is not done yet —
@@ -11778,6 +11878,11 @@ function genInit(){
   d3SetProvider('hunyuan3d');
   uiInit();
   try{acctAdminSync();}catch(e){}
+  /* Block re-check while the app stays open: if the Admin blocks
+     this Gmail / IP / model mid-session, the next sync (≤60 s)
+     enforces it — session cleared + blocked sheet — instead of
+     the block only landing on the next app open. */
+  setInterval(function(){try{acctAdminSync();}catch(e){}},60000);
   try{nameGateCheck();}catch(e){}
   try{giftSchedule();}catch(e){}
   try{notifInit();}catch(e){}
