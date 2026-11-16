@@ -140,6 +140,11 @@ main{max-width:720px;margin:0 auto;padding:calc(4.75rem + env(safe-area-inset-to
 .push-switch.on{background:var(--accent);border-color:transparent}
 .push-switch.on .push-knob{left:25px;background:#fff}
 .push-switch:disabled{opacity:.5;cursor:wait}
+/* Blocked-notifications help sheet: numbered steps the user follows
+   in the browser's own site settings to re-allow notifications. */
+.push-steps{margin:16px 0 0;padding:0;list-style:none;display:flex;flex-direction:column;gap:10px;text-align:left}
+.push-steps li{display:flex;gap:10px;align-items:flex-start;font-size:0.9375rem;line-height:1.65}
+.push-step-n{flex:0 0 auto;width:24px;height:24px;border-radius:50%;background:var(--accent);color:#141414;font-weight:900;font-size:0.8125rem;display:flex;align-items:center;justify-content:center;margin-top:2px}
 .drawer .notif-item{border-color:var(--glass-line);color:var(--glass-text)}
 .drawer .notif-item.unread{border-color:rgba(var(--accent-rgb),.55)}
 .drawer .notif-main .nb,.drawer .notif-main .ntime{color:var(--glass-muted)}
@@ -1777,6 +1782,23 @@ html[data-smooth="1"] .brand-frame,html[data-smooth="1"] .acct-chip,html[data-sm
     <button type="button" class="kbtn kbtn-white" style="margin-top:10px;width:100%" onclick="pushAskDismiss()" data-i18n="pushNotNow">មិនបាច់ទេ · Not now</button>
   </div>
 </div>
+<div id="pushBlockedSheet" class="pkg-sheet" style="display:none" role="dialog" aria-modal="true" onclick="if(event.target===this)pushBlockedClose()">
+  <div class="pkg-sheet-card">
+    <div style="width:64px;height:64px;margin:0 auto;border-radius:50%;background:rgba(229,72,77,.14);color:#e5484d;display:flex;align-items:center;justify-content:center"><svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/><line x1="4" y1="4" x2="20" y2="20"/></svg></div>
+    <h3 style="font-size:1.25rem;font-weight:900;margin-top:14px;text-align:center" data-i18n="pushBlockedTitle">Browser បានបិទដំណឹង · Notifications blocked</h3>
+    <p style="font-size:0.9375rem;line-height:1.75;margin-top:10px;color:var(--muted)" data-i18n="pushBlockedBody">អ្នកធ្លាប់ចុច «Block» ពីមុន ទើប browser លែងលោតសួរ «Allow ឬអត់» ទៀត ហើយ website ក៏សុំសិទ្ធិឡើងវិញអត់បានដែរ។ សូមបើកវាដោយខ្លួនឯងតាមជំហានខាងក្រោម — មិនដល់ ១ នាទីទេ៖</p>
+    <ol class="push-steps">
+      <li><span class="push-step-n">1</span><span data-i18n="pushBlockedStep1">ចុចរូបសោ 🔒 នៅខាងឆ្វេងអាសយដ្ឋាន website នេះ លើ address bar ខាងលើ</span></li>
+      <li><span class="push-step-n">2</span><span data-i18n="pushBlockedStep2">ចុច «Site settings» (ការកំណត់គេហទំព័រ)</span></li>
+      <li><span class="push-step-n">3</span><span data-i18n="pushBlockedStep3">ចុច «Notifications» (ដំណឹង) រួចជ្រើស «Allow» (អនុញ្ញាត)</span></li>
+      <li><span class="push-step-n">4</span><span data-i18n="pushBlockedStep4">ត្រឡប់មក website នេះវិញ រួចបើក switch «Push notifications» ម្ដងទៀត — វានឹងដំណើរការភ្លាម</span></li>
+    </ol>
+    <p style="font-size:0.8125rem;line-height:1.65;margin-top:14px;color:var(--muted)" data-i18n="pushBlockedAlt">រករូបសោ 🔒 អត់ឃើញ? ចុច ⋮ (ចំណុច ៣ នៅខាងលើស្ដាំនៃ browser) → Settings → Site settings → Notifications → រក website នេះក្នុងបញ្ជី «Blocked» → Allow</p>
+    <p id="pushBlockedStill" style="display:none;font-size:0.875rem;line-height:1.6;margin-top:12px;color:#e5484d;font-weight:700" data-i18n="pushBlockedStill">នៅតែ Block នៅឡើយ — សូមពិនិត្យជំហានខាងលើម្ដងទៀត</p>
+    <button type="button" class="kbtn kbtn-black" style="margin-top:18px;width:100%" onclick="pushBlockedRecheck()" data-i18n="pushBlockedDone">ខ្ញុំបើករួចហើយ · I turned it on</button>
+    <button type="button" class="kbtn kbtn-white" style="margin-top:10px;width:100%" onclick="pushBlockedClose()" data-i18n="pushBlockedClose">បិទ · Close</button>
+  </div>
+</div>
 <div id="notifSheet" class="pkg-sheet" style="display:none" role="dialog" aria-modal="true" onclick="if(event.target===this)notifSheetClose()">
   <div class="pkg-sheet-card">
     <div style="display:flex;align-items:center;justify-content:space-between;gap:10px">
@@ -1962,7 +1984,7 @@ km:{
  acctGotFree:'អបអរសាទរ! អ្នកទទួលបាន Credit ហ្វ្រី — Image.Video Credit 250 និង Song Credit 24 ក្នុងគណនីរបស់អ្នកហើយ',
  giftTitle:'កាដូពី Admin',giftBody:'Free 250 Image.Video Credit + 24 Song Credit សម្រាប់អ្នកប្រើថ្មី',giftClaim:'ទទួលយក · Claim',
  navNotif:'ដំណឹង',notifTitle:'ដំណឹង · Notifications',notifEmpty:'មិនទាន់មានដំណឹងទេ',notifGuest:'សូម Log in ដើម្បីមើលដំណឹងរបស់អ្នក',notifLoading:'កំពុងផ្ទុក…',notifJustNow:'ទើបតែឥឡូវនេះ',notifMinAgo:'{n} នាទីមុន',notifHourAgo:'{n} ម៉ោងមុន',notifDayAgo:'{n} ថ្ងៃមុន',notifApproved:'កញ្ចប់របស់អ្នកត្រូវបានអនុម័ត ✓',notifRejected:'កញ្ចប់របស់អ្នកត្រូវបានបដិសេធ',notifLogin:'មានអ្នកប្រើថ្មី Log in',notifRequest:'មានសំណើទិញកញ្ចប់ថ្មី',notifGrant:'Admin បានបន្ថែម Credit ឲ្យអ្នក',notifDeduct:'Admin បានកាត់ Credit របស់អ្នក',notifInfo:'ដំណឹងពី MovAi',notifPost:'បានផុសថ្មីទៅ Public',notifGenCharge:'បានកាត់ Credit ពីការបង្កើត',
- pushAskTitle:'បើកដំណឹងពីទូរស័ព្ទ?',pushAskBody:'ទទួលដំណឹងពិតៗចេញពីទូរស័ព្ទរបស់អ្នកផ្ទាល់ — ពេលកញ្ចប់ត្រូវបានអនុម័ត ពេល Admin បន្ថែម ឬកាត់ Credit និងពេលមានកាដូ — ទោះបីអ្នកមិនបានបើក website ក៏ដោយ',pushAllow:'បើកដំណឹង · Enable',pushNotNow:'មិនបាច់ទេ · Not now',pushSetLabel:'ដំណឹងពីទូរស័ព្ទ · Push notifications',pushStateOn:'បើកហើយ — ដំណឹងនឹងលោតលើទូរស័ព្ទរបស់អ្នក',pushStateOff:'បិទ — បើកដើម្បីទទួលដំណឹងលើទូរស័ព្ទ',pushStateBlocked:'Browser បានបិទដំណឹងឲ្យ website នេះ — សូមបើក Notification ក្នុង Settings របស់ browser',pushStateUnsupported:'Browser នេះមិនគាំទ្រ Web Push ទេ',pushStateGuest:'សូម Log in ជាមុនសិន',
+ pushAskTitle:'បើកដំណឹងពីទូរស័ព្ទ?',pushAskBody:'ទទួលដំណឹងពិតៗចេញពីទូរស័ព្ទរបស់អ្នកផ្ទាល់ — ពេលកញ្ចប់ត្រូវបានអនុម័ត ពេល Admin បន្ថែម ឬកាត់ Credit និងពេលមានកាដូ — ទោះបីអ្នកមិនបានបើក website ក៏ដោយ',pushAllow:'បើកដំណឹង · Enable',pushNotNow:'មិនបាច់ទេ · Not now',pushSetLabel:'ដំណឹងពីទូរស័ព្ទ · Push notifications',pushStateOn:'បើកហើយ — ដំណឹងនឹងលោតលើទូរស័ព្ទរបស់អ្នក',pushStateOff:'បិទ — បើកដើម្បីទទួលដំណឹងលើទូរស័ព្ទ',pushStateBlocked:'Browser បានបិទដំណឹងឲ្យ website នេះ — សូមបើក Notification ក្នុង Settings របស់ browser',pushStateUnsupported:'Browser នេះមិនគាំទ្រ Web Push ទេ',pushStateGuest:'សូម Log in ជាមុនសិន',pushBlockedTitle:'Browser បានបិទដំណឹង · Notifications blocked',pushBlockedBody:'អ្នកធ្លាប់ចុច «Block» ពីមុន ទើប browser លែងលោតសួរ «Allow ឬអត់» ទៀត ហើយ website ក៏សុំសិទ្ធិឡើងវិញអត់បានដែរ។ សូមបើកវាដោយខ្លួនឯងតាមជំហានខាងក្រោម — មិនដល់ ១ នាទីទេ៖',pushBlockedStep1:'ចុចរូបសោ 🔒 នៅខាងឆ្វេងអាសយដ្ឋាន website នេះ លើ address bar ខាងលើ',pushBlockedStep2:'ចុច «Site settings» (ការកំណត់គេហទំព័រ)',pushBlockedStep3:'ចុច «Notifications» (ដំណឹង) រួចជ្រើស «Allow» (អនុញ្ញាត)',pushBlockedStep4:'ត្រឡប់មក website នេះវិញ រួចបើក switch «Push notifications» ម្ដងទៀត — វានឹងដំណើរការភ្លាម',pushBlockedAlt:'រករូបសោ 🔒 អត់ឃើញ? ចុច ⋮ (ចំណុច ៣ នៅខាងលើស្ដាំនៃ browser) → Settings → Site settings → Notifications → រក website នេះក្នុងបញ្ជី «Blocked» → Allow',pushBlockedDone:'ខ្ញុំបើករួចហើយ · I turned it on',pushBlockedClose:'បិទ · Close',pushBlockedStill:'នៅតែ Block នៅឡើយ — សូមពិនិត្យជំហានខាងលើម្ដងទៀត',
  acctErrFill:'សូមបំពេញឲ្យគ្រប់ — អ៊ីមែលត្រូវមាន @ ហើយពាក្យសម្ងាត់យ៉ាងតិច 4 តួ',
  acctErrExists:'អ៊ីមែលនេះបានចុះឈ្មោះរួចហើយ — បានប្ដូរទៅ ចូលគណនី',
  acctErrNoUser:'រកគណនីអ៊ីមែលនេះមិនឃើញទេ — សូមចុះឈ្មោះជាមុនសិន',
@@ -2167,7 +2189,7 @@ en:{
  acctGotFree:'Welcome! You received free credits — 250 Image.Video Credit and 24 Song Credit in your account',
  giftTitle:'A Gift from Admin',giftBody:'Free 250 Image.Video Credit + 24 Song Credit for new users',giftClaim:'Claim · ទទួលយក',
  navNotif:'Notifications',notifTitle:'Notifications · ដំណឹង',notifEmpty:'No notifications yet',notifGuest:'Log in to see your notifications',notifLoading:'Loading…',notifJustNow:'Just now',notifMinAgo:'{n} min ago',notifHourAgo:'{n} hr ago',notifDayAgo:'{n} days ago',notifApproved:'Your package was approved ✓',notifRejected:'Your package was rejected',notifLogin:'New user signed in',notifRequest:'New package purchase request',notifGrant:'Admin added credits to your account',notifDeduct:'Admin deducted credits from your account',notifInfo:'MovAi notification',notifPost:'New post on Public',notifGenCharge:'Credit charged for a creation',
- pushAskTitle:'Turn on phone notifications?',pushAskBody:'Get real alerts on your phone — when a package is approved, when Admin adds or deducts credits, and when a gift arrives — even when the website is closed',pushAllow:'Enable · បើកដំណឹង',pushNotNow:'Not now · មិនបាច់ទេ',pushSetLabel:'Push notifications · ដំណឹងពីទូរស័ព្ទ',pushStateOn:'On — alerts will pop up on your phone',pushStateOff:'Off — turn on to get alerts on your phone',pushStateBlocked:'This browser has blocked notifications for this site — allow Notifications in the browser settings',pushStateUnsupported:'This browser does not support Web Push',pushStateGuest:'Log in first',
+ pushAskTitle:'Turn on phone notifications?',pushAskBody:'Get real alerts on your phone — when a package is approved, when Admin adds or deducts credits, and when a gift arrives — even when the website is closed',pushAllow:'Enable · បើកដំណឹង',pushNotNow:'Not now · មិនបាច់ទេ',pushSetLabel:'Push notifications · ដំណឹងពីទូរស័ព្ទ',pushStateOn:'On — alerts will pop up on your phone',pushStateOff:'Off — turn on to get alerts on your phone',pushStateBlocked:'This browser has blocked notifications for this site — allow Notifications in the browser settings',pushStateUnsupported:'This browser does not support Web Push',pushStateGuest:'Log in first',pushBlockedTitle:'Notifications blocked · Browser បានបិទដំណឹង',pushBlockedBody:'You tapped "Block" before, so the browser no longer shows the "Allow?" prompt — and the website cannot ask again. Turn it back on yourself with the steps below; it takes under a minute:',pushBlockedStep1:'Tap the 🔒 lock icon at the left end of the address bar at the top',pushBlockedStep2:'Tap "Site settings"',pushBlockedStep3:'Tap "Notifications", then choose "Allow"',pushBlockedStep4:'Come back to this website and turn the "Push notifications" switch on again — it will work right away',pushBlockedAlt:'Cannot find the 🔒? Tap ⋮ (the 3 dots at the top right of the browser) → Settings → Site settings → Notifications → find this site under "Blocked" → Allow',pushBlockedDone:'I turned it on · ខ្ញុំបើករួចហើយ',pushBlockedClose:'Close · បិទ',pushBlockedStill:'Still blocked — please check the steps above once more',
  acctErrFill:'Please fill everything — email must contain @ and password at least 4 characters',
  acctErrExists:'This email is already registered — switched to Log in',
  acctErrNoUser:'No account for this email — please sign up first',
@@ -10148,6 +10170,14 @@ function giftClaim(){
      mirrors this device's REAL subscription. Turning it off POSTs
      …/api/public/push-unsubscribe and unsubscribes the device;
      turning it on re-subscribes.
+   - If the browser has BLOCKED notifications for this site
+     (permission 'denied'), the browser will never show its
+     Allow/Block prompt again and the site cannot re-ask — so
+     tapping the switch opens the site's own help sheet
+     (#pushBlockedSheet) with the exact steps to re-allow
+     (🔒 beside the address → Site settings → Notifications →
+     Allow). When the user comes back with permission granted,
+     the sheet closes itself and the switch finishes turning on.
    Everything is best-effort: no PushManager, a denied permission
    or an unreachable server simply leaves the switch off — nothing
    is faked and nothing else on the page is touched. */
@@ -10255,7 +10285,7 @@ function pushSetEnabled(on){
     var perm=Notification.permission;
     var askP=(perm==='default')?Notification.requestPermission():Promise.resolve(perm);
     Promise.resolve(askP).then(function(p){
-      if(p!=='granted'){done();return;}
+      if(p!=='granted'){done();if(p==='denied')pushBlockedShow();return;}
       pushSubscribe().then(done).catch(done);
     }).catch(done);
   }else{
@@ -10287,6 +10317,43 @@ function pushAskDismiss(){
   pushAskedSet();
   var s=document.getElementById('pushSheet');if(s)sheetHideAnim(s);
 }
+/* ===== Blocked notifications · ជំនួយបើកដំណឹងវិញ =====
+   Shown when the browser has blocked notifications for this site:
+   the browser prompt can never be triggered again from the page,
+   so the site itself explains, step by step, where to re-allow
+   (🔒 beside the address → Site settings → Notifications →
+   Allow). «ខ្ញុំបើករួចហើយ» re-reads the REAL permission: granted
+   closes the sheet and finishes turning the switch on; still
+   denied keeps the sheet open and says so. Returning to the page
+   (focus / visibility) re-checks automatically while the sheet
+   is open, so allowing in the settings and coming back is
+   enough — no second tap needed. */
+function pushBlockedShow(){
+  var s=document.getElementById('pushBlockedSheet');if(!s)return;
+  var st=document.getElementById('pushBlockedStill');if(st)st.style.display='none';
+  sheetShowAnim(s);
+}
+function pushBlockedClose(){
+  var s=document.getElementById('pushBlockedSheet');if(s)sheetHideAnim(s);
+}
+function pushBlockedRecheck(){
+  if(!('Notification' in window))return;
+  if(Notification.permission==='granted'){
+    pushBlockedClose();
+    pushSetEnabled(true);
+  }else{
+    var st=document.getElementById('pushBlockedStill');if(st)st.style.display='block';
+    pushRefreshToggle();
+  }
+}
+function pushBlockedAutoRecheck(){
+  var s=document.getElementById('pushBlockedSheet');
+  if(s&&s.style.display==='flex'){
+    if(('Notification' in window)&&Notification.permission==='granted')pushBlockedRecheck();
+  }else{
+    pushRefreshToggle();
+  }
+}
 function pushEnsureSubscribed(){
   if(!pushSupported())return;
   if(Notification.permission!=='granted')return;
@@ -10298,6 +10365,8 @@ function pushInit(){
   pushRefreshToggle();
   pushMaybeAsk();
   pushEnsureSubscribed();
+  document.addEventListener('visibilitychange',function(){if(!document.hidden)pushBlockedAutoRecheck();});
+  window.addEventListener('focus',pushBlockedAutoRecheck);
 }
 /* ===== Notifications · ដំណឹង (real, from the MovAi server) =====
    The bell in the top-right corner (left of the avatar / Log in
