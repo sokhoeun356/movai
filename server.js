@@ -3709,7 +3709,8 @@ function apiRoute(req, res, urlPath) {
   // ---- File uploads for the Admin app Post form (MP3 + cover image) ----
   // POST /api/public/upload — ADMIN KEY required. JSON {kind: 'audio'|'image',
   // filename, data: base64}. Saves under ./data/uploads/ and returns the
-  // public URL. Audio max 15 MB, image max 5 MB. The Admin app reads the
+  // public URL. Audio max 15 MB; image (cover) has NO size cap — any size
+  // allowed (user order 2026-11-16). The Admin app reads the
   // chosen file as base64 and POSTs it here, then fills the Post Link/Cover
   // field with the returned URL. The file is ALSO backed up to GitHub
   // (uploads/) before success is returned, so a proxy restart/redeploy
@@ -3801,7 +3802,7 @@ function apiRoute(req, res, urlPath) {
   if (req.method === 'POST' && urlPath === '/api/public/upload') {
     const a = adminKeyOk(req);
     if (!a.ok) return sendJSON(res, 200, { ok: false, error: a.error });
-    readJSONBody(req, 20 * 1024 * 1024).then(async (body) => {
+    readJSONBody(req, 30 * 1024 * 1024).then(async (body) => {
       const kind = typeof body.kind === 'string' ? body.kind.trim().toLowerCase() : '';
       if (kind !== 'audio' && kind !== 'image') return sendJSON(res, 200, { ok: false, error: 'kind ត្រូវជា audio ឬ image' });
       const ext = uploadSafeExt(kind, body.filename);
@@ -3809,8 +3810,8 @@ function apiRoute(req, res, urlPath) {
       const b64 = typeof body.data === 'string' ? body.data.replace(/\s/g, '') : '';
       if (!b64 || !/^[A-Za-z0-9+/=]+$/.test(b64)) return sendJSON(res, 200, { ok: false, error: 'ទិន្នន័យឯកសារមិនត្រឹមត្រូវទេ' });
       const buf = Buffer.from(b64, 'base64');
-      const maxBytes = kind === 'audio' ? 15 * 1024 * 1024 : 5 * 1024 * 1024;
-      if (!buf.length || buf.length > maxBytes) return sendJSON(res, 200, { ok: false, error: kind === 'audio' ? 'MP3 ធំពេក (អតិបរមា 15 MB)' : 'រូបភាពធំពេក (អតិបរមា 5 MB)' });
+      if (!buf.length) return sendJSON(res, 200, { ok: false, error: 'ឯកសារទទេ' });
+      if (kind === 'audio' && buf.length > 15 * 1024 * 1024) return sendJSON(res, 200, { ok: false, error: 'MP3 ធំពេក (អតិបរមា 15 MB)' });
       try {
         fs.mkdirSync(UPLOADS_DIR, { recursive: true });
         const name = Date.now().toString(36) + '-' + crypto.randomInt(100000, 999999) + ext;
