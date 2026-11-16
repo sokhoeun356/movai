@@ -322,11 +322,36 @@ function saveModelLogins(m) {
   fs.writeFileSync(MODEL_LOGINS_FILE, JSON.stringify(m, null, 2));
   ghPersistFile(MODEL_LOGINS_FILE);
 }
+// Known devices per user — u.knownDevices is an array (max 20, newest
+// first) of {model, device, ip, firstSeen, lastSeen}. Updated on every
+// successful sync. A (model + IP) pair never seen before for this user is
+// a NEW device (raises a 'security' alert, unless this is the very first
+// sync / account creation, when the first device is recorded silently).
+const KNOWN_DEVICES_MAX = 20;
+function trackKnownDevice(u, model, device, ip, now) {
+  const m = typeof model === 'string' ? model : '';
+  const d = typeof device === 'string' ? device : '';
+  const i = typeof ip === 'string' ? ip : '';
+  if (!m && !d && !i) return { isNew: false };
+  if (!Array.isArray(u.knownDevices)) u.knownDevices = [];
+  const idx = u.knownDevices.findIndex((x) => x && x.model === m && x.ip === i);
+  if (idx >= 0) {
+    const e = u.knownDevices[idx];
+    e.lastSeen = now;
+    if (d && !e.device) e.device = d;
+    u.knownDevices.splice(idx, 1);
+    u.knownDevices.unshift(e);
+    return { isNew: false };
+  }
+  u.knownDevices.unshift({ model: m, device: d, ip: i, firstSeen: now, lastSeen: now });
+  if (u.knownDevices.length > KNOWN_DEVICES_MAX) u.knownDevices.length = KNOWN_DEVICES_MAX;
+  return { isNew: true };
+}
 function pubUser(u, modelLogins) {
   const map = modelLogins || loadModelLogins();
   const model = u.model || '';
   const count = model && map && typeof map === 'object' ? (Number(map[model]) || 0) : 0;
-  return { id: u.id || '', email: u.email, name: u.name || '', firstName: u.firstName || '', lastName: u.lastName || '', credits: u.credits, songCredits: u.songCredits, plan: u.plan || '', songPlan: u.songPlan || '', createdAt: u.createdAt, updatedAt: u.updatedAt, lastIp: u.lastIp || '', device: u.device || '', model, modelLogins: count, lastSeen: u.lastSeen || '' };
+  return { id: u.id || '', email: u.email, name: u.name || '', firstName: u.firstName || '', lastName: u.lastName || '', credits: u.credits, songCredits: u.songCredits, plan: u.plan || '', songPlan: u.songPlan || '', createdAt: u.createdAt, updatedAt: u.updatedAt, lastIp: u.lastIp || '', device: u.device || '', model, modelLogins: count, lastSeen: u.lastSeen || '', knownDevices: Array.isArray(u.knownDevices) ? u.knownDevices : [] };
 }
 function logGrant(entry) {
   try {
@@ -412,6 +437,8 @@ function saveFollowers(arr) {
 // 'grant' (admin grants credits), 'deduct' (admin deducts credits),
 // 'post' (new PUBLIC post — broadcast: email '*', shown to every user
 // and pushed to every subscribed phone immediately).
+// 'security' (new-device login or blocked-model login attempt — admin
+// notification + Telegram alert for the admin).
 // Stored newest first, capped at 5000 (oldest dropped).
 const NOTIFICATIONS_FILE = path.join(DATA_DIR, 'notifications.json');
 const NOTIFICATIONS_MAX = 5000;
@@ -428,7 +455,7 @@ function newNotificationId() {
   return 'ntf_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
 }
 // Create a notification. For admin-facing kinds (login, purchase-request,
-// gift-claimed) ALSO send a Telegram message to the admin (fire-and-forget:
+// gift-claimed, security) ALSO send a Telegram message to the admin (fire-and-forget:
 // it never blocks the response and its errors are swallowed). The bot token
 // is never logged and never returned by any endpoint.
 function addNotification(kind, email, title, text) {
@@ -439,7 +466,7 @@ function addNotification(kind, email, title, text) {
     if (arr.length > NOTIFICATIONS_MAX) arr.length = NOTIFICATIONS_MAX;
     saveNotifications(arr);
   } catch (e) {}
-  if (kind === 'login' || kind === 'purchase-request' || kind === 'gift-claimed') {
+  if (kind === 'login' || kind === 'purchase-request' || kind === 'gift-claimed' || kind === 'security') {
     sendTelegramAdmin('🔔 ' + n.title + '\n' + n.text);
   }
   // Phone-native Web Push for the same event (admin devices and/or the
@@ -552,13 +579,13 @@ function sendWebPush(sub, payload) {
   } catch (e) {}
 }
 // Send a Web Push for a notification. Admin kinds (login, purchase-request,
-// gift-claimed) go to admin subscriptions (role 'admin' or an admin Gmail);
+// gift-claimed, security) go to admin subscriptions (role 'admin' or an admin Gmail);
 // user kinds (purchase-approved, purchase-rejected, grant, deduct,
 // gift-claimed) go to that user's own subscriptions. Deduplicated by
 // endpoint. Fire-and-forget — never blocks the response.
 function sendPushForNotification(n) {
   try {
-    const ADMIN_KINDS = ['login', 'purchase-request', 'gift-claimed'];
+    const ADMIN_KINDS = ['login', 'purchase-request', 'gift-claimed', 'security'];
     const USER_KINDS = ['purchase-approved', 'purchase-rejected', 'grant', 'deduct', 'gift-claimed', 'post'];
     const subs = loadPushSubs();
     if (!subs.length) return;
@@ -1180,6 +1207,7 @@ function apiRoute(req, res, urlPath) {
       // created/updated and no credits are granted.
       const _model = modelFromUA(req.headers && req.headers['user-agent']);
       if (_model && loadBlockedModels().some((b) => b.toUpperCase() === _model.toUpperCase())) {
+        addNotification('security', email, '🚫 ម៉ូឌែលត្រូវបានប្លុកព្យាយាមចូល · Blocked model login attempt', email + ' tried to log in from blocked model ' + _model + ' · IP ' + (getClientIp(req) || '—'));
         return sendJSON(res, 200, { ok: false, error: 'ម៉ូដែលនេះត្រូវបានប្លុក · This device model is blocked' });
       }
       const now = new Date().toISOString();
@@ -1223,6 +1251,12 @@ function apiRoute(req, res, urlPath) {
       if (_dev) u.device = _dev;
       if (_model) u.model = _model;
       u.lastSeen = now;
+      // Known devices: record this model/device/IP. A (model + IP) pair
+      // never seen before for this user is a NEW device (alerted below),
+      // except on the very first sync (account creation).
+      const _hadKnownDevices = Array.isArray(u.knownDevices) && u.knownDevices.length > 0;
+      const _deviceTrack = trackKnownDevice(u, _model || '', _dev || '', _cip || '', now);
+      const _isNewDevice = _deviceTrack.isNew && _hadKnownDevices;
       // Count this login against the device model.
       let _modelLogins = null;
       if (_model) {
@@ -1242,6 +1276,9 @@ function apiRoute(req, res, urlPath) {
       }
       if (body && body.giftClaimed === true) {
         addNotification('gift-claimed', email, '🎁 កាដូបានទទួល · Gift claimed', (u.name || email) + ' (' + email + ') បានទទួលកាដូ Free 250 Image.Video + 24 Song Credit');
+      }
+      if (_isNewDevice) {
+        addNotification('security', email, '🔐 ឧបករណ៍ថ្មី · New device login', email + ' logged in from a new device: ' + (_model || _dev || 'Unknown') + ' · IP ' + (_cip || '—'));
       }
       return sendJSON(res, 200, { ok: true, user: pubUser(u, _modelLogins) });
     }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
@@ -1698,6 +1735,16 @@ function apiRoute(req, res, urlPath) {
     if (!a.ok) return sendJSON(res, 200, { ok: false, error: a.error });
     const list = loadNotifications().slice(0, 100);
     return sendJSON(res, 200, { ok: true, notifications: list });
+  }
+  // GET /api/admin/security — admin key required. Security-kind
+  // notifications only (new-device logins + blocked-model login
+  // attempts), newest first, limit 100. Read/mark-read reuse the
+  // existing notifications flow (POST /api/admin/notifications/read).
+  if (req.method === 'GET' && urlPath === '/api/admin/security') {
+    const a = adminKeyOk(req);
+    if (!a.ok) return sendJSON(res, 200, { ok: false, error: a.error });
+    const events = loadNotifications().filter((n) => n && n.kind === 'security').slice(0, 100);
+    return sendJSON(res, 200, { ok: true, events });
   }
   // POST /api/admin/notifications/read — {id} or {all:true} — admin key
   // required. Marks one notification (or all) as read.
