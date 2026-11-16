@@ -486,12 +486,12 @@ html[data-mode="light"] .pkg-tab.media.on{color:#8f27c9}
    increase just shows the new price, no badge. */
 .pkg-was{font-size:1.125rem;font-weight:800;text-decoration:line-through;opacity:.72}
 .pkg-off{display:inline-block;vertical-align:middle;font-size:0.6875rem;font-weight:900;background:rgba(0,0,0,.32);color:#fff;border:1px solid rgba(255,255,255,.4);border-radius:999px;padding:2px 7px;margin-left:4px;white-space:nowrap}
-/* ===== Buy-sheet payment step (2 options, from server settings) =====
-   Local: a KHQR button that opens the Canadia payment link — ONLY
-   the button/link is shown, never an account holder name and never
-   a bank account number. International: the Binance USDT address
-   with a Copy button. Both values come from the server
-   (GET /api/admin/settings → payment); nothing is hard-coded. */
+/* ===== Buy-sheet payment step (from server settings) =====
+   Local: TWO choices — «បង្ហាញ KHQR» shows the Admin's fixed KHQR
+   image in a viewer (scan with any bank app, type the amount
+   yourself), and «បើកក្នុង App Canadia Bank» opens the Canadia
+   payment link from the server settings. International: the
+   Binance USDT address with a Copy button. */
 .pay-title{font-size:0.9375rem;font-weight:900;margin-top:16px}
 .pay-opt{border:1px solid var(--line2);border-radius:14px;padding:14px;margin-top:10px;background:var(--card2)}
 .pay-opt-head{font-size:0.9375rem;font-weight:900}
@@ -501,6 +501,37 @@ html[data-mode="light"] .pkg-tab.media.on{color:#8f27c9}
 .pay-copy{flex:0 0 auto;border:none;border-radius:999px;padding:9px 14px;font-size:0.8125rem;font-weight:800;font-family:inherit;cursor:pointer;background:var(--accent-fill);color:#0d1005;min-height:38px}
 .pay-copy:active{filter:brightness(.93)}
 .pay-loading{font-size:0.8125rem;color:var(--muted);margin-top:12px;line-height:1.6}
+/* ===== KHQR viewer (buy sheet → Local → «បង្ហាញ KHQR») =====
+   A modal ABOVE the buy sheet (.pkg-sheet is z-index 95) showing
+   the Admin's fixed KHQR image big and clear, so the buyer can
+   scan it with any bank app (ABA, Wing, Canadia…). The QR carries
+   no fixed amount — the note under the image tells the buyer to
+   type the amount of their package themself. */
+.khqr-modal{position:fixed;inset:0;z-index:120;background:rgba(0,0,0,.85);align-items:center;justify-content:center;padding:18px}
+.khqr-modal.blur-in{animation:sheetFadeIn .3s ease-out both}
+.khqr-modal.blur-out{animation:sheetFadeOut .25s ease-in both}
+.khqr-card{background:var(--card);border:1px solid var(--line2);border-radius:18px;padding:16px;width:100%;max-width:380px;max-height:92vh;overflow-y:auto;-webkit-overflow-scrolling:touch}
+.khqr-card h3{font-size:1.0625rem;font-weight:900}
+.khqr-img{display:block;width:100%;max-width:320px;height:auto;margin:12px auto 0;border-radius:12px;background:#fff}
+.khqr-note{font-size:0.875rem;color:var(--muted);line-height:1.7;margin-top:12px}
+@media (prefers-reduced-motion:reduce){.khqr-modal.blur-in,.khqr-modal.blur-out{animation:none}}
+/* Payment receipt upload (inside the buy sheet, below the payment
+   options): the buyer MUST attach a receipt screenshot before
+   «I have paid» will send anything — the receipt uploads first and
+   its URL rides along with the purchase request so the Admin can
+   verify the payment is real before approving. */
+.pay-receipt-alert{border-color:#f87171 !important;box-shadow:0 0 0 2px rgba(248,113,113,.35)}
+.pay-receipt-pick{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;margin-top:10px;padding:12px;border:1.5px dashed var(--line2);border-radius:12px;background:var(--field);color:var(--text);font-family:inherit;font-size:0.875rem;font-weight:800;cursor:pointer;min-height:48px;box-sizing:border-box}
+.pay-receipt-pick:active{filter:brightness(1.12)}
+.pay-receipt-prev{margin-top:10px}
+.pay-receipt-prev img{display:block;width:100%;max-height:260px;object-fit:contain;border-radius:10px;border:1px solid var(--line2);background:#000}
+.pay-receipt-meta{display:flex;align-items:center;gap:8px;margin-top:8px}
+.pay-receipt-name{flex:1;min-width:0;font-size:0.75rem;color:var(--muted);overflow-wrap:anywhere}
+.pay-receipt-ok{font-size:0.8125rem;font-weight:800;color:var(--accent-text);white-space:nowrap}
+.pay-receipt-rm{flex:0 0 auto;border:1px solid var(--line2);background:transparent;color:#f87171;border-radius:999px;padding:7px 13px;font-family:inherit;font-size:0.8125rem;font-weight:800;cursor:pointer;min-height:36px}
+.pay-receipt-err{display:none;font-size:0.8125rem;font-weight:800;color:#f87171;line-height:1.6;margin-top:8px}
+.pay-prog{height:10px;border-radius:999px;background:var(--field);border:1px solid var(--line2);overflow:hidden;margin-top:12px}
+.pay-prog-bar{height:100%;width:0%;background:var(--accent-fill);border-radius:999px;transition:width .25s ease}
 .pkg-credits{margin-top:3px;font-size:1.1875rem;font-weight:900;color:var(--accent-text);line-height:1.2}
 /* Feature / model list lives in its OWN scroll area INSIDE the card
    (owner order 2026-11-16): the rows stack top-to-bottom in order,
@@ -1732,6 +1763,29 @@ html[data-smooth="1"] .brand-frame,html[data-smooth="1"] .acct-chip,html[data-sm
     <div id="pkgSheetBody" style="margin-top:8px"></div>
   </div>
 </div>
+<div id="khqrModal" class="khqr-modal" style="display:none" role="dialog" aria-modal="true" onclick="if(event.target===this)payKhqrClose()">
+  <div class="khqr-card">
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:10px">
+      <h3 data-i18n="payKhqrTitle">🇰🇭 KHQR</h3>
+      <button type="button" class="drawer-close" style="background:var(--card2);color:var(--text);border-color:var(--line2)" onclick="payKhqrClose()" aria-label="Close">✕</button>
+    </div>
+    <img class="khqr-img" src="https://movai-proxy.onrender.com/uploads/mwj37gxh-786666.jpg" width="562" height="784" alt="KHQR — YEM SOKHOEUN">
+    <p class="khqr-note" data-i18n="payKhqrNote">ស្កេន QR នេះជាមួយ app ធនាគារណាក៏បាន (ABA, Wing, Canadia…) — QR នេះមិនមានចំនួនលុយថេរទេ សូមបញ្ចូលចំនួនលុយតាមកញ្ចប់ដែលអ្នកទិញដោយខ្លួនឯង</p>
+    <button type="button" class="btn btn-green btn-block" style="margin-top:14px" onclick="payKhqrClose()" data-i18n="payKhqrClose">បិទ · Close</button>
+  </div>
+</div>
+<div id="usdtQrModal" class="khqr-modal" style="display:none" role="dialog" aria-modal="true" onclick="if(event.target===this)payUsdtQrClose()">
+  <div class="khqr-card">
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:10px">
+      <h3 data-i18n="payUsdtQrTitle">₮ USDT QR · Binance</h3>
+      <button type="button" class="drawer-close" style="background:var(--card2);color:var(--text);border-color:var(--line2)" onclick="payUsdtQrClose()" aria-label="Close">✕</button>
+    </div>
+    <img class="khqr-img" src="https://movai-proxy.onrender.com/uploads/mwj39vvp-279496.jpg" alt="USDT QR — Deposit USDT to Binance (TRC20)">
+    <p class="khqr-note" data-i18n="payUsdtQrNote">ស្កេន QR នេះដើម្បីបង់ USDT តាម wallet ណាក៏បាន (Binance, Trust Wallet…) — TRC20 តែប៉ុណ្ណោះ · Min &gt;0.01 USDT</p>
+    <p class="khqr-note" style="margin-top:6px"><code style="font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:0.75rem;overflow-wrap:anywhere">TPHu2Z45PZ9xUB7AzqMehWKv72HysE9Vzd</code></p>
+    <button type="button" class="btn btn-green btn-block" style="margin-top:14px" onclick="payUsdtQrClose()" data-i18n="payKhqrClose">បិទ · Close</button>
+  </div>
+</div>
 <div id="profileSheet" class="pkg-sheet" style="display:none" role="dialog" aria-modal="true" onclick="if(event.target===this)profileClose()">
   <div class="pkg-sheet-card">
     <div style="display:flex;align-items:center;justify-content:space-between;gap:10px">
@@ -2140,7 +2194,9 @@ km:{
  pkgPremium:'Premium',mhPerSec:'Credit/វិនាទី',adminLock:'🔐 ចាក់សោ',provOnline:'Online Live',provBusy:'រវល់',provProblem:'មានបញ្ហា',
  pkgSheetTitle:'សំណើរទិញ',pkgSheetPlan:'កញ្ចប់',pkgCreditsLbl:'Credit ដែលទទួលបាន',pkgTotal:'តម្លៃសរុប',
  pkgConfirm:'បញ្ជាក់ការទិញ',pkgCancel:'បោះបង់',
- payTitle:'របៀបបង់លុយ — ជ្រើសមួយ',payLocal:'🇰🇭 ក្នុងស្រុក',payLocalNote:'បង់តាម KHQR — ចុចប៊ូតុងខាងក្រោមដើម្បីបើកទំព័របង់លុយ',payKhqrBtn:'បើក KHQR · បង់លុយ',payIntl:'🌍 ក្រៅស្រុក',payUsdtNote:'បង់ USDT (Binance) មកអាសយដ្ឋាននេះ៖',payUsdtEmpty:'អាសយដ្ឋាន USDT មិនទាន់មានទេ — សូមទាក់ទង Admin ដើម្បីបង់លុយ',payCopyAddr:'ចម្លង',payPaidBtn:'ខ្ញុំបានបង់រួចហើយ',payLoading:'កំពុងផ្ទុករបៀបបង់លុយ…',payNone:'មិនទាន់មានរបៀបបង់លុយទេ — សូមទាក់ទង Admin',
+ payTitle:'របៀបបង់លុយ — ជ្រើសមួយ',payLocal:'🇰🇭 ក្នុងស្រុក',payLocalNote:'ជ្រើសរបៀបបង់មួយ — បង្ហាញ KHQR ដើម្បីស្កេនបង់ ឬបើកក្នុង App Canadia Bank',payShowKhqrBtn:'🇰🇭 បង្ហាញ KHQR · Show KHQR',payCanadiaBtn:'🏦 បើកក្នុង App Canadia Bank · Open in Canadia Bank App',payKhqrTitle:'🇰🇭 KHQR',payKhqrNote:'ស្កេន QR នេះជាមួយ app ធនាគារណាក៏បាន (ABA, Wing, Canadia…) — QR នេះមិនមានចំនួនលុយថេរទេ សូមបញ្ចូលចំនួនលុយតាមកញ្ចប់ដែលអ្នកទិញដោយខ្លួនឯង',payKhqrClose:'បិទ · Close',payIntl:'🌍 ក្រៅស្រុក',payUsdtNote:'បង់ USDT (Binance) មកអាសយដ្ឋាននេះ៖',payUsdtEmpty:'អាសយដ្ឋាន USDT មិនទាន់មានទេ — សូមទាក់ទង Admin ដើម្បីបង់លុយ',payCopyAddr:'ចម្លង',payPaidBtn:'ខ្ញុំបានបង់រួចហើយ',payLoading:'កំពុងផ្ទុករបៀបបង់លុយ…',payNone:'មិនទាន់មានរបៀបបង់លុយទេ — សូមទាក់ទង Admin',
+ payUsdtNet:'⚠️ ផ្ញើតាមបណ្ដាញ TRC20 តែប៉ុណ្ណោះ — កុំផ្ញើតាមបណ្ដាញផ្សេង',payShowUsdtQrBtn:'₮ បង្ហាញ QR USDT · Show USDT QR',payUsdtQrTitle:'₮ USDT QR · Binance',payUsdtQrNote:'ស្កេន QR នេះដើម្បីបង់ USDT តាម wallet ណាក៏បាន (Binance, Trust Wallet…) — TRC20 តែប៉ុណ្ណោះ · Min >0.01 USDT',
+ payReceiptTitle:'🧾 Payment receipt · វិក្កយបត្រ',payReceiptNote:'សូមបង្ហោះ screenshot វិក្កយបត្របង់លុយរបស់អ្នក ដើម្បីឲ្យ Admin ពិនិត្យមុនពេលអនុម័ត',payReceiptPick:'📷 ជ្រើសរូបវិក្កយបត្រ · Choose receipt image',payReceiptRemove:'លុបរូប',payReceiptOk:'បានជ្រើសរួច ✓',payReceiptNeed:'សូមបង្ហោះរូបវិក្កយបត្រសិន',payReceiptBadImg:'សូមជ្រើសឯកសាររូបភាព (screenshot វិក្កយបត្រ)',payReceiptTooBig:'រូបធំពេក — អតិបរមា 8MB',payReceiptUploading:'កំពុងបង្ហោះវិក្កយបត្រ…',payReceiptFail:'បង្ហោះវិក្កយបត្រមិនបានទេ — សូមព្យាយាមម្ដងទៀត (សំណើរទិញមិនទាន់បានផ្ញើទេ)',payReceiptRetry:'សាកម្ដងទៀត',
  pkgNeedLogin:'សូមចូលគណនី ឬចុះឈ្មោះជាមុនសិន — ដើម្បីឲ្យ Credit និងកញ្ចប់ចូលគណនីរបស់អ្នក',
  pkgLoginBtn:'ចូលគណនី / ចុះឈ្មោះ',
  pkgDoneFmt:'ទិញរួចរាល់! កញ្ចប់ {name} បានបើក ហើយ {c} Credit បានបន្ថែមចូលគណនីរបស់អ្នក — model Premium ប្រើបានឥឡូវនេះ',
@@ -2358,7 +2414,9 @@ en:{
  pkgPremium:'Premium',mhPerSec:'credits/sec',adminLock:'🔐 Locked',provOnline:'Online Live',provBusy:'Busy',provProblem:'Problem',
  pkgSheetTitle:'Purchase request',pkgSheetPlan:'Package',pkgCreditsLbl:'Credits you receive',pkgTotal:'Total',
  pkgConfirm:'Confirm purchase',pkgCancel:'Cancel',
- payTitle:'How to pay — choose one',payLocal:'🇰🇭 Local (Cambodia)',payLocalNote:'Pay with KHQR — tap the button below to open the payment page',payKhqrBtn:'Open KHQR · Pay',payIntl:'🌍 International',payUsdtNote:'Send USDT (Binance) to this address:',payUsdtEmpty:'No USDT address yet — please contact the Admin to pay',payCopyAddr:'Copy',payPaidBtn:'I have paid',payLoading:'Loading payment options…',payNone:'No payment method yet — please contact the Admin',
+ payTitle:'How to pay — choose one',payLocal:'🇰🇭 Local (Cambodia)',payLocalNote:'Choose how to pay — show the KHQR to scan, or open in the Canadia Bank app',payShowKhqrBtn:'🇰🇭 បង្ហាញ KHQR · Show KHQR',payCanadiaBtn:'🏦 បើកក្នុង App Canadia Bank · Open in Canadia Bank App',payKhqrTitle:'🇰🇭 KHQR',payKhqrNote:'Scan this QR with any bank app (ABA, Wing, Canadia…) — this QR has no fixed amount, so enter the amount of the package you are buying yourself',payKhqrClose:'បិទ · Close',payIntl:'🌍 International',payUsdtNote:'Send USDT (Binance) to this address:',payUsdtEmpty:'No USDT address yet — please contact the Admin to pay',payCopyAddr:'Copy',payPaidBtn:'I have paid',payLoading:'Loading payment options…',payNone:'No payment method yet — please contact the Admin',
+ payUsdtNet:'⚠️ Send on the TRC20 network ONLY — do not use any other network',payShowUsdtQrBtn:'₮ បង្ហាញ QR USDT · Show USDT QR',payUsdtQrTitle:'₮ USDT QR · Binance',payUsdtQrNote:'Scan this QR to pay USDT from any wallet (Binance, Trust Wallet…) — TRC20 only · Min >0.01 USDT',
+ payReceiptTitle:'🧾 Payment receipt · វិក្កយបត្រ',payReceiptNote:'Please upload a screenshot of your payment receipt so the Admin can check it before approving',payReceiptPick:'📷 Choose receipt image · ជ្រើសរូបវិក្កយបត្រ',payReceiptRemove:'Remove',payReceiptOk:'Selected ✓',payReceiptNeed:'Please upload your payment receipt first',payReceiptBadImg:'Please pick an image file (receipt screenshot)',payReceiptTooBig:'Image too large — max 8 MB',payReceiptUploading:'Uploading receipt…',payReceiptFail:'Could not upload the receipt — please try again (your purchase request was NOT sent)',payReceiptRetry:'Try again',
  pkgNeedLogin:'Please log in or sign up first — so the credits and the package land in your account',
  pkgLoginBtn:'Log in / Sign up',
  pkgDoneFmt:'Purchase complete! The {name} package is unlocked and {c} credits were added to your account — Premium models are ready to use',
@@ -3366,21 +3424,39 @@ function pkgEvent(action,packageId){
     fetch(PKG_EVENT_URL,{method:'POST',headers:{'Content-Type':'application/json'},keepalive:true,body:JSON.stringify({email:email,packageId:packageId||'',action:action})}).catch(function(){});
   }catch(e){}
 }
-function pkgSendPurchaseRequest(pl){
+function pkgSendPurchaseRequest(pl,receiptUrl){
   var u=acctCurrent();if(!u||!u.email)return Promise.reject(new Error('no user'));
-  return fetch(PURCHASE_REQ_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:u.email,packageId:pl.id,plan:pl.id,amount:pkgCurPrice(pl)})}).then(function(r){if(!r.ok)throw new Error('HTTP '+r.status);PKG_EVT_REQUESTED=true;pkgEvent('request',pl.id);return r;});
+  var payload={email:u.email,packageId:pl.id,plan:pl.id,amount:pkgCurPrice(pl)};
+  if(receiptUrl)payload.receiptUrl=receiptUrl;
+  return fetch(PURCHASE_REQ_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)}).then(function(r){if(!r.ok)throw new Error('HTTP '+r.status);PKG_EVT_REQUESTED=true;pkgEvent('request',pl.id);return r;});
 }
 /* ================= Buy-sheet payment step =================
-   The payment options come from the server — GET
-   /api/admin/settings → payment {khqrLink, binanceUsdtAddress} —
-   read through the SAME settings fetch the app already makes
-   (adminApplySettings captures it) and re-fetched on demand when
-   the buy sheet opens. NOTHING is hard-coded here, and the local
-   KHQR option shows ONLY a button that opens the payment link:
-   no account holder name and no bank account number ever appear.
-   After paying, the user taps «ខ្ញុំបានបង់រួចហើយ» (I have paid),
-   which runs the exact same purchase-request flow as before. */
+   The Canadia payment link and the USDT address come from the
+   server — GET /api/admin/settings → payment {khqrLink,
+   binanceUsdtAddress} — read through the SAME settings fetch the
+   app already makes (adminApplySettings captures it) and
+   re-fetched on demand when the buy sheet opens. The Local option
+   shows TWO choices: «🇰🇭 បង្ហាញ KHQR · Show KHQR» opens a viewer
+   with the Admin's fixed KHQR image (served from the MovAi server) to scan
+   with any bank app — the buyer types the package amount
+   themself because that QR carries no fixed amount — and
+   «🏦 បើកក្នុង App Canadia Bank» opens the Canadia payment link
+   (falling back to the Admin's current link when the server
+   settings have not loaded one). This section is shared by BOTH
+   package groups (Image & Video and Song), so the two choices
+   are identical for every package. After paying, the user taps
+   «ខ្ញុំបានបង់រួចហើយ» (I have paid), which runs the exact same
+   purchase-request flow as before. */
 var PAY_CFG={khqrLink:'',binanceUsdtAddress:''};
+/* Payment receipt state (in-memory only, one buy-sheet session):
+   {dataUrl: full data URL for the preview, b64: raw base64 sent to
+   the server, filename}. «I have paid» refuses to send anything
+   until a receipt is attached; the receipt uploads FIRST to
+   POST /api/public/purchase-receipt {email, filename, data} and
+   only the returned URL goes on with the purchase request, so the
+   Admin can check the payment is real before approving. */
+var PAY_RECEIPT=null;
+var RECEIPT_UPLOAD_URL='https://movai-proxy.onrender.com/api/public/purchase-receipt';
 var PAY_CFG_LOADED=false,PAY_CFG_PROMISE=null;
 function payApplyPayment(pay){
   if(!pay||typeof pay!=='object')return;
@@ -3406,27 +3482,132 @@ function payLoadConfig(){
 }
 function paySectionHtml(confirmFn){
   var h='<div class="pay-title">'+escHtml(tx('payTitle'))+'</div>';
-  var any=false;
-  if(PAY_CFG.khqrLink){
-    any=true;
-    h+='<div class="pay-opt"><div class="pay-opt-head">'+escHtml(tx('payLocal'))+'</div>';
-    h+='<p class="pay-opt-note">'+escHtml(tx('payLocalNote'))+'</p>';
-    h+='<a class="btn btn-green btn-block" style="margin-top:10px;text-align:center;text-decoration:none" href="'+escHtml(PAY_CFG.khqrLink)+'" target="_blank" rel="noopener noreferrer">'+escHtml(tx('payKhqrBtn'))+'</a></div>';
-  }
+  var any=true;
+  var canadiaLink=PAY_CFG.khqrLink||'https://pay.canadiabank.com.kh/K6EkJR30W0BM3VVK';
+  h+='<div class="pay-opt"><div class="pay-opt-head">'+escHtml(tx('payLocal'))+'</div>';
+  h+='<p class="pay-opt-note">'+escHtml(tx('payLocalNote'))+'</p>';
+  h+='<button type="button" class="btn btn-green btn-block" style="margin-top:10px" onclick="payKhqrOpen()">'+escHtml(tx('payShowKhqrBtn'))+'</button>';
+  h+='<a class="kbtn kbtn-white" style="display:flex;width:100%;margin-top:8px;text-decoration:none" href="'+escHtml(canadiaLink)+'" target="_blank" rel="noopener noreferrer">'+escHtml(tx('payCanadiaBtn'))+'</a></div>';
   any=true;
   h+='<div class="pay-opt"><div class="pay-opt-head">'+escHtml(tx('payIntl'))+'</div>';
   if(PAY_CFG.binanceUsdtAddress){
     h+='<p class="pay-opt-note">'+escHtml(tx('payUsdtNote'))+'</p>';
     h+='<div class="pay-addr"><code>'+escHtml(PAY_CFG.binanceUsdtAddress)+'</code><button type="button" class="pay-copy" onclick="payCopyUsdt(this)">'+escHtml(tx('payCopyAddr'))+'</button></div>';
+    h+='<button type="button" class="btn btn-green btn-block" style="margin-top:10px" onclick="payUsdtQrOpen()">'+escHtml(tx('payShowUsdtQrBtn'))+'</button>';
+    h+='<p class="pay-opt-note" style="margin-top:8px;font-weight:800">'+escHtml(tx('payUsdtNet'))+'</p>';
   }else{
     h+='<p class="pay-opt-note">'+escHtml(tx('payUsdtEmpty'))+'</p>';
   }
   h+='</div>';
-  if(!PAY_CFG.khqrLink&&!PAY_CFG.binanceUsdtAddress){
-    h+='<p class="pay-opt-note" style="margin-top:10px">'+escHtml(tx('payNone'))+'</p>';
-  }
+  /* Receipt upload — REQUIRED before «I have paid» sends anything. */
+  h+='<div class="pay-opt" id="payReceiptBox"><div class="pay-opt-head">'+escHtml(tx('payReceiptTitle'))+'</div>';
+  h+='<p class="pay-opt-note">'+escHtml(tx('payReceiptNote'))+'</p>';
+  h+='<label class="pay-receipt-pick" for="payReceiptFile">'+escHtml(tx('payReceiptPick'))+'</label>';
+  h+='<input type="file" id="payReceiptFile" accept="image/*" style="display:none" onchange="payReceiptPick(this)">';
+  h+='<div id="payReceiptPrev">'+payReceiptPrevHtml()+'</div>';
+  h+='<p class="pay-receipt-err" id="payReceiptErr"></p>';
+  h+='</div>';
   h+='<button type="button" class="btn btn-green btn-block" style="margin-top:14px" onclick="'+confirmFn+'()">'+escHtml(tx('payPaidBtn'))+'</button>';
   return h;
+}
+function payReceiptPrevHtml(){
+  if(!PAY_RECEIPT)return '';
+  return '<div class="pay-receipt-prev"><img src="'+PAY_RECEIPT.dataUrl+'" alt="Payment receipt · វិក្កយបត្រ"><div class="pay-receipt-meta"><span class="pay-receipt-name">'+escHtml(PAY_RECEIPT.filename)+'</span><span class="pay-receipt-ok">'+escHtml(tx('payReceiptOk'))+'</span><button type="button" class="pay-receipt-rm" onclick="payReceiptRemove()">'+escHtml(tx('payReceiptRemove'))+'</button></div></div>';
+}
+function payReceiptErr(msg){
+  var e=document.getElementById('payReceiptErr');if(!e)return;
+  e.textContent=msg||'';e.style.display=msg?'block':'none';
+}
+function payReceiptPick(input){
+  var f=input&&input.files&&input.files[0];
+  if(!f)return;
+  payReceiptErr('');
+  if(!/^image\//i.test(f.type||'')){payReceiptErr(tx('payReceiptBadImg'));input.value='';return;}
+  if(f.size>8*1024*1024){payReceiptErr(tx('payReceiptTooBig'));input.value='';return;}
+  var rd=new FileReader();
+  rd.onerror=function(){payReceiptErr(tx('payReceiptBadImg'));};
+  rd.onload=function(){
+    var durl=String(rd.result||'');
+    var b64=durl.split(',')[1]||'';
+    if(!b64){payReceiptErr(tx('payReceiptBadImg'));return;}
+    PAY_RECEIPT={dataUrl:durl,b64:b64,filename:f.name||'receipt.jpg'};
+    var pv=document.getElementById('payReceiptPrev');if(pv)pv.innerHTML=payReceiptPrevHtml();
+  };
+  rd.readAsDataURL(f);
+}
+function payReceiptRemove(){
+  PAY_RECEIPT=null;
+  var pv=document.getElementById('payReceiptPrev');if(pv)pv.innerHTML='';
+  var inp=document.getElementById('payReceiptFile');if(inp)inp.value='';
+  payReceiptErr('');
+}
+/* Gate for «I have paid»: no receipt attached → show the message in
+   the receipt box, highlight it, and send NOTHING. */
+function payReceiptRequire(){
+  if(PAY_RECEIPT&&PAY_RECEIPT.b64)return true;
+  payReceiptErr(tx('payReceiptNeed'));
+  var box=document.getElementById('payReceiptBox');
+  if(box){
+    box.classList.add('pay-receipt-alert');
+    try{box.scrollIntoView({block:'center',behavior:'smooth'});}catch(e){}
+    setTimeout(function(){box.classList.remove('pay-receipt-alert');},2400);
+  }
+  return false;
+}
+/* Upload the receipt FIRST (XHR so the progress bar shows the REAL
+   uploaded percentage). Resolves with the receipt URL the server
+   returns; any failure rejects with err.receiptFail=true and the
+   purchase request is never sent without a receipt. */
+function payReceiptUpload(email,onProg){
+  return new Promise(function(resolve,reject){
+    function fail(msg){var er=new Error(msg||'receipt upload');er.receiptFail=true;reject(er);}
+    var payload;
+    try{payload=JSON.stringify({email:email,filename:PAY_RECEIPT.filename||'receipt.jpg',data:PAY_RECEIPT.b64});}
+    catch(e){fail('encode');return;}
+    var xhr=new XMLHttpRequest();
+    try{xhr.open('POST',RECEIPT_UPLOAD_URL,true);}catch(e){fail('open');return;}
+    try{xhr.setRequestHeader('Content-Type','application/json');}catch(e){}
+    xhr.timeout=120000;
+    if(xhr.upload)xhr.upload.onprogress=function(ev){if(ev&&ev.lengthComputable&&onProg)onProg(Math.round(ev.loaded/ev.total*100));};
+    xhr.onload=function(){
+      var j={};try{j=JSON.parse(xhr.responseText||'{}');}catch(e){}
+      var url=(j&&(j.url||j.receiptUrl||j.path||(j.data&&(j.data.url||j.data.receiptUrl||j.data.path))))||'';
+      if(xhr.status>=200&&xhr.status<300&&j&&j.ok!==false&&url)resolve(url);
+      else fail((j&&j.error)||('HTTP '+xhr.status));
+    };
+    xhr.onerror=function(){fail('network');};
+    xhr.ontimeout=function(){fail('timeout');};
+    xhr.send(payload);
+  });
+}
+/* Shared «I have paid» flow for BOTH package groups: receipt gate →
+   upload receipt with live progress (%, elapsed seconds) → only
+   then create the purchase request carrying the receiptUrl. A
+   receipt-upload failure shows a clear error with a Try-again
+   button (the receipt stays attached) and sends NO request. */
+function pkgConfirmFlow(pl,confirmFnName){
+  var u=acctCurrent();if(!u)return;
+  if(!payReceiptRequire())return;
+  var body=document.getElementById('pkgSheetBody');if(!body)return;
+  body.innerHTML='<p style="font-size:0.9375rem;font-weight:900;line-height:1.6">'+escHtml(tx('payReceiptUploading'))+'</p><div class="pay-prog"><div class="pay-prog-bar" id="payProgBar"></div></div><p id="payProgTxt" style="font-size:0.8125rem;color:var(--muted);margin-top:8px;font-weight:700">0% · 0s</p><button type="button" class="kbtn kbtn-white" style="margin-top:14px;width:100%" onclick="pkgSheetClose()">'+escHtml(tx('pkgCancel'))+'</button>';
+  var t0=Date.now(),pct=0;
+  var timer=setInterval(function(){
+    var s=Math.floor((Date.now()-t0)/1000);
+    var el=document.getElementById('payProgTxt');if(el)el.textContent=pct+'% · '+s+'s';
+    var bar=document.getElementById('payProgBar');if(bar)bar.style.width=pct+'%';
+  },250);
+  payReceiptUpload(u.email,function(p){if(p>pct)pct=p;}).then(function(url){
+    clearInterval(timer);
+    var b2=document.getElementById('pkgSheetBody');
+    if(b2)b2.innerHTML='<p style="font-size:0.875rem;color:var(--muted);line-height:1.7">'+escHtml(tx('pkgReqSending'))+'</p>';
+    return pkgSendPurchaseRequest(pl,url);
+  }).then(function(){pkgShowWaiting();}).catch(function(err){
+    clearInterval(timer);
+    if(err&&err.receiptFail){
+      var b3=document.getElementById('pkgSheetBody');
+      if(b3)b3.innerHTML='<p style="font-size:0.9375rem;font-weight:800;color:#f87171;line-height:1.7">'+escHtml(tx('payReceiptFail'))+'</p><button type="button" class="btn btn-green btn-block" style="margin-top:14px" onclick="'+confirmFnName+'()">'+escHtml(tx('payReceiptRetry'))+'</button><button type="button" class="kbtn kbtn-white" style="margin-top:10px;width:100%" onclick="pkgSheetClose()">'+escHtml(tx('pkgCancel'))+'</button>';
+    }else{pkgShowReqFail();}
+  });
 }
 function pkgPayRender(confirmFn){
   var box=document.getElementById('pkgPayBox');if(!box)return;
@@ -3437,6 +3618,20 @@ function pkgPayRender(confirmFn){
     if(b)b.innerHTML=paySectionHtml(confirmFn);
   });
 }
+/* KHQR viewer: opens the modal with the Admin's fixed KHQR image
+   (served from the MovAi server — uploads/mwj37gxh-786666.jpg —
+   so an Admin-side KHQR change shows up without an app update)
+   above the buy sheet; closing returns to the buy sheet untouched
+   (receipt + package selection stay as-is). */
+function payKhqrOpen(){var m=document.getElementById('khqrModal');if(m)sheetShowAnim(m);}
+function payKhqrClose(){var m=document.getElementById('khqrModal');if(m)sheetHideAnim(m);}
+/* USDT QR viewer: same pattern as the KHQR viewer — opens a modal
+   above the buy sheet with the Admin's fixed Binance «Deposit
+   USDT» QR image (served from the MovAi server, so an Admin-side
+   change shows up without an app update); closing returns to the
+   buy sheet untouched. */
+function payUsdtQrOpen(){var m=document.getElementById('usdtQrModal');if(m)sheetShowAnim(m);}
+function payUsdtQrClose(){var m=document.getElementById('usdtQrModal');if(m)sheetHideAnim(m);}
 function payCopyUsdt(btn){
   var addr=PAY_CFG.binanceUsdtAddress;if(!addr)return;
   function done(ok){
@@ -3464,7 +3659,7 @@ function pkgShowReqFail(){
 }
 var PKG_PENDING=null;
 function pkgBuyAsk(id){
-  PKG_PENDING=id;SONG_PKG_PENDING=null;
+  PKG_PENDING=id;SONG_PKG_PENDING=null;PAY_RECEIPT=null;
   var pl=pkgPlanById(id);if(!pl)return;
   PKG_EVT_LAST=id;pkgEvent('buy',id);
   var sheet=document.getElementById('pkgSheet');if(!sheet)return;
@@ -3527,14 +3722,12 @@ function sheetHideAnim(el,done){
   },sheetAnimReduced()?0:250);
   SHEET_ANIM_TIMERS[k]=t;
 }
-function pkgSheetClose(){var s=document.getElementById('pkgSheet');sheetHideAnim(s);PKG_PENDING=null;SONG_PKG_PENDING=null;}
+function pkgSheetClose(){var s=document.getElementById('pkgSheet');sheetHideAnim(s);PKG_PENDING=null;SONG_PKG_PENDING=null;PAY_RECEIPT=null;}
 function pkgGoLogin(){pkgSheetClose();loginSheetOpen();}
 function pkgBuyConfirm(){
   var pl=pkgPlanById(PKG_PENDING);if(!pl)return;
   var u=acctCurrent();if(!u){pkgBuyAsk(pl.id);return;}
-  var body=document.getElementById('pkgSheetBody');
-  if(body)body.innerHTML='<p style="font-size:0.875rem;color:var(--muted);line-height:1.7">'+escHtml(tx('pkgReqSending'))+'</p>';
-  pkgSendPurchaseRequest(pl).then(function(){pkgShowWaiting();}).catch(function(){pkgShowReqFail();});
+  pkgConfirmFlow(pl,'pkgBuyConfirm');
 }
 /* ================= Song packages (Suno) — LIME group =================
    A SEPARATE package group from the image & video packages above,
@@ -3585,7 +3778,7 @@ function songPkgRender(){
 }
 var SONG_PKG_PENDING=null;
 function songPkgBuyAsk(id){
-  SONG_PKG_PENDING=id;PKG_PENDING=null;
+  SONG_PKG_PENDING=id;PKG_PENDING=null;PAY_RECEIPT=null;
   var pl=songPkgPlanById(id);if(!pl||pl.free)return;
   PKG_EVT_LAST=id;pkgEvent('buy',id);
   var sheet=document.getElementById('pkgSheet');if(!sheet)return;
@@ -3610,9 +3803,7 @@ function songPkgBuyAsk(id){
 function songPkgBuyConfirm(){
   var pl=songPkgPlanById(SONG_PKG_PENDING);if(!pl)return;
   var u=acctCurrent();if(!u){songPkgBuyAsk(pl.id);return;}
-  var body=document.getElementById('pkgSheetBody');
-  if(body)body.innerHTML='<p style="font-size:0.875rem;color:var(--muted);line-height:1.7">'+escHtml(tx('pkgReqSending'))+'</p>';
-  pkgSendPurchaseRequest(pl).then(function(){pkgShowWaiting();}).catch(function(){pkgShowReqFail();});
+  pkgConfirmFlow(pl,'songPkgBuyConfirm');
 }
 var GEN_VID_PROVIDERS=[
  {id:'novai',name:'NovAI',glow:'amber',limit:{km:'ហ្វ្រី · 5 វីដេអូ/ថ្ងៃ',en:'Free · 5 videos/day'},key:'novai',note:''},
@@ -5610,7 +5801,7 @@ function fsExpandBtn(src,type,wm){
   btn.addEventListener('click',function(ev){ev.stopPropagation();fsOpen(src,type,wm);});
   return btn;
 }
-document.addEventListener('keydown',function(e){if(e.key==='Escape')fsClose();});
+document.addEventListener('keydown',function(e){if(e.key==='Escape'){fsClose();payKhqrClose();payUsdtQrClose();}});
 /* Song History card — the same compact row as the generation
    results: small cover · Play · title · duration · Like / Download /
    Share / Post / Delete icon buttons, with a slim seek strip under
