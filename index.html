@@ -104,7 +104,9 @@ main{max-width:720px;margin:0 auto;padding:calc(4.75rem + env(safe-area-inset-to
    order: Name, Gmail, ID, IP, Model. A card about the SIGNED-IN
    user themself shows only the IP and Model rows (Copy on the IP
    only) — their name / Gmail / ID already appear once in the
-   drawer's account box, never twice. Every value is
+   drawer's account box, never twice. In the ☰ drawer itself the
+   IP row is omitted from every such card (the user's IP lives
+   once in the drawer account box instead). Every value is
    cut to ONE line — white-space:nowrap + overflow:hidden +
    text-overflow:ellipsis — so a long Gmail / ID / model can never
    spill outside the card or outside the ☰ drawer, however narrow
@@ -199,7 +201,7 @@ textarea.input{resize:vertical}
 .drawer-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.6);-webkit-backdrop-filter:blur(16px) saturate(130%);backdrop-filter:blur(16px) saturate(130%);opacity:0;pointer-events:none;transition:opacity .25s ease;z-index:40;display:none}
 .drawer-backdrop.open{display:block;pointer-events:auto}
 .drawer-backdrop.shown{opacity:1}
-.drawer{position:fixed;top:0;left:0;max-height:75vh;width:min(48vw,240px);background:linear-gradient(160deg,rgba(255,255,255,calc(.03 + var(--glass-shine,.55)*.32)),rgba(255,255,255,calc(var(--glass-shine,.55)*.08)) 36%,rgba(190,198,212,calc(var(--glass-frost,.65)*.22)) 74%,rgba(var(--glass-tint),.40));background-color:rgba(var(--glass-tint),var(--glass-alpha,.5));-webkit-backdrop-filter:blur(var(--glass-blur,18px)) saturate(170%);backdrop-filter:blur(var(--glass-blur,18px)) saturate(170%);border-right:1px solid rgba(var(--glass-text-rgb),calc(.14 + var(--glass-shine,.55)*.2));border-bottom:1px solid rgba(var(--glass-text-rgb),calc(.14 + var(--glass-shine,.55)*.2));border-bottom-right-radius:16px;color:var(--glass-text);text-shadow:0 1px 2px rgba(var(--glass-shadow-rgb),.25);box-shadow:inset 1px 0 0 rgba(255,255,255,.10),inset 0 1px 0 rgba(255,255,255,calc(.08 + var(--glass-shine,.55)*.4)),12px 0 36px rgba(0,0,0,.22);z-index:50;transform:translateX(-105%);transition:transform .28s ease;overflow-y:auto;padding:calc(18px + env(safe-area-inset-top,0px)) 14px calc(32px + env(safe-area-inset-bottom,0px));display:none}
+.drawer{position:fixed;top:10px;left:10px;max-height:calc(75vh - 10px);width:min(56vw,264px);background:linear-gradient(160deg,rgba(255,255,255,calc(.03 + var(--glass-shine,.55)*.32)),rgba(255,255,255,calc(var(--glass-shine,.55)*.08)) 36%,rgba(190,198,212,calc(var(--glass-frost,.65)*.22)) 74%,rgba(var(--glass-tint),.40));background-color:rgba(var(--glass-tint),var(--glass-alpha,.5));-webkit-backdrop-filter:blur(var(--glass-blur,18px)) saturate(170%);backdrop-filter:blur(var(--glass-blur,18px)) saturate(170%);border:1px solid rgba(var(--glass-text-rgb),calc(.14 + var(--glass-shine,.55)*.2));border-radius:26px;color:var(--glass-text);text-shadow:0 1px 2px rgba(var(--glass-shadow-rgb),.25);box-shadow:inset 1px 0 0 rgba(255,255,255,.10),inset 0 1px 0 rgba(255,255,255,calc(.08 + var(--glass-shine,.55)*.4)),0 18px 44px rgba(0,0,0,.30),12px 0 36px rgba(0,0,0,.22);z-index:50;transform:translateX(-112%);transition:transform .28s ease;overflow-y:auto;padding:calc(18px + env(safe-area-inset-top,0px)) 14px calc(32px + env(safe-area-inset-bottom,0px));display:none}
 .drawer.open{display:block}
 .drawer.shown{transform:translateX(0)}
 .drawer-head{display:flex;align-items:center;justify-content:space-between}
@@ -971,6 +973,32 @@ html[data-smooth="1"] .dock{background-color:rgba(var(--glass-tint),.96)}
 .chat-voice-toggle button{border:none;background:transparent;color:var(--muted);font-family:inherit;font-size:0.75rem;font-weight:800;padding:6px 13px;cursor:pointer;min-height:32px;line-height:1.35;white-space:nowrap;-webkit-tap-highlight-color:transparent}
 .chat-voice-toggle button.on{background:var(--accent-fill);color:#0d1005}
 .chat-voice-toggle button:active{opacity:.8}
+/* AI answer column (owner order 2026-11-16): the bubble, an optional
+   package card and the proof line stack in one column beside the
+   robot avatar inside .chat-row. */
+.chat-col{flex:1 1 auto;min-width:0;display:flex;flex-direction:column}
+.chat-col>.chat-bubble{align-self:stretch}
+/* Proof-of-AI line: small muted text under every AI answer naming
+   the model that answered and how long it took («Kimi K2 · 2.1s»),
+   taken from the server response fields model / ms. */
+.chat-meta{margin-top:5px;padding-left:2px;font-size:0.6875rem;font-weight:700;color:var(--muted);line-height:1.4;font-variant-numeric:tabular-nums}
+/* Package card under an AI answer (owner order 2026-11-16): shown
+   when the reply carries a [PACKAGE:<id>] tag — the plan's name,
+   price and credits with a Buy button that opens that package's
+   buy sheet. Song cards tint lime, media cards purple, matching
+   the Packages panel groups. */
+.chat-pkg-card{margin-top:8px;background:var(--card);border:1px solid var(--line2);border-radius:14px;padding:12px 13px}
+.chat-pkg-card.song{border-color:rgba(173,220,41,.55)}
+.chat-pkg-card.media{border-color:rgba(181,55,242,.55)}
+.chat-pkg-name{font-size:0.875rem;font-weight:800;line-height:1.35}
+.chat-pkg-price{font-size:1.375rem;font-weight:900;line-height:1.15;margin-top:2px}
+.chat-pkg-price small{font-size:0.8125rem;font-weight:700;color:var(--muted)}
+.chat-pkg-credits{font-size:0.9375rem;font-weight:900;margin-top:2px;line-height:1.3}
+.chat-pkg-card.song .chat-pkg-credits{color:#ADDC29}
+.chat-pkg-card.media .chat-pkg-credits{color:#e3aaff}
+html[data-mode="light"] .chat-pkg-card.song .chat-pkg-credits{color:#63910c}
+html[data-mode="light"] .chat-pkg-card.media .chat-pkg-credits{color:#8f27c9}
+.chat-pkg-buy{margin-top:9px;width:100%;padding:10px 16px;font-size:0.875rem;min-height:40px;border-radius:12px}
 .chat-bubble.err{align-self:flex-start;background:rgba(248,113,113,.09);border:1px solid rgba(248,113,113,.5);color:#f87171;border-radius:17px 17px 17px 5px;font-size:0.875rem}
 html[data-mode="light"] .chat-bubble.err{color:#b91c1c;background:rgba(220,38,38,.06);border-color:rgba(220,38,38,.4)}
 .chat-typing{align-self:flex-start;display:none;align-items:center;gap:8px;background:var(--card2);border:1px solid var(--line);border-radius:17px 17px 17px 5px;padding:10px 13px;font-size:0.8125rem;color:var(--muted);font-weight:700}
@@ -6964,6 +6992,36 @@ function profileIdRow(u){
   if(!u||!acctValidUserId(u.id))return '';
   return '<div style="display:flex;align-items:center;gap:10px;margin-top:12px;background:rgba(140,150,170,.10);border:1px solid var(--line);border-radius:12px;padding:10px 13px"><span style="font-size:0.8125rem;font-weight:800;color:var(--muted);flex:0 0 auto">'+escHtml(tx('profileUserId'))+'</span><b style="font-size:0.9375rem;font-weight:900;letter-spacing:.08em">'+escHtml(u.id)+'</b><button type="button" class="uid-copy" data-uid="'+escHtml(u.id)+'" onclick="profileCopyId(this)">'+escHtml(tx('profileCopy'))+'</button></div>';
 }
+/* The signed-in user's own IP shows exactly ONCE in the ☰ drawer:
+   here, as a row in the drawer's account box under the User ID row
+   (alongside the name, Gmail and User ID) — and nowhere else in the
+   drawer; the drawer's notification cards no longer carry it.
+   Source, in order: the IP the Admin sync returned for this very
+   account (rec.ip, adopted in acctApplyServerData), else the IP on
+   the newest notification about this account itself. No IP known
+   yet → no row at all (never a guessed or placeholder address). */
+function acctMyIp(u){
+  u=u||acctCurrent();if(!u)return '';
+  if(u.ip&&/^\d{1,3}(\.\d{1,3}){3}$/.test(String(u.ip)))return String(u.ip);
+  try{
+    for(var i=0;i<notifItems.length;i++){
+      if(notifIsSelf(notifItems[i])){var f=notifDevFields(notifItems[i]);if(f.ip)return f.ip;}
+    }
+  }catch(e){}
+  return '';
+}
+function profileIpRowHtml(u){
+  var ip=acctMyIp(u);if(!ip)return '';
+  return '<div style="display:flex;align-items:center;gap:10px;margin-top:8px;background:rgba(140,150,170,.10);border:1px solid var(--line);border-radius:12px;padding:10px 13px"><span style="font-size:0.8125rem;font-weight:800;color:var(--muted);flex:0 0 auto">IP</span><b style="font-size:0.875rem;font-weight:800;letter-spacing:.04em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0">'+escHtml(ip)+'</b></div>';
+}
+/* Notifications can arrive after the account box was rendered (the
+   IP may only become known then) — refresh just the IP slot in
+   place, never the whole box, so a half-typed name field survives. */
+function acctIpSlotSync(){
+  var slot=document.getElementById('acctIpSlot');if(!slot)return;
+  var u=null;try{u=acctCurrent();}catch(e){}
+  slot.innerHTML=u?profileIpRowHtml(u):'';
+}
 function profileCopyId(btn){
   var id=btn&&btn.getAttribute?btn.getAttribute('data-uid'):'';if(!id)return;
   var done=function(){var old=btn.getAttribute('data-label')||btn.textContent;btn.textContent=tx('profileCopied');setTimeout(function(){btn.textContent=old;},1600);};
@@ -7052,6 +7110,10 @@ function acctApplyServerData(data){
   /* Server-assigned User ID wins over the locally minted one (same
      account only — the email match above already guards this). */
   if(acctValidUserId(srv.id)&&rec.id!==srv.id){rec.id=srv.id;changed=true;}
+  /* The server records the login IP for this account; when it sends
+     it back, keep it on the record so the ☰ drawer account box can
+     show it exactly once (profileIpRowHtml). */
+  if(typeof srv.ip==='string'){var sip=srv.ip.trim();if(/^\d{1,3}(\.\d{1,3}){3}$/.test(sip)&&rec.ip!==sip){rec.ip=sip;changed=true;}}
   var sfn=(typeof srv.firstName==='string')?srv.firstName.trim():'';
   var sln=(typeof srv.lastName==='string')?srv.lastName.trim():'';
   if((sfn||sln)&&(rec.firstName!==sfn||rec.lastName!==sln)){rec.firstName=sfn;rec.lastName=sln;rec.name=(sfn+' '+sln).trim()||rec.name;changed=true;}
@@ -7739,7 +7801,11 @@ function notifDevRow(v,cls,field,i){
    the drawer's account box below. It shows only the event (header
    title + time) and the event's own facts — IP and Model — with a
    Copy button for the IP only. Notices about OTHER people keep all
-   five rows (Name, Gmail, ID, IP, Model). */
+   five rows (Name, Gmail, ID, IP, Model). In the ☰ DRAWER the IP
+   row is dropped from EVERY device/user card (noIp): the signed-in
+   user's IP shows exactly once, in the drawer's account box (see
+   profileIpRowHtml), so a self card there is just event + Model +
+   time. The separate notifications sheet keeps the IP rows. */
 function notifIsSelf(n){
   var u=null;try{u=acctCurrent();}catch(e){}
   if(!u||!u.email)return false;
@@ -7753,7 +7819,7 @@ function notifIsSelf(n){
   var f=notifDevFields(n);
   return !!(f.id&&acctValidUserId(u.id)&&f.id===u.id);
 }
-function notifDevItemHtml(n,i){
+function notifDevItemHtml(n,i,noIp){
   var f=notifDevFields(n);
   var self=notifIsSelf(n);
   var h='<div class="notif-item notif-dev'+(n.read?'':' unread')+'" onclick="notifItemClick('+i+')">';
@@ -7763,13 +7829,13 @@ function notifDevItemHtml(n,i){
   if(t)h+='<span class="nd-time">'+escHtml(t)+'</span>';
   h+='</div><div class="nd-rows">';
   if(self){
-    h+=notifDevRow(f.ip,'','ip',i);
+    if(!noIp)h+=notifDevRow(f.ip,'','ip',i);
     h+=notifDevRow(f.model,'','',i);
   }else{
     h+=notifDevRow(f.name,'nd-name','',i);
     h+=notifDevRow(f.email,'','email',i);
     h+=notifDevRow(f.id,'','id',i);
-    h+=notifDevRow(f.ip,'','ip',i);
+    if(!noIp)h+=notifDevRow(f.ip,'','ip',i);
     h+=notifDevRow(f.model,'','',i);
   }
   h+='</div></div>';
@@ -7785,8 +7851,8 @@ function notifCopyField(ev,btn,i,field){
   if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(v).then(done).catch(function(){profileCopyIdFallback(v);done();});}
   else{profileCopyIdFallback(v);done();}
 }
-function notifItemHtml(n,i){
-  if(notifIsDevCard(n))return notifDevItemHtml(n,i);
+function notifItemHtml(n,i,inDrawer){
+  if(notifIsDevCard(n))return notifDevItemHtml(n,i,!!inDrawer);
   var h='<button type="button" class="notif-item'+(n.read?'':' unread')+'" onclick="notifItemClick('+i+')">';
   h+=notifIcon(n);
   h+='<span class="notif-main"><span class="nt">'+escHtml(n.title||notifDefTitle(n))+'</span>';
@@ -7811,12 +7877,13 @@ function notifRenderAll(){
   if(db){if(u&&c>0){db.style.display='';db.textContent=label;}else db.style.display='none';}
   var kb=document.getElementById('dockNotifBadge');
   if(kb){if(u&&c>0){kb.style.display='';kb.textContent=label;}else kb.style.display='none';}
-  var html;
-  if(!u)html='<p class="notif-note">'+escHtml(tx('notifGuest'))+'</p>';
-  else if(!notifItems.length)html='<p class="notif-note">'+escHtml(tx(notifLoaded?'notifEmpty':'notifLoading'))+'</p>';
-  else{html='';for(var i=0;i<notifItems.length;i++)html+=notifItemHtml(notifItems[i],i);}
+  var html,drawerHtml;
+  if(!u){html='<p class="notif-note">'+escHtml(tx('notifGuest'))+'</p>';drawerHtml=html;}
+  else if(!notifItems.length){html='<p class="notif-note">'+escHtml(tx(notifLoaded?'notifEmpty':'notifLoading'))+'</p>';drawerHtml=html;}
+  else{html='';drawerHtml='';for(var i=0;i<notifItems.length;i++){html+=notifItemHtml(notifItems[i],i,false);drawerHtml+=notifItemHtml(notifItems[i],i,true);}}
   var l1=document.getElementById('notifList');if(l1)l1.innerHTML=html;
-  var l2=document.getElementById('notifDrawerList');if(l2)l2.innerHTML=html;
+  var l2=document.getElementById('notifDrawerList');if(l2)l2.innerHTML=drawerHtml;
+  try{acctIpSlotSync();}catch(e){}
 }
 function notifLoad(){
   var u=null;try{u=acctCurrent();}catch(e){}
@@ -8208,6 +8275,7 @@ function acctRenderUser(u){
     h+='</div>';
   }
   h+=profileIdRow(u);
+  h+='<div id="acctIpSlot">'+profileIpRowHtml(u)+'</div>';
   h+='<div style="margin-top:12px"><span style="font-size:0.8125rem;font-weight:700">'+escHtml(tx('profileBalance'))+'</span>'+profileBalRow('song',tx('acctSongCredit'),u.songCredits)+profileBalRow('media',tx('acctMediaCredit'),u.credits)+'</div>';
   var _plan=pkgGet();
   if(_plan){var _pp=pkgPlanById(_plan.id);h+='<p style="font-size:0.8125rem;margin-top:10px;font-weight:700;color:var(--accent-text);line-height:1.6">'+escHtml(tx('pkgYourPlan'))+': '+escHtml(_pp?loc(_pp.name):String(_plan.id))+' · '+escHtml(tx('pkgActiveUntil').replace('{d}',new Date(_plan.until).toLocaleDateString()))+'</p>';}
@@ -9103,7 +9171,95 @@ function aiChatCopyText(t,btn){
   else fallback();
 }
 var AI_CHAT_ROBOT_SVG='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 7V3"/><circle cx="12" cy="2.4" r="0.6" fill="currentColor"/><rect x="4.5" y="7" width="15" height="11.5" rx="3.5"/><path d="M2.5 12.5v2"/><path d="M21.5 12.5v2"/><circle cx="9.3" cy="12.3" r="0.4" fill="currentColor"/><circle cx="14.7" cy="12.3" r="0.4" fill="currentColor"/><path d="M9.8 15.6c.7.6 1.4.9 2.2.9s1.5-.3 2.2-.9"/></svg>';
-function aiChatAddBubble(role,text,isErr){
+/* ===== AI action tags + proof line (owner order 2026-11-16) =====
+   The server AI can end a reply with action tags:
+     [VOICE:male] / [VOICE:female] — switch the chat voice at once
+       (ប្រុស Piseth / ស្រី Sreymom) and update the voice toggle;
+     [PACKAGE:<id>] — show that package's card under the answer
+       (ids: song-free, song-trial, song-popular, song-pro,
+       monthly, yearly).
+   Tags are stripped from the text the user sees, and from the
+   history kept for the next request. */
+function aiChatParseActions(raw){
+  var out={text:String(raw==null?'':raw),voice:null,pkg:null};
+  out.text=out.text.replace(/\[VOICE:(male|female)\]/gi,function(mm,g){out.voice=String(g).toLowerCase();return '';});
+  out.text=out.text.replace(/\[PACKAGE:([a-z0-9][a-z0-9\-]*)\]/gi,function(mm,g){out.pkg=String(g).toLowerCase();return '';});
+  out.text=out.text.replace(/[ \t]+\n/g,'\n').replace(/\n{3,}/g,'\n\n').replace(/\s+$/,'');
+  return out;
+}
+/* Friendly display name for the model id the server reports; an
+   unknown id is shown exactly as the server sent it. */
+function aiChatModelName(m){
+  var s=String(m||'');
+  var low=s.toLowerCase();
+  if(low.indexOf('kimi-k2')>=0||low.indexOf('kimi_k2')>=0)return 'Kimi K2';
+  if(low.indexOf('gpt-oss-120b')>=0)return 'GPT-OSS 120B';
+  if(low.indexOf('gpt-oss-20b')>=0)return 'GPT-OSS 20B';
+  if(low.indexOf('llama-3.3-70b')>=0)return 'Llama 3.3 70B';
+  if(low.indexOf('llama-3.1-8b')>=0)return 'Llama 3.1 8B';
+  return s;
+}
+/* «Kimi K2 · 2.1s» — model name + elapsed time from the server
+   response fields model / ms (ms under a second shows as e.g.
+   340ms). Empty when the server sent neither field. */
+function aiChatMetaText(model,ms){
+  var parts=[];
+  if(model)parts.push(aiChatModelName(model));
+  if(typeof ms==='number'&&isFinite(ms)&&ms>=0)parts.push(ms>=1000?(ms/1000).toFixed(1)+'s':Math.round(ms)+'ms');
+  return parts.join(' · ');
+}
+/* Package card shown under an AI answer for a [PACKAGE:<id>] tag:
+   the plan's name, current price and credits, plus a Buy button.
+   Buy closes the chat first (the buy sheet sits below the chat
+   panel) and then opens exactly that package's buy sheet — the
+   same flow as the Packages panel. The Free song plan has no buy
+   flow (it is granted automatically), so its button is disabled,
+   matching the Packages panel. */
+function aiChatPkgCard(pkgId){
+  var pl=null,song=false;
+  if(typeof songPkgPlanById==='function')pl=songPkgPlanById(pkgId);
+  if(pl)song=true;
+  else if(typeof pkgPlanById==='function')pl=pkgPlanById(pkgId);
+  if(!pl)return null;
+  var card=document.createElement('div');
+  card.className='chat-pkg-card '+(song?'song':'media');
+  var nm=document.createElement('div');
+  nm.className='chat-pkg-name';
+  nm.textContent=loc(pl.name)+' · MovAi';
+  card.appendChild(nm);
+  var cur=(typeof pkgCurPrice==='function')?pkgCurPrice(pl):pl.price;
+  var disp=(pl.id==='yearly')?cur/12:cur;
+  var pr=document.createElement('div');
+  pr.className='chat-pkg-price';
+  pr.textContent='$'+pkgFmtPrice(disp);
+  var per=document.createElement('small');
+  per.textContent=tx('pkgPerMonth');
+  pr.appendChild(per);
+  card.appendChild(pr);
+  var cr=document.createElement('div');
+  cr.className='chat-pkg-credits';
+  cr.textContent=pkgFmtNum(pl.credits)+' Credit'+(pl.id==='yearly'?((LANG==='km')?'/ឆ្នាំ':'/year'):((LANG==='km')?'/ខែ':'/month'));
+  card.appendChild(cr);
+  var buy=document.createElement('button');
+  buy.type='button';
+  buy.className='btn btn-green chat-pkg-buy';
+  if(pl.free){
+    buy.disabled=true;
+    buy.textContent=tx('songFreeAuto');
+  }else{
+    buy.textContent=tx('pkgBuy');
+    (function(id,isSong,btn){
+      btn.addEventListener('click',function(ev){
+        if(ev){ev.stopPropagation();if(ev.preventDefault)ev.preventDefault();}
+        aiChatClose();
+        if(isSong)songPkgBuyAsk(id);else pkgBuyAsk(id);
+      });
+    })(pl.id,song,buy);
+  }
+  card.appendChild(buy);
+  return card;
+}
+function aiChatAddBubble(role,text,isErr,opts){
   var m=document.getElementById('chatMsgs');if(!m)return null;
   var empty=document.getElementById('chatEmpty');if(empty)empty.style.display='none';
   var b=document.createElement('div');
@@ -9124,7 +9280,29 @@ function aiChatAddBubble(role,text,isErr){
     av.setAttribute('aria-hidden','true');
     av.innerHTML=AI_CHAT_ROBOT_SVG;
     row.appendChild(av);
-    row.appendChild(b);
+    /* The bubble, its package card and its proof line stack in one
+       column beside the avatar. */
+    var col=document.createElement('div');
+    col.className='chat-col';
+    col.appendChild(b);
+    if(!isErr&&opts){
+      /* [PACKAGE:<id>] tag in this reply: that package's card sits
+         directly under the answer. */
+      if(opts.pkg){
+        var pc=aiChatPkgCard(opts.pkg);
+        if(pc)col.appendChild(pc);
+      }
+      /* Proof-of-AI line: model + elapsed time from the server
+         response, in small text under the answer. */
+      var mt=aiChatMetaText(opts.model,opts.ms);
+      if(mt){
+        var meta=document.createElement('div');
+        meta.className='chat-meta';
+        meta.textContent=mt;
+        col.appendChild(meta);
+      }
+    }
+    row.appendChild(col);
     node=row;
   }
   if(role==='ai'&&!isErr){
@@ -9236,6 +9414,23 @@ function aiChatSetTyping(on){
 function aiChatKey(e){
   if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();aiChatSend();}
 }
+/* One server reply, fully processed (owner order 2026-11-16): the
+   action tags are parsed out of the text — a [VOICE:...] tag
+   switches the chat voice at once (and updates the ប្រុស/ស្រី
+   toggle via aiChatSetVoice), a [PACKAGE:<id>] tag attaches that
+   package's card under the answer — and the response's model / ms
+   fields ride along as the small proof line. The CLEANED text is
+   what is shown and what is kept in the conversation history. */
+function aiChatShowReply(data,raw){
+  var p=aiChatParseActions(raw);
+  if(p.voice){try{aiChatSetVoice(p.voice);}catch(e){}}
+  aiChatAddBubble('ai',p.text,false,{
+    model:(data&&typeof data.model==='string'&&data.model)?data.model:null,
+    ms:(data&&typeof data.ms==='number')?data.ms:null,
+    pkg:p.pkg
+  });
+  aiChatHistory.push({role:'assistant',content:p.text});
+}
 async function aiChatSend(){
   if(aiChatBusy)return;
   var inp=document.getElementById('chatInput');if(!inp)return;
@@ -9257,11 +9452,9 @@ async function aiChatSend(){
     if(data&&data.ok===false){
       aiChatAddBubble('ai',String(data.error||data.message||('Server error ('+res.status+')')),true);
     }else if(data&&typeof data.reply==='string'&&data.reply){
-      aiChatAddBubble('ai',data.reply,false);
-      aiChatHistory.push({role:'assistant',content:data.reply});
+      aiChatShowReply(data,data.reply);
     }else if(data&&typeof data.message==='string'&&data.message){
-      aiChatAddBubble('ai',data.message,false);
-      aiChatHistory.push({role:'assistant',content:data.message});
+      aiChatShowReply(data,data.message);
     }else if(!res.ok){
       aiChatAddBubble('ai','Server error ('+res.status+')',true);
     }else{
