@@ -3189,8 +3189,20 @@ function apiRoute(req, res, urlPath) {
       const r = await fetch(ghUploadsUrl('uploads/' + name) + '?ref=main', { headers: ghHeaders(), signal: AbortSignal.timeout(60000) });
       if (!r.ok) return null;
       const j = await r.json().catch(() => null);
-      if (!j || typeof j.content !== 'string') return null;
-      return Buffer.from(j.content.replace(/\s/g, ''), 'base64');
+      if (!j) return null;
+      if (typeof j.content === 'string' && j.content.length) {
+        return Buffer.from(j.content.replace(/\s/g, ''), 'base64');
+      }
+      // Files larger than 1 MB: the GitHub contents API omits `content`.
+      // Fetch the raw bytes via download_url (authenticated — private repo).
+      if (typeof j.download_url === 'string' && j.download_url) {
+        const r2 = await fetch(j.download_url, { headers: { 'Authorization': 'Bearer ' + GH_TOKEN, 'User-Agent': 'movai-proxy' }, signal: AbortSignal.timeout(120000) });
+        if (!r2.ok) return null;
+        const ab = await r2.arrayBuffer();
+        if (!ab || !ab.byteLength) return null;
+        return Buffer.from(ab);
+      }
+      return null;
     } catch (e) { return null; }
   }
   async function ghListUploads() {
@@ -3264,11 +3276,25 @@ function apiRoute(req, res, urlPath) {
     const ext = '.' + String(name).toLowerCase().split('.').pop();
     const mime = UPLOAD_MIME[ext];
     if (!mime || !/^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(name)) { res.writeHead(404, { 'Access-Control-Allow-Origin': '*' }); res.end('Not found'); return; }
-    try {
-      const buf = fs.readFileSync(path.join(UPLOADS_DIR, name));
+    (async () => {
+      let buf = null;
+      try { buf = fs.readFileSync(path.join(UPLOADS_DIR, name)); } catch (e) { buf = null; }
+      if (!buf) {
+        // File missing locally (proxy restarted and the startup restore
+        // missed it) — fetch it from the GitHub backup on demand and
+        // cache it, so the song/cover keeps playing.
+        try {
+          const gb = await ghGetUpload(name);
+          if (gb && gb.length) {
+            try { fs.mkdirSync(UPLOADS_DIR, { recursive: true }); fs.writeFileSync(path.join(UPLOADS_DIR, name), gb); } catch (e) {}
+            buf = gb;
+          }
+        } catch (e) { buf = null; }
+      }
+      if (!buf) { res.writeHead(404, { 'Access-Control-Allow-Origin': '*' }); res.end('Not found'); return; }
       res.writeHead(200, { 'Content-Type': mime, 'Content-Length': buf.length, 'Cache-Control': 'public, max-age=86400', 'Access-Control-Allow-Origin': '*' });
       res.end(buf);
-    } catch (e) { res.writeHead(404, { 'Access-Control-Allow-Origin': '*' }); res.end('Not found'); }
+    })().catch(() => { try { res.writeHead(404, { 'Access-Control-Allow-Origin': '*' }); res.end('Not found'); } catch (e) {} });
     return;
   }
   // POST /api/public/post — PUBLIC. {email, name, userId?, mode, title, url, cover?, visibility?}
