@@ -663,6 +663,23 @@ html[data-mode="light"] .btn-free{color:#63910c}
 .post-cover-prev{width:84px;height:84px;border-radius:12px;object-fit:cover;background:#000;border:1px solid var(--line);flex:0 0 auto}
 .post-cover-none{width:84px;height:84px;border-radius:12px;background:var(--card2);border:1px solid var(--line);color:var(--muted);display:flex;align-items:center;justify-content:center;flex:0 0 auto}
 .post-cover-none svg{width:30px;height:30px}
+/* Cover 1×1 picker inside the Post-to-Public sheet ONLY (songs):
+   a tappable box above the Public/Private buttons; the chosen
+   image previews as a square 1×1 tile the moment it is picked. */
+.pub-cover-pick{display:flex;align-items:center;gap:12px;width:100%;text-align:left;background:var(--card2);border:1.5px dashed var(--line2);border-radius:14px;padding:10px 12px;color:var(--text);font-family:inherit;cursor:pointer;margin:4px 0 6px;-webkit-tap-highlight-color:transparent}
+.pub-cover-pick:active{opacity:.85}
+.pub-cover-pick:disabled{opacity:.55;cursor:wait}
+.pub-cover-prev1{width:84px;height:84px;aspect-ratio:1/1;border-radius:12px;object-fit:cover;background:#000;border:1px solid var(--line);flex:0 0 auto}
+.pub-cover-none1{width:84px;height:84px;aspect-ratio:1/1;border-radius:12px;background:var(--card);border:1px solid var(--line);color:var(--muted);align-items:center;justify-content:center;flex:0 0 auto}
+.pub-cover-none1 svg{width:30px;height:30px}
+.pub-cover-main{flex:1 1 auto;min-width:0}
+.pub-cover-main b{display:block;font-size:0.875rem;font-weight:800;line-height:1.5}
+.pub-cover-main span{display:block;font-size:0.75rem;font-weight:600;color:var(--muted);line-height:1.55;margin-top:2px}
+.pub-cover-clear{display:none;margin:0 0 10px;padding:6px 12px;border-radius:999px;border:1px solid var(--line2);background:transparent;color:#f87171;font-family:inherit;font-size:0.75rem;font-weight:800;cursor:pointer;min-height:32px;-webkit-tap-highlight-color:transparent}
+.pub-cover-clear:active{opacity:.8}
+/* Profile Credit History (owner rule 2026-11-16): only 3 rows
+   tall — anything beyond scrolls INSIDE the list. */
+.credit-hist-scroll{max-height:176px;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;scrollbar-width:thin;padding-right:2px}
 /* ===== Public Follow — inside the Admin's post cards =====
    There is NO floating follow circle in the Public panel (owner
    rule). Instead, every Admin post card carries a Follow pill
@@ -766,6 +783,32 @@ html[data-mode="light"] .btn-free{color:#63910c}
 .pub-mode-btn{display:inline-flex;align-items:center;gap:5px;padding:6px 10px;border-radius:999px;border:1px solid var(--line2);background:transparent;color:var(--muted);font-family:inherit;font-size:0.6875rem;font-weight:800;cursor:pointer;min-height:32px;white-space:nowrap}
 .pub-mode-btn:active{opacity:.8}
 .pub-mode-btn.on{background:var(--accent-fill);color:#0d1005;border-color:transparent}
+/* ===== Playlist (owner rule 2026-11-16) =====
+   A Save button shows its saved state filled with the accent
+   once the song sits in the viewer's Playlist (pill form on the
+   Public cards / rows, icon form on the Create-result and
+   History song rows). The Playlist panel reuses the compact
+   song-row look; the row of the song playing right now carries
+   an accent border. */
+.pub-pill.saved{background:var(--accent-fill);color:#0d1005;border-color:transparent}
+.song-ico-btn.saved{color:var(--accent-text);border-color:var(--accent);background:rgba(var(--accent-rgb),.14)}
+#plList>.song-card{margin-top:5px}
+#plList .hist-card.pl-card-playing{border-color:var(--accent)}
+/* ===== Now-playing glow (owner design 2026-11-16) =====
+   While a song is playing, the big surface of ITS card lights
+   up behind the cover with a bright 8-colour gradient — lime,
+   cyan, blue, purple, magenta, red, orange, yellow — flowing
+   slowly across the card. The gradient is the card's
+   background, so the cover, title and buttons stay on top,
+   fully visible and tappable; when the song pauses or ends,
+   the card falls back to its plain surface. The Public cover
+   additionally carries a soft multi-colour halo while it
+   plays. Applied to every song card: Public big cards and
+   compact rows, Create results, History and Playlist rows. */
+@keyframes npGlowPan{0%{background-position:0% 50%}50%{background-position:100% 50%}100%{background-position:0% 50%}}
+.pub-card.np-glow,.pub-songrow.np-glow,.hist-card.np-glow{background-image:linear-gradient(115deg,rgba(173,220,41,.36),rgba(0,229,255,.32),rgba(46,125,255,.32),rgba(181,55,242,.34),rgba(255,46,136,.32),rgba(255,46,46,.30),rgba(255,106,0,.32),rgba(255,230,0,.32),rgba(173,220,41,.36));background-size:300% 300%;animation:npGlowPan 9s ease infinite;border-color:rgba(255,255,255,.38);box-shadow:0 0 26px rgba(181,55,242,.35),0 0 44px rgba(0,229,255,.18)}
+.pub-cover-wrap.playing .pub-song-cover{box-shadow:0 0 0 2px rgba(255,255,255,.28),0 0 30px 4px rgba(181,55,242,.45),0 0 58px 12px rgba(0,229,255,.28)}
+@media (prefers-reduced-motion:reduce){.pub-card.np-glow,.pub-songrow.np-glow,.hist-card.np-glow{animation:none}}
 /* ===== Public song feed sections (owner layout) =====
    A horizontally swipeable carousel of big cards at the top
    (newest song centred as #1), then the remaining songs as
@@ -804,7 +847,7 @@ html[data-mode="light"] .btn-free{color:#63910c}
 .pub-slide .pub-card{margin-top:0}
 .pub-row-rank{flex:0 0 auto;min-width:28px;text-align:center;font-size:0.8125rem;font-weight:900;color:var(--accent-text);font-variant-numeric:tabular-nums}
 .pub-songrow{align-items:flex-start}
-.pub-row-acts{display:flex;gap:4px;margin-top:5px;align-items:center;flex-wrap:nowrap}
+.pub-row-acts{display:flex;gap:4px;margin-top:5px;align-items:center;flex-wrap:wrap}
 .pub-row-acts .pub-pill,.pub-row-acts .pub-act{flex:0 0 auto;min-height:24px;padding:2px 7px;font-size:0.625rem;gap:3px;border-width:1px}
 .pub-row-acts svg{width:12px;height:12px;flex:0 0 auto}
 /* ===== Floating mini-player (owner rule 2026-11-16) =====
@@ -1306,6 +1349,7 @@ html[data-smooth="1"] .brand-frame,html[data-smooth="1"] .acct-chip,html[data-sm
     <button onclick="menuGo('sec-create','3d')"><span data-i18n="nav3d">រូប 3D Design</span> <small>3D</small></button>
     <button onclick="menuGo('sec-create','song')"><span data-i18n="navSong">បង្កើតបទចម្រៀង</span> <small data-i18n="navSongSub">Song</small></button>
     <button onclick="menuGo('sec-history')"><span data-i18n="navHistory">ប្រវត្តិ</span> <small>History</small></button>
+    <button onclick="menuGo('sec-playlist')"><span data-i18n="plTitle">Playlist · បញ្ជីចម្រៀង</span> <small>Playlist</small></button>
     <button onclick="menuGo('sec-packages')"><span data-i18n="navPackages">កញ្ចប់សេវាកម្ម</span> <small data-i18n="navPackagesSub">Packages</small></button>
   </nav>
   <div class="set-box" id="acctBox" style="margin-top:22px">
@@ -1604,6 +1648,16 @@ html[data-smooth="1"] .brand-frame,html[data-smooth="1"] .acct-chip,html[data-sm
   </div>
 </section>
 <section id="page-history" style="display:none">
+  <div class="panel" id="sec-playlist">
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">
+      <h2 style="font-size:1.125rem;font-weight:800" data-i18n="plTitle">Playlist · បញ្ជីចម្រៀង</h2>
+      <span id="plCount" style="font-size:0.8125rem;color:var(--muted)"></span>
+    </div>
+    <div class="pub-modes" style="justify-content:flex-start;margin-top:10px">
+      <button type="button" class="pub-mode-btn" id="plModeBtn" onclick="pubSetPlayMode()" aria-pressed="false" aria-label="Loop · វិលជុំ"></button>
+    </div>
+    <div id="plList"></div>
+  </div>
   <div class="panel" id="sec-history">
     <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">
       <h2 style="font-size:1.125rem;font-weight:800" data-i18n="histTitle">ប្រវត្តិរបស់អ្នក</h2>
@@ -1677,6 +1731,7 @@ html[data-smooth="1"] .brand-frame,html[data-smooth="1"] .acct-chip,html[data-sm
 </div>
 <input type="file" id="postMp3Input" accept="audio/*,.mp3,.wav,.ogg,.m4a" style="display:none" onchange="postFlowMp3Picked(this)">
 <input type="file" id="postCoverInput" accept="image/*" style="display:none" onchange="postFlowCoverPicked(this)">
+<input type="file" id="pubCoverInput" accept="image/*" style="display:none" onchange="pubCoverPicked(this)">
 <div id="loginSheet" class="pkg-sheet" style="display:none" role="dialog" aria-modal="true" onclick="if(event.target===this)loginSheetClose()">
   <div class="pkg-sheet-card">
     <div class="login-brand" aria-hidden="true"><span class="login-brand-name">Mov<span>Ai</span></span><span class="login-brand-credit"><b>YEM SOKHOEUN</b><i>Create by Owner</i></span></div>
@@ -1764,6 +1819,7 @@ html[data-smooth="1"] .brand-frame,html[data-smooth="1"] .acct-chip,html[data-sm
   <button type="button" class="dock-item on" id="dockPublic" onclick="dockGo('public')" aria-label="Public · សាធារណៈ"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.6 3.9 5.7 3.9 9S14.5 18.4 12 21c-2.5-2.6-3.9-5.7-3.9-9S9.5 5.6 12 3z"/></svg></button>
   <button type="button" class="dock-item" id="dockCreate" onclick="dockGo('create')" aria-label="Create · បង្កើត"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button>
   <button type="button" class="dock-item" id="dockHistory" onclick="dockGo('history')" aria-label="History · ប្រវត្តិ"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/><path d="M12 7v5l3 3"/></svg></button>
+  <button type="button" class="dock-item" id="dockPlaylist" onclick="dockGo('playlist')" aria-label="Playlist · បញ្ជីចម្រៀង"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15V6"/><path d="M18.5 18a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5Z"/><path d="M12 12H3"/><path d="M16 6H3"/><path d="M12 18H3"/></svg></button>
   <button type="button" class="dock-item" id="dockPackages" onclick="dockGo('packages')" aria-label="Packages · កញ្ចប់សេវាកម្ម"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="8" width="18" height="4" rx="1"/><path d="M12 8v13"/><path d="M19 12v7a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-7"/><path d="M7.5 8a2.5 2.5 0 0 1 0-5C11 3 12 8 12 8s1-5 4.5-5a2.5 2.5 0 0 1 0 5"/></svg></button>
   <button type="button" class="dock-item" id="dockNotif" onclick="dockGo('notif')" aria-label="Notifications · ដំណឹង"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg><span class="dock-badge" id="dockNotifBadge" style="display:none">0</span></button>
 </nav>
@@ -1884,10 +1940,11 @@ km:{
  pubCatAll:'ទាំងអស់',pubCatSong:'បទចម្រៀង',pubCatImage:'រូបភាព',pubCatVideo:'វីដេអូ',
  pubEmptyCat:'មិនទាន់មានផុសប្រភេទនេះនៅឡើយទេ',
  pubShare:'ស៊ែរ',pubDislike:'មិនចូលចិត្ត',pubShared:'បានចម្លង link ហើយ ✓',
- pubYtChannel:'YouTube Channel',pubSongLink:'Song Link',pubLinkCopied:'បានចម្លង Link ✓',pubYtOpen:'បើក YouTube',pubModeLoop:'Loop · វិលជុំ',pubModeOne:'Repeat 1 · ម្ដងទៀត',pubModeShuffle:'Shuffle · ប្ដូរបទ',pubModeOff:'បិទ · Off',pubSecNew:'ថ្មីៗ · New',pubSecMore:'បទផ្សេងៗ · More songs',
+ pubYtChannel:'YouTube Channel',pubSongLink:'Song Link',pubLinkCopied:'បានចម្លង Link ✓',pubYtOpen:'បើក YouTube',pubModeLoop:'Loop · វិលជុំ',pubModeOne:'Repeat 1 · ម្ដងទៀត',pubModeShuffle:'Shuffle · ប្ដូរបទ',pubModeOff:'បិទ · Off',pubSecNew:'ថ្មីៗ · New',pubSecMore:'បទផ្សេងៗ · More songs',plSave:'Save · រក្សាទុក',plSaved:'Saved · បានរក្សាទុក',plTitle:'Playlist · បញ្ជីចម្រៀង',plEmpty:'មិនទាន់មានបទក្នុង Playlist ទេ — ចុច «Save · រក្សាទុក» នៅលើបទចម្រៀងណាមួយ បទនោះនឹងចូលមកទីនេះ',plCountFmt:'{n} បទ',plRemove:'ដកចេញ · Remove',
  pubTypeSong:'បទចម្រៀង',pubTypeImage:'រូបភាព',pubTypeVideo:'វីដេអូ',pubType3d:'3D',
  pubSongId:'ID បទចម្រៀង',pubDuration:'រយៈពេល',pubModel:'Model',pubPostedDate:'ថ្ងៃផុស',pubPostedBy:'អ្នកផុស',pubGenre:'ប្រភេទ',
  pubGenreAll:'ទាំងអស់ · All',pubGenrePick:'ជ្រើសរើសស្ទាយបទ · Style',pubGenreNeed:'សូមជ្រើសរើសស្ទាយបទជាមុនសិន ទើបផុសទៅ Public បាន',
+ pubCoverLabel:'រូប Cover 1×1 · Cover 1×1',pubCoverPick:'ចុចជ្រើសរូប Cover',pubCoverChange:'ប្ដូររូប Cover',pubCoverHint:'ជ្រើសរូបពីទូរស័ព្ទ · រូបភាពអតិបរមា 5 MB · ការ៉េ 1×1',pubCoverClear:'✕ ដករូប Cover ចេញ',pubCoverSelected:'បានជ្រើសរូប Cover 1×1 ហើយ ✓',pubCoverBadImg:'សូមជ្រើសឯកសាររូបភាព',pubCoverTooBig:'រូបភាពធំពេក — អតិបរមា 5 MB',pubCoverUploading:'កំពុងអាប់ឡូតរូប Cover',pubCoverUploadFail:'អាប់ឡូតរូប Cover មិនបាន — សូមព្យាយាមម្ដងទៀត ឬដករូប Cover ចេញ',
  postBtn:'＋ ផុស · Post',postFlowTitle:'ផុសបទចម្រៀង · Post a song',
  postOwn:'ផុសបទផ្ទាល់ខ្លួន',postOwnSub:'ជ្រើស MP3 ពីទូរសព្ទរបស់អ្នក',
  postWeb:'ផុសបទដែលបង្កើតក្នុង website',postWebSub:'ជ្រើសបទពី History របស់អ្នក',
@@ -1904,7 +1961,7 @@ km:{
  pubDlLimit:'អ្នកបានប្រើអស់ការទាញយកបទចម្រៀងហ្វ្រី 2 ដងហើយ — សូមទិញកញ្ចប់សេវាកម្មបទចម្រៀង ដើម្បីទាញយកបន្ត',
  acctGotFree:'អបអរសាទរ! អ្នកទទួលបាន Credit ហ្វ្រី — Image.Video Credit 250 និង Song Credit 24 ក្នុងគណនីរបស់អ្នកហើយ',
  giftTitle:'កាដូពី Admin',giftBody:'Free 250 Image.Video Credit + 24 Song Credit សម្រាប់អ្នកប្រើថ្មី',giftClaim:'ទទួលយក · Claim',
- navNotif:'ដំណឹង',notifTitle:'ដំណឹង · Notifications',notifEmpty:'មិនទាន់មានដំណឹងទេ',notifGuest:'សូម Log in ដើម្បីមើលដំណឹងរបស់អ្នក',notifLoading:'កំពុងផ្ទុក…',notifJustNow:'ទើបតែឥឡូវនេះ',notifMinAgo:'{n} នាទីមុន',notifHourAgo:'{n} ម៉ោងមុន',notifDayAgo:'{n} ថ្ងៃមុន',notifApproved:'កញ្ចប់របស់អ្នកត្រូវបានអនុម័ត ✓',notifRejected:'កញ្ចប់របស់អ្នកត្រូវបានបដិសេធ',notifLogin:'មានអ្នកប្រើថ្មី Log in',notifRequest:'មានសំណើទិញកញ្ចប់ថ្មី',notifGrant:'Admin បានបន្ថែម Credit ឲ្យអ្នក',notifDeduct:'Admin បានកាត់ Credit របស់អ្នក',notifInfo:'ដំណឹងពី MovAi',notifPost:'បានផុសថ្មីទៅ Public',
+ navNotif:'ដំណឹង',notifTitle:'ដំណឹង · Notifications',notifEmpty:'មិនទាន់មានដំណឹងទេ',notifGuest:'សូម Log in ដើម្បីមើលដំណឹងរបស់អ្នក',notifLoading:'កំពុងផ្ទុក…',notifJustNow:'ទើបតែឥឡូវនេះ',notifMinAgo:'{n} នាទីមុន',notifHourAgo:'{n} ម៉ោងមុន',notifDayAgo:'{n} ថ្ងៃមុន',notifApproved:'កញ្ចប់របស់អ្នកត្រូវបានអនុម័ត ✓',notifRejected:'កញ្ចប់របស់អ្នកត្រូវបានបដិសេធ',notifLogin:'មានអ្នកប្រើថ្មី Log in',notifRequest:'មានសំណើទិញកញ្ចប់ថ្មី',notifGrant:'Admin បានបន្ថែម Credit ឲ្យអ្នក',notifDeduct:'Admin បានកាត់ Credit របស់អ្នក',notifInfo:'ដំណឹងពី MovAi',notifPost:'បានផុសថ្មីទៅ Public',notifGenCharge:'បានកាត់ Credit ពីការបង្កើត',
  pushAskTitle:'បើកដំណឹងពីទូរស័ព្ទ?',pushAskBody:'ទទួលដំណឹងពិតៗចេញពីទូរស័ព្ទរបស់អ្នកផ្ទាល់ — ពេលកញ្ចប់ត្រូវបានអនុម័ត ពេល Admin បន្ថែម ឬកាត់ Credit និងពេលមានកាដូ — ទោះបីអ្នកមិនបានបើក website ក៏ដោយ',pushAllow:'បើកដំណឹង · Enable',pushNotNow:'មិនបាច់ទេ · Not now',pushSetLabel:'ដំណឹងពីទូរស័ព្ទ · Push notifications',pushStateOn:'បើកហើយ — ដំណឹងនឹងលោតលើទូរស័ព្ទរបស់អ្នក',pushStateOff:'បិទ — បើកដើម្បីទទួលដំណឹងលើទូរស័ព្ទ',pushStateBlocked:'Browser បានបិទដំណឹងឲ្យ website នេះ — សូមបើក Notification ក្នុង Settings របស់ browser',pushStateUnsupported:'Browser នេះមិនគាំទ្រ Web Push ទេ',pushStateGuest:'សូម Log in ជាមុនសិន',
  acctErrFill:'សូមបំពេញឲ្យគ្រប់ — អ៊ីមែលត្រូវមាន @ ហើយពាក្យសម្ងាត់យ៉ាងតិច 4 តួ',
  acctErrExists:'អ៊ីមែលនេះបានចុះឈ្មោះរួចហើយ — បានប្ដូរទៅ ចូលគណនី',
@@ -2088,10 +2145,11 @@ en:{
  pubCatAll:'All',pubCatSong:'Songs',pubCatImage:'Images',pubCatVideo:'Videos',
  pubEmptyCat:'Nothing of this type has been posted yet',
  pubShare:'Share',pubDislike:'Dislike',pubShared:'Link copied ✓',
- pubYtChannel:'YouTube Channel',pubSongLink:'Song Link',pubLinkCopied:'Link copied ✓',pubYtOpen:'Open YouTube',pubModeLoop:'Loop',pubModeOne:'Repeat 1',pubModeShuffle:'Shuffle · Next',pubModeOff:'Off · បិទ',pubSecNew:'New · ថ្មីៗ',pubSecMore:'More songs · បទផ្សេងៗ',
+ pubYtChannel:'YouTube Channel',pubSongLink:'Song Link',pubLinkCopied:'Link copied ✓',pubYtOpen:'Open YouTube',pubModeLoop:'Loop',pubModeOne:'Repeat 1',pubModeShuffle:'Shuffle · Next',pubModeOff:'Off · បិទ',pubSecNew:'New · ថ្មីៗ',pubSecMore:'More songs · បទផ្សេងៗ',plSave:'Save',plSaved:'Saved',plTitle:'Playlist',plEmpty:'No songs in your Playlist yet — tap Save on any song and it will appear here',plCountFmt:'{n} songs',plRemove:'Remove',
  pubTypeSong:'Song',pubTypeImage:'Image',pubTypeVideo:'Video',pubType3d:'3D',
  pubSongId:'Song ID',pubDuration:'Duration',pubModel:'Model',pubPostedDate:'Posted',pubPostedBy:'Posted by',pubGenre:'Genre',
  pubGenreAll:'All · ទាំងអស់',pubGenrePick:'Choose a style · ស្ទាយបទ',pubGenreNeed:'Please choose a song style first before posting to Public',
+ pubCoverLabel:'Cover image 1×1 · រូប Cover',pubCoverPick:'Tap to choose a cover',pubCoverChange:'Change cover image',pubCoverHint:'Pick an image from your phone · max 5 MB · square 1×1',pubCoverClear:'✕ Remove cover',pubCoverSelected:'1×1 cover selected ✓',pubCoverBadImg:'Please pick an image file',pubCoverTooBig:'Image too large — max 5 MB',pubCoverUploading:'Uploading cover',pubCoverUploadFail:'Could not upload the cover — please try again, or remove the cover',
  postBtn:'+ Post · ផុស',postFlowTitle:'Post a song · ផុសបទចម្រៀង',
  postOwn:'Post your own song',postOwnSub:'Pick an MP3 from your phone',
  postWeb:'Post a song made in this website',postWebSub:'Pick a song from your History',
@@ -2108,7 +2166,7 @@ en:{
  pubDlLimit:'You have used your 2 free song downloads — please buy a Song package to keep downloading',
  acctGotFree:'Welcome! You received free credits — 250 Image.Video Credit and 24 Song Credit in your account',
  giftTitle:'A Gift from Admin',giftBody:'Free 250 Image.Video Credit + 24 Song Credit for new users',giftClaim:'Claim · ទទួលយក',
- navNotif:'Notifications',notifTitle:'Notifications · ដំណឹង',notifEmpty:'No notifications yet',notifGuest:'Log in to see your notifications',notifLoading:'Loading…',notifJustNow:'Just now',notifMinAgo:'{n} min ago',notifHourAgo:'{n} hr ago',notifDayAgo:'{n} days ago',notifApproved:'Your package was approved ✓',notifRejected:'Your package was rejected',notifLogin:'New user signed in',notifRequest:'New package purchase request',notifGrant:'Admin added credits to your account',notifDeduct:'Admin deducted credits from your account',notifInfo:'MovAi notification',notifPost:'New post on Public',
+ navNotif:'Notifications',notifTitle:'Notifications · ដំណឹង',notifEmpty:'No notifications yet',notifGuest:'Log in to see your notifications',notifLoading:'Loading…',notifJustNow:'Just now',notifMinAgo:'{n} min ago',notifHourAgo:'{n} hr ago',notifDayAgo:'{n} days ago',notifApproved:'Your package was approved ✓',notifRejected:'Your package was rejected',notifLogin:'New user signed in',notifRequest:'New package purchase request',notifGrant:'Admin added credits to your account',notifDeduct:'Admin deducted credits from your account',notifInfo:'MovAi notification',notifPost:'New post on Public',notifGenCharge:'Credit charged for a creation',
  pushAskTitle:'Turn on phone notifications?',pushAskBody:'Get real alerts on your phone — when a package is approved, when Admin adds or deducts credits, and when a gift arrives — even when the website is closed',pushAllow:'Enable · បើកដំណឹង',pushNotNow:'Not now · មិនបាច់ទេ',pushSetLabel:'Push notifications · ដំណឹងពីទូរស័ព្ទ',pushStateOn:'On — alerts will pop up on your phone',pushStateOff:'Off — turn on to get alerts on your phone',pushStateBlocked:'This browser has blocked notifications for this site — allow Notifications in the browser settings',pushStateUnsupported:'This browser does not support Web Push',pushStateGuest:'Log in first',
  acctErrFill:'Please fill everything — email must contain @ and password at least 4 characters',
  acctErrExists:'This email is already registered — switched to Log in',
@@ -3448,7 +3506,7 @@ var GEN_VID_PROVIDERS=[
 ];
 var GEN_SONG_PROVIDERS=[
  {id:'suno',name:'MovAi',limit:{km:'កាត់ 12 Credit/ដង · បាន 2 បទ',en:'12 credits per generation · 2 songs'},key:'suno',note:{km:'Model v6 — ច្រៀងខ្មែរច្បាស់ជាងគេ។ MovAi មិនមាន API ផ្លូវការសាធារណៈទេ — ប្រើ API Key + Endpoint ដែលអ្នកដាក់ក្នុង ☰ → API Keys (កាត MovAi)។ កាត់ 12 Credit ក្នុងមួយដង បាន 2 បទ។',en:'Model v6 — sings Khmer the clearest. MovAi has no official public API — uses the API key + endpoint you add in ☰ → API Keys (MovAi card). 12 credits per generation, 2 songs.'}},
- {id:'magichour',name:'Magic Hour',glow:'green',limit:{km:'កាត់តាមរយៈពេល · 60 Credit/នាទី · ពី Image.Video Credit · បាន 1 បទ',en:'Charged by length · 60 credits/min · from Image.Video Credit · 1 song'},key:'magichour',note:{km:'កាត់តាមរយៈពេលបទ ពី Image.Video Credit (មិនមែន Song Credit ទេ) — 60 Credit ក្នុង 1 នាទី (1 Credit/វិនាទី)៖ បទ 1 នាទី = 60 · 2 នាទី = 120 · 3.5 នាទី = 210 · 5 នាទី = 300។ ប្រើ Magic Hour API Key ដែលមានស្រាប់។',en:'Charged by song length from Image.Video Credit (not Song Credit) — 60 credits per minute (1 credit/second): 1 min = 60 · 2 min = 120 · 3.5 min = 210 · 5 min = 300. Uses your existing Magic Hour API key.'}},
+ {id:'magichour',name:'Magic Hour',glow:'green',key:'magichour'},
  {id:'acemusic',name:'ACE Music',locked:true,lockNote:{km:'ចាក់សោរ · មិនទាន់ដំណើរការ',en:'Locked · Not yet available'},limit:{km:'ហ្វ្រីរហូត · អត់កាត់ Credit',en:'Free forever · No credits charged'},key:'acemusic',note:{km:'ហ្វ្រីរហូត អត់កាត់ quota/Credit ទេ — បង្កើតបទមានសំឡេងច្រៀងបាន (Model ACE-Step 1.5)។ ត្រូវដាក់ API Key របស់អ្នកផ្ទាល់ក្នុង ☰ → API Keys (កាត ACE Music) — ចុះឈ្មោះយក Key ហ្វ្រីនៅ acemusic.ai អត់ត្រូវកាត។ MovAi មិនយក Key ឲ្យអ្នកដោយអូតូទេ។',en:'Free forever, no quota or credits charged — creates songs with vocals (ACE-Step 1.5 model). Add your own API key in ☰ → API Keys (ACE Music card) — sign up for a free key at acemusic.ai, no card needed. MovAi never fetches a key for you automatically.'}},
  {id:'musicapi',name:'MusicAPI',limit:{km:'កាត់ 20 Credit/ដង · ហ្វ្រី 75 Credit',en:'20 credits/generation · 75 free credits'},key:'musicapi',note:{km:'API ពិត — បង្កើតបទមានសំឡេងច្រៀង (MovAi models v6)។ កាត់ 20 Credit ក្នុងមួយដង បាន 2 បទ។ ចុះឈ្មោះហ្វ្រីនៅ musicapi.ai បាន 75 Credit អត់ត្រូវកាត — តែបានប្រហែល 6 បទម្ដងគត់ប៉ុណ្ណោះ បន្ទាប់មកត្រូវបង់លុយ។ ត្រូវដាក់ API Key របស់អ្នកផ្ទាល់ក្នុង ☰ → API Keys (កាត MusicAPI) — MovAi មិនយក Key ឲ្យអ្នកដោយអូតូទេ។',en:'Real API — creates songs with vocals (MovAi v6 models). 20 credits per generation, 2 songs. Free signup at musicapi.ai gives 75 credits, no card needed — but only about 6 songs, one-time only, then it is paid. Add your own API key in ☰ → API Keys (MusicAPI card) — MovAi never fetches a key for you automatically.'}}
 ];
@@ -3715,9 +3773,10 @@ function genRenderProviders(){
     drop.innerHTML=list.map(function(p){
       if(p.hidden)return '';
       var al=provAdminLocked(p),lk=!!p.locked;
-      var st=p.glow?provGlowStatus(p.glow):null;
       var h='<button type="button" class="dd-opt'+(p.id===gen.provider?' on':'')+((lk||al)?' off':'')+'"'+((lk||al)?' aria-disabled="true"':' onclick="genSetProvider(\''+p.id+'\')"')+'>';
-      h+='<span class="dd-opt-main"><span>'+provNameHtml(p.name)+'</span>'+(p.glow?'<span class="pglow pglow-'+p.glow+'"></span>':'')+(st?'<span class="dd-opt-status" style="color:'+st.c+'">'+escHtml(st.t)+'</span>':'')+'</span>';
+      /* Owner rule 2026-11-16: name + coloured glow dot ONLY —
+         no status text («Online Live» …) next to a provider. */
+      h+='<span class="dd-opt-main"><span>'+provNameHtml(p.name)+'</span>'+(p.glow?'<span class="pglow pglow-'+p.glow+'"></span>':'')+'</span>';
       h+='<span class="dd-opt-right">';
       if(al)h+='<span class="dd-lock">'+escHtml(tx('adminLock'))+'</span>';
       else if(lk)h+='<span class="dd-locknote">'+escHtml(loc(p.lockNote))+'</span>';
@@ -4857,9 +4916,14 @@ function genShowSongs(items,streaming,restored){
     grid.appendChild(genSongCard(s,i+1,it,s.title||sTitle,sProv,sPrompt,streaming));
   });
   box.appendChild(grid);
-  genSongAudios.forEach(function(a,idx){
-    var ps=prevState[idx];
-    if(ps&&ps.src===a.src){
+  /* Carry playback over the re-render by matching the song URL
+     (never by position — order/count can shift between the
+     streaming preview and the final render, and an index match
+     used to lose the playing song). */
+  genSongAudios.forEach(function(a){
+    var ps=null;
+    for(var k=0;k<prevState.length;k++){if(prevState[k].src===a.src){ps=prevState[k];break;}}
+    if(ps){
       try{a.currentTime=ps.t;}catch(e){}
       if(ps.playing){var pr=a.play();if(pr&&pr.catch)pr.catch(function(){});}
     }
@@ -4903,6 +4967,21 @@ function genSongCard(song,n,it,title,prov,prompt,streaming){
   var au=new Audio();
   au.src=u;au.preload='metadata';
   genSongAudios.push(au);
+  /* Mini-player hook (owner rule 2026-11-16): a Create-results
+     song that starts playing hands itself to the floating
+     mini-player, so scrolling away (or switching views) never
+     loses it — the draggable logo appears, opens the full
+     player, and can stop it. The Audio element itself is a
+     standalone object (never a DOM child), so re-rendering the
+     results box cannot destroy it. */
+  au._miniKeep=true;
+  au._miniIt={id:'gen:'+u,type:'song',url:u,title:title||tx('songLabelFmt').replace('{n}',n),image:(song&&song.image)||'',name:''};
+  au.addEventListener('play',function(){
+    try{
+      var list=genSongAudios.map(function(a){return {au:a,it:a._miniIt};});
+      pubMiniSet(au,au._miniIt,list);
+    }catch(e){}
+  });
   var rowEl=document.createElement('div');
   rowEl.className='song-row';
   rowEl.appendChild(songCoverEl(song,n));
@@ -4953,6 +5032,7 @@ function genSongCard(song,n,it,title,prov,prompt,streaming){
   var sh=songIcoBtn(tx('histShare'),SONG_SVG_SHARE);
   sh.addEventListener('click',function(){histShare(it||{type:'song',url:u,title:title,prompt:prompt},sh);});
   rowEl.appendChild(sh);
+  rowEl.appendChild(plIcoBtn({url:u,title:(it&&it.title)||title||tx('songLabelFmt').replace('{n}',n),image:(song&&song.image)||'',name:''}));
   var pb=songIcoBtn(tx('pubPostBtn'),SONG_SVG_POST);
   pb.addEventListener('click',function(){pubOpenSheet(it||{type:'song',url:u,title:title,prompt:prompt});});
   rowEl.appendChild(pb);
@@ -4963,6 +5043,7 @@ function genSongCard(song,n,it,title,prov,prompt,streaming){
   card.appendChild(seek);
   function sync(){
     play.textContent=au.paused?'▶':'❚❚';
+    card.classList.toggle('np-glow',!au.paused);
     var d=isFinite(au.duration)?au.duration:0,c=au.currentTime||0;
     time.textContent=histFmtTime(c);
     if(d>0){dur.textContent=histFmtTime(d);seek.value=Math.round(c/d*1000);}
@@ -5065,8 +5146,12 @@ function histMigrateLegacy(){
    the guest store after log out. */
 function histOnAccountChange(){
   if(histAudio){try{histAudio.pause();}catch(e){}histAudioId=null;}
+  /* The Playlist is per-account too: stop the previous account's
+     Playlist song and show the new account's own list. */
+  try{if(plAudio){plAudio.pause();plAudioUrl=null;}}catch(e){}
   histMigrateLegacy();
   histRender();
+  try{plRender();plSyncSaveBtns();}catch(e){}
   /* The Create results are per-account too: a sign in / out
      clears the previous account's restored results (and stops
      their playback) so the new account restores its OWN saved
@@ -5477,6 +5562,7 @@ function histSongCard(it){
     var sh=songIcoBtn(tx('histShare'),SONG_SVG_SHARE);
     sh.addEventListener('click',function(){histShare(it,sh);});
     rowEl.appendChild(sh);
+    rowEl.appendChild(plIcoBtn({url:it.url,title:it.title||'',image:it.image||'',name:ownerName}));
     var pb=songIcoBtn((it.pubPost==='public')?tx('pubPostedAlready'):tx('pubPostBtn'),SONG_SVG_POST);
     pb.addEventListener('click',function(){pubOpenSheet(it);});
     rowEl.appendChild(pb);
@@ -5675,13 +5761,43 @@ function histPlayerEl(it){
 function histAudioGet(){
   if(!histAudio){
     histAudio=new Audio();
+    histAudio._miniKeep=true;
     histAudio.addEventListener('timeupdate',histPlayerSync);
     histAudio.addEventListener('loadedmetadata',histPlayerSync);
     histAudio.addEventListener('ended',histPlayerSync);
     histAudio.addEventListener('pause',histPlayerSync);
     histAudio.addEventListener('play',histPlayerSync);
+    /* Mini-player hook (owner rule 2026-11-16): a History song
+       that starts playing also hands itself to the floating
+       mini-player — the same draggable logo + full player the
+       Public feed uses — so it keeps playing and stays
+       controllable however far the user scrolls. This element
+       is a standalone object, never rendered into the DOM, so
+       History re-renders cannot destroy it. */
+    histAudio.addEventListener('play',function(){
+      try{
+        var cur=null;
+        var all=histGet();
+        for(var i=0;i<all.length;i++){if(all[i]&&all[i].id===histAudioId){cur=all[i];break;}}
+        if(!cur)return;
+        var list=histMiniList();
+        var mit=null;
+        for(var j=0;j<list.length;j++){if(list[j].it.id==='hist:'+cur.id){mit=list[j].it;break;}}
+        if(mit)pubMiniSet(histAudio,mit,list);
+      }catch(e){}
+    });
   }
   return histAudio;
+}
+/* Prev/next playlist for the mini-player when the playing song
+   lives in History: every History song, each loading through
+   the shared History player element. */
+function histMiniList(){
+  var au=histAudioGet();
+  return histGet().filter(function(x){return x&&x.type==='song'&&x.url;}).map(function(x){
+    var mit={id:'hist:'+x.id,type:'song',url:x.url,title:x.title||x.prompt||'',image:x.image||'',name:''};
+    return {au:au,it:mit,load:function(){histPlayToggle(x);}};
+  });
 }
 function histCardEl(id){return document.querySelector('.hist-card[data-hist-id="'+id+'"]');}
 function histPlayToggle(it){
@@ -5725,6 +5841,7 @@ function histPlayerSync(){
     var play=card.querySelector('.hist-play'),time=card.querySelector('.hist-time'),seek=card.querySelector('.hist-seek');
     var active=(id===histAudioId&&!!histAudio);
     var playing=active&&!histAudio.paused&&!histAudio.ended;
+    card.classList.toggle('np-glow',!!playing);
     if(play)play.textContent=playing?'❚❚':'▶';
     if(time)time.textContent=histFmtTime(active?histAudio.currentTime:0);
     var durEl=card.querySelector('.hist-dur');
@@ -6326,16 +6443,23 @@ function dockGo(dest){
     dockSync('history');
     return;
   }
+  if(dest==='playlist'){
+    appSetView('create');
+    var elp=document.getElementById('sec-playlist');if(elp)elp.scrollIntoView({behavior:'smooth',block:'start'});
+    dockSync('playlist');
+    return;
+  }
   appSetView(dest==='create'?'create':'public');
   window.scrollTo(0,0);
   dockSync();
 }
 function dockSync(force){
-  var pub=document.getElementById('dockPublic'),cre=document.getElementById('dockCreate'),his=document.getElementById('dockHistory');
+  var pub=document.getElementById('dockPublic'),cre=document.getElementById('dockCreate'),his=document.getElementById('dockHistory'),pl=document.getElementById('dockPlaylist');
   var onPub=(typeof APP_VIEW==='undefined'||APP_VIEW!=='create');
   if(pub)pub.classList.toggle('on',onPub);
-  if(cre)cre.classList.toggle('on',!onPub&&force!=='history');
+  if(cre)cre.classList.toggle('on',!onPub&&force!=='history'&&force!=='playlist');
   if(his)his.classList.toggle('on',force==='history');
+  if(pl)pl.classList.toggle('on',force==='playlist');
 }
 /* The AI chat robot button HIDES while the ☰ drawer is open (so it
    never floats over the drawer content) and ALWAYS comes back —
@@ -6513,6 +6637,14 @@ var pubLiked={};
 var pubDisliked={};
 var pubViewed={};
 var pubSheetItem=null;
+/* Cover 1×1 picked inside the Post-to-Public sheet (songs only):
+   the chosen file + its instant square preview object URL. Reset
+   every time the sheet opens; when nothing is picked the post
+   goes out exactly as before (the song's existing cover). */
+var pubCoverFile=null;
+var pubCoverObjUrl='';
+var pubCoverBusy=false;
+var pubCoverTick=null;
 /* ===== Public auto-refresh (owner rule) =====
    While the user is ON the Public tab the feed reloads SILENTLY
    every 30 seconds, so a new post (from the Admin or another
@@ -6681,7 +6813,7 @@ function appSetView(v){
   if(tp){tp.className='view-tab'+(onPub?' on':'');tp.setAttribute('aria-selected',onPub?'true':'false');}
   if(tc){tc.className='view-tab'+(!onPub?' on':'');tc.setAttribute('aria-selected',!onPub?'true':'false');}
   if(onPub){pubLoadFeed(false);try{pubFollowLoad();}catch(e){}try{pubAutoStart();}catch(e){}}
-  else{try{pubAutoStop();}catch(e){}try{histRender();}catch(e){}try{lastSongsRestore();}catch(e){}}
+  else{try{pubAutoStop();}catch(e){}try{histRender();}catch(e){}try{plRender();}catch(e){}try{lastSongsRestore();}catch(e){}}
   if(changed)window.scrollTo(0,0);
   try{dockSync();}catch(e){}
   /* The floating song logo reacts to the view switch at once —
@@ -7204,7 +7336,7 @@ function pubModeMeta(m){
 function pubModeBtnSync(){
   try{
     var meta=pubModeMeta(pubPlayMode);
-    var btns=document.querySelectorAll('#pubFeed .pub-mode-btn');
+    var btns=document.querySelectorAll('.pub-mode-btn');
     for(var i=0;i<btns.length;i++){
       btns[i].className='pub-mode-btn'+(pubPlayMode!=='off'?' on':'');
       btns[i].setAttribute('data-mode',pubPlayMode);
@@ -7214,6 +7346,7 @@ function pubModeBtnSync(){
     }
     var all=document.querySelectorAll('#pubFeed audio');
     for(var j=0;j<all.length;j++)all[j].loop=(pubPlayMode==='one');
+    try{plModeSync();}catch(e){}
   }catch(e){}
 }
 function pubSetPlayMode(m){
@@ -7267,6 +7400,264 @@ function pubWireFeedAudio(au,it,sync){
     if(sync)sync();
     if(pubPlayMode==='loop'||pubPlayMode==='shuffle')pubAdvanceFrom(au);
   });
+}
+/* ===== Playlist (owner rule 2026-11-16) =====
+   Every song — in the Public feed (big cards AND compact rows),
+   in the Create results and in History — carries a
+   «Save · រក្សាទុក» button beside Like / Dislike / Share.
+   Saving puts the song into the viewer's own Playlist, kept in
+   localStorage PER ACCOUNT (key 'movai-playlist-<email>',
+   guests under 'movai-playlist-guest') — the same per-account
+   split History uses. A song's URL is its identity, so the
+   same song shows its saved state in every place it appears,
+   and tapping Save again unsaves it. The Playlist itself sits
+   at the top of the History page and on the dock: saved songs
+   newest first, each with Play + Remove and a song count, and
+   the SAME playback-mode button as the Public cards — with
+   Loop (វិលជុំ) armed, a finished Playlist song hands over to
+   the next one and wraps from the last back to the first
+   (repeat all, never stops); Shuffle·Next jumps to another
+   song; Repeat 1 loops the one song. Playlist playback runs on
+   ONE shared audio element (like History's), hands itself to
+   the floating mini-player with the whole list as its
+   prev/next queue, and pauses every other player, exactly
+   like the other sections do. */
+function plKey(){
+  var em='';
+  try{em=(localStorage.getItem('movai-session')||'').trim().toLowerCase();}catch(e){}
+  return 'movai-playlist-'+(em?em:'guest');
+}
+function plGet(){
+  try{var a=JSON.parse(localStorage.getItem(plKey())||'[]');return Array.isArray(a)?a:[];}catch(e){return[];}
+}
+function plStore(a){try{localStorage.setItem(plKey(),JSON.stringify(a));}catch(e){}}
+function plHas(url){
+  if(!url)return false;
+  var a=plGet();
+  for(var i=0;i<a.length;i++)if(a[i]&&a[i].url===url)return true;
+  return false;
+}
+function plBookmarkSvg(saved){
+  return '<svg width="15" height="15" viewBox="0 0 24 24" fill="'+(saved?'currentColor':'none')+'" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>';
+}
+function plToggle(entry){
+  if(!entry||!entry.url)return;
+  var a=plGet(),found=-1;
+  for(var i=0;i<a.length;i++)if(a[i]&&a[i].url===entry.url)found=i;
+  if(found>=0)a.splice(found,1);
+  else a.unshift({url:entry.url,title:entry.title||'',image:entry.image||'',name:entry.name||'',ts:Date.now()});
+  plStore(a);
+  plSyncSaveBtns();
+  plRender();
+}
+function plRemove(url){
+  if(!url)return;
+  plStore(plGet().filter(function(x){return x&&x.url!==url;}));
+  if(plAudioUrl===url){
+    if(plAudio){try{plAudio.pause();}catch(e){}}
+    plAudioUrl=null;
+    if(pubMini.au&&pubMini.au===plAudio){try{pubMiniStopAll();}catch(e){}}
+  }
+  plSyncSaveBtns();
+  plRender();
+}
+/* Refresh EVERY visible Save button (all sections render the
+   same song independently) to the song's current saved state:
+   filled accent + «Saved» label on the pill form, filled
+   bookmark on the icon form. */
+function plSyncSaveBtns(){
+  var btns=document.querySelectorAll('[data-pl-save]');
+  for(var i=0;i<btns.length;i++){
+    var b=btns[i],saved=plHas(b.getAttribute('data-pl-save'));
+    b.classList.toggle('saved',saved);
+    b.setAttribute('aria-pressed',saved?'true':'false');
+    if(b.classList.contains('pub-pill'))b.innerHTML=plBookmarkSvg(saved)+'<span>'+escHtml(saved?tx('plSaved'):tx('plSave'))+'</span>';
+    else b.innerHTML=plBookmarkSvg(saved);
+  }
+}
+function plPillBtn(entry){
+  var saved=plHas(entry.url);
+  var b=document.createElement('button');
+  b.type='button';b.className='pub-pill pl-save'+(saved?' saved':'');
+  b.setAttribute('data-pl-save',entry.url);
+  b.setAttribute('aria-pressed',saved?'true':'false');
+  b.setAttribute('aria-label',tx('plSave'));
+  b.innerHTML=plBookmarkSvg(saved)+'<span>'+escHtml(saved?tx('plSaved'):tx('plSave'))+'</span>';
+  b.addEventListener('click',function(){plToggle(entry);});
+  return b;
+}
+function plIcoBtn(entry){
+  var saved=plHas(entry.url);
+  var b=songIcoBtn(tx('plSave'),plBookmarkSvg(saved));
+  b.classList.add('pl-save');
+  if(saved)b.classList.add('saved');
+  b.setAttribute('data-pl-save',entry.url);
+  b.setAttribute('aria-pressed',saved?'true':'false');
+  b.addEventListener('click',function(){plToggle(entry);});
+  return b;
+}
+/* ---- Playlist playback (one shared element, like History) ---- */
+var plAudio=null,plAudioUrl=null;
+function plAudioGet(){
+  if(!plAudio){
+    plAudio=new Audio();
+    plAudio._miniKeep=true;
+    plAudio.loop=(pubPlayMode==='one');
+    plAudio.addEventListener('play',function(){
+      try{
+        var list=plMiniList(),mit=null;
+        for(var j=0;j<list.length;j++)if(list[j].it.url===plAudioUrl)mit=list[j].it;
+        if(mit)pubMiniSet(plAudio,mit,list);
+      }catch(e){}
+      plPlayerSync();
+    });
+    plAudio.addEventListener('pause',plPlayerSync);
+    plAudio.addEventListener('timeupdate',plPlayerSync);
+    plAudio.addEventListener('loadedmetadata',plPlayerSync);
+    plAudio.addEventListener('ended',function(){
+      plPlayerSync();
+      /* Loop វិលជុំ: the next Playlist song starts by itself
+         and the list wraps around — repeat all, never stops.
+         Shuffle·Next hands over to another song instead. */
+      if(pubPlayMode==='loop')plAdvance(1,false);
+      else if(pubPlayMode==='shuffle')plAdvance(0,true);
+    });
+  }
+  return plAudio;
+}
+function plMiniList(){
+  var au=plAudioGet();
+  return plGet().map(function(x){
+    var mit={id:'pl:'+x.url,type:'song',url:x.url,title:x.title||'',image:x.image||'',name:x.name||''};
+    return {au:au,it:mit,load:function(){plPlay(x);}};
+  });
+}
+function plPlay(entry){
+  if(!entry||!entry.url)return;
+  var au=plAudioGet();
+  if(plAudioUrl===entry.url){
+    if(au.paused){var pr=au.play();if(pr&&pr.catch)pr.catch(function(){});}
+    else au.pause();
+    plPlayerSync();
+    return;
+  }
+  /* One song at a time across the whole app, like everywhere
+     else: starting a Playlist song puts the feed, the Create
+     results and History to sleep. */
+  try{genSongAudios.forEach(function(a){try{a.pause();}catch(e){}});}catch(e){}
+  try{if(histAudio)histAudio.pause();}catch(e){}
+  try{var all=document.querySelectorAll('#pubFeed audio');for(var i=0;i<all.length;i++){try{all[i].pause();}catch(e){}}}catch(e){}
+  plAudioUrl=entry.url;
+  au.src=entry.url;
+  au.loop=(pubPlayMode==='one');
+  var p2=au.play();if(p2&&p2.catch)p2.catch(function(){});
+  plPlayerSync();
+}
+function plAdvance(dir,random){
+  var a=plGet();if(!a.length)return;
+  var idx=-1;
+  for(var i=0;i<a.length;i++)if(a[i].url===plAudioUrl)idx=i;
+  if(idx<0)idx=0;
+  var t=idx;
+  if(random&&a.length>1){do{t=Math.floor(Math.random()*a.length);}while(t===idx);}
+  else t=(idx+dir+a.length)%a.length;
+  if(a[t].url===plAudioUrl){
+    /* A one-song Playlist on Loop: start that same song over. */
+    var au=plAudioGet();
+    try{au.currentTime=0;}catch(e){}
+    var pr=au.play();if(pr&&pr.catch)pr.catch(function(){});
+    return;
+  }
+  plPlay(a[t]);
+}
+function plModeSync(){if(plAudio)plAudio.loop=(pubPlayMode==='one');}
+function plSeek(entry,seek){
+  var au=plAudioGet();
+  if(plAudioUrl!==entry.url){plPlay(entry);return;}
+  if(au.duration&&isFinite(au.duration))au.currentTime=(parseInt(seek.value,10)/1000)*au.duration;
+}
+function plPlayerSync(){
+  var rows=document.querySelectorAll('#plList [data-pl-url]');
+  for(var i=0;i<rows.length;i++){
+    var card=rows[i],url=card.getAttribute('data-pl-url');
+    var play=card.querySelector('.pl-play'),time=card.querySelector('.pl-time'),seek=card.querySelector('.pl-seek'),durEl=card.querySelector('.pl-dur');
+    var active=(url===plAudioUrl&&!!plAudio);
+    var playing=active&&!plAudio.paused&&!plAudio.ended;
+    if(play)play.textContent=playing?'❚❚':'▶';
+    if(time)time.textContent=histFmtTime(active?plAudio.currentTime:0);
+    if(durEl&&active&&plAudio.duration&&isFinite(plAudio.duration))durEl.textContent=histFmtTime(plAudio.duration);
+    if(seek){
+      if(active&&plAudio.duration&&isFinite(plAudio.duration))seek.value=String(Math.round((plAudio.currentTime/plAudio.duration)*1000));
+      else if(!active)seek.value='0';
+    }
+    card.classList.toggle('pl-card-playing',!!playing);
+    card.classList.toggle('np-glow',!!playing);
+  }
+}
+function plRowEl(en){
+  var card=document.createElement('div');
+  card.className='hist-card song-card';
+  card.setAttribute('data-pl-url',en.url);
+  var rowEl=document.createElement('div');
+  rowEl.className='song-row';
+  rowEl.appendChild(songCoverEl({image:en.image},1));
+  var play=document.createElement('button');
+  play.type='button';play.className='song-play pl-play';
+  play.textContent='▶';play.setAttribute('aria-label',tx('histPlay'));
+  play.addEventListener('click',function(){plPlay(en);});
+  rowEl.appendChild(play);
+  var meta=document.createElement('div');
+  meta.className='song-meta';
+  var tt=document.createElement('div');
+  tt.className='song-title';tt.textContent=en.title||'MovAi';tt.title=en.title||'';
+  meta.appendChild(tt);
+  var sub=document.createElement('div');
+  sub.className='song-sub';
+  var time=document.createElement('span');
+  time.className='pl-time';time.textContent='0:00';
+  sub.textContent=(en.name?(en.name+' · '):'')+histFmtDate(en.ts)+' · ';
+  sub.appendChild(time);
+  meta.appendChild(sub);
+  rowEl.appendChild(meta);
+  var dur=document.createElement('span');
+  dur.className='song-dur pl-dur';dur.textContent='0:00';
+  rowEl.appendChild(dur);
+  var rm=songIcoBtn(tx('plRemove'),SONG_SVG_DEL,true);
+  rm.addEventListener('click',function(){plRemove(en.url);});
+  rowEl.appendChild(rm);
+  card.appendChild(rowEl);
+  var seek=document.createElement('input');
+  seek.type='range';seek.className='song-seek pl-seek';seek.min='0';seek.max='1000';seek.value='0';
+  seek.setAttribute('aria-label','Seek');
+  seek.addEventListener('input',function(){plSeek(en,seek);});
+  card.appendChild(seek);
+  /* Duration read from the file's own metadata once, lightly —
+     the same trick the History song cards use. */
+  var mAu=new Audio();
+  mAu.preload='metadata';mAu.src=en.url;
+  mAu.addEventListener('loadedmetadata',function(){
+    if(isFinite(mAu.duration)&&mAu.duration>0&&plAudioUrl!==en.url)dur.textContent=histFmtTime(mAu.duration);
+    try{mAu.removeAttribute('src');mAu.load();}catch(e){}
+  });
+  return card;
+}
+function plRender(){
+  var box=document.getElementById('plList');if(!box)return;
+  var a=plGet();
+  var cnt=document.getElementById('plCount');
+  if(cnt)cnt.textContent=a.length?tx('plCountFmt').replace('{n}',a.length):'';
+  box.innerHTML='';
+  if(!a.length){
+    var p=document.createElement('p');
+    p.style.cssText='color:var(--muted);font-size:0.875rem;line-height:1.7;padding:8px 0 2px';
+    p.textContent=tx('plEmpty');
+    box.appendChild(p);
+  }else{
+    /* Stored newest first — displayed in that same order. */
+    a.forEach(function(en){box.appendChild(plRowEl(en));});
+  }
+  try{pubModeBtnSync();}catch(e){}
+  plPlayerSync();
 }
 /* ===== Real-audio visualizer (owner rule) =====
    The big card's cover bars are driven by a Web Audio
@@ -7352,10 +7743,16 @@ function pubVizReset(){
    screen. Otherwise playback is never touched by any of this —
    the feed's own <audio> element keeps playing; the
    mini-player only mirrors and controls it. */
-var pubMini={au:null,it:null,open:false,timer:null,logoId:null,panelId:null,suppressClick:0};
-function pubMiniSet(au,it){
+var pubMini={au:null,it:null,open:false,timer:null,logoId:null,panelId:null,suppressClick:0,list:null};
+function pubMiniSet(au,it,list){
   if(!au||!it)return;
   pubMini.au=au;pubMini.it=it;
+  /* `list` is the prev/next playlist for songs that do NOT live
+     in the Public feed (Create results / History): entries are
+     {au, it} — or {au, it, load} when one shared element (the
+     History player) must load the target song first. Feed songs
+     pass no list and keep stepping through the feed. */
+  pubMini.list=list||null;
   if(!pubMini.timer)pubMini.timer=setInterval(pubMiniTick,350);
   pubMiniSync();
 }
@@ -7372,7 +7769,28 @@ function pubMiniAway(){
   /* The card is "away" when another view covers the feed, the
      Packages overlay is open, the song's element is gone, or
      its box sits outside the visible band of the screen. */
-  if(typeof APP_VIEW!=='undefined'&&APP_VIEW!=='public')return true;
+  if(typeof APP_VIEW!=='undefined'&&APP_VIEW!=='public'){
+    /* Create results / History songs (owner rule 2026-11-16):
+       the mini-player serves them too — «away» is judged from
+       their own card: off-screen or gone means the floating
+       logo takes over, on-screen means it stays out of the way. */
+    var it0=pubMini.it;if(!it0)return true;
+    var host0=null;
+    var sid=String(it0.id||'');
+    if(sid.indexOf('hist:')===0){try{host0=histCardEl(sid.slice(5));}catch(e){}}
+    else if(sid.indexOf('pl:')===0){try{host0=document.querySelector('#plList [data-pl-url="'+CSS.escape(sid.slice(3))+'"]');}catch(e){}}
+    else if(sid.indexOf('gen:')===0){
+      try{
+        var gi=genSongAudios.indexOf(pubMini.au);
+        var cards=document.querySelectorAll('#genResult .song-card');
+        if(gi>=0&&cards[gi])host0=cards[gi];
+      }catch(e){}
+    }
+    if(!host0)return true;
+    var r0=host0.getBoundingClientRect();
+    var vh0=window.innerHeight||document.documentElement.clientHeight||0;
+    return r0.bottom<70||r0.top>vh0-60;
+  }
   var pk=document.getElementById('page-packages');
   if(pk&&pk.classList.contains('open'))return true;
   var it=pubMini.it;if(!it)return true;
@@ -7471,7 +7889,7 @@ function pubMiniSync(){
 }
 function pubMiniTick(){
   var au=pubMini.au;
-  if(!au||(au.isConnected===false&&au.paused)){
+  if(!au||(au.isConnected===false&&au.paused&&!au._miniKeep)){
     /* The element is gone AND silent — nothing is playing any
        more, so the mini-player lets go of it. An element that
        left the DOM but is STILL PLAYING is kept: a detached
@@ -7491,6 +7909,26 @@ function pubMiniTogglePlay(){
 }
 function pubMiniStep(dir){
   var it=pubMini.it;if(!it)return;
+  /* Create results / History playlist first (owner rule): step
+     inside the list the playing song came from. */
+  if(pubMini.list&&pubMini.list.length>1){
+    var ci=-1;
+    for(var li=0;li<pubMini.list.length;li++){if(pubMini.list[li].au===pubMini.au&&pubMini.list[li].it===pubMini.it){ci=li;break;}}
+    if(ci<0)for(var lj=0;lj<pubMini.list.length;lj++){if(pubMini.list[lj].au===pubMini.au){ci=lj;break;}}
+    if(ci>=0){
+      var tgt=pubMini.list[(ci+dir+pubMini.list.length)%pubMini.list.length];
+      if(tgt&&tgt.it!==pubMini.it){
+        if(typeof tgt.load==='function'){tgt.load();}
+        else if(tgt.au){
+          try{pubMini.au.pause();}catch(e){}
+          try{tgt.au.currentTime=0;}catch(e){}
+          pubMiniSet(tgt.au,tgt.it,pubMini.list);
+          var pr9=tgt.au.play();if(pr9&&pr9.catch)pr9.catch(function(){});
+        }
+      }
+      return;
+    }
+  }
   var list=pubMiniOrderedSongs();
   if(list.length<2)return;
   var idx=-1;
@@ -7515,7 +7953,7 @@ function pubMiniStopAll(){
      pause and reset its button on their own. */
   var au=pubMini.au;
   if(au){try{au.pause();}catch(e){} try{au.currentTime=0;}catch(e){}}
-  pubMini.au=null;pubMini.it=null;pubMini.open=false;
+  pubMini.au=null;pubMini.it=null;pubMini.open=false;pubMini.list=null;
   pubMini.logoId=null;pubMini.panelId=null;
   if(pubMini.timer){clearInterval(pubMini.timer);pubMini.timer=null;}
   var drop=document.getElementById('miniDrop');if(drop)drop.style.display='none';
@@ -7638,12 +8076,14 @@ function pubSongRowEl(it){
   sh.setAttribute('aria-label',tx('pubShare'));
   sh.addEventListener('click',function(){pubSharePost(it,sh);});
   acts.appendChild(sh);
+  acts.appendChild(plPillBtn({url:it.url,title:it.title||'',image:it.image||'',name:pubDisplayName(it)}));
   main.appendChild(acts);
   var au=document.createElement('audio');
   au.src=it.url;au.preload='metadata';au.style.display='none';
   var sync=function(){
     pb.innerHTML=au.paused?pubPlaySvg():pubPauseSvg();
     pb.setAttribute('aria-label',au.paused?'Play':'Pause');
+    row.classList.toggle('np-glow',!au.paused);
   };
   pubWireFeedAudio(au,it,sync);
   pb.addEventListener('click',function(){
@@ -7922,6 +8362,7 @@ function pubCardEl(it){
     ash.setAttribute('aria-label',tx('pubShare'));
     ash.addEventListener('click',function(){pubSharePost(it,ash);});
     arow.appendChild(ash);
+    arow.appendChild(plPillBtn({url:it.url,title:it.title||'',image:it.image||'',name:pubDisplayName(it)}));
     card.appendChild(arow);
     /* Custom player (Music Library style): the big round accent
        Play button overlays the CENTRE of the cover (above); the
@@ -8010,6 +8451,9 @@ function pubCardEl(it){
       /* While playing, the cover carries the dancing rhythm bars
          (visualizer) — they appear and disappear with playback. */
       coverWrap.classList.toggle('playing',!au.paused);
+      /* Now-playing glow: the whole card surface lights up
+         behind the cover while this song plays. */
+      card.classList.toggle('np-glow',!au.paused);
     };
     au.addEventListener('play',function(){
       pubCountView(it.id);
@@ -8336,7 +8780,94 @@ function pubCountView(id){
   try{fetch(PUB_API+'/view',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:id})}).catch(function(){});}catch(e){}
 }
 /* ----- Post to Public sheet ----- */
-function pubSheetClose(){var s=document.getElementById('pubSheet');sheetHideAnim(s);}
+function pubSheetClose(){pubCoverBusyStop();var s=document.getElementById('pubSheet');sheetHideAnim(s);}
+/* ----- Cover 1×1 picker (Post-to-Public sheet, songs only) -----
+   A tappable box ABOVE the Public/Private buttons. Picking an
+   image (≤5 MB) previews it at once as a square 1×1 tile; on
+   post, the file first uploads through PUB_API /upload (kind
+   'image') and the returned URL rides in the post payload as
+   `image` together with aspect '1x1'. No pick = the post keeps
+   the song's existing cover, exactly as before. */
+function pubCoverHtml(item){
+  var imgSvg='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>';
+  var cur=(item&&item.image)||'';
+  var h='<p style="font-size:0.8125rem;font-weight:800;margin:10px 0 6px">'+escHtml(tx('pubCoverLabel'))+'</p>';
+  h+='<button type="button" class="pub-cover-pick" id="pubCoverPickBtn" aria-label="'+escHtml(tx('pubCoverPick'))+'">'
+    +'<img class="pub-cover-prev1" id="pubCoverPrevImg" alt="" style="display:'+(cur?'block':'none')+'"'+(cur?' src="'+escHtml(cur)+'"':'')+'>'
+    +'<span class="pub-cover-none1" id="pubCoverPrevNone" style="display:'+(cur?'none':'flex')+'">'+imgSvg+'</span>'
+    +'<span class="pub-cover-main"><b id="pubCoverPickTitle">'+escHtml(tx('pubCoverPick'))+'</b><span>'+escHtml(tx('pubCoverHint'))+'</span></span>'
+    +'</button>';
+  h+='<button type="button" class="pub-cover-clear" id="pubCoverClearBtn">'+escHtml(tx('pubCoverClear'))+'</button>';
+  return h;
+}
+function pubCoverPreviewSync(){
+  var img=document.getElementById('pubCoverPrevImg');
+  var none=document.getElementById('pubCoverPrevNone');
+  var clear=document.getElementById('pubCoverClearBtn');
+  var title=document.getElementById('pubCoverPickTitle');
+  var src=pubCoverObjUrl||(pubSheetItem&&pubSheetItem.image)||'';
+  if(img){
+    if(src){img.src=src;img.style.display='block';}
+    else{img.style.display='none';img.removeAttribute('src');}
+  }
+  if(none)none.style.display=src?'none':'flex';
+  if(clear)clear.style.display=pubCoverFile?'inline-block':'none';
+  if(title)title.textContent=pubCoverFile?tx('pubCoverChange'):tx('pubCoverPick');
+}
+function pubCoverPicked(inp){
+  var file=inp&&inp.files&&inp.files[0];if(!file)return;
+  var msg=document.getElementById('pubSheetMsg');
+  if(!/^image\//i.test(file.type||'')){
+    if(msg){msg.textContent=tx('pubCoverBadImg');msg.style.color='#f87171';}
+    return;
+  }
+  if(file.size>5*1024*1024){
+    if(msg){msg.textContent=tx('pubCoverTooBig');msg.style.color='#f87171';}
+    return;
+  }
+  if(pubCoverObjUrl){try{URL.revokeObjectURL(pubCoverObjUrl);}catch(e){} pubCoverObjUrl='';}
+  pubCoverFile=file;
+  try{pubCoverObjUrl=URL.createObjectURL(file);}catch(e){pubCoverObjUrl='';}
+  pubCoverPreviewSync();
+  if(msg){msg.textContent=tx('pubCoverSelected');msg.style.color='var(--accent-text)';}
+}
+function pubCoverClear(){
+  if(pubCoverObjUrl){try{URL.revokeObjectURL(pubCoverObjUrl);}catch(e){} pubCoverObjUrl='';}
+  pubCoverFile=null;
+  pubCoverPreviewSync();
+  var msg=document.getElementById('pubSheetMsg');
+  if(msg)msg.textContent='';
+}
+function pubCoverBusyStart(){
+  pubCoverBusyStop();
+  var t0=Date.now();
+  var render=function(){
+    var m=document.getElementById('pubSheetMsg');if(!m)return;
+    var s=Math.floor((Date.now()-t0)/1000);
+    m.textContent=tx('pubCoverUploading')+' · '+s+'s';m.style.color='var(--muted)';
+  };
+  render();
+  pubCoverTick=setInterval(render,500);
+}
+function pubCoverBusyStop(){if(pubCoverTick){clearInterval(pubCoverTick);pubCoverTick=null;}}
+function pubCoverUpload(file){
+  return new Promise(function(resolve,reject){
+    var rd=new FileReader();
+    rd.onerror=function(){reject(new Error('read'));};
+    rd.onload=function(){
+      var b64=String(rd.result||'').split(',')[1]||'';
+      var u=null;try{u=acctCurrent();}catch(e){}
+      fetch(PUB_API+'/upload',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({kind:'image',filename:file.name,data:b64,email:u?u.email:'',userId:(u&&acctValidUserId(u.id))?u.id:''})})
+        .then(function(r){return r.json().catch(function(){return {};});})
+        .then(function(j){
+          if(j&&j.ok&&j.url)resolve(j.url);
+          else reject(new Error((j&&j.error)||'upload'));
+        })
+        .catch(function(e){reject(e);});
+    };
+    rd.readAsDataURL(file);
+  });
+}
 function pubOptBtnsHtml(){
   return '<button type="button" class="kbtn kbtn-black" style="width:100%" onclick="pubDoPost(\'public\')">'+escHtml(tx('pubOptPublic'))+'</button>'
     +'<button type="button" class="kbtn kbtn-white" style="width:100%;margin-top:8px" onclick="pubDoPost(\'private\')">'+escHtml(tx('pubOptPrivate'))+'</button>';
@@ -8354,6 +8885,11 @@ function pubOpenSheet(item){
   if(!item)return;
   pubSheetItem=item;
   pubSheetGenre='';
+  /* Fresh sheet, fresh cover pick: a cover chosen for a previous
+     song must never leak into this post. */
+  pubCoverBusyStop();pubCoverBusy=false;
+  if(pubCoverObjUrl){try{URL.revokeObjectURL(pubCoverObjUrl);}catch(e){} pubCoverObjUrl='';}
+  pubCoverFile=null;
   var u=null;try{u=acctCurrent();}catch(e){}
   var t=document.getElementById('pubSheetItemTitle');
   if(t)t.textContent=item.title||item.prompt||'';
@@ -8386,10 +8922,15 @@ function pubOpenSheet(item){
       });
       h+='</div>';
     }
+    if(!plHit&&item.type==='song')h+=pubCoverHtml(item);
     if(!plHit)h+=pubOptBtnsHtml();
   }
   h+='<p id="pubSheetMsg" style="font-size:0.8125rem;margin-top:10px;min-height:16px;line-height:1.6"></p>';
   body.innerHTML=h;
+  var cb=document.getElementById('pubCoverPickBtn');
+  if(cb)cb.addEventListener('click',function(){var inp=document.getElementById('pubCoverInput');if(inp){inp.value='';inp.click();}});
+  var cl=document.getElementById('pubCoverClearBtn');
+  if(cl)cl.addEventListener('click',pubCoverClear);
   var gp=document.getElementById('pubGenrePick');
   if(gp){
     var gcs=gp.querySelectorAll('[data-genre]');
@@ -8404,6 +8945,41 @@ function pubOpenSheet(item){
   }
   var s=document.getElementById('pubSheet');if(s)sheetShowAnim(s);
 }
+/* The website-logo cover (owner rule 2026-11-16): a song posted
+   with NO picked cover and NO existing cover gets the MovAi logo
+   as its cover automatically — drawn as a square PNG (accent
+   tile, music note + «MovAi», the same mark the song tiles use)
+   and uploaded like any picked cover, so the post carries a
+   real hosted 1×1 cover image. */
+function pubLogoCoverFile(){
+  return new Promise(function(resolve,reject){
+    try{
+      var c=document.createElement('canvas');c.width=640;c.height=640;
+      var x=c.getContext('2d');if(!x){reject(new Error('canvas'));return;}
+      x.fillStyle='#addc29';x.fillRect(0,0,640,640);
+      x.fillStyle='#0d1005';
+      var p=new Path2D('M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z');
+      x.save();x.translate(176,84);x.scale(12,12);x.fill(p);x.restore();
+      x.font='900 96px system-ui,-apple-system,sans-serif';x.textAlign='center';x.textBaseline='middle';
+      x.fillText('MovAi',320,516);
+      var done=function(b){
+        if(!b){reject(new Error('blob'));return;}
+        var f=null;
+        try{f=new File([b],'movai-cover.png',{type:'image/png'});}catch(e){}
+        if(f){resolve(f);return;}
+        try{b.name='movai-cover.png';}catch(e){}
+        resolve(b);
+      };
+      if(c.toBlob)c.toBlob(done,'image/png');
+      else{
+        var bin=atob(c.toDataURL('image/png').split(',')[1]||'');
+        var arr=new Uint8Array(bin.length);
+        for(var i=0;i<bin.length;i++)arr[i]=bin.charCodeAt(i);
+        done(new Blob([arr],{type:'image/png'}));
+      }
+    }catch(e){reject(e);}
+  });
+}
 function pubDoPost(vis){
   var item=pubSheetItem;if(!item)return;
   var u=null;try{u=acctCurrent();}catch(e){}
@@ -8416,6 +8992,46 @@ function pubDoPost(vis){
     if(msg){msg.textContent=tx('pubGenreNeed');msg.style.color='#f87171';}
     return;
   }
+  if(pubCoverBusy)return;
+  /* Cover flow (owner rule 2026-11-16): a cover picked in this
+     sheet uploads FIRST through /api/public/upload (kind
+     'image'); the post then carries its URL as `image` with
+     aspect '1x1'. A failed cover upload stops the post so the
+     user can retry or remove the cover — the song is never
+     posted without the cover they chose. With NO pick: a song
+     that already has a cover posts exactly as before, and a
+     song with no cover at all gets the website-logo cover
+     automatically (if that upload fails, it simply posts
+     without an image, as before). */
+  if(pubCoverFile){
+    pubCoverBusy=true;pubCoverBusyStart();
+    pubCoverUpload(pubCoverFile).then(function(url){
+      pubCoverBusy=false;pubCoverBusyStop();
+      pubDoPostSend(vis,url);
+    }).catch(function(){
+      pubCoverBusy=false;pubCoverBusyStop();
+      if(msg){msg.textContent=tx('pubCoverUploadFail');msg.style.color='#f87171';}
+    });
+    return;
+  }
+  if(item.type==='song'&&!item.image){
+    pubCoverBusy=true;pubCoverBusyStart();
+    pubLogoCoverFile().then(function(f){return pubCoverUpload(f);}).then(function(url){
+      pubCoverBusy=false;pubCoverBusyStop();
+      pubDoPostSend(vis,url);
+    }).catch(function(){
+      pubCoverBusy=false;pubCoverBusyStop();
+      pubDoPostSend(vis,'');
+    });
+    return;
+  }
+  pubDoPostSend(vis,'');
+}
+function pubDoPostSend(vis,coverUrl){
+  var item=pubSheetItem;if(!item)return;
+  var u=null;try{u=acctCurrent();}catch(e){}
+  if(!u){pubSheetClose();loginSheetOpen();return;}
+  var msg=document.getElementById('pubSheetMsg');
   if(msg){msg.textContent=tx('pubPosting');msg.style.color='var(--muted)';}
   var payload={
     email:u.email,
@@ -8429,6 +9045,7 @@ function pubDoPost(vis){
     image:item.image||(item.type==='image'?item.url:''),
     visibility:vis
   };
+  if(coverUrl){payload.image=coverUrl;payload.aspect='1x1';}
   if(item.type==='song')payload.genre=pubSheetGenre;
   fetch(PUB_API+'/post',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)})
     .then(function(r){
@@ -8454,9 +9071,11 @@ function pubDoPost(vis){
           var nit=null;
           try{nit=pubNormItem((data&&(data.post||data.item))||data);}catch(e){}
           if(!nit||nit.url!==payload.url){
-            nit={id:String((data&&(data.id||data.postId))||('lock'+Date.now().toString(36))),name:payload.name||'',email:payload.email||'',premium:false,title:payload.title||'',type:payload.type,url:payload.url,aspect:'',image:payload.image||'',likes:0,dislikes:0,views:0,rank:null,tier:null,liked:false,disliked:false,duration:null,model:'',genre:payload.genre||'',youtube:'',youtubeChannel:'',ts:Date.now()};
+            nit={id:String((data&&(data.id||data.postId))||('lock'+Date.now().toString(36))),name:payload.name||'',email:payload.email||'',premium:false,title:payload.title||'',type:payload.type,url:payload.url,aspect:payload.aspect||'',image:payload.image||'',likes:0,dislikes:0,views:0,rank:null,tier:null,liked:false,disliked:false,duration:null,model:'',genre:payload.genre||'',youtube:'',youtubeChannel:'',ts:Date.now()};
           }
           if(nit.type==='song'&&payload.genre&&!nit.genre)nit.genre=payload.genre;
+          if(nit.type==='song'&&payload.image&&!nit.image)nit.image=payload.image;
+          if(payload.aspect&&!nit.aspect)nit.aspect=payload.aspect;
           pubLockAdd(nit);
         }catch(e){}
       }
@@ -9052,6 +9671,13 @@ function creditChargePool(pool,amount,detail){
   acctUsersSave(us);
   creditGuardSet(pool,before-after);
   creditHistAdd(rec.email,{pool:pool,delta:-(before-after),kind:'song',detail:detail||'',bal:after});
+  /* Bell notice for the charge (owner rule 2026-11-16): the
+     user's own bell gets the deduction at once (red −amount),
+     and the charge event rides the sync below (one-shot
+     `charge`, the giftClaimed pattern) so the server can raise
+     the Admin's bell notice naming this account. */
+  try{localNotifAdd(rec.email,{type:'deduct',title:tx('notifGenCharge')+(detail?' · '+detail:''),body:tx('histBalanceAfter')+' '+acctFmtBal(after)+' '+(pool==='song'?tx('acctSongCredit'):tx('acctMediaCredit')),media:pool==='media'?(before-after):null,song:pool==='song'?(before-after):null});}catch(e){}
+  try{acctSyncChargeFlag={pool:pool,amount:before-after,detail:detail||'',bal:after,ts:Date.now()};}catch(e){}
   try{acctRender();}catch(e){}
   try{acctAdminSync();}catch(e){}
   return '−'+acctFmtBal(before-after)+' '+(pool==='song'?tx('acctSongCredit'):tx('acctMediaCredit'))+' · '+tx('histBalanceAfter')+' '+acctFmtBal(after);
@@ -9063,6 +9689,11 @@ function creditHistSyncDelta(email,pool,delta,balAfter){
   if(!email||!delta)return;
   if(creditGuardHit(pool,delta))return;
   creditHistAdd(email,{pool:pool,delta:delta,kind:delta>0?'topup':'admindeduct',bal:balAfter});
+  /* Bell notice (owner rule 2026-11-16): an Admin grant / top-up
+     lands in the user's bell in green, an Admin deduction in
+     red — merged against the server's own notices so it never
+     shows twice. */
+  try{localNotifAdd(email,{type:delta>0?'grant':'deduct',title:'',body:tx('histBalanceAfter')+' '+acctFmtBal(Math.max(0,Math.round(balAfter||0)))+' '+(pool==='song'?tx('acctSongCredit'):tx('acctMediaCredit')),media:pool==='media'?Math.abs(delta):null,song:pool==='song'?Math.abs(delta):null});}catch(e){}
 }
 function creditHistLabel(e){
   if(e.kind==='song')return tx('histSong')+(e.detail?' · '+e.detail:'');
@@ -9073,10 +9704,12 @@ function creditHistLabel(e){
 function creditHistHtml(email){
   var list=creditHistGet(email);
   if(!list.length)return '<p style="font-size:0.8125rem;color:var(--muted);margin-top:8px;line-height:1.6">'+escHtml(tx('histEmpty'))+'</p>';
-  var h='';
+  var h='<div class="credit-hist-scroll">';
   list.slice(0,40).forEach(function(e){
     var pos=e.delta>0;
-    var c=pos?'#4ade80':'#fb923c';
+    /* Owner rule 2026-11-16: credit IN is green, credit OUT
+       (charged / deducted) is red. */
+    var c=pos?'#4ade80':'#f87171';
     var poolC=e.pool==='song'?'#ADDC29':'#b537f2';
     var poolName=e.pool==='song'?tx('acctSongCredit'):tx('acctMediaCredit');
     var when='';try{when=new Date(e.t).toLocaleString();}catch(err){}
@@ -9088,7 +9721,7 @@ function creditHistHtml(email){
     h+='<span style="display:block;font-size:0.6875rem;color:var(--muted);margin-top:1px">'+escHtml(tx('histBalanceAfter'))+' '+acctFmtBal(e.bal)+'</span></span>';
     h+='</div>';
   });
-  return h;
+  return h+'</div>';
 }
 /* Tapping a balance row buys more of that pool: close whatever
    account surface is open and show the Packages sheet already on
@@ -9125,6 +9758,12 @@ var acctSyncBusy=false;
    Admin. acctAdminPayload consumes (clears) it, so ordinary syncs
    never send it. */
 var acctSyncGiftFlag=false;
+/* One-shot flag: set by creditChargePool so the sync that follows
+   a generation charge carries `charge` — the server then creates
+   the Admin's bell notification for the charge (naming the
+   account) alongside the user's own. Consumed by
+   acctAdminPayload, so ordinary syncs never send it. */
+var acctSyncChargeFlag=null;
 function acctSyncPlanCopy(p){
   if(!p||!p.id)return null;
   return {id:p.id,until:p.until||0};
@@ -9146,6 +9785,7 @@ function acctAdminPayload(u){
     songPlan:songPlan
   };
   if(acctSyncGiftFlag){payload.giftClaimed=true;acctSyncGiftFlag=false;}
+  if(acctSyncChargeFlag){payload.charge=acctSyncChargeFlag;acctSyncChargeFlag=null;}
   return payload;
 }
 function acctSrvNum(v){
@@ -9696,6 +10336,72 @@ function notifBellRing(){
   bell.classList.add('ringing');
   setTimeout(function(){try{bell.classList.remove('ringing');}catch(e){}},2900);
 }
+/* ===== Local bell notices for credit movements (owner rule
+   2026-11-16) =====
+   A generation charge (creditChargePool) and a balance change
+   landed from the server (creditHistSyncDelta — Admin grant /
+   package top-up / Admin deduction) ALSO raise a notice in the
+   account's own bell at once: the charge in red, the grant in
+   green. They are kept per account on this device
+   ('movai-local-notif-<email>') and merged into the bell list on
+   every server load — de-duplicated against server notices and
+   each other by type + pool amounts + a 10-minute window, so a
+   movement the server also reports never shows twice. The
+   charge additionally rides the account sync payload (one-shot
+   `charge`, the giftClaimed pattern) so the server can raise
+   the Admin's own bell notice naming the account. */
+function localNotifKey(email){return 'movai-local-notif-'+String(email||'').trim().toLowerCase();}
+function localNotifGet(email){
+  try{var a=JSON.parse(localStorage.getItem(localNotifKey(email))||'[]');return Array.isArray(a)?a:[];}catch(e){return [];}
+}
+function localNotifSave(email,a){
+  try{localStorage.setItem(localNotifKey(email),JSON.stringify((a||[]).slice(0,50)));}catch(e){}
+}
+function localNotifSame(a,b){
+  return !!(a&&b&&a.type===b.type&&(a.media||null)===(b.media||null)&&(a.song||null)===(b.song||null)&&Math.abs((a.ts||0)-(b.ts||0))<=600000);
+}
+function localNotifMerge(serverList){
+  var u=null;try{u=acctCurrent();}catch(e){}
+  if(!u||!u.email)return serverList;
+  var locals=localNotifGet(u.email);
+  if(!locals.length)return serverList;
+  var out=serverList.slice();
+  for(var i=0;i<locals.length;i++){
+    var dup=false;
+    for(var j=0;j<out.length;j++){if(localNotifSame(locals[i],out[j])){dup=true;break;}}
+    if(!dup)out.push(locals[i]);
+  }
+  out.sort(function(a,b){return b.ts-a.ts;});
+  return out;
+}
+function localNotifAdd(email,entry){
+  if(!email||!entry)return;
+  var n={
+    id:'loc'+Date.now().toString(36)+Math.floor(Math.random()*1e6).toString(36),
+    type:entry.type||'info',dtype:'local',
+    title:entry.title||'',body:entry.body||'',
+    ts:Date.now(),read:false,
+    media:(entry.media!=null?entry.media:null),song:(entry.song!=null?entry.song:null),pkg:'',
+    dName:'',dEmail:'',dId:'',dIp:'',dModel:''
+  };
+  var a=localNotifGet(email);
+  for(var i=0;i<a.length;i++){if(localNotifSame(n,a[i]))return;}
+  a.unshift(n);localNotifSave(email,a);
+  var u=null;try{u=acctCurrent();}catch(e){}
+  if(u&&u.email&&String(u.email).trim().toLowerCase()===String(email).trim().toLowerCase()){
+    var dup=false;
+    for(var j=0;j<notifItems.length;j++){if(localNotifSame(n,notifItems[j])){dup=true;break;}}
+    if(!dup){notifItems.unshift(n);notifRenderAll();notifBellRing();}
+  }
+}
+function localNotifMarkRead(id){
+  if(String(id).indexOf('loc')!==0)return;
+  var u=null;try{u=acctCurrent();}catch(e){}
+  if(!u||!u.email)return;
+  var a=localNotifGet(u.email),ch=false;
+  for(var i=0;i<a.length;i++){if(a[i].id===id&&!a[i].read){a[i].read=true;ch=true;}}
+  if(ch)localNotifSave(u.email,a);
+}
 function notifIsArr(v){return Object.prototype.toString.call(v)==='[object Array]';}
 function notifArr(data){
   if(!data)return [];
@@ -9789,8 +10495,8 @@ function notifIcon(n){
   else if(n.type==='rejected'){c='#f87171';bg='rgba(248,113,113,.13)';path='<circle cx="12" cy="12" r="9"/><path d="M9 9l6 6M15 9l-6 6"/>';}
   else if(n.type==='login'){c='#60a5fa';bg='rgba(96,165,250,.14)';path='<circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 3.6-6.5 8-6.5s8 2.5 8 6.5"/>';}
   else if(n.type==='request'){c='#facc15';bg='rgba(250,204,21,.13)';path='<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>';}
-  else if(n.type==='grant'){c='#c084fc';bg='rgba(181,55,242,.15)';path='<circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/>';}
-  else if(n.type==='deduct'){c='#fb923c';bg='rgba(251,146,60,.14)';path='<circle cx="12" cy="12" r="9"/><path d="M8 12h8"/>';}
+  else if(n.type==='grant'){c='#4ade80';bg='rgba(74,222,128,.13)';path='<circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/>';}
+  else if(n.type==='deduct'){c='#f87171';bg='rgba(248,113,113,.14)';path='<circle cx="12" cy="12" r="9"/><path d="M8 12h8"/>';}
   else{c='#9a9ea6';bg='rgba(154,158,166,.14)';path='<path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/>';}
   return '<span class="notif-ico" style="background:'+bg+';color:'+c+'"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+path+'</svg></span>';
 }
@@ -9925,7 +10631,9 @@ function notifItemHtml(n,i){
   h+='<span class="notif-main"><span class="nt">'+escHtml(n.title||notifDefTitle(n))+'</span>';
   if(n.body)h+='<span class="nb">'+escHtml(n.body)+'</span>';
   var amt=notifAmountLine(n);
-  if(amt)h+='<span class="nb notif-amt">'+escHtml(amt)+'</span>';
+  /* Owner rule 2026-11-16: credit OUT shows red, credit IN
+     shows green — in the bell just like in the History. */
+  if(amt){var amtC=(n.type==='deduct')?'#f87171':((n.type==='grant'||n.type==='gift'||n.type==='approved')?'#4ade80':'');h+='<span class="nb notif-amt"'+(amtC?' style="color:'+amtC+';font-weight:800"':'')+'>'+escHtml(amt)+'</span>';}
   var t=notifTimeStr(n.ts);
   if(t)h+='<span class="ntime">'+escHtml(t)+'</span>';
   h+='</span>';
@@ -9982,7 +10690,7 @@ function notifLoad(){
     for(var pi=0;pi<notifItems.length;pi++)if(notifItems[pi].type==='post')prevPost[notifItems[pi].id]=true;
     var ringNew=false;
     for(var qi=0;qi<out.length;qi++){var on2=out[qi];if(on2.type==='post'&&!on2.read&&!prevPost[on2.id]&&!notifRungPostIds[on2.id]){notifRungPostIds[on2.id]=true;ringNew=true;}}
-    notifItems=out;notifLoaded=true;
+    notifItems=localNotifMerge(out);notifLoaded=true;
     notifRenderAll();
     if(ringNew)notifBellRing();
   }).catch(function(){if(timer)clearTimeout(timer);notifBusy=false;});
@@ -10006,7 +10714,7 @@ function notifMarkReadSrv(id){
 function notifItemClick(i){
   var n=notifItems[i];if(!n)return;
   var u=null;try{u=acctCurrent();}catch(e){}
-  if(!n.read){n.read=true;notifReadIds[n.id]=true;notifRenderAll();notifMarkReadSrv(n.id);}
+  if(!n.read){n.read=true;notifReadIds[n.id]=true;try{localNotifMarkRead(n.id);}catch(e){}notifRenderAll();notifMarkReadSrv(n.id);}
   /* Tapping also GOES to the place the notification is about (not
      just mark-read): a sign-in notice opens the Profile sheet; a
      purchase approved / rejected / new purchase request opens
@@ -10422,7 +11130,10 @@ function acctMarkMh(entry){
      have skipped their layout while they were hidden).
    - Looping animations (blur melt, song-cover pulse, glow dots)
      pause while their own element is off-screen (animWatch).
-   - When the whole tab is hidden, every player pauses.
+   - When the whole tab is hidden, VIDEOS pause; songs keep
+     playing under the mini-player's control (owner rule
+     2026-11-16 — playback never stops on scroll / view / tab
+     changes).
    Generation polling and progress timers are deliberately NOT
    touched here: they belong to work the user started, and each one
    already stops itself the moment that work finishes. */
@@ -10445,13 +11156,17 @@ function animWatchScan(root){
   var els=(root||document).querySelectorAll('.blur-fill,.song-cover-solid.creating,.pglow');
   for(var i=0;i<els.length;i++)animWatch(els[i]);
 }
+/* Owner rule 2026-11-16 (bug fix): a song that is playing must
+   KEEP playing — scrolling up/down, switching views, switching
+   creation mode, or the tab losing visibility must NEVER pause
+   it. The floating mini-player is the user's control for it
+   (play/pause, seek, Stop, ✕). These two functions therefore
+   pause VIDEOS only; song audios are deliberately left alone. */
 function pauseGenPlayers(){
-  try{genSongAudios.forEach(function(a){try{a.pause();}catch(e){}});}catch(e){}
   var vids=document.querySelectorAll('#genResult video');
   for(var i=0;i<vids.length;i++){try{vids[i].pause();}catch(e){}}
 }
 function pauseHistPlayers(){
-  if(histAudio){try{histAudio.pause();}catch(e){}try{histPlayerSync();}catch(e){}}
   var vids=document.querySelectorAll('#page-history video');
   for(var i=0;i<vids.length;i++){try{vids[i].pause();}catch(e){}}
 }
@@ -10464,7 +11179,10 @@ function histWatchInit(){
       if(es[i].target!==sec)continue;
       histVisible=es[i].isIntersecting;
       sec.classList.toggle('hist-off',!histVisible);
-      if(!histVisible){pauseHistPlayers();continue;}
+      /* Scrolling away from History must NOT stop a playing
+         song (owner rule 2026-11-16) — no pausing here at all;
+         the mini-player takes over while the card is away. */
+      if(!histVisible)continue;
       HIST_TYPES.forEach(function(t){
         var box=document.getElementById('histList-'+t);if(!box)return;
         if(box.classList.contains('hist-carousel')){histCarouselCenter(box);histCarouselActive(box);}

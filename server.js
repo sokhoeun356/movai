@@ -516,6 +516,16 @@ async function deductForGeneration(email, mediaCost, songCost, reason) {
     saveUsers(users);
     await ghFlushFile(USERS_FILE);
     logGrant({ email: em, credits: -mCost, songCredits: -sCost, note: reason || 'generation', at: u.updatedAt });
+    // Admin bell: every generation deduction is visible to the Admin
+    // immediately (account + amount), and to the user in their own bell.
+    // The website also raises a local bell notice instantly; this is the
+    // durable server-side one the Admin app reads.
+    try {
+      const _parts = [];
+      if (mCost > 0) _parts.push('-' + mCost + ' Image.Video');
+      if (sCost > 0) _parts.push('-' + sCost + ' Song');
+      addNotification('deduct', em, '➖ កាត់ Credit · ' + (u.name || em), _parts.join(' · ') + ' — ' + (reason || 'generation') + ' · នៅសល់ ' + Math.floor(numOr(u.credits, 0)) + ' Image.Video / ' + Math.floor(numOr(u.songCredits, 0)) + ' Song');
+    } catch (e) {}
   }
   return { ok: true, credits: Math.floor(numOr(u.credits, 0)), songCredits: Math.floor(numOr(u.songCredits, 0)) };
 }
