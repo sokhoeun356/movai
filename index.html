@@ -635,6 +635,31 @@ html[data-mode="light"] .btn-free{color:#63910c}
 .pub-genre-pick{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px}
 .pub-genre-opt{padding:8px 13px;border-radius:999px;border:1px solid var(--line2);background:transparent;color:var(--muted);font-family:inherit;font-size:0.8125rem;font-weight:800;cursor:pointer;min-height:38px;white-space:nowrap}
 .pub-genre-opt.on{background:var(--accent-fill);color:#0d1005;border-color:transparent}
+/* ===== Post-your-own-song flow (Create → «ផុស», owner rule
+   2026-11-16) =====
+   The «＋ ផុស» button in the Create modes row, the two source
+   options (MP3 from the phone / a song made in this website),
+   the History picker rows and the cover preview in the details
+   form. Daily limits: Free 5/day, package holders 20/day,
+   Admin unlimited (see postLimitInfo). */
+.kbtn-post{background:var(--accent-fill);color:#0d1005;border-color:transparent;font-weight:800}
+.post-opt{display:flex;align-items:center;gap:12px;width:100%;text-align:left;background:var(--card2);border:1px solid var(--line2);border-radius:14px;padding:13px 14px;color:var(--text);font-family:inherit;cursor:pointer;margin-top:10px;-webkit-tap-highlight-color:transparent}
+.post-opt:active{opacity:.85}
+.post-opt:disabled{opacity:.45;cursor:not-allowed}
+.post-opt-ico{flex:0 0 auto;width:42px;height:42px;border-radius:50%;background:rgba(var(--accent-rgb),.16);color:var(--accent-text);display:flex;align-items:center;justify-content:center}
+.post-opt-ico svg{width:21px;height:21px;display:block}
+.post-opt-main{flex:1 1 auto;min-width:0}
+.post-opt-main b{display:block;font-size:0.9375rem;font-weight:800;line-height:1.45}
+.post-opt-main span{display:block;font-size:0.75rem;font-weight:600;color:var(--muted);line-height:1.5;margin-top:1px}
+.post-pick-row{display:flex;align-items:center;gap:10px;width:100%;text-align:left;background:var(--card2);border:1px solid var(--line);border-radius:12px;padding:10px 12px;color:var(--text);font-family:inherit;cursor:pointer;margin-top:8px;-webkit-tap-highlight-color:transparent}
+.post-pick-row:active{opacity:.85}
+.post-pick-main{flex:1 1 auto;min-width:0}
+.post-pick-title{font-weight:800;font-size:0.875rem;line-height:1.45;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.post-pick-tag{flex:0 0 auto;font-size:0.625rem;font-weight:800;color:var(--accent-text);border:1px solid var(--line2);border-radius:999px;padding:2px 8px;white-space:nowrap}
+.post-cover-row{display:flex;align-items:center;gap:12px;margin:4px 0 12px}
+.post-cover-prev{width:84px;height:84px;border-radius:12px;object-fit:cover;background:#000;border:1px solid var(--line);flex:0 0 auto}
+.post-cover-none{width:84px;height:84px;border-radius:12px;background:var(--card2);border:1px solid var(--line);color:var(--muted);display:flex;align-items:center;justify-content:center;flex:0 0 auto}
+.post-cover-none svg{width:30px;height:30px}
 /* ===== Public Follow — inside the Admin's post cards =====
    There is NO floating follow circle in the Public panel (owner
    rule). Instead, every Admin post card carries a Follow pill
@@ -762,23 +787,23 @@ html[data-mode="light"] .btn-free{color:#63910c}
 .pub-mini-title{font-weight:800;font-size:0.75rem;line-height:1.4;margin:7px 0 0;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 /* ===== Song feed — top carousel + numbered rows (owner layout
    2026-11-16) =====
-   The NEWEST song leads in the CENTRE as the big card; the
-   older songs sit beside it (right, then left as you swipe) in
-   a horizontally swipeable carousel — swipe right-to-left to
-   move through them. Under the carousel the remaining songs
-   are compact NUMBERED rows (#1 = the newest song overall) in
-   the normal vertical page scroll, each row carrying the same
-   views + Like + Dislike + Share as the big card. */
+   The NEWEST song leads as the first BIG card; the older songs
+   sit beside it (to the right as you swipe) as BIG cards of
+   the SAME size — the carousel is all big cards, like flipping
+   through photos, never small side cards. Under the carousel
+   the remaining songs are compact NUMBERED rows (#1 = the
+   newest song overall) in the normal vertical page scroll,
+   each row carrying the same views + Like + Dislike + Share
+   as the big card. */
 .pub-carousel{display:flex;gap:12px;overflow-x:auto;scroll-snap-type:x mandatory;padding:6px 8% 10px;margin-top:2px;-webkit-overflow-scrolling:touch;scrollbar-width:none}
 .pub-carousel::-webkit-scrollbar{display:none}
 .pub-slide{flex:0 0 100%;scroll-snap-align:center;min-width:0}
 .pub-slide .pub-card{margin-top:0}
-/* Small side cards in the carousel, beside the one big #1 card */
-.pub-slide-mini{flex:0 0 auto;scroll-snap-align:center;align-self:flex-start;min-width:0}
 .pub-row-rank{flex:0 0 auto;min-width:28px;text-align:center;font-size:0.8125rem;font-weight:900;color:var(--accent-text);font-variant-numeric:tabular-nums}
 .pub-songrow{align-items:flex-start}
-.pub-row-acts{display:flex;gap:6px;margin-top:6px;align-items:center;flex-wrap:wrap}
-.pub-row-acts .pub-pill,.pub-row-acts .pub-act{flex:0 0 auto;min-height:28px;padding:4px 10px;font-size:0.6875rem;gap:5px;border-width:1px}
+.pub-row-acts{display:flex;gap:4px;margin-top:5px;align-items:center;flex-wrap:nowrap}
+.pub-row-acts .pub-pill,.pub-row-acts .pub-act{flex:0 0 auto;min-height:24px;padding:2px 7px;font-size:0.625rem;gap:3px;border-width:1px}
+.pub-row-acts svg{width:12px;height:12px;flex:0 0 auto}
 /* ===== Floating mini-player (owner rule 2026-11-16) =====
    While a Public song plays, if the user taps away — another
    view, the Create page, Packages, or simply scrolls the song
@@ -787,12 +812,24 @@ html[data-mode="light"] .btn-free{color:#63910c}
    anywhere on the screen and the song keeps playing untouched
    underneath whatever the user does. Tapping the logo opens
    the expanded player (cover, title, seek bar, time, stop /
-   previous / next); its ✕ collapses it back into the logo. */
-.mini-logo{position:fixed;right:16px;bottom:calc(100px + env(safe-area-inset-bottom,0px));z-index:56;width:56px;height:56px;border-radius:50%;border:2px solid rgba(var(--accent-rgb),.65);background:var(--card);color:var(--accent-text);padding:0;cursor:pointer;overflow:hidden;box-shadow:0 10px 26px rgba(0,0,0,.45);-webkit-tap-highlight-color:transparent;touch-action:none;align-items:center;justify-content:center}
-.mini-logo img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block}
-.mini-logo-fallback{display:flex;align-items:center;justify-content:center;width:100%;height:100%;background:var(--accent-fill);color:#0d1005}
+   previous / next); its ✕ collapses it back into the logo.
+   The logo is DISMISSABLE (owner rule 2026-11-16): a small ✕
+   badge sits on its top-right corner — tapping it stops the
+   song completely and the logo disappears. While DRAGGING the
+   logo, a ✕ drop zone appears at the bottom of the screen;
+   dropping the logo onto it does the same full stop. The
+   expanded panel also carries a ⏹ Stop button with the same
+   full-stop behaviour. */
+.mini-logo{position:fixed;right:16px;bottom:calc(100px + env(safe-area-inset-bottom,0px));z-index:56;width:56px;height:56px;border-radius:50%;border:2px solid rgba(var(--accent-rgb),.65);background:var(--card);color:var(--accent-text);padding:0;cursor:pointer;box-shadow:0 10px 26px rgba(0,0,0,.45);-webkit-tap-highlight-color:transparent;touch-action:none;align-items:center;justify-content:center}
+.mini-logo img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block;border-radius:50%}
+.mini-logo-fallback{display:flex;align-items:center;justify-content:center;width:100%;height:100%;background:var(--accent-fill);color:#0d1005;border-radius:50%}
 .mini-logo-state{position:absolute;right:0;bottom:0;width:20px;height:20px;border-radius:50%;background:rgba(0,0,0,.72);color:#fff;display:flex;align-items:center;justify-content:center;pointer-events:none}
 .mini-logo-state svg{width:11px;height:11px;display:block}
+.mini-logo-x{position:absolute;top:-5px;right:-5px;width:22px;height:22px;border-radius:50%;background:#e5484d;color:#fff;font-size:0.6875rem;font-weight:900;line-height:1;display:flex;align-items:center;justify-content:center;border:2px solid rgba(0,0,0,.55);box-shadow:0 3px 8px rgba(0,0,0,.45);cursor:pointer;z-index:2}
+.mini-logo-x:active{opacity:.8}
+.mini-drop{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(182px + env(safe-area-inset-bottom,0px));z-index:57;display:flex;align-items:center;gap:8px;background:rgba(20,20,20,.92);color:#fff;border:1.5px dashed rgba(255,255,255,.55);border-radius:999px;padding:11px 18px;font-size:0.8125rem;font-weight:800;box-shadow:0 12px 30px rgba(0,0,0,.5);pointer-events:none;white-space:nowrap}
+.mini-drop.over{background:#e5484d;border-color:#fff;border-style:solid}
+.mini-drop .mini-drop-x{font-size:0.9375rem;font-weight:900;line-height:1}
 .mini-logo.playing::after{content:'';position:absolute;inset:-2px;border-radius:50%;border:2px solid rgba(var(--accent-rgb),.55);animation:miniPulse 1.6s ease-out infinite;pointer-events:none}
 @keyframes miniPulse{0%{transform:scale(.92);opacity:.9}70%{transform:scale(1.18);opacity:0}100%{transform:scale(1.18);opacity:0}}
 @media (prefers-reduced-motion:reduce){.mini-logo.playing::after{animation:none}}
@@ -1338,6 +1375,7 @@ html[data-smooth="1"] .brand-frame,html[data-smooth="1"] .acct-chip,html[data-sm
           <button class="kbtn kbtn-white" id="genTabVid" onclick="genSetMode('video')" data-i18n="tabVideo">វីដេអូ</button>
           <button class="kbtn kbtn-white" id="genTab3d" onclick="genSetMode('3d')">3D Design</button>
           <button class="kbtn kbtn-white" id="genTabSong" onclick="genSetMode('song')" data-i18n="tabSong">បទចម្រៀង</button>
+          <button class="kbtn kbtn-post" id="genTabPost" onclick="postFlowOpen()" data-i18n="postBtn">＋ ផុស · Post</button>
         </div>
         <div id="genProviderWrap">
           <button type="button" class="input" id="genProviderField" onclick="genToggleProviders()" style="display:none;justify-content:space-between;align-items:center;gap:10px;cursor:pointer;text-align:left;width:100%">
@@ -1603,6 +1641,23 @@ html[data-smooth="1"] .brand-frame,html[data-smooth="1"] .acct-chip,html[data-sm
     <div id="pubSheetBody" style="margin-top:6px"></div>
   </div>
 </div>
+<!-- Post-your-own-song sheet (owner rule 2026-11-16): opened by
+     the «＋ ផុស» button in Create. Step 1 offers two sources —
+     an MP3 from the phone, or a song the user created in this
+     website (picked from History). Step 2 is the details form:
+     title, cover image, style/Genre (Admin also picks the post
+     type: Song / Promotion / Service / Other), then «ផុស». -->
+<div id="postSheet" class="pkg-sheet" style="display:none" role="dialog" aria-modal="true" onclick="if(event.target===this)postFlowClose()">
+  <div class="pkg-sheet-card">
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:10px">
+      <h3 style="font-size:1.0625rem;font-weight:800" data-i18n="postFlowTitle">ផុសបទចម្រៀង · Post a song</h3>
+      <button type="button" class="drawer-close" style="background:var(--card2);color:var(--text);border-color:var(--line2)" onclick="postFlowClose()" aria-label="Close">✕</button>
+    </div>
+    <div id="postSheetBody" style="margin-top:8px"></div>
+  </div>
+</div>
+<input type="file" id="postMp3Input" accept="audio/*,.mp3,.wav,.ogg,.m4a" style="display:none" onchange="postFlowMp3Picked(this)">
+<input type="file" id="postCoverInput" accept="image/*" style="display:none" onchange="postFlowCoverPicked(this)">
 <div id="loginSheet" class="pkg-sheet" style="display:none" role="dialog" aria-modal="true" onclick="if(event.target===this)loginSheetClose()">
   <div class="pkg-sheet-card">
     <div class="login-brand" aria-hidden="true"><span class="login-brand-name">Mov<span>Ai</span></span><span class="login-brand-credit"><b>YEM SOKHOEUN</b><i>Create by Owner</i></span></div>
@@ -1697,9 +1752,13 @@ html[data-smooth="1"] .brand-frame,html[data-smooth="1"] .acct-chip,html[data-sm
      song plays and its card is out of sight (another view, or
      scrolled away), this round logo floats like the chat button
      and can be dragged anywhere; tapping it opens the expanded
-     player below; the ✕ collapses the player back to the logo.
-     The song itself never stops while the user works elsewhere. -->
+     player below; the panel ✕ collapses the player back to the
+     logo. The logo carries its own ✕ badge (top-right corner):
+     tapping it — or dragging the logo onto the ✕ drop zone that
+     appears while dragging — stops the song completely and the
+     logo disappears; it never has to stay stuck on screen. -->
 <button type="button" class="mini-logo" id="miniLogo" style="display:none" aria-label="បទកំពុងចាក់ · Now playing"></button>
+<div class="mini-drop" id="miniDrop" style="display:none" aria-hidden="true"><span class="mini-drop-x">✕</span><span>ទម្លាក់ទីនេះដើម្បីឈប់ចាក់ · Drop here to stop</span></div>
 <div class="mini-panel" id="miniPanel" style="display:none" role="dialog" aria-label="កម្មវិធីចាក់បទ · Song player">
   <div class="mini-head">
     <span id="miniThumbWrap" style="display:contents"></span>
@@ -1719,6 +1778,7 @@ html[data-smooth="1"] .brand-frame,html[data-smooth="1"] .acct-chip,html[data-sm
     <button type="button" class="mini-cbtn" id="miniPrev" aria-label="បទមុន · Previous"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M6.5 5h2.4v14H6.5z"/><path d="M18.8 5.3v13.4c0 .72-.8 1.17-1.42.79L9.6 12.8a1.04 1.04 0 0 1 0-1.6l7.78-6.69c.62-.38 1.42.07 1.42.79z"/></svg></button>
     <button type="button" class="mini-cbtn mini-play" id="miniPlayBtn" aria-label="Play / Pause"></button>
     <button type="button" class="mini-cbtn" id="miniNext" aria-label="បទបន្ទាប់ · Next"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M15.1 5h2.4v14h-2.4z"/><path d="M5.2 5.3v13.4c0 .72.8 1.17 1.42.79l7.78-6.69a1.04 1.04 0 0 0 0-1.6L6.62 4.51A1.02 1.02 0 0 0 5.2 5.3z"/></svg></button>
+    <button type="button" class="mini-cbtn" id="miniStop" aria-label="ឈប់ចាក់ និងបិទ · Stop & close"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="6" y="6" width="12" height="12" rx="2"/></svg></button>
   </div>
 </div>
 <button type="button" class="chat-fab" id="chatFab" onclick="aiChatToggle()" aria-label="AI Chat · ឆាតជាមួយ AI" aria-expanded="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 7V3"/><circle cx="12" cy="2.4" r="0.6" fill="currentColor"/><rect x="4.5" y="7" width="15" height="11.5" rx="3.5"/><path d="M2.5 12.5v2"/><path d="M21.5 12.5v2"/><circle class="chat-fab-eye" cx="9.3" cy="12.3" r="0.4" fill="currentColor"/><circle class="chat-fab-eye" cx="14.7" cy="12.3" r="0.4" fill="currentColor"/><path d="M9.8 15.6c.7.6 1.4.9 2.2.9s1.5-.3 2.2-.9"/></svg></button>
@@ -1804,6 +1864,18 @@ km:{
  pubTypeSong:'បទចម្រៀង',pubTypeImage:'រូបភាព',pubTypeVideo:'វីដេអូ',pubType3d:'3D',
  pubSongId:'ID បទចម្រៀង',pubDuration:'រយៈពេល',pubModel:'Model',pubPostedDate:'ថ្ងៃផុស',pubPostedBy:'អ្នកផុស',pubGenre:'ប្រភេទ',
  pubGenreAll:'ទាំងអស់ · All',pubGenrePick:'ជ្រើសរើសស្ទាយបទ · Style',pubGenreNeed:'សូមជ្រើសរើសស្ទាយបទជាមុនសិន ទើបផុសទៅ Public បាន',
+ postBtn:'＋ ផុស · Post',postFlowTitle:'ផុសបទចម្រៀង · Post a song',
+ postOwn:'ផុសបទផ្ទាល់ខ្លួន',postOwnSub:'ជ្រើស MP3 ពីទូរសព្ទរបស់អ្នក',
+ postWeb:'ផុសបទដែលបង្កើតក្នុង website',postWebSub:'ជ្រើសបទពី History របស់អ្នក',
+ postPickWeb:'ជ្រើសបទពី History',postNoSongs:'មិនទាន់មានបទក្នុង History ទេ — សូមបង្កើតបទមួយជាមុនសិន',
+ postTitleLabel:'ចំណងជើងបទ · Title',postCoverLabel:'រូប Cover · Cover image',postCoverPick:'ជ្រើសរូប Cover',
+ postKindLabel:'ប្រភេទផុស · Post type',postKindSong:'បទចម្រៀង · Song',postKindPromo:'Promotion',postKindService:'សេវាកម្ម · Service',postKindOther:'ផ្សេងៗ · Other',
+ postBack:'ថយក្រោយ · Back',postDo:'ផុស · Post',postAlready:'បានផុសហើយ',
+ postLimitInfo:'ថ្ងៃនេះអ្នកផុសបាន {n}/{m} បទ',postLimitAdmin:'Admin — ផុសបានច្រើនគ្មានកំណត់',
+ postLimitHit:'អ្នកផុសគ្រប់ចំនួនថ្ងៃនេះហើយ ({m} បទ/ថ្ងៃ) — ទិញកញ្ចប់ដើម្បីផុសបានច្រើនជាង ឬរង់ចាំដល់ថ្ងៃស្អែក',
+ postUploading:'កំពុង upload',postPosting:'កំពុងផុស',postFileBig:'ឯកសារធំពេក (MP3 អតិបរមា 15MB · រូបភាព 5MB)',
+ postBadFile:'សូមជ្រើសឯកសារ MP3 / audio',postNeedTitle:'សូមដាក់ចំណងជើងបទ',postViewPublic:'មើលក្នុង Public',
+ postSrcFile:'ពីទូរសព្ទ',postSrcWeb:'ពី website',postPackages:'មើលកញ្ចប់ · Packages',
  pubDlFreeLeft:'ទាញយកបទចម្រៀងហ្វ្រីនៅសល់ {n} ដង',
  pubDlLimit:'អ្នកបានប្រើអស់ការទាញយកបទចម្រៀងហ្វ្រី 2 ដងហើយ — សូមទិញកញ្ចប់សេវាកម្មបទចម្រៀង ដើម្បីទាញយកបន្ត',
  acctGotFree:'អបអរសាទរ! អ្នកទទួលបាន Credit ហ្វ្រី — Image.Video Credit 250 និង Song Credit 24 ក្នុងគណនីរបស់អ្នកហើយ',
@@ -1990,6 +2062,18 @@ en:{
  pubTypeSong:'Song',pubTypeImage:'Image',pubTypeVideo:'Video',pubType3d:'3D',
  pubSongId:'Song ID',pubDuration:'Duration',pubModel:'Model',pubPostedDate:'Posted',pubPostedBy:'Posted by',pubGenre:'Genre',
  pubGenreAll:'All · ទាំងអស់',pubGenrePick:'Choose a style · ស្ទាយបទ',pubGenreNeed:'Please choose a song style first before posting to Public',
+ postBtn:'+ Post · ផុស',postFlowTitle:'Post a song · ផុសបទចម្រៀង',
+ postOwn:'Post your own song',postOwnSub:'Pick an MP3 from your phone',
+ postWeb:'Post a song made in this website',postWebSub:'Pick a song from your History',
+ postPickWeb:'Pick a song from History',postNoSongs:'No songs in History yet — create one first',
+ postTitleLabel:'Title · ចំណងជើងបទ',postCoverLabel:'Cover image · រូប Cover',postCoverPick:'Choose cover image',
+ postKindLabel:'Post type · ប្រភេទផុស',postKindSong:'Song · បទចម្រៀង',postKindPromo:'Promotion',postKindService:'Service · សេវាកម្ម',postKindOther:'Other · ផ្សេងៗ',
+ postBack:'Back · ថយក្រោយ',postDo:'Post · ផុស',postAlready:'Posted',
+ postLimitInfo:'Today you have posted {n}/{m} songs',postLimitAdmin:'Admin — unlimited posts',
+ postLimitHit:'You reached the post limit for today ({m} songs/day) — buy a package to post more, or wait until tomorrow',
+ postUploading:'Uploading',postPosting:'Posting',postFileBig:'File too large (MP3 max 15MB · image 5MB)',
+ postBadFile:'Please pick an MP3 / audio file',postNeedTitle:'Please enter a song title',postViewPublic:'View in Public',
+ postSrcFile:'From phone',postSrcWeb:'From website',postPackages:'View packages · កញ្ចប់',
  pubDlFreeLeft:'{n} free song downloads left',
  pubDlLimit:'You have used your 2 free song downloads — please buy a Song package to keep downloading',
  acctGotFree:'Welcome! You received free credits — 250 Image.Video Credit and 24 Song Credit in your account',
@@ -6526,6 +6610,13 @@ function pubKeepViews(out){
   }catch(e){}
   return out;
 }
+/* PUBLIC MEANS PUBLIC (owner rule 2026-11-16): this feed loads
+   with a plain GET — no login, no account, no token. Every
+   visitor sees every post and can play every song: old users,
+   new users, and guests who have never logged in. Nothing in
+   the render, the style/Genre filter, or the players may gate
+   viewing or listening behind a login; a login is required
+   only to POST (and to react), never to watch or listen. */
 function pubLoadFeed(force){
   if(pubLoading)return;
   if(pubLoaded&&!force){pubRender();return;}
@@ -6785,7 +6876,7 @@ function pubNameHtml(it){
    song repeats (the audio element's own loop flag); 'shuffle' —
    when a song ends, a RANDOM other song in the feed starts.
    The state is shared by every song player in the feed (the big
-   card, the numbered rows and the carousel minis). */
+   cards and the numbered rows). */
 var pubPlayMode='off';
 function pubLoopSvg(){
   return '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 2l4 4-4 4"/><path d="M3 11v-1a4 4 0 0 1 4-4h14"/><path d="M7 22l-4-4 4-4"/><path d="M21 13v1a4 4 0 0 1-4 4H3"/></svg>';
@@ -6949,10 +7040,15 @@ function pubVizReset(){
    dragged anywhere and the song keeps playing underneath
    whatever the user is doing. Tapping the logo opens the
    expanded player: cover, title, seek bar, current / total
-   time, stop (pause) and previous / next. The ✕ collapses the
-   player back into the floating logo. Playback itself is never
-   touched by any of this — the feed's own <audio> element keeps
-   playing; the mini-player only mirrors and controls it. */
+   time, stop (pause) and previous / next. The panel ✕ collapses
+   the player back into the floating logo. The logo itself can
+   be DISMISSED (owner rule 2026-11-16): its ✕ badge, a drag
+   onto the ✕ drop zone, or the panel's ⏹ Stop button all run
+   pubMiniStopAll — the song pauses, rewinds, and the floating
+   logo disappears completely instead of staying stuck on
+   screen. Otherwise playback is never touched by any of this —
+   the feed's own <audio> element keeps playing; the
+   mini-player only mirrors and controls it. */
 var pubMini={au:null,it:null,open:false,timer:null,logoId:null,panelId:null,suppressClick:0};
 function pubMiniSet(au,it){
   if(!au||!it)return;
@@ -6992,6 +7088,7 @@ function pubMiniLogoFill(){
   if(it.image&&/^https:/i.test(it.image))h+='<img src="'+escHtml(it.image)+'" alt="">';
   else h+='<span class="mini-logo-fallback">'+noteSvg+'</span>';
   h+='<span class="mini-logo-state"></span>';
+  h+='<span class="mini-logo-x" role="button" aria-label="ឈប់ចាក់ និងបិទ · Stop & close">✕</span>';
   logo.innerHTML=h;
   var limg=logo.querySelector('img');
   if(limg)limg.addEventListener('error',function(){
@@ -7107,11 +7204,36 @@ function pubMiniStep(dir){
 }
 function pubMiniOpenPanel(){pubMini.open=true;pubMiniSync();}
 function pubMiniClosePanel(){pubMini.open=false;pubMiniSync();}
+function pubMiniStopAll(){
+  /* Full stop + dismiss (owner rule 2026-11-16): pause the song,
+     rewind it, and let go of it completely — the panel closes
+     and the floating logo disappears, nothing stays stuck on
+     screen. The song card's own play/pause listeners hear the
+     pause and reset its button on their own. */
+  var au=pubMini.au;
+  if(au){try{au.pause();}catch(e){} try{au.currentTime=0;}catch(e){}}
+  pubMini.au=null;pubMini.it=null;pubMini.open=false;
+  pubMini.logoId=null;pubMini.panelId=null;
+  if(pubMini.timer){clearInterval(pubMini.timer);pubMini.timer=null;}
+  var drop=document.getElementById('miniDrop');if(drop)drop.style.display='none';
+  pubMiniSync();
+}
 (function(){
   var logo=document.getElementById('miniLogo');if(!logo)return;
-  var sx=0,sy=0,ox=0,oy=0,dragging=false,moved=false;
+  var drop=document.getElementById('miniDrop');
+  var sx=0,sy=0,ox=0,oy=0,dragging=false,moved=false,xTap=false;
+  function onX(t){return !!(t&&t.closest&&t.closest('.mini-logo-x'));}
+  function dropOver(){
+    if(!drop||drop.style.display==='none')return false;
+    var dr=drop.getBoundingClientRect(),lr=logo.getBoundingClientRect();
+    var cx=lr.left+lr.width/2,cy=lr.top+lr.height/2;
+    return cx>=dr.left&&cx<=dr.right&&cy>=dr.top&&cy<=dr.bottom;
+  }
   logo.addEventListener('pointerdown',function(e){
-    dragging=true;moved=false;
+    /* A press that starts on the ✕ badge is a dismiss tap,
+       never the start of a drag. */
+    if(onX(e.target)){xTap=true;dragging=false;return;}
+    xTap=false;dragging=true;moved=false;
     var r=logo.getBoundingClientRect();
     sx=e.clientX;sy=e.clientY;ox=r.left;oy=r.top;
     try{logo.setPointerCapture(e.pointerId);}catch(err){}
@@ -7120,24 +7242,35 @@ function pubMiniClosePanel(){pubMini.open=false;pubMiniSync();}
     if(!dragging)return;
     var dx=e.clientX-sx,dy=e.clientY-sy;
     if(!moved&&Math.abs(dx)+Math.abs(dy)<7)return;
+    if(!moved&&drop)drop.style.display='flex';
     moved=true;
     var w=logo.offsetWidth||56,h=logo.offsetHeight||56;
     var nx=Math.max(4,Math.min((window.innerWidth||320)-w-4,ox+dx));
     var ny=Math.max(4,Math.min((window.innerHeight||480)-h-4,oy+dy));
     logo.style.left=nx+'px';logo.style.top=ny+'px';
     logo.style.right='auto';logo.style.bottom='auto';
+    if(drop)drop.classList.toggle('over',dropOver());
   });
   function endDrag(){
-    if(!dragging)return;dragging=false;
-    if(moved)pubMini.suppressClick=Date.now();
+    var wasDrag=dragging;dragging=false;
+    var over=moved&&dropOver();
+    if(drop){drop.style.display='none';drop.classList.remove('over');}
+    if(!wasDrag)return;
+    if(moved){
+      pubMini.suppressClick=Date.now();
+      /* Dropped onto the ✕ zone → full stop, logo gone. */
+      if(over)pubMiniStopAll();
+    }
   }
   logo.addEventListener('pointerup',endDrag);
   logo.addEventListener('pointercancel',endDrag);
-  logo.addEventListener('click',function(){
+  logo.addEventListener('click',function(e){
+    if(onX(e.target)||xTap){xTap=false;pubMiniStopAll();return;}
     if(pubMini.suppressClick&&Date.now()-pubMini.suppressClick<400)return;
     pubMiniOpenPanel();
   });
   var xc=document.getElementById('miniClose');if(xc)xc.addEventListener('click',pubMiniClosePanel);
+  var sb=document.getElementById('miniStop');if(sb)sb.addEventListener('click',pubMiniStopAll);
   var pb=document.getElementById('miniPlayBtn');if(pb)pb.addEventListener('click',pubMiniTogglePlay);
   var pv=document.getElementById('miniPrev');if(pv)pv.addEventListener('click',function(){pubMiniStep(-1);});
   var nx2=document.getElementById('miniNext');if(nx2)nx2.addEventListener('click',function(){pubMiniStep(1);});
@@ -7219,60 +7352,17 @@ function pubSongRowEl(it){
   row.appendChild(au);
   return row;
 }
-/* Mini card for the swipeable rail of older songs: small cover
-   with a centre Play button, a short title and the view count. */
-function pubSongMiniEl(it){
-  var m=document.createElement('div');
-  m.className='pub-mini';
-  m.setAttribute('data-pub-id',it.id);
-  var cw=document.createElement('div');
-  cw.className='pub-mini-coverwrap';
-  if(it.image&&/^https:/i.test(it.image)){
-    var im=document.createElement('img');
-    im.src=it.image;im.alt=it.title||'';im.className='pub-mini-cover';im.loading='lazy';
-    im.addEventListener('error',function(){im.replaceWith(pubSongCoverFallback(it));});
-    cw.appendChild(im);
-  }else{
-    cw.appendChild(pubSongCoverFallback(it));
-  }
-  var pb=document.createElement('button');
-  pb.type='button';pb.className='pub-mini-play';
-  pb.setAttribute('aria-label','Play');
-  pb.innerHTML=pubPlaySvg();
-  cw.appendChild(pb);
-  m.appendChild(cw);
-  var tt=document.createElement('p');
-  tt.className='pub-mini-title';tt.textContent=it.title||'';tt.title=it.title||'';
-  m.appendChild(tt);
-  var meta=document.createElement('span');
-  meta.className='pub-row-meta';
-  meta.innerHTML=pubEyeSvg()+'<span data-pub-views="'+escHtml(it.id)+'">'+fmtCount(it.views)+'</span>';
-  m.appendChild(meta);
-  var au=document.createElement('audio');
-  au.src=it.url;au.preload='metadata';au.style.display='none';
-  var sync=function(){
-    pb.innerHTML=au.paused?pubPlaySvg():pubPauseSvg();
-    pb.setAttribute('aria-label',au.paused?'Play':'Pause');
-  };
-  pubWireFeedAudio(au,it,sync);
-  var toggle=function(){
-    if(au.paused){var pr=au.play();if(pr&&pr.catch)pr.catch(function(){});}
-    else au.pause();
-  };
-  pb.addEventListener('click',function(ev){ev.stopPropagation();toggle();});
-  cw.addEventListener('click',toggle);
-  m.appendChild(au);
-  return m;
-}
 /* Song feed layout (owner rule 2026-11-16): the songs display
-   NEWEST FIRST. ONLY the newest song (#1) is a big card, in the
-   centre of the top carousel; the next songs sit beside it as
-   SMALL cards in the same swipeable strip. Under the carousel,
-   EVERY remaining song (#2, #3, ...) shows as a compact
-   NUMBERED row in the normal vertical scroll: first the next
-   newest under «New», then the older ones under «More songs» —
-   every row numbered in the same newest-first order and
-   carrying views + Like + Dislike + Share like the big card.
+   NEWEST FIRST. The top carousel is a swipeable strip of BIG
+   cards — ALL of them big, like flipping through photos: the
+   newest song (#1) leads, and the older songs beside it (to
+   the right as you swipe) are the SAME full-size big cards,
+   never shrunk side cards. Under the carousel, EVERY remaining
+   song (#2, #3, ...) shows as a compact NUMBERED row in the
+   normal vertical scroll: first the next newest under «New»,
+   then the older ones under «More songs» — every row numbered
+   in the same newest-first order and carrying views + Like +
+   Dislike + Share like the big card.
    (The views ranking still decides each post's tier and its
    server rank; the song feed's display order and its # numbers
    are the newest-first order the owner asked for.) */
@@ -7284,24 +7374,20 @@ function pubRenderSongs(box,songs){
   });
   ordered.forEach(function(it,i){it._dispRank=i+1;});
   if(!ordered.length)return;
-  /* Carousel (owner rule 2026-11-16): ONLY the newest song (#1)
-     is the big card, in the centre; the next songs sit beside
-     it as SMALL cards in the same swipeable strip. EVERY other
-     song (#2, #3, ...) ALSO appears as a numbered row below —
-     the rows must never vanish just because the songs fit in
-     the carousel. */
+  /* Carousel (owner rule 2026-11-16): EVERY slide is a full
+     BIG card — the newest song (#1) first, the older songs
+     after it at the same big size, like a photo gallery.
+     EVERY other song (#2, #3, ...) ALSO appears as a numbered
+     row below — the rows must never vanish just because the
+     songs fit in the carousel. */
   var car=document.createElement('div');
   car.className='pub-carousel';
   car.setAttribute('aria-label','Songs');
-  var s=document.createElement('div');
-  s.className='pub-slide';
-  s.appendChild(pubCardEl(ordered[0]));
-  car.appendChild(s);
-  ordered.slice(1,5).forEach(function(it){
-    var w=document.createElement('div');
-    w.className='pub-slide-mini';
-    w.appendChild(pubSongMiniEl(it));
-    car.appendChild(w);
+  ordered.slice(0,5).forEach(function(it){
+    var s=document.createElement('div');
+    s.className='pub-slide';
+    s.appendChild(pubCardEl(it));
+    car.appendChild(s);
   });
   box.appendChild(car);
   var rest=ordered.slice(1);
@@ -7973,8 +8059,13 @@ function pubOpenSheet(item){
   }else if(!/^https:/i.test(item.url||'')){
     h+='<p style="font-size:0.875rem;line-height:1.7;color:var(--muted)">'+escHtml(tx('pubNoLink'))+'</p>';
   }else{
-    if(item.pubPost==='public')h+='<p style="font-size:0.875rem;font-weight:700;color:var(--accent-text);margin-bottom:10px">'+escHtml(tx('pubPostedAlready'))+'</p>';
-    if(item.type==='song'){
+    var pli=postLimitInfo(u);
+    var plHit=item.pubPost!=='public'&&!pli.admin&&pli.used>=pli.limit;
+    if(plHit){
+      h+='<p style="font-size:0.875rem;line-height:1.7;color:#f87171">'+escHtml(tx('postLimitHit').replace('{m}',pli.limit))+'</p>';
+      h+='<button type="button" class="kbtn kbtn-black" style="width:100%;margin-top:10px" onclick="pubSheetClose();dockGo(\'packages\')">'+escHtml(tx('postPackages'))+'</button>';
+    }else if(item.pubPost==='public')h+='<p style="font-size:0.875rem;font-weight:700;color:var(--accent-text);margin-bottom:10px">'+escHtml(tx('pubPostedAlready'))+'</p>';
+    if(!plHit&&item.type==='song'){
       /* Style picker (owner rule): whoever posts a song — a user
          or the Admin through this same sheet — MUST choose the
          song's style; it is sent as the post's genre and drives
@@ -7989,7 +8080,7 @@ function pubOpenSheet(item){
       });
       h+='</div>';
     }
-    h+=pubOptBtnsHtml();
+    if(!plHit)h+=pubOptBtnsHtml();
   }
   h+='<p id="pubSheetMsg" style="font-size:0.8125rem;margin-top:10px;min-height:16px;line-height:1.6"></p>';
   body.innerHTML=h;
@@ -8044,12 +8135,330 @@ function pubDoPost(vis){
         for(var i=0;i<a.length;i++){if(a[i].id===item.id){a[i].pubPost=vis;histSave(a);break;}}
         item.pubPost=vis;
       }
-      if(vis==='public')pubLoaded=false;
+      if(vis==='public'){pubLoaded=false;try{postCountBump(u);}catch(e){}}
       if(msg){msg.textContent=(vis==='public')?tx('pubPostedOk'):tx('pubPrivateOk');msg.style.color='var(--accent-text)';}
     })
     .catch(function(){
       if(msg){msg.textContent=tx('pubPostFail');msg.style.color='#f87171';}
     });
+}
+
+/* ================= Post your own song (Create → «＋ ផុស») =================
+   Owner rule 2026-11-16: the «＋ ផុស» button in Create opens a
+   sheet with TWO sources: (1) the user's own MP3 picked from
+   the phone, (2) a song the user created in this website,
+   picked from their History. Then a details form: title, cover
+   image, the song's style/Genre (required for songs — the same
+   PUB_GENRES as the Post-to-Public sheet), and — for the Admin
+   only — the post type (Song / Promotion / Service / Other).
+   Posting goes to the same PUB_API /post the History sheet
+   uses; an own MP3 (or a newly picked cover image) first goes
+   through PUB_API /upload so the post carries a permanent
+   https URL.
+   DAILY LIMITS (owner rule): Free = 5 posts/day, package
+   holders = 20/day, Admin = unlimited. The counter is shared
+   with the History Post-to-Public sheet (pubDoPost bumps it,
+   pubOpenSheet enforces it) and lives in localStorage
+   'movai-post-day', per account + local date.
+   PUBLIC MEANS PUBLIC (owner rule): none of this gates the
+   feed. The feed loads with a plain unauthenticated GET and
+   every visitor — old user, new user, logged in or NOT (a
+   guest with no account) — sees every post and can play every
+   song; the style/Genre chips only filter what the viewer
+   chose to filter. A login is required only to POST, never to
+   watch or listen. */
+var POST_FREE_LIMIT=5,POST_PKG_LIMIT=20;
+var postFlow={src:null,file:null,histItem:null,coverFile:null,coverUrl:'',coverObjUrl:'',genre:'',kind:'song',busy:false};
+var postTickTimer=null;
+function postDayKey(){var d=new Date();return d.getFullYear()+'-'+('0'+(d.getMonth()+1)).slice(-2)+'-'+('0'+d.getDate()).slice(-2);}
+function postCountGet(u){
+  if(!u||!u.email)return 0;
+  try{
+    var j=JSON.parse(localStorage.getItem('movai-post-day')||'null');
+    if(j&&j.email===u.email&&j.date===postDayKey())return Math.max(0,Math.floor(j.count||0));
+  }catch(e){}
+  return 0;
+}
+function postCountBump(u){
+  if(!u||!u.email)return;
+  try{localStorage.setItem('movai-post-day',JSON.stringify({email:u.email,date:postDayKey(),count:postCountGet(u)+1}));}catch(e){}
+}
+function postIsAdminUser(u){return !!u&&pubIsAdmin({email:u.email||'',name:u.name||''});}
+function postLimitInfo(u){
+  var used=postCountGet(u);
+  if(postIsAdminUser(u))return {used:used,limit:Infinity,admin:true};
+  var has=false;try{has=acctHasPlan(u);}catch(e){}
+  return {used:used,limit:has?POST_PKG_LIMIT:POST_FREE_LIMIT,admin:false};
+}
+function postLimitText(u){
+  var li=postLimitInfo(u);
+  if(li.admin)return tx('postLimitAdmin');
+  return tx('postLimitInfo').replace('{n}',li.used).replace('{m}',li.limit);
+}
+function postFlowMsgSet(html,color){
+  var m=document.getElementById('postFlowMsg');if(!m)return;
+  m.innerHTML=html||'';m.style.color=color||'var(--muted)';
+}
+function postFlowBusyStart(label){
+  postFlowBusyStop();
+  var t0=Date.now();
+  var render=function(){
+    var s=Math.floor((Date.now()-t0)/1000);
+    postFlowMsgSet(escHtml(label)+' · '+s+'s','var(--muted)');
+  };
+  render();
+  postTickTimer=setInterval(render,500);
+}
+function postFlowBusyStop(){if(postTickTimer){clearInterval(postTickTimer);postTickTimer=null;}}
+function postFlowClose(){
+  postFlowBusyStop();postFlow.busy=false;
+  var s=document.getElementById('postSheet');if(s)sheetHideAnim(s);
+}
+function postFlowOpen(){
+  postFlow={src:null,file:null,histItem:null,coverFile:null,coverUrl:'',coverObjUrl:'',genre:'',kind:'song',busy:false};
+  postFlowRenderStep1();
+  var s=document.getElementById('postSheet');if(s)sheetShowAnim(s);
+}
+function postFlowRenderStep1(){
+  var body=document.getElementById('postSheetBody');if(!body)return;
+  var u=null;try{u=acctCurrent();}catch(e){}
+  var h='';
+  if(!u){
+    h+='<p style="font-size:0.875rem;line-height:1.7">'+escHtml(tx('pubNeedLogin'))+'</p>';
+    h+='<button type="button" class="kbtn kbtn-black" style="width:100%;margin-top:10px" onclick="postFlowClose();loginSheetOpen()">'+escHtml(tx('pubLoginBtn'))+'</button>';
+  }else{
+    var li=postLimitInfo(u);
+    h+='<p style="font-size:0.8125rem;font-weight:700;color:var(--muted)">'+escHtml(postLimitText(u))+'</p>';
+    var hit=!li.admin&&li.used>=li.limit;
+    var noteSvg='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>';
+    var globeSvg='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.6 3.9 5.7 3.9 9s-1.4 6.4-3.9 9c-2.5-2.6-3.9-5.7-3.9-9S9.5 5.6 12 3z"/></svg>';
+    h+='<button type="button" class="post-opt" id="postOptOwn"'+(hit?' disabled':'')+'><span class="post-opt-ico">'+noteSvg+'</span><span class="post-opt-main"><b>'+escHtml(tx('postOwn'))+'</b><span>'+escHtml(tx('postOwnSub'))+'</span></span></button>';
+    h+='<button type="button" class="post-opt" id="postOptWeb"'+(hit?' disabled':'')+'><span class="post-opt-ico">'+globeSvg+'</span><span class="post-opt-main"><b>'+escHtml(tx('postWeb'))+'</b><span>'+escHtml(tx('postWebSub'))+'</span></span></button>';
+    if(hit){
+      h+='<p style="font-size:0.8125rem;line-height:1.7;color:#f87171;margin-top:12px">'+escHtml(tx('postLimitHit').replace('{m}',li.limit))+'</p>';
+      h+='<button type="button" class="kbtn kbtn-black" style="width:100%;margin-top:8px" onclick="postFlowClose();dockGo(\'packages\')">'+escHtml(tx('postPackages'))+'</button>';
+    }
+  }
+  h+='<p id="postFlowMsg" style="font-size:0.8125rem;margin-top:10px;min-height:16px;line-height:1.6"></p>';
+  body.innerHTML=h;
+  var b1=document.getElementById('postOptOwn');
+  if(b1)b1.addEventListener('click',function(){var inp=document.getElementById('postMp3Input');if(inp){inp.value='';inp.click();}});
+  var b2=document.getElementById('postOptWeb');
+  if(b2)b2.addEventListener('click',postFlowRenderPicker);
+}
+function postFlowRenderPicker(){
+  var body=document.getElementById('postSheetBody');if(!body)return;
+  var songs=histGet().filter(function(x){return x&&x.type==='song';});
+  var h='<p style="font-size:0.8125rem;font-weight:800;margin:2px 0 4px">'+escHtml(tx('postPickWeb'))+'</p>';
+  if(!songs.length){
+    h+='<p style="font-size:0.875rem;line-height:1.7;color:var(--muted)">'+escHtml(tx('postNoSongs'))+'</p>';
+  }else{
+    songs.forEach(function(it,i){
+      h+='<button type="button" class="post-pick-row" data-pick="'+i+'"><span class="post-pick-main"><span class="post-pick-title" style="display:block">'+escHtml(it.title||it.prompt||'')+'</span></span>'+(it.pubPost==='public'?'<span class="post-pick-tag">'+escHtml(tx('postAlready'))+'</span>':'')+'</button>';
+    });
+  }
+  h+='<button type="button" class="kbtn kbtn-white" style="width:100%;margin-top:12px" onclick="postFlowRenderStep1()">'+escHtml(tx('postBack'))+'</button>';
+  h+='<p id="postFlowMsg" style="font-size:0.8125rem;margin-top:10px;min-height:16px;line-height:1.6"></p>';
+  body.innerHTML=h;
+  var rows=body.querySelectorAll('[data-pick]');
+  for(var i=0;i<rows.length;i++){
+    rows[i].addEventListener('click',function(){
+      var it=songs[parseInt(this.getAttribute('data-pick'),10)];
+      if(!it)return;
+      postFlow.src='web';postFlow.histItem=it;postFlow.file=null;
+      postFlow.coverUrl=it.image||'';postFlow.coverFile=null;postFlow.coverObjUrl='';
+      postFlow.genre=pubGenreKey(it.genre||it.style||'');
+      postFlowRenderForm(it.title||'');
+    });
+  }
+}
+function postFlowMp3Picked(inp){
+  var file=inp&&inp.files&&inp.files[0];if(!file)return;
+  var okType=/audio\//i.test(file.type||'')||/\.(mp3|wav|ogg|m4a)$/i.test(file.name||'');
+  if(!okType){postFlowMsgSet(escHtml(tx('postBadFile')),'#f87171');return;}
+  if(file.size>15*1024*1024){postFlowMsgSet(escHtml(tx('postFileBig')),'#f87171');return;}
+  postFlow.src='file';postFlow.file=file;postFlow.histItem=null;
+  postFlow.coverFile=null;postFlow.coverUrl='';postFlow.coverObjUrl='';postFlow.genre='';
+  postFlowRenderForm((file.name||'').replace(/\.[^.]+$/,''));
+}
+function postFlowCoverPicked(inp){
+  var file=inp&&inp.files&&inp.files[0];if(!file)return;
+  if(!/^image\//i.test(file.type||'')){postFlowMsgSet(escHtml(tx('postBadFile')),'#f87171');return;}
+  if(file.size>5*1024*1024){postFlowMsgSet(escHtml(tx('postFileBig')),'#f87171');return;}
+  postFlow.coverFile=file;
+  try{postFlow.coverObjUrl=URL.createObjectURL(file);}catch(e){postFlow.coverObjUrl='';}
+  var row=document.getElementById('postCoverRow');
+  if(row){row.innerHTML=postFlowCoverHtml();postFlowWireCoverBtn();}
+}
+function postFlowCoverHtml(){
+  var noteSvg='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>';
+  var inner='';
+  if(postFlow.coverFile&&postFlow.coverObjUrl)inner='<img class="post-cover-prev" src="'+postFlow.coverObjUrl+'" alt="">';
+  else if(postFlow.coverUrl)inner='<img class="post-cover-prev" src="'+escHtml(postFlow.coverUrl)+'" alt="">';
+  else inner='<span class="post-cover-none">'+noteSvg+'</span>';
+  return inner+'<button type="button" class="kbtn kbtn-white" id="postCoverBtn" style="min-height:40px;padding:8px 14px">'+escHtml(tx('postCoverPick'))+'</button>';
+}
+function postFlowWireCoverBtn(){
+  var b=document.getElementById('postCoverBtn');
+  if(b)b.addEventListener('click',function(){var inp=document.getElementById('postCoverInput');if(inp){inp.value='';inp.click();}});
+}
+function postFlowGenreSync(){
+  var box=document.getElementById('postGenrePick');if(!box)return;
+  var chips=box.querySelectorAll('[data-genre]');
+  for(var i=0;i<chips.length;i++){
+    var on=chips[i].getAttribute('data-genre')===postFlow.genre;
+    chips[i].className='pub-genre-opt'+(on?' on':'');
+    chips[i].setAttribute('aria-pressed',on?'true':'false');
+  }
+}
+function postFlowKindSync(){
+  var box=document.getElementById('postKindPick');if(!box)return;
+  var chips=box.querySelectorAll('[data-kind]');
+  for(var i=0;i<chips.length;i++){
+    var on=chips[i].getAttribute('data-kind')===postFlow.kind;
+    chips[i].className='pub-genre-opt'+(on?' on':'');
+    chips[i].setAttribute('aria-pressed',on?'true':'false');
+  }
+  var gw=document.getElementById('postGenreWrap');
+  if(gw)gw.style.display=(postFlow.kind==='song')?'':'none';
+}
+function postFlowRenderForm(title){
+  var body=document.getElementById('postSheetBody');if(!body)return;
+  var u=null;try{u=acctCurrent();}catch(e){}
+  var admin=postIsAdminUser(u);
+  var srcLabel=postFlow.src==='file'?tx('postSrcFile'):tx('postSrcWeb');
+  var srcName=postFlow.src==='file'?(postFlow.file?postFlow.file.name:''):(postFlow.histItem?(postFlow.histItem.title||''):'');
+  var noLink=postFlow.src==='web'&&postFlow.histItem&&!/^https:/i.test(postFlow.histItem.url||'');
+  var h='';
+  h+='<p style="font-size:0.75rem;font-weight:700;color:var(--muted);margin-bottom:8px;overflow-wrap:break-word">'+escHtml(srcLabel)+' · '+escHtml(srcName)+'</p>';
+  h+='<p style="font-size:0.8125rem;font-weight:800;margin:2px 0 6px">'+escHtml(tx('postTitleLabel'))+'</p>';
+  h+='<input class="input" id="postTitleInput" style="width:100%" maxlength="200" value="'+escHtml(title||'')+'">';
+  h+='<p style="font-size:0.8125rem;font-weight:800;margin:12px 0 6px">'+escHtml(tx('postCoverLabel'))+'</p>';
+  h+='<div class="post-cover-row" id="postCoverRow">'+postFlowCoverHtml()+'</div>';
+  if(admin){
+    var kinds=[['song',tx('postKindSong')],['promotion',tx('postKindPromo')],['service',tx('postKindService')],['other',tx('postKindOther')]];
+    h+='<p style="font-size:0.8125rem;font-weight:800;margin:2px 0 8px">'+escHtml(tx('postKindLabel'))+'</p>';
+    h+='<div class="pub-genre-pick" id="postKindPick" role="group" aria-label="'+escHtml(tx('postKindLabel'))+'">';
+    kinds.forEach(function(k){
+      h+='<button type="button" class="pub-genre-opt'+(k[0]===postFlow.kind?' on':'')+'" data-kind="'+k[0]+'" aria-pressed="'+(k[0]===postFlow.kind?'true':'false')+'">'+escHtml(k[1])+'</button>';
+    });
+    h+='</div>';
+  }
+  h+='<div id="postGenreWrap">';
+  h+='<p style="font-size:0.8125rem;font-weight:800;margin:2px 0 8px">'+escHtml(tx('pubGenrePick'))+'</p>';
+  h+='<div class="pub-genre-pick" id="postGenrePick" role="group" aria-label="'+escHtml(tx('pubGenrePick'))+'">';
+  PUB_GENRES.forEach(function(g){
+    h+='<button type="button" class="pub-genre-opt'+(g===postFlow.genre?' on':'')+'" data-genre="'+escHtml(g)+'" aria-pressed="'+(g===postFlow.genre?'true':'false')+'">'+escHtml(g)+'</button>';
+  });
+  h+='</div></div>';
+  if(noLink)h+='<p style="font-size:0.8125rem;line-height:1.7;color:#f87171;margin-bottom:10px">'+escHtml(tx('pubNoLink'))+'</p>';
+  h+='<button type="button" class="kbtn kbtn-black" id="postSubmitBtn" style="width:100%"'+(noLink?' disabled':'')+'>'+escHtml(tx('postDo'))+'</button>';
+  h+='<button type="button" class="kbtn kbtn-white" id="postBackBtn" style="width:100%;margin-top:8px">'+escHtml(tx('postBack'))+'</button>';
+  h+='<p id="postFlowMsg" style="font-size:0.8125rem;margin-top:10px;min-height:16px;line-height:1.6"></p>';
+  body.innerHTML=h;
+  postFlowWireCoverBtn();
+  var gp=document.getElementById('postGenrePick');
+  if(gp){
+    var gcs=gp.querySelectorAll('[data-genre]');
+    for(var gi=0;gi<gcs.length;gi++){
+      gcs[gi].addEventListener('click',function(){
+        postFlow.genre=this.getAttribute('data-genre')||'';
+        postFlowGenreSync();
+        if(postFlow.genre)postFlowMsgSet('');
+      });
+    }
+  }
+  var kp=document.getElementById('postKindPick');
+  if(kp){
+    var kcs=kp.querySelectorAll('[data-kind]');
+    for(var ki=0;ki<kcs.length;ki++){
+      kcs[ki].addEventListener('click',function(){
+        postFlow.kind=this.getAttribute('data-kind')||'song';
+        postFlowKindSync();
+      });
+    }
+  }
+  var sb=document.getElementById('postSubmitBtn');
+  if(sb)sb.addEventListener('click',postFlowSubmit);
+  var bb=document.getElementById('postBackBtn');
+  if(bb)bb.addEventListener('click',postFlowRenderStep1);
+  postFlowKindSync();
+}
+function postFlowUpload(file,kind){
+  return new Promise(function(resolve,reject){
+    var rd=new FileReader();
+    rd.onerror=function(){reject(new Error('read'));};
+    rd.onload=function(){
+      var b64=String(rd.result||'').split(',')[1]||'';
+      var u=null;try{u=acctCurrent();}catch(e){}
+      fetch(PUB_API+'/upload',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({kind:kind,filename:file.name,data:b64,email:u?u.email:'',userId:(u&&acctValidUserId(u.id))?u.id:''})})
+        .then(function(r){return r.json().catch(function(){return {};});})
+        .then(function(j){
+          if(j&&j.ok&&j.url)resolve(j.url);
+          else reject(new Error((j&&j.error)||'upload'));
+        })
+        .catch(function(e){reject(e);});
+    };
+    rd.readAsDataURL(file);
+  });
+}
+async function postFlowSubmit(){
+  if(postFlow.busy)return;
+  var u=null;try{u=acctCurrent();}catch(e){}
+  if(!u){postFlowClose();loginSheetOpen();return;}
+  var li=postLimitInfo(u);
+  if(!li.admin&&li.used>=li.limit){postFlowMsgSet(escHtml(tx('postLimitHit').replace('{m}',li.limit)),'#f87171');return;}
+  var titleEl=document.getElementById('postTitleInput');
+  var title=titleEl?titleEl.value.trim():'';
+  if(!title){postFlowMsgSet(escHtml(tx('postNeedTitle')),'#f87171');if(titleEl)titleEl.focus();return;}
+  if(postFlow.kind==='song'&&!postFlow.genre){postFlowMsgSet(escHtml(tx('pubGenreNeed')),'#f87171');return;}
+  postFlow.busy=true;
+  var btn=document.getElementById('postSubmitBtn');if(btn)btn.disabled=true;
+  try{
+    var url='',image='';
+    if(postFlow.src==='file'){
+      postFlowBusyStart(tx('postUploading'));
+      url=await postFlowUpload(postFlow.file,'audio');
+    }else{
+      url=postFlow.histItem?postFlow.histItem.url:'';
+      if(!/^https:/i.test(url||''))throw new Error(tx('pubNoLink'));
+    }
+    if(postFlow.coverFile){
+      postFlowBusyStart(tx('postUploading'));
+      image=await postFlowUpload(postFlow.coverFile,'image');
+    }else{
+      image=postFlow.coverUrl||'';
+    }
+    postFlowBusyStart(tx('postPosting'));
+    var payload={email:u.email,userId:acctValidUserId(u.id)?u.id:'',name:u.name||'',firstName:u.firstName||'',lastName:u.lastName||'',title:title,type:'song',url:url,image:image,visibility:'public'};
+    if(postFlow.kind==='song')payload.genre=postFlow.genre;
+    else payload.kind=postFlow.kind;
+    var r=await fetch(PUB_API+'/post',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+    if(!r||!r.ok)throw new Error('http '+(r?r.status:0));
+    await r.json().catch(function(){return {};});
+    postCountBump(u);
+    if(postFlow.histItem&&postFlow.histItem.id){
+      var a=histGet();
+      for(var i=0;i<a.length;i++){if(a[i].id===postFlow.histItem.id){a[i].pubPost='public';histSave(a);break;}}
+      postFlow.histItem.pubPost='public';
+    }
+    pubLoaded=false;
+    postFlowBusyStop();
+    postFlowRenderDone(u);
+  }catch(e){
+    postFlowBusyStop();
+    var em=(e&&e.message)?e.message:'';
+    postFlowMsgSet(escHtml(tx('pubPostFail'))+(em?' ('+escHtml(em)+')':''),'#f87171');
+    var btn2=document.getElementById('postSubmitBtn');if(btn2)btn2.disabled=false;
+  }
+  postFlow.busy=false;
+}
+function postFlowRenderDone(u){
+  var body=document.getElementById('postSheetBody');if(!body)return;
+  body.innerHTML='<p style="font-size:0.9375rem;font-weight:800;color:var(--accent-text);line-height:1.7">'+escHtml(tx('pubPostedOk'))+'</p>'
+    +'<p style="font-size:0.8125rem;font-weight:700;color:var(--muted);margin-top:4px">'+escHtml(postLimitText(u))+'</p>'
+    +'<button type="button" class="kbtn kbtn-black" style="width:100%;margin-top:12px" onclick="postFlowClose();dockGo(\'public\');pubLoadFeed(true)">'+escHtml(tx('postViewPublic'))+'</button>'
+    +'<button type="button" class="kbtn kbtn-white" style="width:100%;margin-top:8px" onclick="postFlowClose()">បិទ · Close</button>';
 }
 
 /* ================= User accounts + Magic Hour connect =================
