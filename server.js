@@ -1009,7 +1009,105 @@ async function withProviderKeyRotation(provider, fn, reqKey, candidatesOverride)
 }
 
 /* --------------------------------- api ------------------------------------- */
+// ---- Multi-user fairness + attack protection (FREE, in-memory) ----
+// (1) Per-user generation rate limit: each Gmail may start at most
+// GEN_LIMIT_PER_MIN generations per minute (image+video+song combined).
+// One user can never hog the whole server — everyone gets a fair turn.
+// (2) Per-provider create throttle: at most one new generation per
+// provider every GEN_THROTTLE_MS — simultaneous creates are spread out
+// in time (a queue) so the provider is never hit by 20 users at the
+// exact same instant. A create waits at most GEN_THROTTLE_WAIT_MS.
+// (3) Per-IP request rate limit + auto-block: every public request is
+// counted per IP in a 60s window. Over IP_LIMIT_PER_MIN requests/min
+// the IP is slowed (429). Over IP_BLOCK_PER_MIN it is auto-blocked at
+// once (blocked-ips.json + 'security' notification) — the same block
+// the admin-key attack guard uses. A request carrying the CORRECT
+// admin key is never rate-limited or blocked by these guards, so the
+// admin can never lock themselves out.
+function isAdminKeyRequest(req) {
+  try {
+    const k = process.env.MOVAI_ADMIN_KEY;
+    if (!k) return false;
+    const h = String(req.headers['authorization'] || '');
+    const m = /^Bearer\s+(.+)$/.exec(h);
+    return !!(m && m[1] === k);
+  } catch (e) { return false; }
+}
+const GEN_LIMIT_PER_MIN = 10;
+const GEN_WINDOW_MS = 60 * 1000;
+const _genRate = new Map();
+function genRateCheck(email) {
+  const now = Date.now();
+  const key = email || 'guest';
+  let rec = _genRate.get(key);
+  if (!rec || (now - rec.windowStart) >= GEN_WINDOW_MS) { rec = { count: 0, windowStart: now }; _genRate.set(key, rec); }
+  if (rec.count >= GEN_LIMIT_PER_MIN) {
+    return { ok: false, waitSec: Math.ceil((GEN_WINDOW_MS - (now - rec.windowStart)) / 1000) };
+  }
+  rec.count += 1;
+  return { ok: true };
+}
+const GEN_THROTTLE_MS = 800;
+const GEN_THROTTLE_WAIT_MS = 20000;
+const _genLastCreate = new Map();
+async function genThrottle(provider) {
+  const p = normProvider(provider) || 'unknown';
+  const start = Date.now();
+  for (;;) {
+    const last = _genLastCreate.get(p) || 0;
+    const now = Date.now();
+    if (now - last >= GEN_THROTTLE_MS) { _genLastCreate.set(p, now); return true; }
+    if (now - start >= GEN_THROTTLE_WAIT_MS) return false;
+    await new Promise((r) => setTimeout(r, Math.min(200, GEN_THROTTLE_MS - (now - last))));
+  }
+}
+const IP_LIMIT_PER_MIN = 120;
+const IP_BLOCK_PER_MIN = 300;
+const IP_WINDOW_MS = 60 * 1000;
+const _ipRate = new Map();
+function ipRateCheck(req) {
+  const ip = getClientIp(req);
+  if (!ip) return { ok: true };
+  if (loadBlockedIps().some((b) => b === ip)) return { ok: false, blocked: true };
+  const now = Date.now();
+  let rec = _ipRate.get(ip);
+  if (!rec || (now - rec.windowStart) >= IP_WINDOW_MS) { rec = { count: 0, windowStart: now }; _ipRate.set(ip, rec); }
+  rec.count += 1;
+  if (rec.count > IP_BLOCK_PER_MIN) {
+    _ipRate.delete(ip);
+    const blocked = loadBlockedIps();
+    if (!blocked.some((b) => b === ip)) {
+      blocked.push(ip);
+      saveBlockedIps(blocked);
+      ghFlushFile(BLOCKED_IPS_FILE).catch(() => {});
+      addNotification('security', '', '🚫 វាយប្រហារ · Auto-blocked attack', 'IP ' + ip + ' request ' + rec.count + ' ដងក្នុង 1 នាទី (spam/DDoS) — ត្រូវបានប្លុកដោយអូតូ');
+    }
+    return { ok: false, blocked: true };
+  }
+  if (rec.count > IP_LIMIT_PER_MIN) return { ok: false, rateLimited: true, retryAfter: Math.ceil((IP_WINDOW_MS - (now - rec.windowStart)) / 1000) };
+  return { ok: true };
+}
+// Enforce the per-user generation rate limit + the per-provider create
+// throttle for one generation create. Returns an error string to send,
+// or '' when the request may proceed.
+async function genFairnessGate(email, provider) {
+  const gr = genRateCheck(email);
+  if (!gr.ok) return 'បង្កើតច្រើនពេក — សូមរង់ចាំ ' + gr.waitSec + ' វិនាទី · Too many generations, please wait ' + gr.waitSec + 's';
+  const th = await genThrottle(provider);
+  if (!th) return 'Server រវល់ — សូមសាកល្បងម្តងទៀត · Server is busy, please try again';
+  return '';
+}
 function apiRoute(req, res, urlPath) {
+  // Attack protection: count this IP's requests (all /api/* + /uploads/*).
+  // A correct admin key is never rate-limited or blocked here (the admin
+  // can never lock themselves out — see isAdminKeyRequest).
+  if (!isAdminKeyRequest(req)) {
+    const ipc = ipRateCheck(req);
+    if (!ipc.ok) {
+      if (ipc.blocked) return sendJSON(res, 200, { ok: false, error: 'គណនីនេះត្រូវបានប្លុក · This account is blocked' });
+      if (ipc.rateLimited) { try { res.setHeader('Retry-After', String(ipc.retryAfter || 60)); } catch (e) {} return sendJSON(res, 429, { ok: false, error: 'Request ច្រើនពេក — សូមរង់ចាំ ' + (ipc.retryAfter || 60) + ' វិនាទី · Too many requests, please wait' }); }
+    }
+  }
   // ---- Generate Image & Video (free APIs) ----
   // Keys arrive with each request only (from the visitor's own browser).
   function genErrText(j, fb) {
@@ -1032,6 +1130,8 @@ function apiRoute(req, res, urlPath) {
       try {
         if (!body || typeof body.prompt !== 'string' || !body.prompt.trim()) return sendJSON(res, 200, { ok: false, error: 'សូមសរសេរ prompt ជាមុនសិន' });
         const provider = body.provider;
+        const _gateErr = await genFairnessGate(normEmail(body.email), provider);
+        if (_gateErr) return sendJSON(res, 200, { ok: false, error: _gateErr });
         const key = typeof body.key === 'string' ? body.key : '';
         const prompt = body.prompt.trim().slice(0, 2000);
         const width = Math.max(64, Math.min(2048, Number(body.width) || 768));
@@ -1171,6 +1271,8 @@ function apiRoute(req, res, urlPath) {
       try {
         if (!body || typeof body.prompt !== 'string' || !body.prompt.trim()) return sendJSON(res, 200, { ok: false, error: 'សូមសរសេរ prompt ជាមុនសិន' });
         const provider = body.provider;
+        const _gateErr = await genFairnessGate(normEmail(body.email), provider);
+        if (_gateErr) return sendJSON(res, 200, { ok: false, error: _gateErr });
         const reqKey = typeof body.key === 'string' ? body.key : '';
         const prompt = body.prompt.trim().slice(0, 4000);
         const duration = [5, 10].includes(Number(body.duration)) ? Number(body.duration) : 5;
@@ -1337,6 +1439,8 @@ function apiRoute(req, res, urlPath) {
       try {
         if (!body || (typeof body.prompt !== 'string' && typeof body.title !== 'string' && typeof body.lyrics !== 'string' && typeof body.style !== 'string')) return sendJSON(res, 200, { ok: false, error: 'សូមសរសេរ prompt ជាមុនសិន' });
         const provider = body.provider;
+        const _gateErr = await genFairnessGate(normEmail(body.email), provider);
+        if (_gateErr) return sendJSON(res, 200, { ok: false, error: _gateErr });
         const reqKey = typeof body.key === 'string' ? body.key : '';
         const title = typeof body.title === 'string' ? body.title.trim().slice(0, 200) : '';
         const lyrics = typeof body.lyrics === 'string' ? body.lyrics.trim().slice(0, 4000) : '';
@@ -1553,12 +1657,12 @@ function apiRoute(req, res, urlPath) {
     'MovAi is an image/video/3D/song generation website.',
     'Login is Google account ONLY — there is no other login method.',
     'New users get FREE 250 Image/Video Credit + 24 Song Credit via a gift CLAIM popup after first login (they must tap CLAIM, otherwise they stay at 0).',
-    'Media packages (purple): Monthly $25 = 11,000 Credit/month, Yearly $18/month billed $216/year = 140,000 Credit/year.',
-    'Song packages (orange): Free 24 Credit/month, Trial $5 = 750 Credit, Popular $10 = 1,500 Credit, Pro $22 = 3,750 Credit (12 Credit per song generation = 2 songs).',
+    'Media packages (purple): Monthly $25 = 11,000 Credit/month, Yearly $15/month billed $180/year = 140,000 Credit/year.',
+    'Song packages (lime): Free 24 Credit/month, Trial $5 = 750 Credit, Popular $10 = 1,500 Credit, Pro $22 = 3,750 Credit (12 Credit per song generation = 2 songs).',
     'FREE download limit: a free user can download songs 2 times for free — after 2 downloads they must buy a song package; package buyers can download freely (unlimited).',
     'Providers: Magic Hour, NovAI, MusicAPI, MovAi (Suno v6). ACE Music is LOCKED (no new API keys).',
     'The creator/admin is YEM SOKHOEUN, phone 081 914 728, Gmail sokhoeun7788@gmail.com, Telegram @yemsokhoeun_9999. For problems the user can contact the admin on Telegram @yemsokhoeun_9999.',
-    'RULES: Answer DIRECTLY and appropriately in the language the user writes (Khmer if they write Khmer, English if they write English). NEVER use pre-prepared or canned answers — every reply must be generated live from this prompt and the live context. NEVER invent prices, limits or features that are not in this prompt. If asked whether the system is down, slow or broken, use the live context (server uptime and provider status) to answer honestly and tell the user what is wrong. NAME: the chat header shows "MovAi AI" (the app name), NEVER the user\'s name — use the user\'s first name ONLY inside the chat when greeting them (for example "សួស្តី So Khoeun9"). STYLE: NEVER use markdown or formatting symbols — no asterisks (* **), no square brackets ([ ]), no backticks (`), no # headings, no > quotes, no (link) markup. Write plain natural text only. Instead of symbols, use EMOJIS to express emotion and make replies friendly (🤖 😂 😊 ❤️ 👍 🎵 🎬 ✨). THINK FIRST: before answering, think step by step about what the user actually asks, then answer ONLY that question — short and direct. Do NOT dump all the facts as a long list. Only give the details the user asked for. If the user asks a simple question, give a short simple answer. Never repeat the same long answer for every question.',
+    'RULES: Answer DIRECTLY and appropriately in the language the user writes (Khmer if they write Khmer, English if they write English). NEVER use pre-prepared or canned answers — every reply must be generated live from this prompt and the live context. NEVER invent prices, limits or features that are not in this prompt. If asked whether the system is down, slow or broken, use the live context (server uptime and provider status) to answer honestly and tell the user what is wrong. NAME: the chat header shows "MovAi AI" (the app name), NEVER the user\'s name. GREET: greet the user by their first name ONLY when the live context says this is their first message after 2 or more hours away — otherwise do NOT greet with their name at all, just answer directly. Never greet with the name twice in one conversation. STYLE: plain text ONLY — NEVER use markdown or any formatting symbols: no asterisks (* **), no square brackets ([ ]), no backticks (`), no # headings, no > quotes, no bullet symbols, no numbered-list symbols, no emojis, no decorative symbols of any kind. No links. Just plain sentences. LENGTH: answer in 1 to 3 short sentences ONLY. Answer ONLY the question the user asked. If the user asks HOW to do something, give ONLY the next step, not the whole guide. NEVER dump all the facts as a long list or a full guide. Never use bullet points or numbered lists unless the user explicitly asks for a list. If the user asks a simple question, give a short simple answer. Never repeat the same long answer for every question. THINK FIRST: before answering, think step by step about what the user actually asks, then answer ONLY that question.',
   ].join('\n');
   function chatLeaderValidate(body) {
     if (!body || typeof body !== 'object') return { ok: false, error: 'សូមសរសេរសំណួរជាមុនសិន · Please write a message first' };
@@ -1591,6 +1695,7 @@ function apiRoute(req, res, urlPath) {
       'Active providers — ' + fmtMode('image') + ' | ' + fmtMode('video') + ' | ' + fmtMode('song') + '.',
       'Groq AI chat key configured: ' + (groqConfigured ? 'yes' : 'no') + '.',
       'User: ' + userText + '.',
+      'Greet by name: ' + (chatGreetFlag(email) ? 'YES — this is the user\'s first message after 2+ hours away, greet them once by their first name, then answer.' : 'NO — do NOT greet with their name, just answer directly.') + '.',
     ].join('\n');
   }
   function chatThinkerCallGroq(systemPrompt, history, message, key) {
@@ -1620,7 +1725,32 @@ function apiRoute(req, res, urlPath) {
       return { ok: true, reply: content.trim() };
     }).catch((e) => ({ ok: false, error: 'Groq: ' + (e && e.message ? e.message : 'request failed'), status: 0 }));
   }
-  function chatDirectReply(text) { return String(text || '').trim(); }
+  // HARD LOCK on reply style (user order 2026-11-16): the model keeps
+  // emitting ** and emoji despite the prompt, so the server STRIPS every
+  // markdown marker and every emoji/decorative symbol from the reply
+  // before returning it. What reaches the user is plain text only.
+  function sanitizeChatReply(t) {
+    let s = String(t || '');
+    s = s.replace(/\*\*/g, '').replace(/\*/g, '').replace(/`/g, '');
+    s = s.replace(/^#{1,6}\s*/gm, '').replace(/^>\s*/gm, '');
+    s = s.replace(/\[([^\]]*)\]\([^)]*\)/g, '$1').replace(/[\[\]]/g, '');
+    s = s.replace(/[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}\u{2190}-\u{21FF}\u{2B00}-\u{2BFF}\u{FE0F}\u{20E3}\u{2022}\u{25AA}-\u{25FF}]/gu, '');
+    s = s.replace(/\n{3,}/g, '\n\n').trim();
+    return s;
+  }
+  function chatDirectReply(text) { return sanitizeChatReply(text); }
+  // Greet-by-name only once per conversation gap: the user is greeted by
+  // name ONLY when their previous chat was 2+ hours ago (or never). The
+  // map is in-memory; a server restart simply greets once more.
+  const _lastChatAt = new Map();
+  const CHAT_GREET_GAP_MS = 2 * 60 * 60 * 1000;
+  function chatGreetFlag(email) {
+    const now = Date.now();
+    const last = email ? _lastChatAt.get(email) : 0;
+    const greet = !last || (now - last) >= CHAT_GREET_GAP_MS;
+    if (email) _lastChatAt.set(email, now);
+    return greet;
+  }
   // POST /api/chat — {email?, message, history?} — PUBLIC (no admin key).
   // Runs the 5-stage pipeline above and returns {ok:true, reply}.
   if (req.method === 'POST' && urlPath === '/api/chat') {
