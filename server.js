@@ -3893,32 +3893,47 @@ function apiRoute(req, res, urlPath) {
   function warmMp3ForSongs(songs) {
     try {
       if (!Array.isArray(songs)) return;
+      // Only warm the first 3 songs per call — conversions are serialized
+      // (one at a time) so warming a whole feed would queue up minutes of
+      // background work on the 512 MB Free instance.
+      let n = 0;
       for (const s of songs) {
+        if (n >= 3) break;
         const u = s && (s.url || s.audioUrl || s.audio_url || s.streamUrl);
-        if (typeof u === 'string' && u.startsWith('http')) convertAndCacheMp3(u).catch(() => {});
+        if (typeof u === 'string' && u.startsWith('http')) { n++; convertAndCacheMp3(u).catch(() => {}); }
       }
     } catch (e) {}
   }
   // Convert a source audio URL to MP3 128kbps, cache it in uploads/, and
   // return the cached filename. Returns null on failure. If already cached
   // returns the cached filename immediately (no re-convert).
+  // MEMORY FIX (2026-11-16): the Free instance has only 512 MB and the
+  // server CRASHED twice (OOM) when several long songs converted at once
+  // (each holds ~50 MB WAV + ~50 MB PCM). Conversions now run ONE AT A
+  // TIME through a queue, and the WAV buffer is freed before encoding.
   const _mp3Converting = new Map();
+  let _mp3Queue = Promise.resolve();
   async function convertAndCacheMp3(u) {
     const cached = mp3CacheGet(u);
     if (cached) return path.basename(cached);
     if (_mp3Converting.has(u)) return _mp3Converting.get(u);
-    const p = (async () => {
+    const run = _mp3Queue.then(async () => {
+      const c2 = mp3CacheGet(u);
+      if (c2) return path.basename(c2);
       try {
         const ctrl = new AbortController();
         const t = setTimeout(() => ctrl.abort(), 180000);
         const r = await fetch(u, { signal: ctrl.signal, headers: { 'User-Agent': 'MovAi/1.0' } });
         clearTimeout(t);
         if (!r.ok) return null;
-        const buf = Buffer.from(await r.arrayBuffer());
+        let buf = Buffer.from(await r.arrayBuffer());
         let mp3;
         if (isMp3Bytes(buf)) mp3 = buf;
-        else if (buf.toString('ascii', 0, 4) === 'RIFF') { const pcm = wavParsePcm(buf); mp3 = await pcmToMp3(pcm, 128); }
-        else return null;
+        else if (buf.toString('ascii', 0, 4) === 'RIFF') {
+          const pcm = wavParsePcm(buf);
+          buf = null; // free the ~50 MB WAV before encoding
+          mp3 = await pcmToMp3(pcm, 128);
+        } else return null;
         const fname = 'mp3-' + mp3CacheKey(u) + '.mp3';
         fs.mkdirSync(path.join(DATA_DIR, 'uploads'), { recursive: true });
         fs.writeFileSync(path.join(DATA_DIR, 'uploads', fname), mp3);
@@ -3927,9 +3942,10 @@ function apiRoute(req, res, urlPath) {
         mp3CacheSave();
         return fname;
       } catch (e) { return null; }
-    })();
-    _mp3Converting.set(u, p);
-    try { return await p; } finally { _mp3Converting.delete(u); }
+    });
+    _mp3Queue = run.catch(() => {});
+    _mp3Converting.set(u, run);
+    try { return await run; } finally { _mp3Converting.delete(u); }
   }
   if (req.method === 'GET' && urlPath === '/api/gen/song/mp3') {
     // Handler is NOT async — run the async work in an IIFE (same pattern
