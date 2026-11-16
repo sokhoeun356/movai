@@ -458,7 +458,8 @@ html[data-mode="light"] .pkg-tab.media.on{color:#8f27c9}
 .pay-copy:active{filter:brightness(.93)}
 .pay-loading{font-size:0.8125rem;color:var(--muted);margin-top:12px;line-height:1.6}
 .pkg-credits{margin-top:2px;font-size:0.875rem;font-weight:900;color:var(--accent-text)}
-.pkg-feats{margin-top:5px;font-size:0.68rem;color:var(--muted);line-height:1.4;flex:1}
+.pkg-feats{margin-top:6px;font-size:0.72rem;color:var(--muted);line-height:1.55;flex:1}
+.pkg-feats>div+div{margin-top:3px}
 .pkg-card .btn{margin-top:8px;width:100%;padding:10px 16px;font-size:0.875rem;min-height:40px}
 /* Package cards carry NO brand/creator credit — «MovAi» + «YEM
    SOKHOEUN / Create by Owner» lives only on the free-video watermark
@@ -1230,9 +1231,9 @@ html[data-smooth="1"] .brand-frame,html[data-smooth="1"] .acct-chip,html[data-sm
       <button type="button" class="pkg-tab media" id="pkgTabMedia" role="tab" aria-selected="false" onclick="pkgSetTab('media')"><span data-i18n="pkgTabMedia">Create Video</span></button>
     </div>
     <div class="pkg-group-head" id="pkgHeadSong"><span class="gdot gdot-song"></span><h3 data-i18n="pkgGroupSong">សម្រាប់បទចម្រៀង · Song Credit</h3></div>
-    <div class="pkg-group-head" id="pkgHeadMedia" style="display:none"><span class="gdot gdot-media"></span><h3 data-i18n="pkgGroupMedia">សម្រាប់រូបភាព និង វីដេអូ · Image.Video Credit</h3></div>
-    <p class="pkg-group-note" id="pkgNoteSong" data-i18n="pkgGroupSongNote">កញ្ចប់ពណ៌ត្រួយចេក — ទិញហើយបានតែ Song Credit (ពណ៌ត្រួយចេក ដូច chip នៅខាងលើ) ប៉ុណ្ណោះ</p>
-    <p class="pkg-group-note" id="pkgNoteMedia" data-i18n="pkgGroupMediaNote" style="display:none">កញ្ចប់ពណ៌ស្វាយ — ទិញហើយបានតែ Image.Video Credit (ពណ៌ស្វាយ ដូច chip នៅខាងលើ) ប៉ុណ្ណោះ</p>
+    <div class="pkg-group-head" id="pkgHeadMedia" style="display:none"><span class="gdot gdot-media"></span><h3 data-i18n="pkgGroupMedia">សម្រាប់រូបភាព និង វីដេអូ · Image &amp; Video Credit</h3></div>
+    <p class="pkg-group-note" id="pkgNoteSong" data-i18n="pkgGroupSongNote">បន្ថែមតែ Song Credit ប៉ុណ្ណោះ — ប្រើសម្រាប់បង្កើតបទចម្រៀង</p>
+    <p class="pkg-group-note" id="pkgNoteMedia" data-i18n="pkgGroupMediaNote" style="display:none">បន្ថែមតែ Image &amp; Video Credit ប៉ុណ្ណោះ — ប្រើសម្រាប់បង្កើតរូបភាព និងវីដេអូ</p>
     <div class="pkg-pane on" id="pkgPaneSong">
     <div class="pkg-grid" id="songPkgGrid"></div>
     </div>
@@ -1244,9 +1245,12 @@ html[data-smooth="1"] .brand-frame,html[data-smooth="1"] .acct-chip,html[data-sm
         <p style="font-size:0.7rem;color:var(--muted);margin-top:1px" id="pkgBilled-yearly" data-i18n="pkgBilledYear">បង់ $216/ឆ្នាំ</p>
         <div class="pkg-credits" data-i18n="pkgCreditsYear">140,000 Credit/ឆ្នាំ</div>
         <div class="pkg-feats">
-          <div data-i18n="pkgFeatMedia">បង្កើតបានទាំងរូបភាព និងវីដេអូ</div>
-          <div data-i18n="pkgFeatPremium">បើក model Premium ទាំងអស់ (រូបភាព + វីដេអូ)</div>
-          <div data-i18n="pkgMediaOnlyNote">បានតែ Image.Video Credit (ពណ៌ស្វាយ) ប៉ុណ្ណោះ</div>
+          <div data-i18n="pkgFeatImgModels">រូបភាព · Z-Image Turbo · Qwen Image 2.1 · Flux 2 Klein · Krea 2</div>
+          <div data-i18n="pkgFeatVidModels">វីដេអូ · LTX 2.5 · MiniMax H3</div>
+          <div data-i18n="pkgFeatPremImg">Premium រូបភាព · GPT Image 2 · Nano Banana 2.1 · Nano Banana Pro</div>
+          <div data-i18n="pkgFeatPremVid">Premium វីដេអូ · Kling 3.0 · Kling 4.0 · Veo 3.1 · Seedance 2.5</div>
+          <div data-i18n="pkgDur365">រយៈពេល · 365 ថ្ងៃ (12 ខែ)</div>
+          <div data-i18n="pkgMediaOnlyNote">បានតែ Image &amp; Video Credit ប៉ុណ្ណោះ</div>
         </div>
         <button type="button" class="btn btn-green" id="pkgBuy-yearly" onclick="pkgBuyAsk('yearly')" data-i18n="pkgBuy">ទិញឥឡូវ</button>
       </div>
@@ -1255,9 +1259,12 @@ html[data-smooth="1"] .brand-frame,html[data-smooth="1"] .acct-chip,html[data-sm
         <div class="pkg-price" id="pkgPrice-monthly">$25<small data-i18n="pkgPerMonth">/ខែ</small></div>
         <div class="pkg-credits" data-i18n="pkgCreditsMonth">11,000 Credit/ខែ</div>
         <div class="pkg-feats">
-          <div data-i18n="pkgFeatMedia">បង្កើតបានទាំងរូបភាព និងវីដេអូ</div>
-          <div data-i18n="pkgFeatPremium">បើក model Premium ទាំងអស់ (រូបភាព + វីដេអូ)</div>
-          <div data-i18n="pkgMediaOnlyNote">បានតែ Image.Video Credit (ពណ៌ស្វាយ) ប៉ុណ្ណោះ</div>
+          <div data-i18n="pkgFeatImgModels">រូបភាព · Z-Image Turbo · Qwen Image 2.1 · Flux 2 Klein · Krea 2</div>
+          <div data-i18n="pkgFeatVidModels">វីដេអូ · LTX 2.5 · MiniMax H3</div>
+          <div data-i18n="pkgFeatPremImg">Premium រូបភាព · GPT Image 2 · Nano Banana 2.1 · Nano Banana Pro</div>
+          <div data-i18n="pkgFeatPremVid">Premium វីដេអូ · Kling 3.0 · Kling 4.0 · Veo 3.1 · Seedance 2.5</div>
+          <div data-i18n="pkgDur30">រយៈពេល · 30 ថ្ងៃ (1 ខែ)</div>
+          <div data-i18n="pkgMediaOnlyNote">បានតែ Image &amp; Video Credit ប៉ុណ្ណោះ</div>
         </div>
         <button type="button" class="btn btn-green" id="pkgBuy-monthly" onclick="pkgBuyAsk('monthly')" data-i18n="pkgBuy">ទិញឥឡូវ</button>
       </div>
@@ -1555,13 +1562,14 @@ km:{
  pkgMonthly:'ប្រចាំខែ',pkgYearly:'ប្រចាំឆ្នាំ',pkgPerMonth:'/ខែ',pkgBilledYear:'បង់ $216/ឆ្នាំ',
  pkgCreditsMonth:'11,000 Credit/ខែ',pkgCreditsYear:'140,000 Credit/ឆ្នាំ',
  pkgFeatMedia:'បង្កើតបានទាំងរូបភាព និងវីដេអូ',
- pkgFeatPremium:'បើក model Premium ទាំងអស់ (រូបភាព + វីដេអូ)',
+ pkgFeatPremium:'បើក Model Premium ទាំងអស់',
+ pkgModelSong:'ម៉ូដែល · Model v6',pkgSongPerGen:'បង្កើត 1 ដង · 12 Credit · បាន 2 បទ',pkgDlFree2:'Download · បាន 2 ដងប៉ុណ្ណោះ',pkgDlUnlimited:'Download · ឥតកំណត់',pkgDur30:'រយៈពេល · 30 ថ្ងៃ (1 ខែ)',pkgDur365:'រយៈពេល · 365 ថ្ងៃ (12 ខែ)',pkgFeatImgModels:'រូបភាព · Z-Image Turbo · Qwen Image 2.1 · Flux 2 Klein · Krea 2',pkgFeatVidModels:'វីដេអូ · LTX 2.5 · MiniMax H3',pkgFeatPremImg:'Premium រូបភាព · GPT Image 2 · Nano Banana 2.1 · Nano Banana Pro',pkgFeatPremVid:'Premium វីដេអូ · Kling 3.0 · Kling 4.0 · Veo 3.1 · Seedance 2.5',
  pkgBuy:'ទិញឥឡូវ',pkgActive:'កំពុងប្រើកញ្ចប់នេះ',pkgTabSong:'Create Music',pkgTabMedia:'Create Video',pkgDragHint:'អូសចុះក្រោមដើម្បីបិទ · Drag down to close',pkgWaitingAdmin:'រង់ចាំ Admin អនុម័ត',pkgReqSent:'បានផ្ញើសំណើរទិញទៅ Admin ហើយ — រង់ចាំ Admin អនុម័ត ទើប Credit ចូលគណនីរបស់អ្នក',pkgReqFail:'ផ្ញើសំណើរមិនបានទេ — Server មិនទាន់ភ្ជាប់ សូមព្យាយាមម្ដងទៀតបន្តិចក្រោយ',pkgReqSending:'កំពុងផ្ញើសំណើរទិញទៅ Admin…',
  pkgYourPlan:'កញ្ចប់របស់អ្នក',pkgActiveUntil:'ប្រើបានដល់ {d}',
- pkgGroupMedia:'សម្រាប់រូបភាព និង វីដេអូ · Image.Video Credit',pkgGroupMediaNote:'កញ្ចប់ពណ៌ស្វាយ — ទិញហើយបានតែ Image.Video Credit (ពណ៌ស្វាយ ដូច chip នៅខាងលើ) ប៉ុណ្ណោះ',
- pkgGroupSong:'សម្រាប់បទចម្រៀង · Song Credit',pkgGroupSongNote:'កញ្ចប់ពណ៌ត្រួយចេក — ទិញហើយបានតែ Song Credit (ពណ៌ត្រួយចេក ដូច chip នៅខាងលើ) ប៉ុណ្ណោះ',
- songFreeNote:'Credit ហ្វ្រី 24/ខែ — ទទួលបានដោយស្វ័យប្រវត្តិ ពេលចុះឈ្មោះគណនីថ្មី',songFreeAuto:'ទទួលដោយស្វ័យប្រវត្តិ',
- songPkgOnlyNote:'បានតែ Song Credit (ពណ៌ត្រួយចេក) ប៉ុណ្ណោះ',pkgMediaOnlyNote:'បានតែ Image.Video Credit (ពណ៌ស្វាយ) ប៉ុណ្ណោះ',profileSongPlan:'កញ្ចប់បទចម្រៀង',
+ pkgGroupMedia:'សម្រាប់រូបភាព និង វីដេអូ · Image & Video Credit',pkgGroupMediaNote:'បន្ថែមតែ Image & Video Credit ប៉ុណ្ណោះ — ប្រើសម្រាប់បង្កើតរូបភាព និងវីដេអូ',
+ pkgGroupSong:'សម្រាប់បទចម្រៀង · Song Credit',pkgGroupSongNote:'បន្ថែមតែ Song Credit ប៉ុណ្ណោះ — ប្រើសម្រាប់បង្កើតបទចម្រៀង',
+ songFreeNote:'ទទួលដោយស្វ័យប្រវត្តិ ពេលចុះឈ្មោះគណនីថ្មី',songFreeAuto:'ទទួលដោយស្វ័យប្រវត្តិ',
+ songPkgOnlyNote:'បានតែ Song Credit ប៉ុណ្ណោះ',pkgMediaOnlyNote:'បានតែ Image & Video Credit ប៉ុណ្ណោះ',profileSongPlan:'កញ្ចប់បទចម្រៀង',
  songDoneFmt:'ទិញរួចរាល់! កញ្ចប់បទចម្រៀង {name} បានបើក ហើយ Song Credit {c} បានបន្ថែមចូលគណនីរបស់អ្នកហើយ',
  pkgPremium:'Premium',mhPerSec:'Credit/វិនាទី',adminLock:'🔐 ចាក់សោ',provOnline:'Online Live',provBusy:'រវល់',provProblem:'មានបញ្ហា',
  pkgSheetTitle:'សំណើរទិញ',pkgSheetPlan:'កញ្ចប់',pkgCreditsLbl:'Credit ដែលទទួលបាន',pkgTotal:'តម្លៃសរុប',
@@ -1739,13 +1747,14 @@ en:{
  pkgMonthly:'Monthly',pkgYearly:'Yearly',pkgPerMonth:'/month',pkgBilledYear:'Billed $216/year',
  pkgCreditsMonth:'11,000 credits/month',pkgCreditsYear:'140,000 credits/year',
  pkgFeatMedia:'Create both images and videos',
- pkgFeatPremium:'Unlocks every Premium model (image + video)',
+ pkgFeatPremium:'Unlocks every Premium model',
+ pkgModelSong:'Model · Model v6',pkgSongPerGen:'Per generation · 12 credits · 2 songs',pkgDlFree2:'Downloads · 2 only',pkgDlUnlimited:'Downloads · Unlimited',pkgDur30:'Duration · 30 days (1 month)',pkgDur365:'Duration · 365 days (12 months)',pkgFeatImgModels:'Image · Z-Image Turbo · Qwen Image 2.1 · Flux 2 Klein · Krea 2',pkgFeatVidModels:'Video · LTX 2.5 · MiniMax H3',pkgFeatPremImg:'Premium image · GPT Image 2 · Nano Banana 2.1 · Nano Banana Pro',pkgFeatPremVid:'Premium video · Kling 3.0 · Kling 4.0 · Veo 3.1 · Seedance 2.5',
  pkgBuy:'Buy now',pkgActive:'This is your active package',pkgTabSong:'Create Music',pkgTabMedia:'Create Video',pkgDragHint:'Drag down to close',pkgWaitingAdmin:'Waiting for Admin approval',pkgReqSent:'Your purchase request was sent to the Admin — credits will arrive after the Admin approves it',pkgReqFail:'Could not send the request — the server is not connected yet, please try again in a little while',pkgReqSending:'Sending your purchase request to the Admin…',
  pkgYourPlan:'Your package',pkgActiveUntil:'Active until {d}',
- pkgGroupMedia:'For Image & Video · Image.Video Credit',pkgGroupMediaNote:'Purple packages — they add Image.Video Credit only (purple, like the credit chip at the top)',
- pkgGroupSong:'For Songs · Song Credit',pkgGroupSongNote:'Lime green packages — they add Song Credit only (lime green, like the credit chip at the top)',
- songFreeNote:'24 free credits/month — granted automatically when a new account signs up',songFreeAuto:'Automatic',
- songPkgOnlyNote:'Song Credit only (lime green)',pkgMediaOnlyNote:'Image.Video Credit only (purple)',profileSongPlan:'Song package',
+ pkgGroupMedia:'For Image & Video · Image & Video Credit',pkgGroupMediaNote:'Adds Image & Video Credit only — for creating images and videos',
+ pkgGroupSong:'For Songs · Song Credit',pkgGroupSongNote:'Adds Song Credit only — for creating songs',
+ songFreeNote:'Granted automatically when a new account signs up',songFreeAuto:'Automatic',
+ songPkgOnlyNote:'Song Credit only',pkgMediaOnlyNote:'Image & Video Credit only',profileSongPlan:'Song package',
  songDoneFmt:'Purchase complete! The {name} song package is active and {c} Song Credit were added to your account',
  pkgPremium:'Premium',mhPerSec:'credits/sec',adminLock:'🔐 Locked',provOnline:'Online Live',provBusy:'Busy',provProblem:'Problem',
  pkgSheetTitle:'Purchase request',pkgSheetPlan:'Package',pkgCreditsLbl:'Credits you receive',pkgTotal:'Total',
@@ -2795,7 +2804,7 @@ function songPkgRender(){
     h+='<span class="pkg-name">'+escHtml(loc(pl.name))+'</span>';
     h+='<div class="pkg-price">'+(pl.free?('$'+pl.price):pkgPriceHtml(pl,'<small>'+escHtml(tx('pkgPerMonth'))+'</small>'))+'</div>';
     h+='<div class="pkg-credits">'+pkgFmtNum(pl.credits)+' Credit'+per+'</div>';
-    h+='<div class="pkg-feats"><div>'+escHtml(tx('songCostSuno')).replace(/^MovAi/,provNameHtml('MovAi'))+'</div><div>'+escHtml(tx('songPkgOnlyNote'))+'</div>'+(pl.free?'<div>'+escHtml(tx('songFreeNote'))+'</div>':'')+'</div>';
+    h+='<div class="pkg-feats"><div>'+escHtml(tx('pkgModelSong'))+'</div><div>'+escHtml(tx('pkgSongPerGen'))+'</div><div>'+escHtml(tx(pl.free?'pkgDlFree2':'pkgDlUnlimited'))+'</div><div>'+escHtml(tx('pkgDur30'))+'</div><div>'+escHtml(tx('songPkgOnlyNote'))+'</div>'+(pl.free?'<div>'+escHtml(tx('songFreeNote'))+'</div>':'')+'</div>';
     if(pl.free){
       h+='<button type="button" class="btn btn-free" disabled>'+escHtml(tx('songFreeAuto'))+'</button>';
     }else{
