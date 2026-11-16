@@ -3956,6 +3956,18 @@ function apiRoute(req, res, urlPath) {
     })();
     return;
   }
+  // GET /api/gen/song/mp3-warm?u=<audio-url> — warm the MP3 cache in the
+  // background; returns immediately {ok:true, cached}. The website calls
+  // this when a song is shown/played so the MP3 is ready before the user
+  // taps Download (the download then starts instantly).
+  if (req.method === 'GET' && urlPath === '/api/gen/song/mp3-warm') {
+    const qp = new URL(req.url, 'http://localhost').searchParams;
+    const u = qp.get('u') || '';
+    if (!u || !/^https?:\/\//i.test(u)) return sendJSON(res, 400, { ok: false, error: 'missing u' });
+    const already = !!mp3CacheGet(u);
+    if (!already) convertAndCacheMp3(u).catch(() => {});
+    return sendJSON(res, 200, { ok: true, cached: already });
+  }
   // GET /api/public/provider-status — PUBLIC (no admin key). API key
   // health for the website's red/green indicators: green = working,
   // red = exhausted (out of credits/quota/auth failed), unknown = not
