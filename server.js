@@ -3461,12 +3461,21 @@ function apiRoute(req, res, urlPath) {
         return n;
       }
       const todayStart = nowMs - DAY;
+      const yearStart = nowMs - 365 * DAY;
       let songsToday = 0, videosToday = 0, imagesToday = 0, failuresToday = 0;
+      let songsYear = 0, videosYear = 0, imagesYear = 0, failuresYear = 0;
       const failures = [];
       for (const r of act) {
         if (!r || !r.at) continue;
         const t = Date.parse(r.at);
-        if (!Number.isFinite(t) || t < todayStart) continue;
+        if (!Number.isFinite(t)) continue;
+        if (t >= yearStart) {
+          if (r.mode === 'song' && r.ok) songsYear++;
+          else if (r.mode === 'video' && r.ok) videosYear++;
+          else if (r.mode === 'image' && r.ok) imagesYear++;
+          if ((r.mode === 'image' || r.mode === 'video' || r.mode === 'song') && r.ok === false) failuresYear++;
+        }
+        if (t < todayStart) continue;
         if (r.mode === 'song' && r.ok) songsToday++;
         else if (r.mode === 'video' && r.ok) videosToday++;
         else if (r.mode === 'image' && r.ok) imagesToday++;
@@ -3475,16 +3484,39 @@ function apiRoute(req, res, urlPath) {
           failures.push({ at: r.at, mode: r.mode, provider: r.provider || '', error: r.error || '' });
         }
       }
+      // Public totals (from the real public feed) + recent activity so the
+      // Admin tracking page shows real numbers everywhere, immediately.
+      // NOTE: read public.json directly — loadPublicPosts()/PUBLIC_FILE are
+      // declared later in this handler, so calling them here throws a TDZ
+      // ReferenceError and the catch below would return all zeros.
+      let pubPosts = [];
+      try {
+        const _pj = JSON.parse(fs.readFileSync(path.join(DATA_DIR, 'public.json'), 'utf8'));
+        if (Array.isArray(_pj)) pubPosts = _pj.filter((p) => p && p.visibility === 'public');
+      } catch (e) {}
+      let publicPosts = pubPosts.length, publicViews = 0, publicLikes = 0, publicDownloads = 0, songsTotal = 0, mediaTotal = 0;
+      for (const p of pubPosts) {
+        publicViews += (p.views || 0);
+        publicLikes += (p.likes || 0);
+        publicDownloads += (p.downloads || 0);
+        if (p.mode === 'song') songsTotal++;
+        else mediaTotal++;
+      }
+      const recentActivity = act.slice(-20).reverse().map((r) => ({ at: r.at || '', email: r.email || '', mode: r.mode || '', ok: r.ok !== false, error: r.error || '' }));
       return sendJSON(res, 200, { ok: true, stats: {
         usersToday: distinctSyncUsers(1),
         usersWeek: distinctSyncUsers(7),
         usersMonth: distinctSyncUsers(30),
+        usersYear: distinctSyncUsers(365),
         songsToday, videosToday, imagesToday,
         failuresToday,
+        songsYear, videosYear, imagesYear, failuresYear,
         recentErrors: failures.slice(-20).reverse(),
+        publicPosts, publicViews, publicLikes, publicDownloads, songsTotal, mediaTotal,
+        recentActivity,
       }});
     } catch (e) {
-      return sendJSON(res, 200, { ok: true, stats: { usersToday: 0, usersWeek: 0, usersMonth: 0, songsToday: 0, videosToday: 0, imagesToday: 0, failuresToday: 0, recentErrors: [] } });
+      return sendJSON(res, 200, { ok: true, stats: { usersToday: 0, usersWeek: 0, usersMonth: 0, usersYear: 0, songsToday: 0, videosToday: 0, imagesToday: 0, failuresToday: 0, songsYear: 0, videosYear: 0, imagesYear: 0, failuresYear: 0, recentErrors: [], publicPosts: 0, publicViews: 0, publicLikes: 0, publicDownloads: 0, songsTotal: 0, mediaTotal: 0, recentActivity: [] } });
     }
   }
   // ---- Notifications ----
@@ -3669,7 +3701,7 @@ function apiRoute(req, res, urlPath) {
   }
   // Public view of a post. likedBy (liker emails) is never exposed.
   function pubPost(p) {
-    return { id: p.id, email: p.email, name: p.name || '', userId: p.userId || '', mode: p.mode, title: p.title, url: p.url, cover: p.cover || '', aspect: p.aspect || '', youtube: p.youtube || '', youtubeChannel: p.youtubeChannel || '', visibility: p.visibility, likes: p.likes || 0, views: p.views || 0, createdAt: p.createdAt };
+    return { id: p.id, email: p.email, name: p.name || '', userId: p.userId || '', mode: p.mode, title: p.title, url: p.url, cover: p.cover || '', aspect: p.aspect || '', youtube: p.youtube || '', youtubeChannel: p.youtubeChannel || '', visibility: p.visibility, likes: p.likes || 0, views: p.views || 0, downloads: p.downloads || 0, createdAt: p.createdAt };
   }
   // ---- File uploads for the Admin app Post form (MP3 + cover image) ----
   // POST /api/public/upload — ADMIN KEY required. JSON {kind: 'audio'|'image',
@@ -3881,7 +3913,7 @@ function apiRoute(req, res, urlPath) {
         userId: typeof body.userId === 'string' ? body.userId.trim().slice(0, 50) : '',
         mode, title, url,
         cover: typeof body.cover === 'string' ? body.cover.trim().slice(0, 2000) : '',
-        aspect, youtube, youtubeChannel, visibility, likes: 0, views: 0, likedBy: [], createdAt: now,
+        aspect, youtube, youtubeChannel, visibility, likes: 0, views: 0, downloads: 0, likedBy: [], createdAt: now,
       };
       posts.push(p);
       if (posts.length > PUBLIC_MAX) posts.splice(0, posts.length - PUBLIC_MAX);
@@ -3976,6 +4008,23 @@ function apiRoute(req, res, urlPath) {
       savePublicPosts(posts);
       await ghFlushFile(PUBLIC_FILE);
       return sendJSON(res, 200, { ok: true, views: p.views });
+    }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
+    return;
+  }
+  // POST /api/public/download — PUBLIC. {postId}. Counts one download.
+  // Mirrors /api/public/view: increment, save, await the GitHub flush so
+  // the count is locked in and never lost on restart.
+  if (req.method === 'POST' && urlPath === '/api/public/download') {
+    readJSONBody(req, 64 * 1024).then(async (body) => {
+      const postId = typeof body.postId === 'string' ? body.postId.trim() : '';
+      if (!postId) return sendJSON(res, 200, { ok: false, error: 'សូមដាក់ postId' });
+      const posts = loadPublicPosts();
+      const p = posts.find((x) => x.id === postId);
+      if (!p) return sendJSON(res, 404, { ok: false, error: 'រក post នេះមិនឃើញទេ' });
+      p.downloads = (p.downloads || 0) + 1;
+      savePublicPosts(posts);
+      await ghFlushFile(PUBLIC_FILE);
+      return sendJSON(res, 200, { ok: true, downloads: p.downloads });
     }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
     return;
   }
