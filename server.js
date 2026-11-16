@@ -1965,7 +1965,7 @@ function apiRoute(req, res, urlPath) {
       'Active providers — ' + fmtMode('image') + ' | ' + fmtMode('video') + ' | ' + fmtMode('song') + '.',
       'Groq AI chat key configured: ' + (groqConfigured ? 'yes' : 'no') + '.',
       'User: ' + userText + '.',
-      'Greet by name: ' + (chatGreetFlag(email) ? 'YES — this is the user\'s first message after 2+ hours away, greet them once by their first name, then answer.' : 'NO — do NOT greet with their name, just answer directly.') + '.',
+      'Greet by name: ' + (chatGreetFlag(email) ? 'YES — this is the user\'s first message after 2+ hours away, greet them once by their FULL name (first name plus last name together, never just the first name alone), then answer.' : 'NO — do NOT greet with their name, just answer directly.') + '.',
     ].join('\n');
   }
   // Kimi K2 does NOT respond on Groq for these keys (verified 2026-11-16:
