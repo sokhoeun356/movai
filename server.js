@@ -549,6 +549,24 @@ async function deductForGeneration(email, mediaCost, songCost, reason) {
   }
   return { ok: true, credits: Math.floor(numOr(u.credits, 0)), songCredits: Math.floor(numOr(u.songCredits, 0)) };
 }
+// Refund a generation charge (provider failed AFTER we deducted).
+// Adds the credits back and logs a 'refund' grant entry.
+async function refundForGeneration(email, mediaCost, songCost, reason) {
+  const em = normEmail(email);
+  if (!em) return { ok: true };
+  const users = loadUsers();
+  const u = users[em];
+  if (!u) return { ok: true };
+  const mCost = Math.floor(numOr(mediaCost, 0));
+  const sCost = Math.floor(numOr(songCost, 0));
+  if (mCost > 0) u.credits = Math.floor(numOr(u.credits, 0)) + mCost;
+  if (sCost > 0) u.songCredits = Math.floor(numOr(u.songCredits, 0)) + sCost;
+  u.updatedAt = new Date().toISOString();
+  saveUsers(users);
+  await ghFlushFile(USERS_FILE);
+  logGrant({ email: em, credits: mCost, songCredits: sCost, note: 'refund: ' + (reason || 'generation failed'), at: u.updatedAt });
+  return { ok: true, credits: Math.floor(numOr(u.credits, 0)), songCredits: Math.floor(numOr(u.songCredits, 0)) };
+}
 
 // Activity log (./data/activity.json) — one record per generation attempt
 // (create calls only: /api/gen/image, /api/gen/video, /api/gen/song) and
@@ -1674,6 +1692,11 @@ function apiRoute(req, res, urlPath) {
           // Magic Hour image via the admin-stored keys (browser sends no
           // key). Rotates to the next key when one is exhausted.
           const model = typeof body.model === 'string' && body.model.trim() ? body.model.trim().slice(0, 100) : 'z-image-turbo';
+          // Deduct FIRST (before the provider call) so the user account,
+          // the server, and the Admin all show the same reduced balance
+          // the moment Generate is tapped. Refunded below if the provider fails.
+          const _dedImg = await deductForGeneration(body.email, imgCost, 0, 'image:magichour:' + model);
+          if (!_dedImg.ok) return sendJSON(res, 200, { ok: false, error: _dedImg.error || 'Credit មិនគ្រប់ទេ', needBuy: true, kind: 'media', balance: _dedImg.balance, cost: imgCost });
           let out;
           try {
             out = await withProviderKeyRotation('magichour', async (k) => {
@@ -1684,10 +1707,10 @@ function apiRoute(req, res, urlPath) {
               throw rotErr('Magic Hour: ' + genErrText(j, 'HTTP ' + r.status), r.status);
             }, key);
           } catch (e) {
+            await refundForGeneration(body.email, imgCost, 0, 'image:magichour:' + model + ' failed');
             if (e && e.noKey) return sendJSON(res, 200, { ok: false, error: 'Admin មិនទាន់ដាក់ Magic Hour Key ទេ' });
             return sendJSON(res, 200, { ok: false, error: (e && e.message) || 'Magic Hour: request failed' });
           }
-          const _dedImg = await deductForGeneration(body.email, imgCost, 0, 'image:magichour:' + model);
           return sendJSON(res, 200, { ok: true, jobId: out.jobId, credits: _dedImg.credits, songCredits: _dedImg.songCredits });
         }
         if (provider === 'novai') {
@@ -1856,6 +1879,11 @@ function apiRoute(req, res, urlPath) {
           const height = Number(body.height) || 432;
           const aspect = width >= height ? '16:9' : '9:16';
           const resName = { 480: '480p', 720: '720p', 1080: '1080p', 4000: '4k' }[Number(body.res)] || '720p';
+          // Deduct FIRST (before the provider call) so the user account,
+          // the server, and the Admin all show the same reduced balance
+          // the moment Generate is tapped. Refunded below if the provider fails.
+          const _dedVid = await deductForGeneration(body.email, vidCost, 0, 'video:magichour:' + duration + 's');
+          if (!_dedVid.ok) return sendJSON(res, 200, { ok: false, error: _dedVid.error || 'Credit មិនគ្រប់ទេ', needBuy: true, kind: 'media', balance: _dedVid.balance, cost: vidCost });
           let out;
           try {
             out = await withProviderKeyRotation('magichour', async (k) => {
@@ -1865,10 +1893,10 @@ function apiRoute(req, res, urlPath) {
               throw rotErr('Magic Hour: ' + genErrText(j, 'HTTP ' + r.status), r.status);
             }, reqKey);
           } catch (e) {
+            await refundForGeneration(body.email, vidCost, 0, 'video:magichour:' + duration + 's failed');
             if (e && e.noKey) return sendJSON(res, 200, { ok: false, error: 'Admin មិនទាន់ដាក់ Magic Hour Key ទេ' });
             return sendJSON(res, 200, { ok: false, error: (e && e.message) || 'Magic Hour: request failed' });
           }
-          const _dedVid = await deductForGeneration(body.email, vidCost, 0, 'video:magichour:' + duration + 's');
           return sendJSON(res, 200, { ok: true, jobId: out.jobId, credits: _dedVid.credits, songCredits: _dedVid.songCredits });
         }
         if (provider === 'tavus') {
@@ -2084,6 +2112,11 @@ function apiRoute(req, res, urlPath) {
             const desc = parts.join('. ').slice(0, 4000) || prompt;
             reqBody = { custom_mode: false, mv: 'sonic-v6', gpt_description_prompt: desc };
           }
+          // Deduct FIRST (before the provider call) so the user account,
+          // the server, and the Admin all show the same reduced balance
+          // the moment Generate is tapped. Refunded below if the provider fails.
+          const _ded = await deductForGeneration(body.email, SONG_POOL === 'media' ? SONG_COST : 0, SONG_POOL === 'media' ? 0 : SONG_COST, 'song:' + provider);
+          if (!_ded.ok) return sendJSON(res, 200, { ok: false, error: _ded.error || 'Credit មិនគ្រប់ទេ', needBuy: true, kind: SONG_POOL, balance: _ded.balance, cost: SONG_COST });
           let out;
           try {
             out = await withProviderKeyRotation('musicapi', async (k) => {
@@ -2094,10 +2127,10 @@ function apiRoute(req, res, urlPath) {
               throw rotErr('MusicAPI: ' + genErrText(j, 'HTTP ' + r.status), r.status);
             }, reqKey);
           } catch (e) {
+            await refundForGeneration(body.email, SONG_POOL === 'media' ? SONG_COST : 0, SONG_POOL === 'media' ? 0 : SONG_COST, 'song:' + provider + ' failed');
             if (e && e.noKey) return sendJSON(res, 200, { ok: false, error: 'Admin មិនទាន់ដាក់ MusicAPI Key ទេ' });
             return sendJSON(res, 200, { ok: false, error: (e && e.message) || 'MusicAPI: request failed' });
           }
-          const _ded = await deductForGeneration(body.email, SONG_POOL === 'media' ? SONG_COST : 0, SONG_POOL === 'media' ? 0 : SONG_COST, 'song:' + provider);
           return sendJSON(res, 200, { ok: true, jobId: out.jobId, credits: _ded.credits, songCredits: _ded.songCredits });
         }
         if (provider === 'suno') {
@@ -2124,6 +2157,8 @@ function apiRoute(req, res, urlPath) {
           };
           if (voice === 'male') genBody.vocalGender = 'm';
           else if (voice === 'female') genBody.vocalGender = 'f';
+          const _ded = await deductForGeneration(body.email, SONG_POOL === 'media' ? SONG_COST : 0, SONG_POOL === 'media' ? 0 : SONG_COST, 'song:' + provider);
+          if (!_ded.ok) return sendJSON(res, 200, { ok: false, error: _ded.error || 'Credit មិនគ្រប់ទេ', needBuy: true, kind: SONG_POOL, balance: _ded.balance, cost: SONG_COST });
           let out;
           try {
             out = await withProviderKeyRotation('suno', async (k, endpoint) => {
@@ -2136,9 +2171,9 @@ function apiRoute(req, res, urlPath) {
               throw rotErr('Suno: ' + sunoErrText(j, 'HTTP ' + r.status), r.status);
             }, '', sunoKeys);
           } catch (e) {
+            await refundForGeneration(body.email, SONG_POOL === 'media' ? SONG_COST : 0, SONG_POOL === 'media' ? 0 : SONG_COST, 'song:' + provider + ' failed');
             return sendJSON(res, 200, { ok: false, error: (e && e.message) || 'Suno: request failed' });
           }
-          const _ded = await deductForGeneration(body.email, SONG_POOL === 'media' ? SONG_COST : 0, SONG_POOL === 'media' ? 0 : SONG_COST, 'song:' + provider);
           return sendJSON(res, 200, { ok: true, jobId: out.jobId, credits: _ded.credits, songCredits: _ded.songCredits });
         }
         if (provider === 'magichour') {
@@ -2172,6 +2207,8 @@ function apiRoute(req, res, urlPath) {
               prompt: mhPrompt,
             },
           };
+          const _ded = await deductForGeneration(body.email, SONG_POOL === 'media' ? SONG_COST : 0, SONG_POOL === 'media' ? 0 : SONG_COST, 'song:' + provider);
+          if (!_ded.ok) return sendJSON(res, 200, { ok: false, error: _ded.error || 'Credit មិនគ្រប់ទេ', needBuy: true, kind: SONG_POOL, balance: _ded.balance, cost: SONG_COST });
           let out;
           try {
             out = await withProviderKeyRotation('magichour', async (k) => {
@@ -2182,10 +2219,10 @@ function apiRoute(req, res, urlPath) {
               throw rotErr('Magic Hour: ' + genErrText(j, 'HTTP ' + r.status), r.status);
             });
           } catch (e) {
+            await refundForGeneration(body.email, SONG_POOL === 'media' ? SONG_COST : 0, SONG_POOL === 'media' ? 0 : SONG_COST, 'song:' + provider + ' failed');
             if (e && e.noKey) return sendJSON(res, 200, { ok: false, error: 'Admin មិនទាន់ដាក់ Magic Hour Key ទេ' });
             return sendJSON(res, 200, { ok: false, error: (e && e.message) || 'Magic Hour: request failed' });
           }
-          const _ded = await deductForGeneration(body.email, SONG_POOL === 'media' ? SONG_COST : 0, SONG_POOL === 'media' ? 0 : SONG_COST, 'song:' + provider);
           return sendJSON(res, 200, { ok: true, jobId: out.jobId, credits: _ded.credits, songCredits: _ded.songCredits });
         }
         return sendJSON(res, 200, { ok: false, error: 'Provider មិនស្គាល់ទេ' });
