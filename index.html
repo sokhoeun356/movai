@@ -910,6 +910,13 @@ html[data-smooth="1"] .dock{background-color:rgba(var(--glass-tint),.96)}
 .chat-empty svg{width:52px;height:52px;display:block;margin:0 auto;color:var(--faint)}
 .chat-empty p{font-size:0.875rem;line-height:1.7;margin-top:10px}
 .chat-bubble{max-width:82%;padding:10px 13px;font-size:0.9375rem;line-height:1.65;overflow-wrap:break-word;white-space:pre-wrap}
+/* Robot avatar beside EVERY AI answer (owner order 2026-11-16): each
+   AI bubble sits in a row with the same robot mark as the chat header
+   on its left, so an answer is never shown without its robot. */
+.chat-row{display:flex;align-items:flex-start;gap:8px;align-self:flex-start;max-width:94%}
+.chat-row .chat-bubble{flex:1 1 auto;min-width:0;max-width:100%}
+.chat-msg-avatar{width:30px;height:30px;border-radius:50%;flex:0 0 auto;background:var(--accent-fill);color:#0d1005;display:flex;align-items:center;justify-content:center;margin-top:2px}
+.chat-msg-avatar svg{width:19px;height:19px;display:block}
 .chat-bubble.user{align-self:flex-end;background:var(--accent-fill);color:#0d1005;border-radius:17px 17px 5px 17px;font-weight:600}
 .chat-bubble.ai{align-self:flex-start;background:var(--card2);border:1px solid var(--line);color:var(--text);border-radius:17px 17px 17px 5px}
 /* Long AI answers collapse into ONE block (owner order 2026-11-16):
@@ -931,10 +938,39 @@ html[data-smooth="1"] .dock{background-color:rgba(var(--glass-tint),.96)}
    text and OUTSIDE the collapsible .chat-txt scroll area, so it is
    always visible and tappable without expanding the answer. Tapping
    it copies the FULL answer text and flashes «Copied ✓». */
-.chat-copy-row{display:flex;justify-content:flex-end;margin-top:8px}
-.chat-copy-btn{border:1px solid var(--line2);background:transparent;color:var(--accent-text);border-radius:999px;padding:5px 13px;font-size:0.75rem;font-weight:800;font-family:inherit;cursor:pointer;line-height:1.35;min-height:32px;white-space:nowrap}
+.chat-copy-row{display:flex;justify-content:flex-end;align-items:center;gap:6px;margin-top:8px}
+/* Copy is a SMALL pill now (owner order 2026-11-16) — a touch smaller
+   than before, sitting beside the new Like / Dislike pills. */
+.chat-copy-btn{border:1px solid var(--line2);background:transparent;color:var(--accent-text);border-radius:999px;padding:3px 10px;font-size:0.6875rem;font-weight:800;font-family:inherit;cursor:pointer;line-height:1.3;min-height:26px;white-space:nowrap}
 .chat-copy-btn:active{opacity:.75}
 .chat-copy-btn.done{color:#22c55e;border-color:rgba(34,197,94,.55)}
+/* Like / Dislike pills (owner order 2026-11-16): one tap selects
+   (accent-filled active state), tapping the same one again clears it;
+   picking one clears the other. Per-answer, in-memory only. */
+.chat-react-btn{border:1px solid var(--line2);background:transparent;color:var(--text);border-radius:999px;padding:3px 9px;font-size:0.8125rem;font-family:inherit;cursor:pointer;line-height:1.3;min-height:26px;white-space:nowrap;-webkit-tap-highlight-color:transparent}
+.chat-react-btn:active{opacity:.75}
+.chat-react-btn.on{background:var(--accent-fill);border-color:transparent}
+/* Listen button (owner order 2026-11-16): every AI bubble gets a
+   «🔊 ស្ដាប់» button beside Copy — it plays the answer aloud via the
+   server's Microsoft Edge TTS endpoint (POST /api/chat/tts, no API
+   key on the client), falling back to the browser's own
+   speechSynthesis when the server TTS fails. While audio plays the
+   button shows the playing state; tapping it again stops. */
+.chat-listen-btn{border:1px solid var(--line2);background:transparent;color:var(--accent-text);border-radius:999px;padding:5px 13px;font-size:0.75rem;font-weight:800;font-family:inherit;cursor:pointer;line-height:1.35;min-height:32px;white-space:nowrap}
+.chat-listen-btn:active{opacity:.75}
+.chat-listen-btn.playing{color:#22c55e;border-color:rgba(34,197,94,.55);animation:chatListenPulse 1.2s ease-in-out infinite}
+@keyframes chatListenPulse{0%,100%{opacity:1}50%{opacity:.5}}
+@media (prefers-reduced-motion:reduce){.chat-listen-btn.playing{animation:none}}
+/* Voice picker row (owner order 2026-11-16): a slim ប្រុស/ស្រី toggle
+   pinned under the chat header — male = Edge voice Piseth, female =
+   Edge voice Sreymom. The choice is remembered in localStorage
+   (key 'movai-chat-voice') and applied by aiChatSetVoice. */
+.chat-voice-row{flex:0 0 auto;display:flex;align-items:center;justify-content:space-between;gap:10px;padding:7px 14px;border-bottom:1px solid var(--line);background:var(--card)}
+.chat-voice-label{font-size:0.75rem;font-weight:800;color:var(--muted);white-space:nowrap}
+.chat-voice-toggle{display:flex;border:1px solid var(--line2);border-radius:999px;overflow:hidden;flex:0 0 auto}
+.chat-voice-toggle button{border:none;background:transparent;color:var(--muted);font-family:inherit;font-size:0.75rem;font-weight:800;padding:6px 13px;cursor:pointer;min-height:32px;line-height:1.35;white-space:nowrap;-webkit-tap-highlight-color:transparent}
+.chat-voice-toggle button.on{background:var(--accent-fill);color:#0d1005}
+.chat-voice-toggle button:active{opacity:.8}
 .chat-bubble.err{align-self:flex-start;background:rgba(248,113,113,.09);border:1px solid rgba(248,113,113,.5);color:#f87171;border-radius:17px 17px 17px 5px;font-size:0.875rem}
 html[data-mode="light"] .chat-bubble.err{color:#b91c1c;background:rgba(220,38,38,.06);border-color:rgba(220,38,38,.4)}
 .chat-typing{align-self:flex-start;display:none;align-items:center;gap:8px;background:var(--card2);border:1px solid var(--line);border-radius:17px 17px 17px 5px;padding:10px 13px;font-size:0.8125rem;color:var(--muted);font-weight:700}
@@ -1495,6 +1531,13 @@ html[data-smooth="1"] .brand-frame,html[data-smooth="1"] .acct-chip,html[data-sm
     <span class="chat-avatar" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 7V3"/><circle cx="12" cy="2.4" r="0.6" fill="currentColor"/><rect x="4.5" y="7" width="15" height="11.5" rx="3.5"/><path d="M2.5 12.5v2"/><path d="M21.5 12.5v2"/><circle cx="9.3" cy="12.3" r="0.4" fill="currentColor"/><circle cx="14.7" cy="12.3" r="0.4" fill="currentColor"/><path d="M9.8 15.6c.7.6 1.4.9 2.2.9s1.5-.3 2.2-.9"/></svg></span>
     <span class="chat-head-main"><span class="chat-head-title"><span id="chatUserName">Mov<span class="chat-name-lime">Ai</span> AI</span><span class="chat-online-dot" role="status" aria-label="អនឡាញ · Online"></span></span><span class="chat-head-sub" style="display:block">MovAi AI · ជំនួយការ AI — សួរអ្វីក៏បានអំពី MovAi</span></span>
     <button type="button" class="chat-close" onclick="aiChatClose()" aria-label="បិទឆាត · Close">✕</button>
+  </div>
+  <div class="chat-voice-row">
+    <span class="chat-voice-label">🔊 សំឡេងនិយាយ · Voice</span>
+    <span class="chat-voice-toggle" role="group" aria-label="ជ្រើសសំឡេង · Choose voice">
+      <button type="button" id="chatVoiceMale" onclick="aiChatSetVoice('male')">ប្រុស · Piseth</button>
+      <button type="button" id="chatVoiceFemale" onclick="aiChatSetVoice('female')">ស្រី · Sreymom</button>
+    </span>
   </div>
   <div class="chat-msgs" id="chatMsgs">
     <div class="chat-empty" id="chatEmpty"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 7V3"/><circle cx="12" cy="2.4" r="0.6" fill="currentColor"/><rect x="4.5" y="7" width="15" height="11.5" rx="3.5"/><path d="M2.5 12.5v2"/><path d="M21.5 12.5v2"/><circle cx="9.3" cy="12.3" r="0.4" fill="currentColor"/><circle cx="14.7" cy="12.3" r="0.4" fill="currentColor"/><path d="M9.8 15.6c.7.6 1.4.9 2.2.9s1.5-.3 2.2-.9"/></svg><p>សួរសំណួររបស់អ្នកនៅខាងក្រោម<br>AI នឹងឆ្លើយជូនភ្លាមៗ</p></div>
@@ -9031,6 +9074,7 @@ function aiChatOpen(){
   var inp=document.getElementById('chatInput');if(inp)setTimeout(function(){try{inp.focus();}catch(e){}},80);
 }
 function aiChatClose(){
+  try{aiChatStopSpeak();}catch(e){}
   var p=document.getElementById('chatPanel');if(p)p.classList.remove('open');
   var bd=document.getElementById('chatBackdrop');if(bd)bd.classList.remove('open');
   var fab=document.getElementById('chatFab');if(fab)fab.setAttribute('aria-expanded','false');
@@ -9058,6 +9102,7 @@ function aiChatCopyText(t,btn){
   if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(t).then(function(){done(true);},function(){fallback();});}
   else fallback();
 }
+var AI_CHAT_ROBOT_SVG='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 7V3"/><circle cx="12" cy="2.4" r="0.6" fill="currentColor"/><rect x="4.5" y="7" width="15" height="11.5" rx="3.5"/><path d="M2.5 12.5v2"/><path d="M21.5 12.5v2"/><circle cx="9.3" cy="12.3" r="0.4" fill="currentColor"/><circle cx="14.7" cy="12.3" r="0.4" fill="currentColor"/><path d="M9.8 15.6c.7.6 1.4.9 2.2.9s1.5-.3 2.2-.9"/></svg>';
 function aiChatAddBubble(role,text,isErr){
   var m=document.getElementById('chatMsgs');if(!m)return null;
   var empty=document.getElementById('chatEmpty');if(empty)empty.style.display='none';
@@ -9067,6 +9112,21 @@ function aiChatAddBubble(role,text,isErr){
   body.className='chat-txt';
   body.textContent=String(text==null?'':text);
   b.appendChild(body);
+  /* Every AI answer gets the robot avatar on its left (owner order
+     2026-11-16) — the same robot mark as the chat header, wrapped in
+     a row with the bubble so it can never go missing. */
+  var node=b;
+  if(role==='ai'){
+    var row=document.createElement('div');
+    row.className='chat-row';
+    var av=document.createElement('span');
+    av.className='chat-msg-avatar';
+    av.setAttribute('aria-hidden','true');
+    av.innerHTML=AI_CHAT_ROBOT_SVG;
+    row.appendChild(av);
+    row.appendChild(b);
+    node=row;
+  }
   if(role==='ai'&&!isErr){
     /* Every AI answer carries its own Copy button at the bottom of
        the bubble: one tap copies the FULL answer text (the closure
@@ -9076,6 +9136,23 @@ function aiChatAddBubble(role,text,isErr){
     var fullText=String(text==null?'':text);
     var crow=document.createElement('div');
     crow.className='chat-copy-row';
+    /* Listen button beside Copy (owner order 2026-11-16): plays this
+       answer aloud with the chosen Edge voice (ប្រុស Piseth / ស្រី
+       Sreymom) through the server TTS endpoint, or the browser's
+       speechSynthesis if the server fails. Same stopPropagation
+       guard as Copy so it never toggles the collapsible bubble. */
+    var lbtn=document.createElement('button');
+    lbtn.type='button';
+    lbtn.className='chat-listen-btn';
+    lbtn.textContent='🔊 ស្ដាប់';
+    lbtn.setAttribute('aria-label','ស្ដាប់ · Listen');
+    (function(ft,btn){
+      btn.addEventListener('click',function(ev){
+        if(ev){ev.stopPropagation();if(ev.preventDefault)ev.preventDefault();}
+        aiChatSpeak(ft,btn);
+      });
+    })(fullText,lbtn);
+    crow.appendChild(lbtn);
     var cbtn=document.createElement('button');
     cbtn.type='button';
     cbtn.className='chat-copy-btn';
@@ -9088,10 +9165,43 @@ function aiChatAddBubble(role,text,isErr){
       });
     })(fullText,cbtn);
     crow.appendChild(cbtn);
+    /* Like / Dislike pills beside Copy (owner order 2026-11-16): one
+       tap selects (accent-filled), tapping the same pill again
+       clears it, and picking one clears the other. State lives only
+       on this answer's buttons — nothing is stored or sent. */
+    var likeBtn=document.createElement('button');
+    likeBtn.type='button';
+    likeBtn.className='chat-react-btn';
+    likeBtn.textContent='👍';
+    likeBtn.setAttribute('aria-label','ចូលចិត្ត · Like');
+    likeBtn.setAttribute('aria-pressed','false');
+    var dislikeBtn=document.createElement('button');
+    dislikeBtn.type='button';
+    dislikeBtn.className='chat-react-btn';
+    dislikeBtn.textContent='👎';
+    dislikeBtn.setAttribute('aria-label','មិនចូលចិត្ត · Dislike');
+    dislikeBtn.setAttribute('aria-pressed','false');
+    (function(lb,db){
+      function react(btn,other){
+        var on=btn.classList.toggle('on');
+        btn.setAttribute('aria-pressed',on?'true':'false');
+        if(on){other.classList.remove('on');other.setAttribute('aria-pressed','false');}
+      }
+      lb.addEventListener('click',function(ev){
+        if(ev){ev.stopPropagation();if(ev.preventDefault)ev.preventDefault();}
+        react(lb,db);
+      });
+      db.addEventListener('click',function(ev){
+        if(ev){ev.stopPropagation();if(ev.preventDefault)ev.preventDefault();}
+        react(db,lb);
+      });
+    })(likeBtn,dislikeBtn);
+    crow.appendChild(likeBtn);
+    crow.appendChild(dislikeBtn);
     b.appendChild(crow);
   }
   var t=document.getElementById('chatTyping');
-  if(t)m.insertBefore(b,t);else m.appendChild(b);
+  if(t)m.insertBefore(node,t);else m.appendChild(node);
   if(role==='ai'){
     /* Long answers only (owner order 2026-11-16): once the bubble is
        laid out, if its text runs past ~4 lines it collapses into a
@@ -9169,6 +9279,115 @@ async function aiChatSend(){
 document.addEventListener('keydown',function(e){
   if(e.key==='Escape'){var p=document.getElementById('chatPanel');if(p&&p.classList.contains('open'))aiChatClose();}
 });
+/* ================= AI Chat — spoken replies (Edge TTS) =================
+   Owner order 2026-11-16: every AI answer can be LISTENED to. The
+   «🔊 ស្ដាប់» button on each AI bubble POSTs the answer text to the
+   MovAi proxy's Microsoft Edge TTS endpoint — Edge TTS needs no API
+   key; the server does the synthesis and returns MP3 audio:
+     POST https://movai-proxy.onrender.com/api/chat/tts
+     {text: <answer>, voice: 'Piseth' | 'Sreymom'}
+   The reply may be the MP3 itself (audio/*), a JSON {url}/{audioUrl},
+   or a JSON {audio: <base64>} — all three are played. If the server
+   TTS fails for any reason (offline, error status, unplayable), the
+   browser's own speechSynthesis speaks the text instead, preferring
+   a Khmer (km) voice when one is installed, so listening still
+   works. The ប្រុស/ស្រី toggle under the chat header picks the voice
+   (male = Piseth, female = Sreymom) and is remembered in
+   localStorage ('movai-chat-voice'). Only one answer plays at a
+   time; tapping the playing button again stops it. */
+var AI_CHAT_TTS_URL='https://movai-proxy.onrender.com/api/chat/tts';
+var aiChatVoice='male';
+try{var _savedVoice=localStorage.getItem('movai-chat-voice');if(_savedVoice==='male'||_savedVoice==='female')aiChatVoice=_savedVoice;}catch(e){}
+var aiChatAudio=null;
+var aiChatObjUrl=null;
+var aiChatSpeakBtn=null;
+var aiChatSpeakToken=0;
+function aiChatVoiceName(){return aiChatVoice==='female'?'Sreymom':'Piseth';}
+function aiChatVoiceUI(){
+  var m=document.getElementById('chatVoiceMale'),f=document.getElementById('chatVoiceFemale');
+  if(m)m.classList.toggle('on',aiChatVoice==='male');
+  if(f)f.classList.toggle('on',aiChatVoice==='female');
+}
+function aiChatSetVoice(v){
+  aiChatVoice=(v==='female')?'female':'male';
+  try{localStorage.setItem('movai-chat-voice',aiChatVoice);}catch(e){}
+  aiChatVoiceUI();
+  aiChatStopSpeak();
+}
+function aiChatResetSpeakBtn(){
+  if(aiChatSpeakBtn&&aiChatSpeakBtn.isConnected){aiChatSpeakBtn.textContent='🔊 ស្ដាប់';aiChatSpeakBtn.classList.remove('playing');}
+  aiChatSpeakBtn=null;
+}
+function aiChatStopSpeak(){
+  aiChatSpeakToken++;
+  if(aiChatAudio){try{aiChatAudio.pause();}catch(e){}aiChatAudio=null;}
+  if(aiChatObjUrl){try{URL.revokeObjectURL(aiChatObjUrl);}catch(e){}aiChatObjUrl=null;}
+  try{if('speechSynthesis' in window)speechSynthesis.cancel();}catch(e){}
+  aiChatResetSpeakBtn();
+}
+function aiChatSpeakBrowser(text,btn,token){
+  /* Fallback: the browser's built-in speech synthesis. Prefers a
+     Khmer voice when the device has one; otherwise the default
+     voice still reads the text aloud. */
+  try{
+    if(!('speechSynthesis' in window)){aiChatResetSpeakBtn();return;}
+    speechSynthesis.cancel();
+    var u=new SpeechSynthesisUtterance(String(text||''));
+    var vs=[];try{vs=speechSynthesis.getVoices()||[];}catch(e){}
+    for(var i=0;i<vs.length;i++){
+      if(vs[i]&&vs[i].lang&&String(vs[i].lang).toLowerCase().indexOf('km')===0){u.voice=vs[i];u.lang=vs[i].lang;break;}
+    }
+    if(!u.voice){try{u.lang='km-KH';}catch(e){}}
+    if(aiChatSpeakBtn===btn)btn.textContent='⏹ កំពុងចាក់…';
+    u.onend=function(){if(token===aiChatSpeakToken)aiChatResetSpeakBtn();};
+    u.onerror=function(){if(token===aiChatSpeakToken)aiChatResetSpeakBtn();};
+    speechSynthesis.speak(u);
+  }catch(e){aiChatResetSpeakBtn();}
+}
+async function aiChatSpeak(text,btn){
+  if(aiChatSpeakBtn===btn){aiChatStopSpeak();return;}
+  aiChatStopSpeak();
+  var token=aiChatSpeakToken;
+  aiChatSpeakBtn=btn;
+  btn.classList.add('playing');
+  btn.textContent='⏳ កំពុងផ្ទុក…';
+  var url=null;
+  try{
+    var res=await fetch(AI_CHAT_TTS_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:String(text||''),voice:aiChatVoiceName()})});
+    if(token!==aiChatSpeakToken)return;
+    if(!res.ok)throw new Error('tts '+res.status);
+    var ct='';try{ct=(res.headers.get('content-type')||'').toLowerCase();}catch(e){}
+    if(ct.indexOf('audio')===0||ct.indexOf('octet-stream')>=0){
+      var blob=await res.blob();
+      if(token!==aiChatSpeakToken)return;
+      aiChatObjUrl=URL.createObjectURL(blob);
+      url=aiChatObjUrl;
+    }else{
+      var d=null;try{d=await res.json();}catch(e){}
+      if(token!==aiChatSpeakToken)return;
+      if(d){
+        if(typeof d.url==='string'&&d.url)url=d.url;
+        else if(typeof d.audioUrl==='string'&&d.audioUrl)url=d.audioUrl;
+        else if(typeof d.audio==='string'&&d.audio){
+          url=(d.audio.indexOf('http')===0||d.audio.indexOf('data:')===0)?d.audio:('data:audio/mpeg;base64,'+d.audio);
+        }
+      }
+    }
+    if(!url)throw new Error('tts no audio');
+    var a=new Audio(url);
+    aiChatAudio=a;
+    btn.textContent='⏹ កំពុងចាក់…';
+    a.onended=function(){if(token===aiChatSpeakToken)aiChatStopSpeak();};
+    a.onerror=function(){if(token===aiChatSpeakToken){aiChatAudio=null;aiChatSpeakBrowser(text,btn,token);}};
+    var pr=null;try{pr=a.play();}catch(e){}
+    if(pr&&pr.catch)pr.catch(function(){if(token===aiChatSpeakToken&&aiChatAudio===a){aiChatAudio=null;aiChatSpeakBrowser(text,btn,token);}});
+  }catch(err){
+    if(token!==aiChatSpeakToken)return;
+    aiChatSpeakBrowser(text,btn,token);
+  }
+}
+aiChatVoiceUI();
+try{if('speechSynthesis' in window){speechSynthesis.getVoices();if(speechSynthesis.onvoiceschanged!==undefined)speechSynthesis.addEventListener('voiceschanged',function(){try{speechSynthesis.getVoices();}catch(e){}});}}catch(e){}
 </script>
 </body>
 </html>

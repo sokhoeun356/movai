@@ -7,6 +7,8 @@ const http = require('http');
 const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
+let WebSocketLib = null;
+try { WebSocketLib = require('ws'); } catch (e) { WebSocketLib = null; }
 
 const ROOT = __dirname;
 const PORT = process.env.PORT || 3000;
@@ -1662,7 +1664,7 @@ function apiRoute(req, res, urlPath) {
     'FREE download limit: a free user can download songs 2 times for free — after 2 downloads they must buy a song package; package buyers can download freely (unlimited).',
     'Providers: Magic Hour, NovAI, MusicAPI, MovAi (Suno v6). ACE Music is LOCKED (no new API keys).',
     'The creator/admin is YEM SOKHOEUN, phone 081 914 728, Gmail sokhoeun7788@gmail.com, Telegram @yemsokhoeun_9999. For problems the user can contact the admin on Telegram @yemsokhoeun_9999.',
-    'RULES: Answer DIRECTLY and appropriately in the language the user writes (Khmer if they write Khmer, English if they write English). NEVER use pre-prepared or canned answers — every reply must be generated live from this prompt and the live context. NEVER invent prices, limits or features that are not in this prompt. If asked whether the system is down, slow or broken, use the live context (server uptime and provider status) to answer honestly and tell the user what is wrong. NAME: the chat header shows "MovAi AI" (the app name), NEVER the user\'s name. GREET: greet the user by their first name ONLY when the live context says this is their first message after 2 or more hours away — otherwise do NOT greet with their name at all, just answer directly. Never greet with the name twice in one conversation. STYLE: plain text ONLY — NEVER use markdown or any formatting symbols: no asterisks (* **), no square brackets ([ ]), no backticks (`), no # headings, no > quotes, no bullet symbols, no numbered-list symbols, no emojis, no decorative symbols of any kind. No links. Just plain sentences. LENGTH: answer in 1 to 3 short sentences ONLY. Answer ONLY the question the user asked. If the user asks HOW to do something, give ONLY the next step, not the whole guide. NEVER dump all the facts as a long list or a full guide. Never use bullet points or numbered lists unless the user explicitly asks for a list. If the user asks a simple question, give a short simple answer. Never repeat the same long answer for every question. THINK FIRST: before answering, think step by step about what the user actually asks, then answer ONLY that question.',
+    'RULES: Answer DIRECTLY and appropriately in the language the user writes (Khmer if they write Khmer, English if they write English). NEVER use pre-prepared or canned answers — every reply must be generated live from this prompt and the live context. NEVER invent prices, limits or features that are not in this prompt. If asked whether the system is down, slow or broken, use the live context (server uptime and provider status) to answer honestly and tell the user what is wrong. NAME: the chat header shows "MovAi AI" (the app name), NEVER the user\'s name. GREET: greet the user by their first name ONLY when the live context says this is their first message after 2 or more hours away — otherwise do NOT greet with their name at all, just answer directly. Never greet with the name twice in one conversation. STYLE: plain text ONLY — NEVER use markdown or any formatting symbols: no asterisks (* **), no square brackets ([ ]), no backticks (`), no # headings, no > quotes, no bullet symbols, no numbered-list symbols, no emojis, no decorative symbols of any kind. Give a link ONLY when the user explicitly asks for a link (then give just that link, nothing else). Just plain sentences. LENGTH: answer in 1 to 3 short sentences ONLY. Answer ONLY the question the user asked. If the user asks HOW to do something, give ONLY the next step, not the whole guide. NEVER dump all the facts as a long list or a full guide. Never use bullet points or numbered lists unless the user explicitly asks for a list. If the user asks a simple question, give a short simple answer. Never repeat the same long answer for every question. THINK FIRST: before answering, think step by step about what the user actually asks, then answer ONLY that question.',
   ].join('\n');
   function chatLeaderValidate(body) {
     if (!body || typeof body !== 'object') return { ok: false, error: 'សូមសរសេរសំណួរជាមុនសិន · Please write a message first' };
@@ -1773,6 +1775,69 @@ function apiRoute(req, res, urlPath) {
         return sendJSON(res, 200, { ok: false, error: (e && e.message) || 'Groq: request failed' });
       }
       return sendJSON(res, 200, { ok: true, reply: chatDirectReply(reply) });
+    }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
+    return;
+  }
+  // ---- Microsoft Edge TTS (FREE, no API key) ----
+  // Speaks an AI chat reply aloud in Khmer. Male = km-KH-PisethNeural,
+  // Female = km-KH-SreymomNeural. Uses the same free Edge endpoint the
+  // Edge browser's Read Aloud uses (WebSocket, no key). Returns an MP3
+  // Buffer. Throws on failure (the website then falls back to the
+  // browser's own speechSynthesis).
+  const EDGE_TTS_TOKEN = '6A5AA1D4EAFF4E9FB37E23D68491D6F4';
+  const EDGE_TTS_WS = 'wss://speech.platform.bing.com/consumer/speech/synthesize/readaloud/edge/v1?TrustedClientToken=' + EDGE_TTS_TOKEN;
+  function edgeTTS(text, voice) {
+    return new Promise((resolve, reject) => {
+      if (!WebSocketLib) return reject(new Error('ws module missing'));
+      const connId = crypto.randomUUID().replaceAll('-', '');
+      const ws = new WebSocketLib(EDGE_TTS_WS + '&ConnectionId=' + connId, {
+        headers: {
+          'Origin': 'chrome-extension://jdiccldimpdaibmpdkjnbmckianbfold',
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/103.0.5060.66 Safari/537.36 Edg/103.0.1264.44',
+        },
+      });
+      const audio = [];
+      const timer = setTimeout(() => { try { ws.close(); } catch (e) {} reject(new Error('Edge TTS timeout')); }, 20000);
+      const fail = (err) => { clearTimeout(timer); try { ws.close(); } catch (e) {} reject(err instanceof Error ? err : new Error(String(err))); };
+      ws.on('open', () => {
+        const ts = new Date().toUTCString();
+        try {
+          ws.send('X-Timestamp:' + ts + '\r\nContent-Type:application/json; charset=utf-8\r\nPath:speech.config\r\n\r\n{"context":{"synthesis":{"audio":{"metadataoptions":{"sentenceBoundaryEnabled":"false","wordBoundaryEnabled":"true"},"outputFormat":"audio-24khz-48kbitrate-mono-mp3"}}}}');
+          const esc = String(text).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+          const ssml = '<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xmlns:mstts="http://www.w3.org/2001/mstts" xml:lang="km-KH"><voice name="' + voice + '"><prosody rate="+0%" volume="+0%" pitch="+0Hz">' + esc + '</prosody></voice></speak>';
+          ws.send('X-RequestId:' + connId + '\r\nContent-Type:application/ssml+xml\r\nX-Timestamp:' + ts + '\r\nPath:ssml\r\n\r\n' + ssml);
+        } catch (e) { fail(e); }
+      });
+      ws.on('message', (data, isBinary) => {
+        if (!isBinary) {
+          const s = data.toString('utf8');
+          if (s.includes('turn.end')) { clearTimeout(timer); try { ws.close(); } catch (e) {} resolve(Buffer.concat(audio)); }
+          return;
+        }
+        const buf = Buffer.isBuffer(data) ? data : Buffer.from(data);
+        const sep = Buffer.from('Path:audio\r\n');
+        const idx = buf.indexOf(sep);
+        if (idx >= 0) audio.push(buf.subarray(idx + sep.length));
+      });
+      ws.on('error', (e) => fail(e));
+      ws.on('close', () => { if (audio.length === 0) fail(new Error('Edge TTS closed with no audio')); });
+    });
+  }
+  // POST /api/chat/tts — {text, voice:'male'|'female'} — PUBLIC.
+  // Returns MP3 audio of the text spoken in Khmer (Edge TTS, no key).
+  if (req.method === 'POST' && urlPath === '/api/chat/tts') {
+    readJSONBody(req, 64 * 1024).then(async (body) => {
+      const text = typeof body.text === 'string' ? body.text.trim().slice(0, 2000) : '';
+      if (!text) return sendJSON(res, 200, { ok: false, error: 'សូមសរសេរអត្ថបទជាមុនសិន' });
+      const voice = body.voice === 'female' ? 'km-KH-SreymomNeural' : 'km-KH-PisethNeural';
+      try {
+        const mp3 = await edgeTTS(text, voice);
+        if (!mp3 || mp3.length < 100) return sendJSON(res, 200, { ok: false, error: 'Microsoft TTS មិនបានឆ្លើយតបទេ · Microsoft TTS did not respond' });
+        res.writeHead(200, { 'Content-Type': 'audio/mpeg', 'Content-Length': mp3.length, 'Cache-Control': 'no-store' });
+        return res.end(mp3);
+      } catch (e) {
+        return sendJSON(res, 200, { ok: false, error: 'Microsoft TTS មានបញ្ហា · ' + (e && e.message ? String(e.message).slice(0, 120) : 'request failed') });
+      }
     }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
     return;
   }
