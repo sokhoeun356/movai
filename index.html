@@ -1030,6 +1030,10 @@ html[data-mode="light"] .offline-ico{color:#dc2626;background:rgba(220,38,38,.1)
 @keyframes netReadyBlurOut{from{opacity:1;filter:blur(0);transform:translateX(-50%) translateY(0) scale(1)}to{opacity:0;filter:blur(12px);transform:translateX(-50%) translateY(-8px) scale(.97)}}
 @media (prefers-reduced-motion: reduce){.net-ready-toast.blur-in,.net-ready-toast.blur-out{animation:none}}
 footer{text-align:center;color:var(--faint);font-size:0.8125rem;padding:32px 16px 104px;line-height:1.7}
+.legal-links{display:flex;align-items:center;justify-content:center;gap:10px;font-size:0.8125rem}
+.legal-links a{color:var(--muted);font-weight:600;text-decoration:none}
+.legal-links a:hover{color:var(--text);text-decoration:underline}
+.legal-links .sep{color:var(--faint)}
 .set-box{margin-top:22px;padding-top:20px;border-top:1px solid var(--line2)}
 .set-label{font-size:0.8125rem;font-weight:700;color:var(--label);letter-spacing:.02em}
 .set-row{margin-top:18px}
@@ -1695,7 +1699,14 @@ html[data-smooth="1"] .brand-frame,html[data-smooth="1"] .acct-chip,html[data-sm
   </div>
 </section>
 </main>
-<footer data-i18n="footerText">MovAi — បង្កើតរូបភាព &amp; វីដេអូ<br>Provider, Model និង Key ទាំងអស់គ្រប់គ្រងដោយ Admin ពី server</footer>
+<footer>
+  <div data-i18n="footerText">MovAi — បង្កើតរូបភាព &amp; វីដេអូ<br>Provider, Model និង Key ទាំងអស់គ្រប់គ្រងដោយ Admin ពី server</div>
+  <div class="legal-links" style="margin-top:14px">
+    <a href="https://movai-1.onrender.com/about" target="_blank" rel="noopener">About</a>
+    <span class="sep" aria-hidden="true">|</span>
+    <a href="https://movai-1.onrender.com/privacy-policy" target="_blank" rel="noopener">Privacy Policy</a>
+  </div>
+</footer>
 <div id="fsViewer" class="fs-viewer" style="display:none" role="dialog" aria-modal="true" onclick="if(event.target===this||event.target.id==='fsBody')fsClose()">
   <button type="button" class="fs-close" id="fsCloseBtn" onclick="fsClose()" aria-label="Close">✕</button>
   <div class="fs-body" id="fsBody"></div>
@@ -1758,6 +1769,11 @@ html[data-smooth="1"] .brand-frame,html[data-smooth="1"] .acct-chip,html[data-sm
     <div id="loginGsiSlot" style="display:none;margin-top:14px;justify-content:center"></div>
     <p id="loginMsg" style="font-size:0.8125rem;margin-top:10px;min-height:16px;line-height:1.6"></p>
     <button type="button" class="kbtn kbtn-white" style="margin-top:10px;width:100%" onclick="loginSheetClose()" data-i18n="pkgCancel">បោះបង់</button>
+    <div class="legal-links" style="margin-top:16px;padding-top:14px;border-top:1px solid var(--line)">
+      <a href="https://movai-1.onrender.com/about" target="_blank" rel="noopener">About</a>
+      <span class="sep" aria-hidden="true">|</span>
+      <a href="https://movai-1.onrender.com/privacy-policy" target="_blank" rel="noopener">Privacy Policy</a>
+    </div>
   </div>
 </div>
 <div id="nameSheet" class="pkg-sheet" style="display:none" role="dialog" aria-modal="true" aria-labelledby="nameGateTitle">
