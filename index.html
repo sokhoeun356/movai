@@ -2192,6 +2192,7 @@ km:{
  msgEnterPrompt:'សូមសរសេរ prompt ជាមុនសិន',
  msgNoKey:'មិនទាន់មាន API Key សម្រាប់ {name} ទេ — សូមដាក់ Key ក្នុងម៉ឺនុយ ☰ (API Keys) ជាមុនសិន',
  msgDone:'បង្កើតរួចរាល់',
+ acctLoading:'កំពុងផ្ទុកគណនេយ្យ…',
  msgNetErr:'ហៅ API មិនបានទេ — provider នេះទំនងជាមិនអនុញ្ញាតឲ្យ browser ហៅត្រង់ (CORS) ឬអ៊ីនធឺណិតមានបញ្ហា។ Pollinations និង Puter.js ហៅត្រង់ពី browser បាន។',
  progWaiting:'កំពុងរង់ចាំវីដេអូ… ',
  errTimeoutVideo:'អស់ពេលរង់ចាំ (10 នាទី) — វីដេអូអាចនៅកំពុងបង្កើតក្នុងគណនីរបស់អ្នក',
@@ -2417,6 +2418,7 @@ en:{
  msgEnterPrompt:'Please write a prompt first',
  msgNoKey:'No API key for {name} yet — add a key in the ☰ menu (API Keys) first',
  msgDone:'Done',
+ acctLoading:'Loading your account…',
  msgNetErr:'Could not reach the API — this provider may not allow direct browser calls (CORS), or the connection failed. Pollinations and Puter.js work directly from the browser.',
  progWaiting:'Waiting for the video… ',
  errTimeoutVideo:'Timed out after 10 minutes — the video may still be generating in your account',
@@ -3877,7 +3879,17 @@ function updateErrBox(boxId,textId,msgId,t,contextLabel){
   var ta=document.getElementById(textId);
   var cm=document.getElementById(msgId);if(cm)cm.textContent='';
   var infoVals=[tx('msgDone'),tx('msgGenCancelled'),tx('d3MsgDone'),tx('d3MsgUploaded'),tx('d3MsgImgReady'),tx('d3MsgMpxOpening'),tx('novaiFreeDone')];
-  if(!t||infoVals.indexOf(t)>=0){box.style.display='none';if(ta)ta.value='';return;}
+  /* A SUCCESS message is never an error (owner fix 2026-11-16):
+     the song success line is «msgDone» PLUS the charged-credit
+     note («បង្កើតរួចរាល់ · −210 …»), so an exact-match check let
+     it fall through and pop this error box with its Copy button
+     after a song was created successfully. Any message that IS
+     msgDone or starts with «msgDone · » is info — the box (and
+     its Copy button) shows ONLY for a real failure. The
+     account-loading note is info too, never an error. */
+  var doneMsg='';try{doneMsg=tx('msgDone');}catch(e){}
+  var loadMsg='';try{loadMsg=tx('acctLoading');}catch(e){}
+  if(!t||infoVals.indexOf(t)>=0||(doneMsg&&(t===doneMsg||t.indexOf(doneMsg+' · ')===0))||(loadMsg&&t===loadMsg)){box.style.display='none';if(ta)ta.value='';return;}
   box.style.display='block';
   if(ta){
     var when='';try{when=new Date().toLocaleString();}catch(e){}
@@ -4368,6 +4380,11 @@ function genPuterSignIn(){if(window.puter&&puter.auth){puter.auth.signIn().then(
 function genPuterSignOut(){if(window.puter&&puter.auth){puter.auth.signOut().then(function(){genPuterStatus();}).catch(function(){});}}
 async function genGenerate(){
   if(!requireLogin())return;
+  /* Never generate before the account/email has loaded (owner
+     fix 2026-11-16): with no email yet, no request is sent at
+     all — the user just sees «កំពុងផ្ទុកគណនេយ្យ…» and the
+     Generate button stays gated until the account lands. */
+  if(!genUserEmail()){genMsg(tx('acctLoading'));genGateSync();return;}
   if(genAnyBusy)return;
   if(gen.mode==='3d')return;
   var prompt;
@@ -4467,6 +4484,7 @@ async function genGenerate(){
   }catch(e){
     var sp=document.getElementById('genSongPending');if(sp)sp.remove();
     if(e&&e.genCancelled){genMsg(tx('msgGenCancelled'));}
+    else if(e&&e.acctNotReady){genMsg(tx('acctLoading'));}
     else if(e&&e.adminServerDown){genMsg(tx('serverOffline'));}
     else{
       var m=(e&&e.message?e.message:String(e));
@@ -4474,7 +4492,7 @@ async function genGenerate(){
       genMsg(m);
     }
   }
-  finally{genStopProg();btn.disabled=false;if(abtn)abtn.disabled=false;genAnyBusy=false;epSyncButtons();}
+  finally{genStopProg();btn.disabled=false;if(abtn)abtn.disabled=false;genAnyBusy=false;epSyncButtons();try{genGateSync();}catch(e){}}
 }
 
 /* Manual «អូតូ» (Auto) button next to Generate: nothing switches on its own —
@@ -5313,7 +5331,12 @@ async function genDoSong(p,prompt,keyEntry){
        clip carries audio_url + image_url (picked up, kept together,
        by songProxySongs). One create returns 2 song variants. */
     var PROXY_SONG='https://movai-proxy.onrender.com/api/gen/song';
-    var mBody={provider:'musicapi',key:mkey,prompt:prompt,title:sTitle,name:sTitle,lyrics:prompt,style:styleFull,tags:styleFull,voice:sVoice,make_instrumental:sInstr,instrumental:sInstr};
+    /* The user's email rides this /api/gen/song call too (owner
+       fix 2026-11-16) — and with no email loaded yet the request
+       is never sent at all. */
+    var mEmail=genUserEmail();
+    if(!mEmail){var mne=new Error(tx('acctLoading'));mne.acctNotReady=true;throw mne;}
+    var mBody={provider:'musicapi',key:mkey,email:mEmail,prompt:prompt,title:sTitle,name:sTitle,lyrics:prompt,style:styleFull,tags:styleFull,voice:sVoice,make_instrumental:sInstr,instrumental:sInstr};
     if(sVoice==='male')mBody.vocal_gender='m';
     else if(sVoice==='female')mBody.vocal_gender='f';
     var jmapi=null,createErr=null,t0c=Date.now();
@@ -5338,7 +5361,7 @@ async function genDoSong(p,prompt,keyEntry){
       genProgTxt(tx('progWaitingSong')+'('+Math.floor((Date.now()-t0m)/1000)+'s)');
       var jqapi=null;
       try{
-        var rqapi=await fetch(PROXY_SONG+'/status',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({provider:'musicapi',key:mkey,jobId:jobId})});
+        var rqapi=await fetch(PROXY_SONG+'/status',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({provider:'musicapi',key:mkey,email:mEmail,jobId:jobId})});
         jqapi=await rqapi.json().catch(function(){return null;});
       }catch(e){jqapi=null;}
       if(!jqapi)continue;
@@ -9536,7 +9559,17 @@ function pubCoverUpload(file){
     rd.onload=function(){
       var b64=String(rd.result||'').split(',')[1]||'';
       var u=null;try{u=acctCurrent();}catch(e){}
-      fetch(PUB_API+'/upload',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({kind:'image',filename:file.name,data:b64,email:u?u.email:'',userId:(u&&acctValidUserId(u.id))?u.id:''})})
+      /* Cover uploads go to the server's PUBLIC cover endpoint
+         (owner fix 2026-11-16): POST /api/public/cover with just
+         {email, filename, data} — NO Admin key and NO
+         Authorization header, so a normal signed-in user can
+         upload a cover of ANY size. The old /api/public/upload
+         demanded the Admin key, which normal users do not have,
+         so every picked cover failed with «Admin key
+         មិនត្រឹមត្រូវទេ» and the post could not go out. A failed
+         upload still surfaces the server's real reason through
+         pubCoverFailMsg. */
+      fetch(PUB_API+'/cover',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:u?u.email:'',filename:file.name,data:b64})})
         .then(function(r){return r.json().catch(function(){return {};});})
         .then(function(j){
           if(j&&j.ok&&j.url)resolve(j.url);
@@ -9685,8 +9718,8 @@ function pubDoPost(vis){
   }
   if(pubCoverBusy)return;
   /* Cover flow (owner rule 2026-11-16): a cover picked in this
-     sheet uploads FIRST through /api/public/upload (kind
-     'image'); the post then carries its URL as `image` with
+     sheet uploads FIRST through /api/public/cover (the public
+     cover endpoint — the user's email only, no Admin key); the post then carries its URL as `image` with
      aspect '1x1'. A failed cover upload stops the post so the
      user can retry or remove the cover — the song is never
      posted without the cover they chose. With NO pick: a song
@@ -10029,7 +10062,12 @@ function postFlowUpload(file,kind){
     rd.onload=function(){
       var b64=String(rd.result||'').split(',')[1]||'';
       var u=null;try{u=acctCurrent();}catch(e){}
-      fetch(PUB_API+'/upload',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({kind:kind,filename:file.name,data:b64,email:u?u.email:'',userId:(u&&acctValidUserId(u.id))?u.id:''})})
+      /* A picked COVER image (kind 'image') goes to the public
+         cover endpoint /api/public/cover — {email, filename,
+         data} only, no Admin key (owner fix 2026-11-16, same as
+         the Post-to-Public sheet). Audio keeps /api/public/upload. */
+      var isCover=(kind==='image');
+      fetch(PUB_API+(isCover?'/cover':'/upload'),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(isCover?{email:u?u.email:'',filename:file.name,data:b64}:{kind:kind,filename:file.name,data:b64,email:u?u.email:'',userId:(u&&acctValidUserId(u.id))?u.id:''})})
         .then(function(r){return r.json().catch(function(){return {};});})
         .then(function(j){
           if(j&&j.ok&&j.url)resolve(j.url);
@@ -12201,6 +12239,7 @@ function acctRender(){
   }
   try{acctIpSlotSync();}catch(e){}
   try{pkgRender();}catch(e){}
+  try{genGateSync();}catch(e){}
 }
 function acctRenderUser(u){
   var box=document.getElementById('acctUser');if(!box)return;
@@ -12598,9 +12637,48 @@ async function adminGetProviders(){
   return adminProvidersCache;
 }
 /* ---- Server-proxy generation calls (no key in the browser) ---- */
+/* The signed-in user's email — the identity every generation
+   request must carry (owner fix 2026-11-16). Reads the account
+   record first, then the session value itself (the session IS
+   the account email), so it is empty only while the account has
+   genuinely not loaded yet. */
+function genUserEmail(){
+  var u=null;try{u=acctCurrent();}catch(e){}
+  if(u&&u.email)return String(u.email);
+  var em='';try{em=localStorage.getItem('movai-session')||'';}catch(e){}
+  return String(em||'');
+}
+/* Generate stays locked until the account/email has loaded
+   (owner fix 2026-11-16): while a session exists but no usable
+   email is in yet, the Generate / Auto buttons are disabled so
+   no generation request can ever leave without an email.
+   Guests keep the buttons live — tapping one opens the login
+   sheet, exactly as before. */
+function genGateSync(){
+  var sess='';try{sess=localStorage.getItem('movai-session')||'';}catch(e){}
+  var locked=!!sess&&!genUserEmail();
+  if(genAnyBusy)return;
+  var gb=document.getElementById('genBtn');if(gb)gb.disabled=locked;
+  var ab=document.getElementById('genAutoBtn');if(ab)ab.disabled=locked;
+}
 async function adminGenPost(path,body,timeoutMs){
+  body=body||{};
+  /* The user's email rides EVERY generation request (owner fix
+     2026-11-16): the server now refuses /api/gen/song,
+     /api/gen/image and /api/gen/video calls that carry no email,
+     and it charges the credit of the account the email names.
+     If the account/email has not loaded yet, the request is NOT
+     sent at all — an acctNotReady error is thrown before any
+     fetch, and the caller shows «កំពុងផ្ទុកគណនេយ្យ…» instead. */
+  if(path.indexOf('/api/gen/')===0&&!body.email){
+    var gem=genUserEmail();
+    if(!gem){var ne=new Error(tx('acctLoading'));ne.acctNotReady=true;throw ne;}
+    body.email=gem;
+    var gu=null;try{gu=acctCurrent();}catch(e){}
+    if(gu&&acctValidUserId(gu.id)&&!body.userId)body.userId=gu.id;
+  }
   var ctrl=null,timer=null;
-  var opts={method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body||{})};
+  var opts={method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)};
   try{
     if(window.AbortController){
       ctrl=new AbortController();opts.signal=ctrl.signal;
