@@ -384,7 +384,10 @@ img.hist-media,.d3-preview{cursor:zoom-in}
 .song-stream-badge{font-weight:700;color:var(--accent-text);animation:songPulse 1.8s ease-in-out infinite}
 @media (prefers-reduced-motion:reduce){.song-stream-badge{animation:none}}
 .song-cover{display:block;width:100%;aspect-ratio:1/1;object-fit:cover;border-radius:10px;background:#22262c}
-.song-cover-solid{border:1px solid rgba(255,255,255,.14)}
+.song-cover-solid{border:1px solid rgba(255,255,255,.14);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;overflow:hidden;container-type:size}
+.song-cover-solid .sc-logo{width:44%;height:auto;display:block;color:rgba(255,255,255,.94)}
+.song-cover-solid .sc-name{font-size:.4375rem;font-weight:800;letter-spacing:.03em;color:rgba(255,255,255,.94);line-height:1.1;white-space:nowrap}
+@container (min-width:90px){.song-cover-solid .sc-logo{width:36%}.song-cover-solid .sc-name{font-size:.875rem}}
 .song-cover-solid.creating{animation:songPulse 1.8s ease-in-out infinite}
 .song-creating-txt{margin-left:auto;font-size:0.8125rem;font-weight:700;color:var(--muted)}
 @keyframes songPulse{0%,100%{opacity:1}50%{opacity:.5}}
@@ -3981,7 +3984,12 @@ async function genGenerate(){
       genMsg(tx('adminNotSet'));
     }else{
       if(gen.mode==='song'){
-        genSongPending({id:'server',name:''});
+        /* Pending cards match what the provider actually returns
+           from ONE generation: Suno / MusicAPI return 2 songs,
+           Magic Hour / ACE Music return only 1 — so only that many
+           cards are shown, never an extra empty one. */
+        var pendId=/suno/i.test(cfg.provider||'')?'suno':(/musicapi/i.test(cfg.provider||'')?'musicapi':'magichour');
+        genSongPending({id:pendId,name:''});
         await genDoSongServer(cfg,prompt);
       }else if(gen.mode==='video'){
         var busyT0=Date.now();
@@ -4473,6 +4481,7 @@ async function genDoSong(p,prompt,keyEntry){
   var voiceTag=sInstr?'':(sVoice==='male'?'male vocals':(sVoice==='female'?'female vocals':''));
   var styleFull=[sStyle,voiceTag].filter(function(x){return !!x;}).join(', ');
   histCtx={prompt:prompt,provider:p.name,title:sTitle};
+  histCtxStamp();
   if(p.id==='magichour'){
     var key=(typeof keyEntry==='string')?keyEntry:(keyEntry&&keyEntry.key);
     var secs=Math.round(gen.songDur*60);
@@ -4674,6 +4683,10 @@ function songSolidCover(n,creating){
   var d=document.createElement('div');
   d.className='song-cover song-cover-solid'+(creating?' creating':'');
   d.style.background=SONG_COVER_COLORS[(Math.max(1,n)-1)%SONG_COVER_COLORS.length];
+  /* No cover image from the provider: the tile still carries the
+     MovAi logo (music note + wordmark) instead of sitting blank
+     next to the Play button. */
+  d.innerHTML='<svg class="sc-logo" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg><span class="sc-name">MovAi</span>';
   return d;
 }
 function songCoverEl(song,n){
@@ -4709,7 +4722,7 @@ function genSongPending(p){
   var grid=document.createElement('div');
   grid.className='song-grid';grid.id='genSongPending';
   var title=(document.getElementById('songTitle').value||'').trim();
-  var count=(p.id==='suno'||p.id==='musicapi'||p.id==='server')?2:1;
+  var count=(p.id==='suno'||p.id==='musicapi')?2:1;
   for(var i=0;i<count;i++){
     var n=i+1;
     var card=document.createElement('div');
@@ -4742,7 +4755,7 @@ var genSongAudios=[];
    Playback state (position + playing) is carried over to the new
    cards when the same URLs are re-rendered, so the final update does
    not restart a preview the user is already listening to. */
-function genShowSongs(items,streaming){
+function genShowSongs(items,streaming,restored){
   var songs=(items||[]).map(function(x){return typeof x==='string'?{url:x,image:null,title:''}:(x||{});}).filter(function(s){return !!s.url;});
   songs.forEach(function(s){if(!/^(https:|blob:|data:audio\/)/i.test(s.url))throw new Error(tx('badSongUrl'));});
   var box=document.getElementById('genResult');
@@ -4754,13 +4767,28 @@ function genShowSongs(items,streaming){
   var sTitle=(histCtx&&histCtx.title)||'';
   var sProv=histCtx?histCtx.provider:histProviderName();
   var sPrompt=histCtx?histCtx.prompt:'';
-  if(!streaming){
+  /* The finished songs belong to the account that STARTED the
+     generation (histCtx.acctKey, stamped at start): they save
+     into that account's History even if another account has
+     signed in since — an in-progress creation is never moved,
+     mixed into someone else's History, or lost. */
+  var saveKey=(histCtx&&histCtx.acctKey)?histCtx.acctKey:histKey();
+  if(!streaming&&!restored){
     songs.forEach(function(s){
       var su=/^https:/i.test(s.url)?s.url:((/^data:audio\//i.test(s.url)&&s.url.length<1200000)?s.url:null);
-      if(su)histAdd({type:'song',url:su,title:s.title||sTitle,prompt:sPrompt,provider:sProv,image:(s.image&&/^https:/i.test(s.image))?s.image:undefined});
+      if(su)histAddTo({type:'song',url:su,title:s.title||sTitle,prompt:sPrompt,provider:sProv,image:(s.image&&/^https:/i.test(s.image))?s.image:undefined},saveKey);
     });
+    /* The Create results themselves are kept too (owner rule
+       2026-11-16): the songs stay in the creation place,
+       playable, for a long time — closing and reopening the app
+       restores them (lastSongsRestore) instead of leaving an
+       empty results box. Only permanent https URLs are kept. */
+    try{
+      var keep=songs.filter(function(s){return /^https:/i.test(s.url);}).map(function(s){return {url:s.url,title:s.title||'',image:(s.image&&/^https:/i.test(s.image))?s.image:null};});
+      if(keep.length)localStorage.setItem((histCtx&&histCtx.lastKey)?histCtx.lastKey:lastSongsKey(),JSON.stringify({ts:Date.now(),title:sTitle,provider:sProv,prompt:sPrompt,songs:keep}));
+    }catch(e){}
   }
-  var saved=streaming?[]:histGet();
+  var saved=streaming?[]:histGetFrom(saveKey);
   var grid=document.createElement('div');
   grid.className='song-grid';
   songs.forEach(function(s,i){
@@ -4776,6 +4804,34 @@ function genShowSongs(items,streaming){
       if(ps.playing){var pr=a.play();if(pr&&pr.catch)pr.catch(function(){});}
     }
   });
+}
+/* ===== Create results stay (owner rule 2026-11-16) =====
+   The last finished songs of THIS account are restored into the
+   Create results box when the app opens on Create / the user
+   switches to Create with an empty box, so the songs they made
+   are still there to listen to — for a long time, not just
+   until the page is closed. Per-account, like History: the key
+   follows whoever is signed in ('movai-lastsongs-<email>', or
+   '-guest'). A generation in progress (pending cards in the
+   box) is never touched. */
+function lastSongsKey(){
+  var em='';
+  try{em=(localStorage.getItem('movai-session')||'').trim().toLowerCase();}catch(e){}
+  return 'movai-lastsongs-'+(em?em:'guest');
+}
+var lastSongsRestored=false;
+function lastSongsRestore(){
+  if(lastSongsRestored)return;
+  var box=document.getElementById('genResult');
+  if(!box||box.children.length)return;
+  var raw=null;try{raw=localStorage.getItem(lastSongsKey());}catch(e){}
+  if(!raw)return;
+  var j=null;try{j=JSON.parse(raw);}catch(e){}
+  if(!j||!Array.isArray(j.songs)||!j.songs.length)return;
+  lastSongsRestored=true;
+  histCtx={prompt:j.prompt||'',provider:j.provider||'',title:j.title||''};
+  histCtxStamp();
+  try{genShowSongs(j.songs,false,true);}catch(e){}
 }
 function genSongCard(song,n,it,title,prov,prompt,streaming){
   var u=song.url;
@@ -4951,10 +5007,28 @@ function histOnAccountChange(){
   if(histAudio){try{histAudio.pause();}catch(e){}histAudioId=null;}
   histMigrateLegacy();
   histRender();
+  /* The Create results are per-account too: a sign in / out
+     clears the previous account's restored results (and stops
+     their playback) so the new account restores its OWN saved
+     songs — but a generation IN PROGRESS (pending cards on
+     screen) is left completely untouched: it keeps running and
+     finishes into its creator's History, never the new
+     account's. */
+  try{
+    lastSongsRestored=false;
+    var gb=document.getElementById('genResult');
+    if(gb&&!document.getElementById('genSongPending')){
+      genSongAudios.forEach(function(a){try{a.pause();}catch(e){}});
+      genSongAudios=[];
+      gb.innerHTML='';
+    }
+  }catch(e){}
 }
 function histGet(){try{var a=JSON.parse(localStorage.getItem(histKey())||'[]');return Array.isArray(a)?a:[];}catch(e){return[];}}
 function histSave(a){
-  var key=histKey();
+  return histSaveTo(histKey(),a);
+}
+function histSaveTo(key,a){
   var variants=[a,a.map(function(it){var c={};for(var k in it){if(k!=='thumb')c[k]=it[k];}return c;})];
   for(var v=0;v<variants.length;v++){
     var arr=variants[v];
@@ -4965,15 +5039,39 @@ function histSave(a){
   }
   return false;
 }
+function histGetFrom(key){try{var a=JSON.parse(localStorage.getItem(key)||'[]');return Array.isArray(a)?a:[];}catch(e){return[];}}
 function histAdd(item){
+  histAddTo(item,histKey());
+}
+/* Saves into a SPECIFIC account's store (owner rule 2026-11-16):
+   a creation belongs to the account that STARTED it. When a song
+   is still generating while a different account signs in on the
+   same device, the finished song must land in its CREATOR's
+   History — never in the newly signed-in account's, and never
+   lost. genShowSongs passes the key captured in histCtx.acctKey
+   when the generation began. */
+function histAddTo(item,key){
   if(!item||!item.type)return;
   item.id='h'+Date.now().toString(36)+Math.floor(Math.random()*1000000).toString(36);
   item.ts=Date.now();
   if(item.liked!==true)item.liked=false;
-  var a=histGet();a.unshift(item);
+  var a=histGetFrom(key);a.unshift(item);
   if(a.length>300)a=a.slice(0,300);
-  histSave(a);
+  histSaveTo(key,a);
   histRender();
+}
+/* Stamps the CURRENT signed-in account (its History key + its
+   last-songs key) onto histCtx. Called the moment a generation
+   starts, so everything the generation later saves is tied to
+   the account that created it — whatever account is signed in
+   by the time it finishes. */
+function histCtxStamp(){
+  if(!histCtx)return;
+  try{
+    var em=(localStorage.getItem('movai-session')||'').trim().toLowerCase();
+    histCtx.acctKey='movai-history-'+(em?em:'guest');
+    histCtx.lastKey='movai-lastsongs-'+(em?em:'guest');
+  }catch(e){}
 }
 function histProviderName(){
   try{var list=gen.mode==='video'?GEN_VID_PROVIDERS:(gen.mode==='song'?GEN_SONG_PROVIDERS:GEN_IMG_PROVIDERS);
@@ -6523,7 +6621,7 @@ function appSetView(v){
   if(tp){tp.className='view-tab'+(onPub?' on':'');tp.setAttribute('aria-selected',onPub?'true':'false');}
   if(tc){tc.className='view-tab'+(!onPub?' on':'');tc.setAttribute('aria-selected',!onPub?'true':'false');}
   if(onPub){pubLoadFeed(false);try{pubFollowLoad();}catch(e){}try{pubAutoStart();}catch(e){}}
-  else{try{pubAutoStop();}catch(e){}try{histRender();}catch(e){}}
+  else{try{pubAutoStop();}catch(e){}try{histRender();}catch(e){}try{lastSongsRestore();}catch(e){}}
   if(changed)window.scrollTo(0,0);
   try{dockSync();}catch(e){}
   /* The floating song logo reacts to the view switch at once —
@@ -6643,6 +6741,107 @@ function pubKeepViews(out){
   }catch(e){}
   return out;
 }
+/* ===== POSTED = LOCKED FOREVER (owner rule 2026-11-16) =====
+   A post that has appeared in Public must NEVER disappear
+   again — no «up, then gone, then up, then gone». Every post
+   this page has ever seen (from the server feed, or posted
+   from this device) is mirrored into a permanent local store
+   (localStorage 'movai-public-lock'), and every feed load and
+   every silent refresh MERGES the server snapshot with that
+   lock instead of replacing the feed with it. So when the
+   free-tier server sleeps, restarts, or loses a post from its
+   own snapshot, the post stays on screen from the lock —
+   forever, in every place the feed shows. A locked copy only
+   ever gets UPDATED by the server's fresher copy of the same
+   post (matched by id, or by media URL for a just-posted copy
+   the server has not id'd yet); it is never subtracted, and
+   its view count never goes down. The store keeps the newest
+   300 posts and sheds oldest-first only if storage runs out. */
+var PUB_LOCK_KEY='movai-public-lock';
+var PUB_LOCK_MAX=300;
+function pubLockRead(){
+  try{
+    var a=JSON.parse(localStorage.getItem(PUB_LOCK_KEY)||'[]');
+    if(!Array.isArray(a))return [];
+    var out=[];
+    a.forEach(function(x){var n=pubNormItem(x);if(n)out.push(n);});
+    return out;
+  }catch(e){return [];}
+}
+function pubLockWrite(items){
+  var arr=(items||[]).slice().sort(function(a,b){return pubTsVal(b)-pubTsVal(a);});
+  if(arr.length>PUB_LOCK_MAX)arr=arr.slice(0,PUB_LOCK_MAX);
+  while(arr.length){
+    try{localStorage.setItem(PUB_LOCK_KEY,JSON.stringify(arr));return;}
+    catch(e){arr=arr.slice(0,Math.max(1,Math.floor(arr.length*0.8)));}
+  }
+}
+/* Union of the server's fresh snapshot with the lock: fresh
+   copies win for posts the server still returns (with views
+   never dropping below the locked count); locked posts the
+   server no longer returns are carried over unchanged. The
+   merged set becomes the new lock. */
+function pubLockMerge(fresh){
+  var lock=pubLockRead();
+  if(!lock.length){pubLockWrite(fresh);return fresh;}
+  var byId={},byUrl={};
+  fresh.forEach(function(it){
+    byId[it.id]=it;
+    if(it.url)byUrl[it.type+'|'+it.url]=it;
+  });
+  var out=fresh.slice();
+  lock.forEach(function(old){
+    var f=byId[old.id];
+    if(f){
+      /* Views never go down (owner rule) — the locked count is
+         the floor. Likes / dislikes follow the server's fresh
+         copy, so an un-like still counts down as it should. */
+      if(old.views>f.views)f.views=old.views;
+      return;
+    }
+    /* The server now returns this post under its real id (same
+       media URL): its fresh copy replaces the locked one — the
+       post shows once, never twice. */
+    if(old.url&&byUrl[old.type+'|'+old.url])return;
+    out.push(old);
+  });
+  pubLockWrite(out);
+  return out;
+}
+/* On open, before the server answers (it may be asleep for
+   half a minute), the feed is seeded from the lock so every
+   post is already there — nothing waits on the server to
+   exist. */
+function pubLockSeed(){
+  if(pubItems.length)return;
+  var c=pubLockRead();
+  if(c.length)pubItems=pubSortItems(c);
+}
+/* Count changes made on screen (a listen, a like) are written
+   back into the lock, debounced — so a locked post's counts
+   survive a reload exactly as they were left, never reset. */
+var pubLockTouchTimer=null;
+function pubLockTouch(){
+  if(pubLockTouchTimer)return;
+  pubLockTouchTimer=setTimeout(function(){
+    pubLockTouchTimer=null;
+    try{pubLockWrite(pubItems);}catch(e){}
+  },4000);
+}
+/* A post made from THIS device is locked the moment the server
+   accepts it — it enters the feed and the lock at once, so it
+   is up permanently even before the next feed load, and even
+   if the server later drops it from its snapshot. */
+function pubLockAdd(item){
+  if(!item||!item.url)return;
+  var found=false;
+  for(var i=0;i<pubItems.length;i++){
+    if(pubItems[i].id===item.id||(pubItems[i].type===item.type&&pubItems[i].url===item.url)){pubItems[i]=item;found=true;break;}
+  }
+  if(!found)pubItems.unshift(item);
+  pubItems=pubSortItems(pubItems);
+  pubLockWrite(pubItems);
+}
 /* PUBLIC MEANS PUBLIC (owner rule 2026-11-16): this feed loads
    with a plain GET — no login, no account, no token. Every
    visitor sees every post and can play every song: old users,
@@ -6653,6 +6852,10 @@ function pubKeepViews(out){
 function pubLoadFeed(force){
   if(pubLoading)return;
   if(pubLoaded&&!force){pubRender();return;}
+  /* Locked posts render at once, before the server answers —
+     a post that exists never waits on the server to show. */
+  pubLockSeed();
+  if(pubItems.length)pubRender();
   pubLoading=true;
   var box=document.getElementById('pubFeed');
   if(box&&!pubItems.length)box.innerHTML='<p style="color:var(--muted);font-size:0.875rem;line-height:1.7;padding:10px 0">'+escHtml(tx('pubLoading'))+'</p>';
@@ -6672,13 +6875,18 @@ function pubLoadFeed(force){
     if(!Array.isArray(arr))arr=[];
     var out=[];
     arr.forEach(function(x){var n=pubNormItem(x);if(n)out.push(n);});
-    pubItems=pubSortItems(pubKeepViews(out));
+    /* MERGE with the lock, never replace: posts the server
+       stopped returning stay in the feed forever. */
+    pubItems=pubSortItems(pubLockMerge(pubKeepViews(out)));
     pubItems.forEach(function(it){if(it.liked)pubLiked[it.id]=true;if(it.disliked)pubDisliked[it.id]=true;});
     pubLoaded=true;
     pubRender();
   }).catch(function(){
     if(timer)clearTimeout(timer);
     pubLoading=false;
+    /* Server unreachable: the locked posts stay on screen —
+       the error state shows only when there is truly nothing
+       locked yet (pubRenderError already renders any items). */
     pubRenderError();
   });
 }
@@ -6733,7 +6941,9 @@ function pubSilentRefresh(){
     if(!Array.isArray(arr))arr=[];
     var out=[];
     arr.forEach(function(x){var n=pubNormItem(x);if(n)out.push(n);});
-    out=pubSortItems(pubKeepViews(out));
+    /* Same lock merge as a full load: a silent tick can add or
+       update posts, but it can never make one disappear. */
+    out=pubSortItems(pubLockMerge(pubKeepViews(out)));
     if(pubLoaded&&pubFeedSig(out)===pubFeedSig(pubItems))return;
     var sy=window.scrollY||window.pageYOffset||0;
     var anchorId=null,anchorTop=0;
@@ -7898,6 +8108,7 @@ function pubToggleLike(id){
   pubUpdateLike(id);
   pubPostReact(id,'like',!was);
   it._liking=false;
+  pubLockTouch();
 }
 function pubToggleDislike(id){
   var it=null;for(var i=0;i<pubItems.length;i++)if(pubItems[i].id===id)it=pubItems[i];
@@ -7915,6 +8126,7 @@ function pubToggleDislike(id){
   pubUpdateDislike(id);
   pubPostReact(id,'dislike',!was);
   it._liking=false;
+  pubLockTouch();
 }
 function pubPostReact(id,kind,on){
   var u=null;try{u=acctCurrent();}catch(e){}
@@ -8055,6 +8267,7 @@ function pubCountView(id){
   var it=null;for(var i=0;i<pubItems.length;i++)if(pubItems[i].id===id)it=pubItems[i];
   if(it){
     it.views++;
+    pubLockTouch();
     /* Every place the count is shown (title line, action row,
        compact row, rail mini) refreshes together. */
     var els=document.querySelectorAll('[data-pub-views="'+CSS.escape(id)+'"]');
@@ -8162,13 +8375,31 @@ function pubDoPost(vis){
       if(!r||!r.ok)throw new Error('http '+(r?r.status:0));
       return r.json().catch(function(){return {};});
     })
-    .then(function(){
+    .then(function(data){
       if(item.id){
         var a=histGet();
         for(var i=0;i<a.length;i++){if(a[i].id===item.id){a[i].pubPost=vis;histSave(a);break;}}
         item.pubPost=vis;
       }
-      if(vis==='public'){pubLoaded=false;try{postCountBump(u);}catch(e){}}
+      if(vis==='public'){
+        pubLoaded=false;try{postCountBump(u);}catch(e){}
+        /* Lock it NOW (owner rule): the post enters the feed
+           and the permanent lock the moment the server accepts
+           it — it can never appear-then-vanish afterwards. The
+           server's own copy (its id) is used when the response
+           carries one; otherwise the post is locked under a
+           local id and the server copy replaces it by URL on
+           the next feed load. */
+        try{
+          var nit=null;
+          try{nit=pubNormItem((data&&(data.post||data.item))||data);}catch(e){}
+          if(!nit||nit.url!==payload.url){
+            nit={id:String((data&&(data.id||data.postId))||('lock'+Date.now().toString(36))),name:payload.name||'',email:payload.email||'',premium:false,title:payload.title||'',type:payload.type,url:payload.url,aspect:'',image:payload.image||'',likes:0,dislikes:0,views:0,rank:null,tier:null,liked:false,disliked:false,duration:null,model:'',genre:payload.genre||'',youtube:'',youtubeChannel:'',ts:Date.now()};
+          }
+          if(nit.type==='song'&&payload.genre&&!nit.genre)nit.genre=payload.genre;
+          pubLockAdd(nit);
+        }catch(e){}
+      }
       if(msg){msg.textContent=(vis==='public')?tx('pubPostedOk'):tx('pubPrivateOk');msg.style.color='var(--accent-text)';}
     })
     .catch(function(){
@@ -8468,8 +8699,20 @@ async function postFlowSubmit(){
     else payload.kind=postFlow.kind;
     var r=await fetch(PUB_API+'/post',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
     if(!r||!r.ok)throw new Error('http '+(r?r.status:0));
-    await r.json().catch(function(){return {};});
+    var pj=await r.json().catch(function(){return {};});
     postCountBump(u);
+    /* Lock it NOW (owner rule): the post is in the Public feed
+       and the permanent lock from this moment on — up once, up
+       forever, never up-then-gone. */
+    try{
+      var nit2=null;
+      try{nit2=pubNormItem((pj&&(pj.post||pj.item))||pj);}catch(e){}
+      if(!nit2||nit2.url!==url){
+        nit2={id:String((pj&&(pj.id||pj.postId))||('lock'+Date.now().toString(36))),name:u.name||'',email:u.email||'',premium:false,title:title,type:'song',url:url,aspect:'',image:image||'',likes:0,dislikes:0,views:0,rank:null,tier:null,liked:false,disliked:false,duration:null,model:'',genre:(postFlow.kind==='song'?postFlow.genre:''),youtube:'',youtubeChannel:'',ts:Date.now()};
+      }
+      if(postFlow.kind==='song'&&postFlow.genre&&!nit2.genre)nit2.genre=postFlow.genre;
+      pubLockAdd(nit2);
+    }catch(e){}
     if(postFlow.histItem&&postFlow.histItem.id){
       var a=histGet();
       for(var i=0;i<a.length;i++){if(a[i].id===postFlow.histItem.id){a[i].pubPost='public';histSave(a);break;}}
@@ -10393,10 +10636,23 @@ async function genDoSongServer(cfg,prompt){
   var voiceTag=sInstr?'':(sVoice==='male'?'male vocals':(sVoice==='female'?'female vocals':''));
   var styleFull=[sStyle,voiceTag].filter(function(x){return !!x;}).join(', ');
   histCtx={prompt:prompt,provider:cfg.provider,title:sTitle,style:styleFull};
-  var sBody={provider:cfg.provider,title:sTitle,name:sTitle,lyrics:prompt,prompt:prompt,style:styleFull,tags:styleFull,voice:sVoice,model:cfg.model,instrumental:sInstr,make_instrumental:sInstr};
+  histCtxStamp();
+  /* The duration the user picked (1 / 2 / 3 / 3.5 / 5 minutes) MUST
+     travel with the create call — without it the server/provider
+     falls back to its own 120-second default and a 3.5-minute pick
+     comes back as a 2-minute song. Sent in seconds under every
+     field name the providers use (duration is the one the direct
+     Magic Hour call uses), so whichever one the server reads, the
+     song is made at exactly the length the user set. */
+  var sSecs=Math.round((gen.songDur||3)*60);
+  var sBody={provider:cfg.provider,title:sTitle,name:sTitle,lyrics:prompt,prompt:prompt,style:styleFull,tags:styleFull,voice:sVoice,model:cfg.model,instrumental:sInstr,make_instrumental:sInstr,duration:sSecs,durationSeconds:sSecs,duration_seconds:sSecs};
   if(sVoice==='male')sBody.vocal_gender='m';
   else if(sVoice==='female')sBody.vocal_gender='f';
   var j=await adminGenPost('/api/gen/song',sBody,60000);
+  /* Show exactly as many songs as ONE generation from this provider
+     produces: Suno / MusicAPI produce 2, Magic Hour / ACE Music
+     produce 1 — the result list is capped to that, no more. */
+  var songCap=(/suno/i.test(cfg.provider||'')||/musicapi/i.test(cfg.provider||''))?2:1;
   var songs=adminSongsFrom(j);
   if(!songs.length){
     var jobId=adminJobId(j);
@@ -10411,7 +10667,7 @@ async function genDoSongServer(cfg,prompt){
     var earlySongs=null,earlyKey='';
     var done=await adminPollJob('song',cfg.provider,jobId,isSuno?SUNO_WAIT_MAX:SONG_WAIT_MAX,function(t0){genProgTxt(tx('progWaitingSong')+'('+Math.floor((Date.now()-t0)/1000)+'s)');},isSuno?function(sg){
       var key=sg.map(function(x){return x.url;}).join('|');
-      if(key&&key!==earlyKey){earlyKey=key;earlySongs=sg;try{genShowSongs(sg.slice(0,2),true);}catch(e){}}
+      if(key&&key!==earlyKey){earlyKey=key;earlySongs=sg;try{genShowSongs(sg.slice(0,songCap),true);}catch(e){}}
     }:null);
     if(!done){
       /* Budget over: a playable Suno preview already on screen is
@@ -10424,7 +10680,7 @@ async function genDoSongServer(cfg,prompt){
     }
   }
   if(genCtl.cancelled)throw genCtlErr();
-  genShowSongs(songs.slice(0,2));
+  genShowSongs(songs.slice(0,songCap));
 }
 /* ---- 3D through the server proxy (Admin holds the 3D keys) ---- */
 function admin3dFiles(j){
