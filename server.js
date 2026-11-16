@@ -497,6 +497,24 @@ function logGrant(entry) {
 // calling the provider, and deducts AFTER the provider accepts the job.
 // Every deduction is logged to grants.json (the credit history) and the
 // user file is GitHub-flushed before returning success.
+// Out-of-credit notifications: at most one per user per 24h, so a user
+// hammering Generate does not spam the Admin bell + Telegram. Goes to
+// Admin (bell) + Telegram via the 'out-of-credit' kind.
+const outOfCreditNotifiedAt = new Map();
+function notifyOutOfCredit(email, kind, balance, cost) {
+  try {
+    const em = normEmail(email);
+    if (!em) return;
+    const now = Date.now();
+    const last = outOfCreditNotifiedAt.get(em) || 0;
+    if (now - last < 24 * 60 * 60 * 1000) return;
+    outOfCreditNotifiedAt.set(em, now);
+    const users = loadUsers();
+    const u = users[em];
+    const uid = u && u.id ? u.id : '—';
+    addNotification('out-of-credit', em, '⚠️ Credit អស់ · Out of credit', (u && u.name ? u.name : em) + ' · ' + em + ' · ID: ' + uid + ' — ' + (kind === 'media' ? 'Image.Video' : 'Song') + ' Credit មិនគ្រប់ (នៅសល់ ' + Math.floor(numOr(balance, 0)) + ' / ត្រូវការ ' + Math.floor(numOr(cost, 0)) + ')');
+  } catch (e) {}
+}
 async function deductForGeneration(email, mediaCost, songCost, reason) {
   const em = normEmail(email);
   if (!em) return { ok: true, guest: true };
@@ -507,8 +525,8 @@ async function deductForGeneration(email, mediaCost, songCost, reason) {
   const sCost = Math.floor(numOr(songCost, 0));
   const mBal = Math.floor(numOr(u.credits, 0));
   const sBal = Math.floor(numOr(u.songCredits, 0));
-  if (mCost > 0 && mBal < mCost) return { ok: false, error: 'Image.Video Credit មិនគ្រប់ទេ', needBuy: true, kind: 'media', balance: mBal, cost: mCost };
-  if (sCost > 0 && sBal < sCost) return { ok: false, error: 'Song Credit មិនគ្រប់ទេ', needBuy: true, kind: 'song', balance: sBal, cost: sCost };
+  if (mCost > 0 && mBal < mCost) { notifyOutOfCredit(em, 'media', mBal, mCost); return { ok: false, error: 'Image.Video Credit មិនគ្រប់ទេ', needBuy: true, kind: 'media', balance: mBal, cost: mCost }; }
+  if (sCost > 0 && sBal < sCost) { notifyOutOfCredit(em, 'song', sBal, sCost); return { ok: false, error: 'Song Credit មិនគ្រប់ទេ', needBuy: true, kind: 'song', balance: sBal, cost: sCost }; }
   if (mCost > 0 || sCost > 0) {
     if (mCost > 0) u.credits = Math.max(0, mBal - mCost);
     if (sCost > 0) u.songCredits = Math.max(0, sBal - sCost);
@@ -524,7 +542,7 @@ async function deductForGeneration(email, mediaCost, songCost, reason) {
       const _parts = [];
       if (mCost > 0) _parts.push('-' + mCost + ' Image.Video');
       if (sCost > 0) _parts.push('-' + sCost + ' Song');
-      addNotification('deduct', em, '➖ កាត់ Credit · ' + (u.name || em), _parts.join(' · ') + ' — ' + (reason || 'generation') + ' · នៅសល់ ' + Math.floor(numOr(u.credits, 0)) + ' Image.Video / ' + Math.floor(numOr(u.songCredits, 0)) + ' Song');
+      addNotification('deduct', em, '➖ កាត់ Credit · ' + (u.name || em), _parts.join(' · ') + ' — ' + (reason || 'generation') + ' · នៅសល់ ' + Math.floor(numOr(u.credits, 0)) + ' Image.Video / ' + Math.floor(numOr(u.songCredits, 0)) + ' Song · ' + em + ' · ID: ' + (u.id || '—'));
     } catch (e) {}
   }
   return { ok: true, credits: Math.floor(numOr(u.credits, 0)), songCredits: Math.floor(numOr(u.songCredits, 0)) };
@@ -621,7 +639,9 @@ function newNotificationId() {
   return 'ntf_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
 }
 // Create a notification. For admin-facing kinds (login, purchase-request,
-// gift-claimed, security) ALSO send a Telegram message to the admin (fire-and-forget:
+// gift-claimed, security, update, grant, deduct, purchase-approved,
+// purchase-rejected, plan-expired, out-of-credit) ALSO send a Telegram
+// message to the admin (fire-and-forget:
 // it never blocks the response and its errors are swallowed). The bot token
 // is never logged and never returned by any endpoint.
 function addNotification(kind, email, title, text) {
@@ -632,7 +652,7 @@ function addNotification(kind, email, title, text) {
     if (arr.length > NOTIFICATIONS_MAX) arr.length = NOTIFICATIONS_MAX;
     saveNotifications(arr);
   } catch (e) {}
-  if (kind === 'login' || kind === 'purchase-request' || kind === 'gift-claimed' || kind === 'security' || kind === 'update') {
+  if (kind === 'login' || kind === 'purchase-request' || kind === 'gift-claimed' || kind === 'security' || kind === 'update' || kind === 'grant' || kind === 'deduct' || kind === 'purchase-approved' || kind === 'purchase-rejected' || kind === 'plan-expired' || kind === 'out-of-credit') {
     sendTelegramAdmin('🔔 ' + n.title + '\n' + n.text);
   }
   // Phone-native Web Push for the same event (admin devices and/or the
@@ -1394,6 +1414,7 @@ function apiRoute(req, res, urlPath) {
             const _imgUsers = loadUsers();
             const _imgU = _imgUsers[_imgEm];
             if (_imgU && Math.floor(numOr(_imgU.credits, 0)) < imgCost) {
+              notifyOutOfCredit(_imgEm, 'media', Math.floor(numOr(_imgU.credits, 0)), imgCost);
               return sendJSON(res, 200, { ok: false, error: 'Image.Video Credit មិនគ្រប់ទេ · Not enough Image/Video Credits — សូមទិញ Credit បន្ថែម', needBuy: true, kind: 'media', balance: Math.floor(numOr(_imgU.credits, 0)), cost: imgCost });
             }
           }
@@ -1550,6 +1571,7 @@ function apiRoute(req, res, urlPath) {
             const _vidUsers = loadUsers();
             const _vidU = _vidUsers[_vidEm];
             if (_vidU && Math.floor(numOr(_vidU.credits, 0)) < vidCost) {
+              notifyOutOfCredit(_vidEm, 'media', Math.floor(numOr(_vidU.credits, 0)), vidCost);
               return sendJSON(res, 200, { ok: false, error: 'Image.Video Credit មិនគ្រប់ទេ · Not enough Image/Video Credits — សូមទិញ Credit បន្ថែម', needBuy: true, kind: 'media', balance: Math.floor(numOr(_vidU.credits, 0)), cost: vidCost });
             }
           }
@@ -1778,6 +1800,7 @@ function apiRoute(req, res, urlPath) {
           const _bal = SONG_POOL === 'media' ? Math.floor(numOr(_songU.credits, 0)) : Math.floor(numOr(_songU.songCredits, 0));
           if (_songU && _bal < SONG_COST) {
             const _err = SONG_POOL === 'media' ? 'Image.Video Credit មិនគ្រប់ទេ · Not enough Image/Video Credits — សូមទិញ Credit បន្ថែម' : 'Song Credit មិនគ្រប់ទេ · Not enough Song Credits — សូមទិញ Credit បន្ថែម';
+            notifyOutOfCredit(_songEm, SONG_POOL, _bal, SONG_COST);
             return sendJSON(res, 200, { ok: false, error: _err, needBuy: true, kind: SONG_POOL, balance: _bal, cost: SONG_COST });
           }
         }
@@ -2470,9 +2493,9 @@ function apiRoute(req, res, urlPath) {
       const deltaText = fmtCreditDelta(dMedia, dSong);
       const grantNote = typeof body.note === 'string' ? body.note.trim().slice(0, 200) : '';
       if (dMedia < 0 || dSong < 0) {
-        addNotification('deduct', email, '➖ កាត់ Credit · Credits deducted', 'Admin បានកាត់ ' + deltaText + ' ពី ' + email + (grantNote ? ' — ' + grantNote : ''));
+        addNotification('deduct', email, '➖ កាត់ Credit · Credits deducted', 'Admin បានកាត់ ' + deltaText + ' ពី ' + email + ' · ID: ' + (u.id || '—') + (grantNote ? ' — ' + grantNote : ''));
       } else {
-        addNotification('grant', email, '➕ បន្ថែម Credit · Credits granted', 'Admin បានបន្ថែម ' + deltaText + ' ឲ្យ ' + email + (grantNote ? ' — ' + grantNote : ''));
+        addNotification('grant', email, '➕ បន្ថែម Credit · Credits granted', 'Admin បានបន្ថែម ' + deltaText + ' ឲ្យ ' + email + ' · ID: ' + (u.id || '—') + (grantNote ? ' — ' + grantNote : ''));
       }
       return sendJSON(res, 200, { ok: true, user: pubUser(u) });
     }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
@@ -3059,7 +3082,9 @@ function apiRoute(req, res, urlPath) {
       };
       reqs.push(r);
       savePurchaseRequests(reqs);
-      addNotification('purchase-request', email, '🛒 សំណើទិញកញ្ចប់ · Purchase request', email + ' បានស្នើទិញកញ្ចប់ ' + packageId + ' ($' + pkg.price + ')');
+      const _pu = loadUsers()[email];
+      const _puid = _pu && _pu.id ? _pu.id : '—';
+      addNotification('purchase-request', email, '🛒 សំណើទិញកញ្ចប់ · Purchase request', email + ' · ID: ' + _puid + ' បានស្នើទិញកញ្ចប់ ' + packageId + ' ($' + pkg.price + ')');
       return sendJSON(res, 200, { ok: true, request: r });
     }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
     return;
@@ -3096,8 +3121,8 @@ function apiRoute(req, res, urlPath) {
       const now = new Date().toISOString();
       u.credits = Math.max(0, Math.floor(numOr(u.credits, 0)) + pkg.credits);
       u.songCredits = Math.max(0, Math.floor(numOr(u.songCredits, 0)) + pkg.songCredits);
-      if (pkg.credits) u.plan = r.packageId;
-      if (pkg.songCredits) u.songPlan = r.packageId;
+      if (pkg.credits) { u.plan = r.packageId; u.planExpiresAt = new Date(Date.now() + Math.max(1, pkg.days || 30) * 86400000).toISOString(); }
+      if (pkg.songCredits) { u.songPlan = r.packageId; u.songPlanExpiresAt = new Date(Date.now() + Math.max(1, pkg.days || 30) * 86400000).toISOString(); }
       u.updatedAt = now;
       saveUsers(users);
       logGrant({ email: r.email, credits: pkg.credits, songCredits: pkg.songCredits, note: 'purchase:' + r.packageId, at: now });
@@ -3110,7 +3135,7 @@ function apiRoute(req, res, urlPath) {
       // restart cannot lose a purchase the Admin app already approved.
       await ghFlushFile(USERS_FILE);
       await ghFlushFile(PURCHASE_REQUESTS_FILE);
-      addNotification('purchase-approved', r.email, '✅ បានអនុម័ត · Purchase approved', 'កញ្ចប់ ' + r.packageId + ' របស់ ' + r.email + ' បានអនុម័ត — +' + pkg.credits + ' Image.Video / +' + pkg.songCredits + ' Song Credit');
+      addNotification('purchase-approved', r.email, '✅ បានអនុម័ត · Purchase approved', 'កញ្ចប់ ' + r.packageId + ' របស់ ' + r.email + ' · ID: ' + (u.id || '—') + ' បានអនុម័ត — +' + pkg.credits + ' Image.Video / +' + pkg.songCredits + ' Song Credit');
       return sendJSON(res, 200, { ok: true, request: r, user: pubUser(u) });
     }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
     return;
@@ -3131,7 +3156,9 @@ function apiRoute(req, res, urlPath) {
       r.decidedAt = now;
       r.updatedAt = now;
       savePurchaseRequests(reqs);
-      addNotification('purchase-rejected', r.email, '❌ បដិសេធ · Purchase rejected', 'សំណើទិញកញ្ចប់ ' + r.packageId + ' របស់ ' + r.email + ' ត្រូវបានបដិសេធ');
+      const _ru = loadUsers()[r.email];
+      const _ruid = _ru && _ru.id ? _ru.id : '—';
+      addNotification('purchase-rejected', r.email, '❌ បដិសេធ · Purchase rejected', 'សំណើទិញកញ្ចប់ ' + r.packageId + ' របស់ ' + r.email + ' · ID: ' + _ruid + ' ត្រូវបានបដិសេធ');
       return sendJSON(res, 200, { ok: true, request: r });
     }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
     return;
@@ -3702,6 +3729,38 @@ const server = http.createServer((req, res) => {
   });
 });
 
+// Plan-expiry sweep: when a bought package reaches its expiry date, notify
+// the Admin once per expiry (bell + Telegram via 'plan-expired'), so the
+// Admin can follow up. A renewal (new approve) stores a new expiry date,
+// so the next expiry notifies again. Runs hourly + once after startup.
+function checkPlanExpiries() {
+  try {
+    const users = loadUsers();
+    const now = Date.now();
+    let changed = false;
+    for (const em of Object.keys(users)) {
+      const u = users[em];
+      if (!u || typeof u !== 'object') continue;
+      const plans = [
+        { exp: u.planExpiresAt, notified: u.planExpiryNotifiedAt, field: 'planExpiryNotifiedAt', label: (u.plan || 'package') },
+        { exp: u.songPlanExpiresAt, notified: u.songPlanExpiryNotifiedAt, field: 'songPlanExpiryNotifiedAt', label: (u.songPlan || 'song package') },
+      ];
+      for (const pl of plans) {
+        if (!pl.exp) continue;
+        const expMs = Date.parse(pl.exp);
+        if (!expMs || expMs > now) continue;
+        if (pl.notified && pl.notified === pl.exp) continue;
+        const uid = u.id || '—';
+        addNotification('plan-expired', em, '⏰ កញ្ចប់ផុតកំណត់ · Package expired', (u.name || em) + ' · ' + em + ' · ID: ' + uid + ' — កញ្ចប់ ' + pl.label + ' បានផុតកំណត់ (' + String(pl.exp).slice(0, 10) + ')');
+        u[pl.field] = pl.exp;
+        u.updatedAt = new Date().toISOString();
+        changed = true;
+      }
+    }
+    if (changed) { saveUsers(users); ghFlushFile(USERS_FILE).catch(() => {}); }
+  } catch (e) {}
+}
+
 if (require.main === module) {
   // Restore persistent data from GitHub first (no-op without a token),
   // so the server starts with the true data, then listen.
@@ -3710,8 +3769,10 @@ if (require.main === module) {
       console.log('MovAi Gen live on port ' + PORT);
       // Auto Update Version New: hourly sweep (auto-apply due updates +
       // model check when due) + a first sweep 5 min after startup.
-      setTimeout(() => { autoUpdateSweep(); }, 5 * 60 * 1000);
-      setInterval(() => { autoUpdateSweep(); }, 60 * 60 * 1000);
+      // Plan-expiry sweep runs on the same schedule: when a bought package
+      // reaches its expiry date, notify the Admin once (bell + Telegram).
+      setTimeout(() => { autoUpdateSweep(); checkPlanExpiries(); }, 5 * 60 * 1000);
+      setInterval(() => { autoUpdateSweep(); checkPlanExpiries(); }, 60 * 60 * 1000);
     });
   });
 }
