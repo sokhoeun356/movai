@@ -2131,7 +2131,7 @@ km:{
  postUploading:'កំពុង upload',postPosting:'កំពុងផុស',postFileBig:'ឯកសារធំពេក (MP3 អតិបរមា 15MB · រូបភាព 5MB)',
  postBadFile:'សូមជ្រើសឯកសារ MP3 / audio',postNeedTitle:'សូមដាក់ចំណងជើងបទ',postViewPublic:'មើលក្នុង Public',
  postSrcFile:'ពីទូរសព្ទ',postSrcWeb:'ពី website',postPackages:'មើលកញ្ចប់ · Packages',
- pubDlFreeLeft:'ទាញយកបទហ្វ្រីនៅសល់ {n}/4 ដង · Suno {s}/2 · Magic Hour {m}/2',
+ pubDlFreeLeft:'ទាញយកបទដោយសេរី · Unlimited downloads',
  pubDlLimit:'អ្នកបានប្រើអស់ការទាញយកហ្វ្រី {p} 2 ដងហើយ — សូមទិញកញ្ចប់បទចម្រៀង ដើម្បីទាញយកបន្ត',
  acctGotFree:'អបអរសាទរ! អ្នកទទួលបាន Credit ហ្វ្រី — Image.Video Credit 250 និង Song Credit 24 ក្នុងគណនីរបស់អ្នកហើយ',
  giftTitle:'កាដូពី Admin',giftBody:'Free 250 Image.Video Credit + 24 Song Credit សម្រាប់អ្នកប្រើថ្មី',giftClaim:'ទទួលយក · Claim',blockedTitle:'គណនីនេះត្រូវបានប្លុក · This account is blocked',blockedBody:'គណនី / IP / ឧបករណ៍នេះត្រូវបាន Admin ប្លុក — អ្នកចូលប្រើ ឬបង្កើតអ្វីមិនបានទេ។ បើចង់ដោះស្រាយ សូមទាក់ទង Admin។',blockedContact:'ទាក់ទង Admin តាម Telegram',blockedLogout:'ចេញពីគណនី · Log out',
@@ -2356,7 +2356,7 @@ en:{
  postUploading:'Uploading',postPosting:'Posting',postFileBig:'File too large (MP3 max 15MB · image 5MB)',
  postBadFile:'Please pick an MP3 / audio file',postNeedTitle:'Please enter a song title',postViewPublic:'View in Public',
  postSrcFile:'From phone',postSrcWeb:'From website',postPackages:'View packages · កញ្ចប់',
- pubDlFreeLeft:'{n}/4 free song downloads left · Suno {s}/2 · Magic Hour {m}/2',
+ pubDlFreeLeft:'Unlimited song downloads',
  pubDlLimit:'You have used your 2 free {p} downloads — please buy a Song package to keep downloading',
  acctGotFree:'Welcome! You received free credits — 250 Image.Video Credit and 24 Song Credit in your account',
  giftTitle:'A Gift from Admin',giftBody:'Free 250 Image.Video Credit + 24 Song Credit for new users',giftClaim:'Claim · ទទួលយក',blockedTitle:'This account is blocked · គណនីនេះត្រូវបានប្លុក',blockedBody:'This account / IP / device has been blocked by the Admin — you cannot log in or create anything. To resolve this, contact the Admin.',blockedContact:'Contact Admin on Telegram',blockedLogout:'Log out · ចេញពីគណនី',
@@ -9508,23 +9508,11 @@ function pubCountDownload(it){
 }
 function pubDownloadPost(it,btn){
   if(!it||!it.url)return;
-  if(it.type==='song'&&!pubHasSongPlan()){
-    var bucket=pubSongBucket(it);
-    if(pubSongDlLeft(bucket)<=0){
-      if(btn){
-        var sp=btn.querySelector('span:last-child');
-        if(sp){var old=sp.textContent;sp.textContent=tx('pubDlLimit').replace('{p}',pubSongBucketName(bucket));setTimeout(function(){if(sp.isConnected)sp.textContent=old;},3200);}
-      }
-      try{pkgSetTab('song');}catch(e){}
-      packagesShow();
-      return;
-    }
-    pubSongDlBump(bucket);
-    pubCountDownload(it);
-    pubDownloadFile(it);
-    pubDlNoteRefresh();
-    return;
-  }
+  /* Downloads are FREE / UNLIMITED (owner order 2026-11-16): the old
+     4-free limit (Suno 2 + Magic Hour 2, then buy a package) is
+     REMOVED — everyone downloads songs without limit, no package
+     needed. Downloads are still counted (pubCountDownload) so the
+     Admin stats show them. */
   pubCountDownload(it);
   pubDownloadFile(it);
 }
