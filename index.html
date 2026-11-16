@@ -645,14 +645,15 @@ html[data-mode="light"] .btn-free{color:#63910c}
 .pub-songlink:active{opacity:.8}
 .pub-dl-note{font-size:0.75rem;color:var(--muted);margin-top:8px;line-height:1.6}
 /* ===== Public song card — Music Library style =====
-   Song posts lead with a square cover, the title under it, then
-   a custom player: an accent progress bar with a knob and
-   current / total time — followed by accent-outline pills:
-   Like / Share. The Play button sits in the CENTRE of the cover
-   itself (overlay), and while the song plays, rhythm bars dance
-   inside the bottom of the cover. The accent is the app lime
-   green, so the «green» of the design follows the user's chosen
-   App Color like everything else. */
+   Song posts lead with a square cover, the title under it, a
+   compact row of small Like / Dislike / Share buttons, then a
+   custom player: an accent progress bar with a knob and
+   current / total time. The Play button sits in the CENTRE of
+   the cover itself (overlay), and while the song plays, rhythm
+   bars dance in two small groups at the bottom corners of the
+   cover. The accent is the app lime green, so the «green» of
+   the design follows the user's chosen App Color like
+   everything else. */
 .pub-cover-wrap{position:relative;width:min(56%,240px);margin:6px auto 0;border-radius:14px;cursor:pointer;-webkit-tap-highlight-color:transparent}
 .pub-cover-wrap .pub-song-cover{width:100%;margin:0}
 .pub-song-cover{display:block;width:min(56%,240px);aspect-ratio:1/1;object-fit:cover;margin:6px auto 0;border-radius:14px;background:#000}
@@ -662,34 +663,49 @@ html[data-mode="light"] .btn-free{color:#63910c}
 .pub-playbtn{width:54px;height:54px;flex:0 0 auto;border-radius:50%;border:none;background:var(--accent-fill);color:#0d1005;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;padding:0;-webkit-tap-highlight-color:transparent;box-shadow:0 4px 14px rgba(var(--accent-rgb),.35)}
 .pub-playbtn:active{filter:brightness(.93)}
 .pub-play-overlay{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);z-index:3;width:58px;height:58px;box-shadow:0 6px 20px rgba(0,0,0,.5),0 0 0 5px rgba(0,0,0,.18)}
-/* Visualizer (owner rule): the bars live in TWO small groups at
-   the bottom-left and bottom-right corners of the cover — the
-   centre (cover logo / MovAi wordmark) stays completely clear.
-   Bar heights are set from REAL audio frequency data by the Web
-   Audio analyser (pubVizFrame) — no CSS bounce, no random data. */
-.pub-viz{position:absolute;left:0;right:0;bottom:0;height:54px;z-index:2;display:flex;align-items:flex-end;justify-content:space-between;padding:0 10px 8px;opacity:0;transition:opacity .25s;pointer-events:none}
+/* Visualizer (owner rule): the bars live ONLY in TWO small
+   groups pinned to the bottom-left and bottom-right corners of
+   the cover — each group is a narrow strip sitting in its own
+   corner, and the centre of the cover (logo / MovAi wordmark)
+   stays completely clear at all times. Bar heights are set
+   from REAL audio frequency data by the Web Audio analyser
+   (pubVizFrame) — no CSS bounce, no random data. */
+.pub-viz{position:absolute;left:0;right:0;bottom:0;height:38px;z-index:2;opacity:0;transition:opacity .25s;pointer-events:none}
 .pub-cover-wrap.playing .pub-viz{opacity:1}
-.pub-viz-side{display:flex;align-items:flex-end;gap:3px;height:100%}
-.pub-viz i{flex:0 0 auto;width:5px;height:12%;min-height:3px;border-radius:3px;background:var(--accent-fill);transition:height .07s linear}
+.pub-viz-side{position:absolute;bottom:7px;display:flex;align-items:flex-end;gap:2px;height:28px}
+.pub-viz-side:first-child{left:8px}
+.pub-viz-side:last-child{right:8px}
+.pub-viz i{flex:0 0 auto;width:4px;height:12%;min-height:3px;border-radius:2px;background:var(--accent-fill);transition:height .07s linear}
 @media (prefers-reduced-motion:reduce){.pub-viz i{transition:none}}
 .pub-prog{position:relative;flex:1 1 auto;height:22px;display:flex;align-items:center;cursor:pointer;touch-action:pan-y}
 .pub-prog::before{content:'';position:absolute;left:0;right:0;top:50%;transform:translateY(-50%);height:5px;border-radius:999px;background:var(--line2)}
 .pub-prog-fill{position:relative;height:5px;border-radius:999px;background:var(--accent-fill);width:0%;z-index:1}
 .pub-prog-knob{position:absolute;right:-8px;top:50%;transform:translateY(-50%);width:16px;height:16px;border-radius:50%;background:var(--accent-fill);box-shadow:0 1px 5px rgba(0,0,0,.45)}
 .pub-time{flex:0 0 auto;font-size:0.8125rem;font-weight:700;color:var(--text2);font-variant-numeric:tabular-nums;white-space:nowrap}
-.pub-pills{display:flex;gap:8px;margin-top:6px;flex-wrap:wrap}
 .pub-pill{flex:1 1 0;display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:7px 10px;border-radius:999px;border:1.5px solid var(--accent);background:transparent;color:var(--accent-text);font-family:inherit;font-size:0.8125rem;font-weight:800;cursor:pointer;min-height:36px;font-variant-numeric:tabular-nums;white-space:nowrap}
 .pub-pill:active{opacity:.8}
 .pub-pill.liked{background:rgba(var(--accent-rgb),.14)}
+/* Compact action row (owner layout, annotated mock): Like /
+   Dislike / Share as SMALL buttons in ONE row directly under
+   the song title, before the progress bar — there is no action
+   row at the bottom of the card any more, and views appear
+   ONLY beside the title, never twice. The buttons keep their
+   .pub-pill / .pub-act classes (the like / dislike refresh
+   helpers key off them) but shrink inside this row. */
+.pub-acts{display:flex;gap:6px;margin-top:6px;align-items:center;flex-wrap:wrap}
+.pub-acts .pub-pill,.pub-acts .pub-act{flex:0 0 auto;min-height:30px;padding:5px 11px;font-size:0.75rem;gap:5px;border-width:1px}
 /* ===== Public song card — top links, one-line title + views,
-   playback-mode row (owner layout, annotated mock) =====
+   compact action row, playback-mode row (owner layout,
+   annotated mock) =====
    «Song Link» and the YouTube logo button sit at the very TOP of
    the card; the title stays on ONE line with the view count on
-   the same line right after it; the three playback-mode buttons
+   the same line right after it; Like / Dislike / Share sit in
+   ONE compact row of small buttons immediately BELOW the title
+   (before the progress bar); the three playback-mode buttons
    (Loop / Repeat One / Shuffle-Next) sit in a row just BELOW the
-   progress bar. Like / Share / Views / Dislike stay in their
-   action rows below, exactly as before. The card is compact:
-   tight margins keep cover, title, progress, modes and pills
+   progress bar. There is NO bottom action row: views appear
+   only beside the title, never twice. The card is compact:
+   tight margins keep cover, title, actions, progress and modes
    close together with no excess gaps. */
 .pub-toplinks{display:flex;align-items:center;gap:8px;margin-top:6px;flex-wrap:wrap}
 .pub-toplinks .pub-songlink{margin-top:0}
@@ -6976,6 +6992,36 @@ function pubCardEl(it){
     tvw.innerHTML=pubEyeSvg()+'<span data-pub-views="'+escHtml(it.id)+'">'+acctFmtBal(it.views)+'</span>';
     trow.appendChild(tvw);
     card.appendChild(trow);
+    /* Compact action row (owner layout, annotated mock): Like /
+       Dislike / Share as SMALL buttons in ONE row immediately
+       under the title, BEFORE the progress bar — they used to
+       sit at the very bottom of the card. No Download button:
+       a Public post belongs to its poster, so viewers cannot
+       download it (owner rule). Views are NOT repeated here —
+       the count beside the title is the only one on the card. */
+    var arow=document.createElement('div');
+    arow.className='pub-acts';
+    var alk=document.createElement('button');
+    alk.type='button';alk.className='pub-pill'+(pubLiked[it.id]?' liked':'');
+    alk.setAttribute('data-pub-like',it.id);
+    alk.innerHTML=histHeartSvg(!!pubLiked[it.id])+'<span>'+escHtml(tx('histLike'))+'</span><span>'+acctFmtBal(it.likes)+'</span>';
+    alk.setAttribute('aria-label',tx('histLike'));
+    alk.addEventListener('click',function(){pubToggleLike(it.id);});
+    arow.appendChild(alk);
+    var adk=document.createElement('button');
+    adk.type='button';adk.className='pub-act'+(pubDisliked[it.id]?' disliked':'');
+    adk.setAttribute('data-pub-dislike',it.id);
+    adk.innerHTML='<span style="display:inline-flex;transform:rotate(180deg)">'+pubThumbSvg()+'</span><span>'+acctFmtBal(it.dislikes)+'</span>';
+    adk.setAttribute('aria-label',tx('pubDislike'));
+    adk.addEventListener('click',function(){pubToggleDislike(it.id);});
+    arow.appendChild(adk);
+    var ash=document.createElement('button');
+    ash.type='button';ash.className='pub-pill';
+    ash.innerHTML=pubShareSvg()+'<span>'+escHtml(tx('pubShare'))+'</span>';
+    ash.setAttribute('aria-label',tx('pubShare'));
+    ash.addEventListener('click',function(){pubSharePost(it,ash);});
+    arow.appendChild(ash);
+    card.appendChild(arow);
     /* Custom player (Music Library style): the big round accent
        Play button overlays the CENTRE of the cover (above); the
        row under the title carries an accent progress bar that
@@ -7107,7 +7153,7 @@ function pubCardEl(it){
     });
     /* NO meta/details box under a song card (owner rule): the
        Song ID / Song / Posted by / Posted date text is gone —
-       the card ends with its pills, views row and links. */
+       the card ends with its mode row and links. */
     /* Song-card links row (owner rule): only the YouTube Channel
        link stays under the card — «Song Link» and the YouTube
        logo button moved to the TOP of the card (see the top
@@ -7136,43 +7182,11 @@ function pubCardEl(it){
        the card now (owner layout). */
   }
   if(it.type==='song'){
-    /* Music Library actions: two accent-outline pills —
-       Like / Share. No Download pill: a Public post belongs to
-       its poster, so viewers cannot download it (owner rule). */
-    var sfoot=document.createElement('div');
-    sfoot.className='pub-pills';
-    var slk=document.createElement('button');
-    slk.type='button';slk.className='pub-pill'+(pubLiked[it.id]?' liked':'');
-    slk.setAttribute('data-pub-like',it.id);
-    slk.innerHTML=histHeartSvg(!!pubLiked[it.id])+'<span>'+escHtml(tx('histLike'))+'</span><span>'+acctFmtBal(it.likes)+'</span>';
-    slk.setAttribute('aria-label',tx('histLike'));
-    slk.addEventListener('click',function(){pubToggleLike(it.id);});
-    sfoot.appendChild(slk);
-    var ssh=document.createElement('button');
-    ssh.type='button';ssh.className='pub-pill';
-    ssh.innerHTML=pubShareSvg()+'<span>'+escHtml(tx('pubShare'))+'</span>';
-    ssh.setAttribute('aria-label',tx('pubShare'));
-    ssh.addEventListener('click',function(){pubSharePost(it,ssh);});
-    sfoot.appendChild(ssh);
-    card.appendChild(sfoot);
-    /* Views (the ranking stat) + thumbs-down stay available on a
-       quiet second row under the pills, then the song links
-       collected earlier. */
-    var srow=document.createElement('div');
-    srow.className='pub-foot';
-    srow.style.marginTop='6px';
-    var svw=document.createElement('span');
-    svw.className='pub-views';
-    svw.innerHTML=pubEyeSvg()+'<span data-pub-views="'+escHtml(it.id)+'">'+acctFmtBal(it.views)+'</span><small>'+escHtml(tx('pubViews'))+'</small>';
-    srow.appendChild(svw);
-    var sdk=document.createElement('button');
-    sdk.type='button';sdk.className='pub-act'+(pubDisliked[it.id]?' disliked':'');
-    sdk.setAttribute('data-pub-dislike',it.id);
-    sdk.innerHTML='<span style="display:inline-flex;transform:rotate(180deg)">'+pubThumbSvg()+'</span><span>'+acctFmtBal(it.dislikes)+'</span>';
-    sdk.setAttribute('aria-label',tx('pubDislike'));
-    sdk.addEventListener('click',function(){pubToggleDislike(it.id);});
-    srow.appendChild(sdk);
-    card.appendChild(srow);
+    /* Like / Dislike / Share now live in the compact row under
+       the title (see the song branch above) and the old bottom
+       «views + dislike» row is gone — views show only beside
+       the title. Only the song links collected earlier (the
+       YouTube Channel link) still close the card. */
     if(songExtra)card.appendChild(songExtra);
   }else{
   var foot=document.createElement('div');
