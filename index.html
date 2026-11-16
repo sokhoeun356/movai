@@ -485,8 +485,16 @@ html[data-mode="light"] .pkg-tab.media.on{color:#8f27c9}
    pill whose label takes a DARK shade of the card's own colour
    (dark lime on song cards, dark purple on media cards) so it
    reads clearly on white too. Colour only — prices, plan names,
-   tabs, the carousel and the Buy flow are untouched. */
-.pkg-card.song{background:linear-gradient(155deg,#527a0b 0%,#3d5f07 52%,#191d16 100%);color:#fff;border-radius:14px}
+   tabs, the carousel and the Buy flow are untouched.
+   BRIGHTEN pass (owner order 2026-11-16): the darkened song
+   gradient (#527a0b→#3d5f07→#191d16) read TOO dark — the lime now
+   opens brighter and holds its colour much further down the card
+   (#7fb816→#639e0c→#3c6607), and the near-black grey tail is
+   replaced by a deep olive (#2c4d05) so the grey/black shadow is
+   cut back. No white or pale tint is mixed in, and the card's
+   dark text-shadow is kept, so the white lettering stays clear.
+   Media (purple) cards are untouched. */
+.pkg-card.song{background:linear-gradient(155deg,#7fb816 0%,#639e0c 48%,#3c6607 82%,#2c4d05 100%);color:#fff;border-radius:14px}
 .pkg-card.media{background:linear-gradient(155deg,#8a2bd6 0%,#6d1cb3 52%,#1d1a24 100%);color:#fff;border-radius:14px}
 .pkg-card.song,.pkg-card.media{border-color:transparent;box-shadow:0 6px 18px rgba(0,0,0,.35);text-shadow:0 1px 3px rgba(0,0,0,.5)}
 .pkg-card.media.hot{border-color:transparent;box-shadow:0 6px 18px rgba(0,0,0,.35)}
@@ -497,7 +505,7 @@ html[data-mode="light"] .pkg-card.song .pkg-credits,html[data-mode="light"] .pkg
 .pkg-card .pkg-feats{color:#fff}
 .pkg-card.media>p{color:rgba(255,255,255,.92) !important}
 .pkg-card .btn{background:#fff;border-color:transparent;text-shadow:none}
-.pkg-card.song .btn{color:#3d5f07}
+.pkg-card.song .btn{color:#4a7009}
 .pkg-card.media .btn{color:#7b21c9}
 /* Disabled buttons inside package cards (the Free plan's
    «Automatic» pill, an active plan's Buy button) keep full
@@ -816,7 +824,13 @@ html[data-smooth="1"] .dock{background-color:rgba(var(--glass-tint),.96)}
 /* ===== AI Chat — floating robot button (bottom-LEFT) + chat panel =====
    The robot button is fixed in the BOTTOM-LEFT corner with safe-area
    padding, mirroring the quick-settings FAB on the bottom-right —
-   the two never overlap. Tapping it opens the chat panel above it.
+   the two never overlap. Tapping it opens the chat FULL HEIGHT
+   (owner order 2026-11-16): the panel stretches from the very top
+   of the screen to the bottom, covering the Public/Create area,
+   and a full-screen blurred backdrop hides everything behind it —
+   only the chat is visible. The header shows the signed-in user's
+   name two-tone (white + lime #ADDC29, like the «MovAi» logo) with
+   a green online dot beside it (see aiChatSetUserName).
    Chat is login-only: guests are sent to the log-in sheet instead
    (see aiChatOpen in the script). Every reply comes live from the
    MovAi proxy server (POST /api/chat) — nothing is pre-written. */
@@ -826,11 +840,17 @@ html[data-smooth="1"] .dock{background-color:rgba(var(--glass-tint),.96)}
 .chat-fab:active{filter:brightness(.93)}
 .chat-fab .chat-fab-eye{animation:chatBlink 4.6s ease-in-out infinite;transform-origin:center;transform-box:fill-box}
 @keyframes chatBlink{0%,92%,100%{transform:scaleY(1)}95%{transform:scaleY(.12)}}
-.chat-panel{position:fixed;left:16px;bottom:calc(86px + env(safe-area-inset-bottom,0px));z-index:94;width:min(92vw,384px);height:min(66vh,560px);max-height:calc(100dvh - 110px - env(safe-area-inset-top,0px) - env(safe-area-inset-bottom,0px));display:none;flex-direction:column;background:var(--card);border:1px solid var(--line2);border-radius:20px;box-shadow:0 22px 54px rgba(0,0,0,.5);overflow:hidden;color:var(--text)}
+.chat-backdrop{position:fixed;inset:0;z-index:124;display:none;background:rgba(3,4,5,.5);-webkit-backdrop-filter:blur(18px) saturate(115%);backdrop-filter:blur(18px) saturate(115%)}
+.chat-backdrop.open{display:block;animation:chatFadeIn .25s ease-out both}
+@keyframes chatFadeIn{from{opacity:0}to{opacity:1}}
+.chat-panel{position:fixed;top:0;bottom:0;left:0;right:0;margin:0 auto;z-index:125;width:min(100%,560px);height:auto;max-height:none;display:none;flex-direction:column;background:var(--card);border-left:1px solid var(--line2);border-right:1px solid var(--line2);box-shadow:0 0 60px rgba(0,0,0,.5);overflow:hidden;color:var(--text)}
 .chat-panel.open{display:flex;animation:chatPanelIn .26s ease-out both}
-@keyframes chatPanelIn{from{opacity:0;transform:translateY(14px) scale(.97)}to{opacity:1;transform:translateY(0) scale(1)}}
-@media (prefers-reduced-motion:reduce){.chat-panel.open{animation:none}.chat-fab .chat-fab-eye{animation:none}}
-.chat-head{display:flex;align-items:center;gap:11px;padding:13px 14px;border-bottom:1px solid var(--line);background:var(--card2);flex:0 0 auto}
+@keyframes chatPanelIn{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
+@media (prefers-reduced-motion:reduce){.chat-panel.open{animation:none}.chat-backdrop.open{animation:none}.chat-fab .chat-fab-eye{animation:none}.chat-online-dot{animation:none}}
+.chat-head{display:flex;align-items:center;gap:11px;padding:calc(13px + env(safe-area-inset-top,0px)) 14px 13px;border-bottom:1px solid var(--line);background:var(--card2);flex:0 0 auto}
+.chat-name-lime{color:#ADDC29}
+.chat-online-dot{display:inline-block;width:10px;height:10px;border-radius:50%;background:#22c55e;box-shadow:0 0 0 2px rgba(34,197,94,.22),0 0 8px rgba(34,197,94,.85);margin-left:8px;vertical-align:2px;animation:chatOnlinePulse 2.4s ease-in-out infinite}
+@keyframes chatOnlinePulse{0%,100%{box-shadow:0 0 0 2px rgba(34,197,94,.22),0 0 8px rgba(34,197,94,.85)}50%{box-shadow:0 0 0 4px rgba(34,197,94,.10),0 0 12px rgba(34,197,94,1)}}
 .chat-avatar{width:42px;height:42px;border-radius:50%;flex:0 0 auto;background:var(--accent-fill);color:#0d1005;display:flex;align-items:center;justify-content:center}
 .chat-avatar svg{width:25px;height:25px;display:block}
 .chat-head-main{flex:1 1 auto;min-width:0}
@@ -855,7 +875,7 @@ html[data-mode="light"] .chat-bubble.err{color:#b91c1c;background:rgba(220,38,38
 .chat-typing .tdots i:nth-child(3){animation-delay:.32s}
 @keyframes chatDotBounce{0%,100%{transform:translateY(0);opacity:.55}45%{transform:translateY(-4px);opacity:1}}
 @media (prefers-reduced-motion:reduce){.chat-typing .tdots i{animation:none}}
-.chat-input-row{flex:0 0 auto;display:flex;gap:8px;align-items:flex-end;padding:10px;border-top:1px solid var(--line);background:var(--card)}
+.chat-input-row{flex:0 0 auto;display:flex;gap:8px;align-items:flex-end;padding:10px 10px calc(10px + env(safe-area-inset-bottom,0px));border-top:1px solid var(--line);background:var(--card)}
 .chat-input{flex:1 1 auto;min-width:0;border:1px solid var(--line2);border-radius:999px;padding:11px 16px;font-size:0.9375rem;font-family:inherit;background:var(--field);color:var(--text);outline:none;min-height:44px;max-height:110px;resize:none;line-height:1.45}
 .chat-input:focus{border-color:var(--accent-text)}
 .chat-input::placeholder{color:var(--faint)}
@@ -1393,10 +1413,11 @@ html[data-smooth="1"] .brand-frame,html[data-smooth="1"] .acct-chip,html[data-sm
   <button type="button" class="dock-item" id="dockNotif" onclick="dockGo('notif')" aria-label="Notifications · ដំណឹង"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg><span class="dock-badge" id="dockNotifBadge" style="display:none">0</span></button>
 </nav>
 <button type="button" class="chat-fab" id="chatFab" onclick="aiChatToggle()" aria-label="AI Chat · ឆាតជាមួយ AI" aria-expanded="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 7V3"/><circle cx="12" cy="2.4" r="0.6" fill="currentColor"/><rect x="4.5" y="7" width="15" height="11.5" rx="3.5"/><path d="M2.5 12.5v2"/><path d="M21.5 12.5v2"/><circle class="chat-fab-eye" cx="9.3" cy="12.3" r="0.4" fill="currentColor"/><circle class="chat-fab-eye" cx="14.7" cy="12.3" r="0.4" fill="currentColor"/><path d="M9.8 15.6c.7.6 1.4.9 2.2.9s1.5-.3 2.2-.9"/></svg></button>
-<div id="chatPanel" class="chat-panel" role="dialog" aria-modal="false" aria-label="AI Chat">
+<div id="chatBackdrop" class="chat-backdrop" onclick="aiChatClose()" aria-hidden="true"></div>
+<div id="chatPanel" class="chat-panel" role="dialog" aria-modal="true" aria-label="AI Chat">
   <div class="chat-head">
     <span class="chat-avatar" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 7V3"/><circle cx="12" cy="2.4" r="0.6" fill="currentColor"/><rect x="4.5" y="7" width="15" height="11.5" rx="3.5"/><path d="M2.5 12.5v2"/><path d="M21.5 12.5v2"/><circle cx="9.3" cy="12.3" r="0.4" fill="currentColor"/><circle cx="14.7" cy="12.3" r="0.4" fill="currentColor"/><path d="M9.8 15.6c.7.6 1.4.9 2.2.9s1.5-.3 2.2-.9"/></svg></span>
-    <span class="chat-head-main"><span class="chat-head-title">MovAi AI Chat</span><span class="chat-head-sub" style="display:block">ជំនួយការ AI — សួរអ្វីក៏បានអំពី MovAi</span></span>
+    <span class="chat-head-main"><span class="chat-head-title"><span id="chatUserName">Mov<span class="chat-name-lime">Ai</span></span><span class="chat-online-dot" role="status" aria-label="អនឡាញ · Online"></span></span><span class="chat-head-sub" style="display:block">MovAi AI · ជំនួយការ AI — សួរអ្វីក៏បានអំពី MovAi</span></span>
     <button type="button" class="chat-close" onclick="aiChatClose()" aria-label="បិទឆាត · Close">✕</button>
   </div>
   <div class="chat-msgs" id="chatMsgs">
@@ -8786,9 +8807,27 @@ function aiChatToggle(){
   if(p&&p.classList.contains('open')){aiChatClose();return;}
   aiChatOpen();
 }
+/* Chat header name (owner order 2026-11-16): the signed-in user's
+   name, two-tone like the «MovAi» logo — first part in the normal
+   (white) text colour, the rest in lime #ADDC29 (.chat-name-lime) —
+   with the green online dot beside it in the header markup. Falls
+   back to the Gmail prefix, then to the two-tone MovAi wordmark. */
+function aiChatSetUserName(){
+  var el=document.getElementById('chatUserName');if(!el)return;
+  var u=aiChatUser();
+  var name=(u&&u.name)?String(u.name).trim():'';
+  if(!name&&u&&u.email)name=String(u.email).split('@')[0].trim();
+  if(!name){el.innerHTML='Mov<span class="chat-name-lime">Ai</span>';return;}
+  var parts=name.split(/\s+/),first,rest;
+  if(parts.length>1){first=parts[0];rest=parts.slice(1).join(' ');}
+  else{var half=Math.ceil(name.length/2);first=name.slice(0,half);rest=name.slice(half);}
+  el.innerHTML=escHtml(first)+(rest?' <span class="chat-name-lime">'+escHtml(rest)+'</span>':'');
+}
 function aiChatOpen(){
   if(!aiChatUser()){if(typeof loginSheetOpen==='function')loginSheetOpen();return;}
   var p=document.getElementById('chatPanel');if(!p)return;
+  aiChatSetUserName();
+  var bd=document.getElementById('chatBackdrop');if(bd)bd.classList.add('open');
   p.classList.add('open');
   var fab=document.getElementById('chatFab');if(fab)fab.setAttribute('aria-expanded','true');
   aiChatScroll();
@@ -8796,6 +8835,7 @@ function aiChatOpen(){
 }
 function aiChatClose(){
   var p=document.getElementById('chatPanel');if(p)p.classList.remove('open');
+  var bd=document.getElementById('chatBackdrop');if(bd)bd.classList.remove('open');
   var fab=document.getElementById('chatFab');if(fab)fab.setAttribute('aria-expanded','false');
 }
 function aiChatScroll(){
