@@ -1752,6 +1752,42 @@ function apiRoute(req, res, urlPath) {
           }
           return sendJSON(res, 200, { ok: true, jobId: out.jobId });
         }
+        if (provider === 'magichour') {
+          // Magic Hour music — POST /v1/ai-music-generator.
+          // duration 15-300s, 1 credit/sec. style: {instrumental, lyrics, prompt}.
+          // Returns a project id; poll GET /v1/audio-projects/{id}.
+          const instrumental = body.instrumental === true || body.make_instrumental === true;
+          const mhDuration = (typeof body.duration === 'number' && body.duration >= 15 && body.duration <= 300) ? Math.round(body.duration) : 120;
+          const mhPromptParts = [];
+          if (style) mhPromptParts.push(style);
+          if (voice === 'male' && !instrumental) mhPromptParts.push('male vocals');
+          else if (voice === 'female' && !instrumental) mhPromptParts.push('female vocals');
+          if (title) mhPromptParts.push('titled "' + title + '"');
+          const mhPrompt = mhPromptParts.join('. ').slice(0, 1000) || 'pop song';
+          const mhBody = {
+            name: (title || 'MovAi song').slice(0, 80),
+            duration: mhDuration,
+            style: {
+              instrumental: instrumental,
+              lyrics: lyrics.slice(0, 5000),
+              prompt: mhPrompt,
+            },
+          };
+          let out;
+          try {
+            out = await withProviderKeyRotation('magichour', async (k) => {
+              const r = await fetch('https://api.magichour.ai/v1/ai-music-generator', { method: 'POST', headers: { 'Authorization': 'Bearer ' + k, 'Content-Type': 'application/json' }, body: JSON.stringify(mhBody), signal: AbortSignal.timeout(60000) });
+              const j = await r.json().catch(() => null);
+              const id = j && typeof j.id === 'string' ? j.id : '';
+              if (id) return { jobId: id };
+              throw rotErr('Magic Hour: ' + genErrText(j, 'HTTP ' + r.status), r.status);
+            });
+          } catch (e) {
+            if (e && e.noKey) return sendJSON(res, 200, { ok: false, error: 'Admin មិនទាន់ដាក់ Magic Hour Key ទេ' });
+            return sendJSON(res, 200, { ok: false, error: (e && e.message) || 'Magic Hour: request failed' });
+          }
+          return sendJSON(res, 200, { ok: true, jobId: out.jobId });
+        }
         return sendJSON(res, 200, { ok: false, error: 'Provider មិនស្គាល់ទេ' });
       } catch (e) { return sendJSON(res, 200, { ok: false, error: 'ហៅ API មិនបានទេ៖ ' + (e && e.message ? e.message : 'unknown') }); }
     }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
@@ -1853,6 +1889,32 @@ function apiRoute(req, res, urlPath) {
           } catch (e) {
             if (e && e.noKey) return sendJSON(res, 200, { ok: false, error: 'Admin មិនទាន់ដាក់ MusicAPI Key ទេ' });
             return sendJSON(res, 200, { ok: false, error: (e && e.message) || 'MusicAPI: request failed' });
+          }
+          return sendJSON(res, 200, Object.assign({ ok: true }, out));
+        }
+        if (provider === 'magichour') {
+          let out;
+          try {
+            out = await withProviderKeyRotation('magichour', async (k) => {
+              const r = await fetch('https://api.magichour.ai/v1/audio-projects/' + encodeURIComponent(jobId), { headers: { 'Authorization': 'Bearer ' + k }, signal: AbortSignal.timeout(30000) });
+              const j = await r.json().catch(() => null);
+              if (r.status === 401 || r.status === 403 || r.status === 429) throw rotErr('Magic Hour: ' + genErrText(j, 'HTTP ' + r.status), r.status);
+              const st = j && typeof j.status === 'string' ? j.status : '';
+              if (st === 'complete') {
+                const songs = [];
+                if (Array.isArray(j.downloads)) {
+                  j.downloads.forEach((d) => { if (d && typeof d.url === 'string' && d.url) songs.push({ url: d.url, title: typeof j.name === 'string' ? j.name : '' }); });
+                }
+                if (songs.length) return { status: 'done', songs };
+                return { status: 'done', songs: [], raw: j };
+              }
+              if (st === 'error') throw rotErr('Magic Hour: ' + genErrText(j, 'បង្កើតមិនបានទេ'), r.status);
+              if (st === 'canceled') throw rotErr('Magic Hour: បទត្រូវបានលុបចោល', r.status);
+              return { status: 'working', providerStatus: st || 'queued' };
+            });
+          } catch (e) {
+            if (e && e.noKey) return sendJSON(res, 200, { ok: false, error: 'Admin មិនទាន់ដាក់ Magic Hour Key ទេ' });
+            return sendJSON(res, 200, { ok: false, error: (e && e.message) || 'Magic Hour: request failed' });
           }
           return sendJSON(res, 200, Object.assign({ ok: true }, out));
         }
