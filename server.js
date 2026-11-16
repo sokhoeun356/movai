@@ -86,7 +86,11 @@ const FREE_SONG_CREDITS = 24;
 // ghFlushFile before returning success, so a restart cannot lose a write
 // already reported as ok. When the token is unset, behaviour is EXACTLY
 // as before (local ./data/*.json only).
-// Uploads (./data/uploads/) are binary and stay local/ephemeral.
+// Uploads (./data/uploads/) are binary. They are ALSO backed up to
+// GitHub (movai-data repo, uploads/) on every upload and restored on
+// startup (ghPutUpload / ghRestoreUploads) — a proxy restart/redeploy
+// can no longer wipe a song MP3 or cover. (2026-11-16: uploads were
+// wiped on EVERY restart — the recurring song-breaker.)
 // The token is NEVER hardcoded and NEVER logged — only process.env.
 const GH_REPO = process.env.MOVAI_DATA_REPO || 'sokhoeun356/movai-data';
 const GH_TOKEN = process.env.MOVAI_GITHUB_TOKEN || '';
@@ -215,6 +219,7 @@ async function ghRestoreAll() {
       console.log('[github] restore ' + name + ' skipped: ' + (e && e.message ? e.message : e));
     }
   }));
+  await ghRestoreUploads(); // uploaded MP3/cover files (GitHub-backed)
 }
 
 // Failed admin-key attempts (attack detection) — in-memory ONLY, never
@@ -1255,6 +1260,46 @@ async function genFairnessGate(email, provider) {
   if (!th) return 'Server រវល់ — សូមសាកល្បងម្តងទៀត · Server is busy, please try again';
   return '';
 }
+// ---- Suno (sunoapi.org) ----
+// sunoapi.org API (verified 2026-11-16 from docs.sunoapi.org):
+// generate POST {endpoint}/api/v1/generate (customMode, instrumental,
+// callBackUrl, model V6/V6_WILD/V6_MINI); status GET
+// {endpoint}/api/v1/generate/record-info?taskId=...; credit GET
+// {endpoint}/api/v1/generate/credit. The gateway REQUIRES a callBackUrl
+// and calls it at stages text / first / complete.
+const SUNO_CALLBACK_URL = process.env.SUNO_CALLBACK_URL || 'https://movai-proxy.onrender.com/api/suno/callback';
+// Latest callback result per taskId: {status, songs, preview, updatedAt}.
+// In-memory only (a restart loses it — the status handler then falls
+// back to polling record-info, so nothing breaks).
+const sunoCallbacks = new Map();
+function sunoApiModel(m) {
+  const s = String(m || '').trim().toLowerCase();
+  if (s === 'v6-wild' || s === 'v6_wild') return 'V6_WILD';
+  if (s === 'v6-mini' || s === 'v6_mini') return 'V6_MINI';
+  return 'V6';
+}
+// sunoapi.org puts its error text in `msg` (genErrText does not read it).
+function sunoErrText(j, fb) {
+  if (j && typeof j.msg === 'string' && j.msg) return j.msg;
+  return genErrText(j, fb);
+}
+// Extract playable songs from a record-info / callback data object.
+function sunoSongsFromData(d) {
+  const resp = (d && d.response) || {};
+  const arr = Array.isArray(resp.sunoData) ? resp.sunoData : (Array.isArray(d && d.sunoData) ? d.sunoData : []);
+  return arr.filter((c) => c && typeof c.audio_url === 'string' && c.audio_url).map((c) => ({
+    url: c.audio_url,
+    title: typeof c.title === 'string' ? c.title : '',
+    image: typeof c.image_url === 'string' ? c.image_url : '',
+    duration: typeof c.duration === 'number' ? c.duration : 0,
+  }));
+}
+function sunoPreviewFromData(d) {
+  const resp = (d && d.response) || {};
+  const arr = Array.isArray(resp.sunoData) ? resp.sunoData : (Array.isArray(d && d.sunoData) ? d.sunoData : []);
+  const first = arr.find((c) => c && (c.stream_audio_url || c.audio_url));
+  return first ? (first.stream_audio_url || first.audio_url) : '';
+}
 function apiRoute(req, res, urlPath) {
   // Attack protection: count this IP's requests (all /api/* + /uploads/*).
   // A correct admin key is never rate-limited or blocked here (the admin
@@ -1583,6 +1628,26 @@ function apiRoute(req, res, urlPath) {
     }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
     return;
   }
+  // POST /api/suno/callback — PUBLIC (no admin key). sunoapi.org calls
+  // this when a generation changes stage (text / first / complete).
+  // We store the result by taskId so /api/gen/song/status can answer
+  // instantly; polling record-info remains the fallback. Always
+  // answers 200 — a non-200 makes the gateway report CALLBACK_EXCEPTION.
+  if (req.method === 'POST' && urlPath === '/api/suno/callback') {
+    readJSONBody(req, 256 * 1024).then((body) => {
+      try {
+        const d = (body && body.data) || body || {};
+        const taskId = typeof d.taskId === 'string' && d.taskId ? d.taskId : (typeof body.taskId === 'string' ? body.taskId : '');
+        if (taskId) {
+          const st = typeof d.status === 'string' ? d.status : '';
+          sunoCallbacks.set(taskId, { status: st, songs: sunoSongsFromData(d), preview: sunoPreviewFromData(d), updatedAt: Date.now() });
+          if (sunoCallbacks.size > 200) { const k = sunoCallbacks.keys().next().value; sunoCallbacks.delete(k); }
+        }
+      } catch (e) {}
+      return sendJSON(res, 200, { code: 200, msg: 'ok' });
+    }).catch(() => sendJSON(res, 200, { code: 200, msg: 'ok' }));
+    return;
+  }
   // POST /api/gen/song — {provider:'musicapi', key, title, lyrics, style, voice, prompt}
   // MusicAPI is CORS-blocked from the browser, so the browser calls this proxy.
   // Keys arrive with each request only (from the visitor's own browser).
@@ -1648,44 +1713,39 @@ function apiRoute(req, res, urlPath) {
           return sendJSON(res, 200, { ok: true, jobId: out.jobId });
         }
         if (provider === 'suno') {
-          // Suno (MovAi) via the admin-stored gateway endpoint + key.
-          // The browser sends no key and no endpoint — both live on the
-          // server. Each stored Suno key carries its own gateway
-          // endpoint; keys without an endpoint cannot be called and are
-          // skipped. Rotates to the next key when one is exhausted.
+          // Suno (MovAi) via sunoapi.org — the admin-stored gateway
+          // endpoint + key. The browser sends no key and no endpoint —
+          // both live on the server. Each stored Suno key carries its
+          // own gateway endpoint; keys without an endpoint cannot be
+          // called and are skipped. Rotates to the next key when one is
+          // exhausted. sunoapi.org requires customMode + instrumental +
+          // callBackUrl + model (V6/V6_WILD/V6_MINI).
           const sunoKeys = adminProviderKeyList('suno').filter((e) => e.endpoint);
           if (!sunoKeys.length) {
             if (!adminProviderKeyList('suno').length) return sendJSON(res, 200, { ok: false, error: 'Admin មិនទាន់ដាក់ Suno Key ទេ' });
             return sendJSON(res, 200, { ok: false, error: 'Admin មិនទាន់ដាក់ Suno endpoint ទេ' });
           }
           const genBody = {
-            prompt: lyrics || (style ? style + (title ? ' titled "' + title + '"' : '') : (title || prompt)),
-            tags: style || '',
-            model,
-            make_instrumental: false,
+            customMode: true,
+            instrumental: false,
+            callBackUrl: SUNO_CALLBACK_URL,
+            model: sunoApiModel(model),
+            style: (style || 'pop').slice(0, 1000),
+            lyrics: (lyrics || prompt || '').slice(0, 5000),
+            title: title.slice(0, 80),
           };
-          if (title) genBody.title = title;
+          if (voice === 'male') genBody.vocalGender = 'm';
+          else if (voice === 'female') genBody.vocalGender = 'f';
           let out;
           try {
             out = await withProviderKeyRotation('suno', async (k, endpoint) => {
               const ep = endpoint.replace(/\/+$/, '');
-              const r = await fetch(ep + '/api/generate', { method: 'POST', headers: { 'Authorization': 'Bearer ' + k, 'Content-Type': 'application/json' }, body: JSON.stringify(genBody), signal: AbortSignal.timeout(60000) });
+              const r = await fetch(ep + '/api/v1/generate', { method: 'POST', headers: { 'Authorization': 'Bearer ' + k, 'Content-Type': 'application/json' }, body: JSON.stringify(genBody), signal: AbortSignal.timeout(60000) });
               const j = await r.json().catch(() => null);
-              const ids = [];
-              const collectIds = (o) => {
-                if (!o) return;
-                if (Array.isArray(o)) { o.forEach(collectIds); return; }
-                if (typeof o === 'object') {
-                  if (typeof o.id === 'string' && o.id) ids.push(o.id);
-                  if (Array.isArray(o.clips)) o.clips.forEach(collectIds);
-                  if (Array.isArray(o.data)) o.data.forEach(collectIds);
-                  else if (o.data && typeof o.data === 'object') collectIds(o.data);
-                }
-              };
-              collectIds(j);
-              const uniq = [...new Set(ids)];
-              if (uniq.length) return { jobId: uniq.join(',') };
-              throw rotErr('Suno: ' + genErrText(j, 'HTTP ' + r.status), r.status);
+              const data = (j && j.data) || {};
+              const taskId = typeof data.taskId === 'string' ? data.taskId : '';
+              if (j && j.code === 200 && taskId) return { jobId: taskId };
+              throw rotErr('Suno: ' + sunoErrText(j, 'HTTP ' + r.status), r.status);
             }, '', sunoKeys);
           } catch (e) {
             return sendJSON(res, 200, { ok: false, error: (e && e.message) || 'Suno: request failed' });
@@ -1706,27 +1766,43 @@ function apiRoute(req, res, urlPath) {
         const jobId = String(body.jobId || '');
         if (!jobId) return sendJSON(res, 200, { ok: false, error: 'មិនមាន jobId ទេ' });
         if (provider === 'suno') {
-          // Suno status: poll the admin gateway /api/get?ids=<clip ids>.
+          // Suno status (sunoapi.org): first check the callback store
+          // (the gateway calls /api/suno/callback when a stage
+          // completes), then poll /api/v1/generate/record-info.
           // Keys without an endpoint cannot be called and are skipped.
           const sunoKeys = adminProviderKeyList('suno').filter((e) => e.endpoint);
           if (!sunoKeys.length) {
             if (!adminProviderKeyList('suno').length) return sendJSON(res, 200, { ok: false, error: 'Admin មិនទាន់ដាក់ Suno Key ទេ' });
             return sendJSON(res, 200, { ok: false, error: 'Admin មិនទាន់ដាក់ Suno endpoint ទេ' });
           }
+          const cb = sunoCallbacks.get(jobId);
+          if (cb && cb.status === 'SUCCESS' && cb.songs && cb.songs.length) {
+            return sendJSON(res, 200, { ok: true, status: 'done', songs: cb.songs });
+          }
+          if (cb && cb.status === 'FIRST_SUCCESS' && cb.preview) {
+            return sendJSON(res, 200, { ok: true, status: 'working', providerStatus: 'first', preview: cb.preview, streamUrl: cb.preview });
+          }
           let out;
           try {
             out = await withProviderKeyRotation('suno', async (k, endpoint) => {
               const ep = endpoint.replace(/\/+$/, '');
-              const r = await fetch(ep + '/api/get?ids=' + encodeURIComponent(jobId), { headers: { 'Authorization': 'Bearer ' + k }, signal: AbortSignal.timeout(30000) });
+              const r = await fetch(ep + '/api/v1/generate/record-info?taskId=' + encodeURIComponent(jobId), { headers: { 'Authorization': 'Bearer ' + k }, signal: AbortSignal.timeout(30000) });
               const j = await r.json().catch(() => null);
-              if (j && typeof j.error === 'string' && j.error) throw rotErr('Suno: ' + j.error, r.status);
-              const clips = Array.isArray(j) ? j : (j && Array.isArray(j.data) ? j.data : []);
-              if (clips.length && clips.every((c) => c && typeof c.audio_url === 'string' && c.audio_url)) {
-                const songs = clips.map((c) => ({ url: c.audio_url, title: typeof c.title === 'string' ? c.title : '', image: typeof c.image_url === 'string' ? c.image_url : '' }));
-                return { status: 'done', songs };
+              if (r.status === 401 || r.status === 403 || r.status === 429) throw rotErr('Suno: ' + sunoErrText(j, 'HTTP ' + r.status), r.status);
+              const d = (j && j.data) || null;
+              if (!d || typeof d.status !== 'string') throw rotErr('Suno: ' + sunoErrText(j, 'HTTP ' + r.status), r.status);
+              const st = d.status;
+              if (st === 'SUCCESS') {
+                const songs = sunoSongsFromData(d);
+                if (songs.length) return { status: 'done', songs };
+                throw rotErr('Suno: បង្កើតបានតែគ្មានបទទេ', r.status);
               }
-              if (clips.some((c) => c && (c.status === 'failed' || c.state === 'failed' || c.status === 'error' || c.state === 'error'))) throw rotErr('Suno: បង្កើតមិនបានទេ', r.status);
-              return { status: 'working', providerStatus: 'queued' };
+              if (st === 'FIRST_SUCCESS') {
+                const preview = sunoPreviewFromData(d);
+                return { status: 'working', providerStatus: 'first', preview, streamUrl: preview };
+              }
+              if (st === 'PENDING' || st === 'TEXT_SUCCESS') return { status: 'working', providerStatus: 'queued' };
+              throw rotErr('Suno: ' + (d.errorMessage || st || 'បង្កើតមិនបានទេ'), r.status);
             }, '', sunoKeys);
           } catch (e) {
             return sendJSON(res, 200, { ok: false, error: (e && e.message) || 'Suno: request failed' });
@@ -2492,9 +2568,9 @@ function apiRoute(req, res, urlPath) {
       if (p === 'suno') {
         const ep = typeof endpoint === 'string' ? endpoint.replace(/\/+$/, '') : '';
         if (!ep) return { status: 'unknown', message: 'មិនមាន gateway endpoint — មិនអាចសាកល្បងបាន' };
-        // GET on the gateway's POST-only generate endpoint: a valid key
-        // answers 405/400/404 (auth passed); a bad key answers 401/403.
-        const r = await fetch(ep + '/api/generate', { headers: { 'Authorization': 'Bearer ' + key }, signal: AbortSignal.timeout(timeoutMs) });
+        // GET the credit balance (sunoapi.org): a valid key answers 200
+        // (integer credits); a bad key answers 401/403.
+        const r = await fetch(ep + '/api/v1/generate/credit', { headers: { 'Authorization': 'Bearer ' + key }, signal: AbortSignal.timeout(timeoutMs) });
         if (r.status === 401 || r.status === 403) return blockedMsg(r.status);
         if (r.status === 429) return { status: 'error', message: 'Rate limit (HTTP 429) — សាកល្បងម្តងទៀតពេលក្រោយ' };
         return okMsg;
@@ -3071,8 +3147,9 @@ function apiRoute(req, res, urlPath) {
   // filename, data: base64}. Saves under ./data/uploads/ and returns the
   // public URL. Audio max 15 MB, image max 5 MB. The Admin app reads the
   // chosen file as base64 and POSTs it here, then fills the Post Link/Cover
-  // field with the returned URL. Render free disk is ephemeral (same as
-  // ./data/*.json) — uploaded files can be lost on restart/redeploy.
+  // field with the returned URL. The file is ALSO backed up to GitHub
+  // (uploads/) before success is returned, so a proxy restart/redeploy
+  // can no longer wipe it — it is restored on startup.
   const UPLOADS_DIR = path.join(DATA_DIR, 'uploads');
   const UPLOAD_MIME = { '.mp3': 'audio/mpeg', '.wav': 'audio/wav', '.ogg': 'audio/ogg', '.m4a': 'audio/mp4', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png', '.webp': 'image/webp', '.gif': 'image/gif' };
   function uploadSafeExt(kind, filename) {
@@ -3082,10 +3159,73 @@ function apiRoute(req, res, urlPath) {
     if (kind === 'image') return ['.jpg', '.jpeg', '.png', '.webp', '.gif'].includes(dot) ? dot : '';
     return '';
   }
+  // ---- GitHub backup for uploaded files (binary) ----
+  // Every upload is ALSO PUT to the movai-data repo under uploads/ and
+  // restored to ./data/uploads/ on startup, so a Render restart can no
+  // longer wipe a song MP3 or cover. Upload names are unique
+  // (timestamp-random), so creates never need a sha.
+  function ghUploadsUrl(p) {
+    return 'https://api.github.com/repos/' + GH_REPO + '/contents/' + p.split('/').map(encodeURIComponent).join('/');
+  }
+  async function ghPutUpload(name, b64) {
+    if (!ghEnabled()) return true;
+    try {
+      const r = await fetch(ghUploadsUrl('uploads/' + name), {
+        method: 'PUT',
+        headers: Object.assign({ 'Content-Type': 'application/json' }, ghHeaders()),
+        body: JSON.stringify({ message: 'movai-proxy: upload ' + name, content: b64, branch: 'main' }),
+        signal: AbortSignal.timeout(60000),
+      });
+      if (!r.ok) { console.log('[github] PUT uploads/' + name + ' failed: HTTP ' + r.status); return false; }
+      return true;
+    } catch (e) {
+      console.log('[github] PUT uploads/' + name + ' error: ' + (e && e.message ? e.message : e));
+      return false;
+    }
+  }
+  async function ghGetUpload(name) {
+    if (!ghEnabled()) return null;
+    try {
+      const r = await fetch(ghUploadsUrl('uploads/' + name) + '?ref=main', { headers: ghHeaders(), signal: AbortSignal.timeout(60000) });
+      if (!r.ok) return null;
+      const j = await r.json().catch(() => null);
+      if (!j || typeof j.content !== 'string') return null;
+      return Buffer.from(j.content.replace(/\s/g, ''), 'base64');
+    } catch (e) { return null; }
+  }
+  async function ghListUploads() {
+    if (!ghEnabled()) return [];
+    try {
+      const r = await fetch(ghUploadsUrl('uploads') + '?ref=main', { headers: ghHeaders(), signal: AbortSignal.timeout(15000) });
+      if (!r.ok) return [];
+      const j = await r.json().catch(() => null);
+      if (!Array.isArray(j)) return [];
+      return j.filter((e) => e && e.type === 'file' && typeof e.name === 'string').map((e) => e.name);
+    } catch (e) { return []; }
+  }
+  async function ghRestoreUploads() {
+    if (!ghEnabled()) return;
+    try { fs.mkdirSync(UPLOADS_DIR, { recursive: true }); } catch (e) {}
+    const names = await ghListUploads();
+    await Promise.all(names.map(async (name) => {
+      try {
+        const ext = '.' + String(name).toLowerCase().split('.').pop();
+        if (!UPLOAD_MIME[ext]) return;
+        const local = path.join(UPLOADS_DIR, name);
+        if (fs.existsSync(local)) return; // already here — keep the local copy
+        const buf = await ghGetUpload(name);
+        if (!buf || !buf.length) return;
+        fs.writeFileSync(local, buf);
+        console.log('[github] restored upload ' + name);
+      } catch (e) {
+        console.log('[github] restore upload ' + name + ' skipped: ' + (e && e.message ? e.message : e));
+      }
+    }));
+  }
   if (req.method === 'POST' && urlPath === '/api/public/upload') {
     const a = adminKeyOk(req);
     if (!a.ok) return sendJSON(res, 200, { ok: false, error: a.error });
-    readJSONBody(req, 20 * 1024 * 1024).then((body) => {
+    readJSONBody(req, 20 * 1024 * 1024).then(async (body) => {
       const kind = typeof body.kind === 'string' ? body.kind.trim().toLowerCase() : '';
       if (kind !== 'audio' && kind !== 'image') return sendJSON(res, 200, { ok: false, error: 'kind ត្រូវជា audio ឬ image' });
       const ext = uploadSafeExt(kind, body.filename);
@@ -3101,6 +3241,11 @@ function apiRoute(req, res, urlPath) {
         fs.writeFileSync(path.join(UPLOADS_DIR, name), buf);
         const proto = req.headers && req.headers['x-forwarded-proto'] === 'http' ? 'http' : 'https';
         const host = (req.headers && req.headers.host) || 'movai-proxy.onrender.com';
+        // Back up to GitHub BEFORE returning success, so the Admin app
+        // only proceeds to create the post once the file is durable.
+        // A GitHub failure does NOT fail the upload (the local file
+        // still works) — it is only logged.
+        await ghPutUpload(name, b64);
         return sendJSON(res, 200, { ok: true, url: proto + '://' + host + '/uploads/' + name, name, kind, size: buf.length });
       } catch (e) {
         return sendJSON(res, 200, { ok: false, error: 'រក្សាទុកឯកសារបរាជ័យ' });
