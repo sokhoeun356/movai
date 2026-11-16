@@ -4016,20 +4016,27 @@ function apiRoute(req, res, urlPath) {
       const qp = new URL(req.url, 'http://localhost').searchParams;
       const u = (qp.get('u') || '').trim();
       const name = (qp.get('name') || 'song').replace(/[\\/:*?"<>|]/g, '_').replace(/\.mp3$/i, '') + '.mp3';
+      // Content-Disposition filename MUST be ASCII — Node rejects
+      // non-Latin1 header chars, so a Khmer title crashed the download
+      // with "Invalid character in header content [Content-Disposition]"
+      // (user hit this 2026-11-16 ~23:56). ASCII fallback + RFC 5987
+      // UTF-8 filename so browsers that support it still save the Khmer name.
+      const asciiName = name.replace(/[^\x20-\x7E]/g, '_').replace(/"/g, '');
+      const disp = 'attachment; filename="' + asciiName + '"; filename*=UTF-8\'\'' + encodeURIComponent(name).replace(/'/g, '%27');
       if (!u) return sendJSON(res, 400, { ok: false, error: 'missing u' });
       try {
         // Cached MP3? Serve it instantly (no re-fetch, no re-encode).
         const cachedFp = mp3CacheGet(u);
         if (cachedFp) {
           const mp3 = fs.readFileSync(cachedFp);
-          res.writeHead(200, { 'Content-Type': 'audio/mpeg', 'Content-Disposition': 'attachment; filename="' + name.replace(/"/g, '') + '"', 'Content-Length': mp3.length, 'Cache-Control': 'public, max-age=86400' });
+          res.writeHead(200, { 'Content-Type': 'audio/mpeg', 'Content-Disposition': disp, 'Content-Length': mp3.length, 'Cache-Control': 'public, max-age=86400' });
           res.end(mp3);
           return;
         }
         const fname = await convertAndCacheMp3(u);
         if (!fname) return sendJSON(res, 500, { ok: false, error: 'MP3 convert failed' });
         const mp3 = fs.readFileSync(path.join(DATA_DIR, 'uploads', fname));
-        res.writeHead(200, { 'Content-Type': 'audio/mpeg', 'Content-Disposition': 'attachment; filename="' + name.replace(/"/g, '') + '"', 'Content-Length': mp3.length, 'Cache-Control': 'public, max-age=86400' });
+        res.writeHead(200, { 'Content-Type': 'audio/mpeg', 'Content-Disposition': disp, 'Content-Length': mp3.length, 'Cache-Control': 'public, max-age=86400' });
         res.end(mp3);
       } catch (e) {
         try { sendJSON(res, 500, { ok: false, error: 'MP3 convert failed: ' + String((e && e.message) || e).slice(0, 200) }); } catch (e2) {}
