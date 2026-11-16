@@ -640,14 +640,63 @@ function saveNotifications(arr) {
 function newNotificationId() {
   return 'ntf_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
 }
+// ---- Purchase notification display (big + clean) ----
+// The Admin bell + Telegram + website show a purchase as BIG, clean lines:
+// package name, price, credits — with the buyer small at the bottom.
+// No long messy sentence. Used by purchase-request / approved / rejected.
+function tgEsc(s) {
+  return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+const PKG_DISPLAY_NAME = { monthly: 'Monthly', yearly: 'Yearly', 'song-trial': 'Song Trial', 'song-popular': 'Song Popular', 'song-pro': 'Song Pro' };
+function pkgDisplay(pkg) {
+  if (!pkg || typeof pkg !== 'object') return { pkgName: '', priceText: '', creditText: '' };
+  const days = numOr(pkg.days, 30);
+  const per = days >= 365 ? 'year' : 'month';
+  const price = numOr(pkg.price, 0);
+  const cr = (numOr(pkg.songCredits, 0) || 0) + (numOr(pkg.credits, 0) || 0);
+  return {
+    pkgName: PKG_DISPLAY_NAME[pkg.id] || String(pkg.id || ''),
+    priceText: '$' + price + '/' + per,
+    creditText: Number(cr).toLocaleString('en-US') + ' Credit/' + per,
+  };
+}
+// Clean multi-line notification text: package name / price / credits /
+// buyer. The Admin app + website render the first 3 lines BIG.
+function pkgNotifText(pkg, email, buyerId) {
+  const d = pkgDisplay(pkg);
+  const buyer = (email || '') + (buyerId && buyerId !== '—' ? ' · ID: ' + buyerId : '');
+  return [d.pkgName, d.priceText, d.creditText, buyer].filter(Boolean).join('\n');
+}
+// Telegram version of the same lines, with the 3 key lines bold.
+function pkgNotifTelegram(title, pkg, email, buyerId) {
+  const d = pkgDisplay(pkg);
+  const buyer = tgEsc(email || '') + (buyerId && buyerId !== '—' ? ' · ID: ' + tgEsc(buyerId) : '');
+  return '🔔 ' + tgEsc(title) + '\n<b>' + tgEsc(d.pkgName) + '</b>\n<b>' + tgEsc(d.priceText) + '</b>\n<b>' + tgEsc(d.creditText) + '</b>\n' + buyer;
+}
+// When a purchase request is decided (approved/rejected), mark the
+// original purchase-request notification as decided so the Admin bell
+// no longer shows it as a pending/new request.
+function markPurchaseRequestDecided(email, packageId, decision, at) {
+  try {
+    const arr = loadNotifications();
+    const orig = arr.find((x) => x && x.kind === 'purchase-request' && x.email === email && !x.decision && (!x.pkg || x.pkg === packageId));
+    if (orig) {
+      orig.decision = decision;
+      orig.decidedAt = at || new Date().toISOString();
+      orig.read = true;
+      saveNotifications(arr);
+    }
+  } catch (e) {}
+}
 // Create a notification. For admin-facing kinds (login, purchase-request,
 // gift-claimed, security, update, grant, deduct, purchase-approved,
 // purchase-rejected, plan-expired, out-of-credit) ALSO send a Telegram
 // message to the admin (fire-and-forget:
 // it never blocks the response and its errors are swallowed). The bot token
 // is never logged and never returned by any endpoint.
-function addNotification(kind, email, title, text) {
+function addNotification(kind, email, title, text, opts) {
   const n = { id: newNotificationId(), at: new Date().toISOString(), kind, email: email || '', title: title || '', text: text || '', read: false };
+  if (opts && typeof opts === 'object' && opts.extra && typeof opts.extra === 'object') Object.assign(n, opts.extra);
   try {
     const arr = loadNotifications();
     arr.unshift(n);
@@ -655,24 +704,30 @@ function addNotification(kind, email, title, text) {
     saveNotifications(arr);
   } catch (e) {}
   if (kind === 'login' || kind === 'purchase-request' || kind === 'gift-claimed' || kind === 'security' || kind === 'update' || kind === 'grant' || kind === 'deduct' || kind === 'purchase-approved' || kind === 'purchase-rejected' || kind === 'plan-expired' || kind === 'out-of-credit') {
-    sendTelegramAdmin('🔔 ' + n.title + '\n' + n.text);
+    if (opts && typeof opts === 'object' && typeof opts.telegramHtml === 'string' && opts.telegramHtml) {
+      sendTelegramAdmin(opts.telegramHtml, 'HTML');
+    } else {
+      sendTelegramAdmin('🔔 ' + n.title + '\n' + n.text);
+    }
   }
   // Phone-native Web Push for the same event (admin devices and/or the
   // user the notification is about). Fire-and-forget, never blocks.
   sendPushForNotification(n);
   return n;
 }
-function sendTelegramAdmin(text) {
+function sendTelegramAdmin(text, parseMode) {
   try {
     const s = loadSettings();
     const tel = (s && s.telegram && typeof s.telegram === 'object' && !Array.isArray(s.telegram)) ? s.telegram : {};
     const token = typeof tel.botToken === 'string' ? tel.botToken.trim() : '';
     const chatId = typeof tel.chatId === 'string' ? tel.chatId.trim() : '';
     if (!token || !chatId) return; // not configured — skip silently
+    const body = { chat_id: chatId, text: String(text).slice(0, 4000) };
+    if (parseMode) body.parse_mode = parseMode;
     fetch('https://api.telegram.org/bot' + token + '/sendMessage', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ chat_id: chatId, text: String(text).slice(0, 4000) }),
+      body: JSON.stringify(body),
       signal: AbortSignal.timeout(10000),
     }).catch(() => {});
   } catch (e) {}
@@ -3285,7 +3340,8 @@ function apiRoute(req, res, urlPath) {
       savePurchaseRequests(reqs);
       const _pu = loadUsers()[email];
       const _puid = _pu && _pu.id ? _pu.id : '—';
-      addNotification('purchase-request', email, '🛒 សំណើទិញកញ្ចប់ · Purchase request', email + ' · ID: ' + _puid + ' បានស្នើទិញកញ្ចប់ ' + packageId + ' ($' + pkg.price + ')');
+      const _pd = pkgDisplay(pkg);
+      addNotification('purchase-request', email, '🛒 សំណើទិញកញ្ចប់ · Purchase request', pkgNotifText(pkg, email, _puid), { extra: { pkg: packageId, pkgName: _pd.pkgName, priceText: _pd.priceText, creditText: _pd.creditText, buyerId: _puid }, telegramHtml: pkgNotifTelegram('🛒 សំណើទិញកញ្ចប់ · Purchase request', pkg, email, _puid) });
       return sendJSON(res, 200, { ok: true, request: r });
     }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
     return;
@@ -3336,7 +3392,9 @@ function apiRoute(req, res, urlPath) {
       // restart cannot lose a purchase the Admin app already approved.
       await ghFlushFile(USERS_FILE);
       await ghFlushFile(PURCHASE_REQUESTS_FILE);
-      addNotification('purchase-approved', r.email, '✅ បានអនុម័ត · Purchase approved', 'កញ្ចប់ ' + r.packageId + ' របស់ ' + r.email + ' · ID: ' + (u.id || '—') + ' បានអនុម័ត — +' + pkg.credits + ' Image.Video / +' + pkg.songCredits + ' Song Credit');
+      const _pd2 = pkgDisplay(pkg);
+      addNotification('purchase-approved', r.email, '✅ បានអនុម័ត · Purchase approved', pkgNotifText(pkg, r.email, u.id || '—'), { extra: { pkg: r.packageId, pkgName: _pd2.pkgName, priceText: _pd2.priceText, creditText: _pd2.creditText, buyerId: u.id || '—', decision: 'approved' }, telegramHtml: pkgNotifTelegram('✅ បានអនុម័ត · Purchase approved', pkg, r.email, u.id || '—') });
+      markPurchaseRequestDecided(r.email, r.packageId, 'approved', now);
       return sendJSON(res, 200, { ok: true, request: r, user: pubUser(u) });
     }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
     return;
@@ -3359,7 +3417,10 @@ function apiRoute(req, res, urlPath) {
       savePurchaseRequests(reqs);
       const _ru = loadUsers()[r.email];
       const _ruid = _ru && _ru.id ? _ru.id : '—';
-      addNotification('purchase-rejected', r.email, '❌ បដិសេធ · Purchase rejected', 'សំណើទិញកញ្ចប់ ' + r.packageId + ' របស់ ' + r.email + ' · ID: ' + _ruid + ' ត្រូវបានបដិសេធ');
+      const _pkgR = loadPackages()[r.packageId];
+      const _pd3 = pkgDisplay(_pkgR);
+      addNotification('purchase-rejected', r.email, '❌ បដិសេធ · Purchase rejected', pkgNotifText(_pkgR, r.email, _ruid), { extra: { pkg: r.packageId, pkgName: _pd3.pkgName, priceText: _pd3.priceText, creditText: _pd3.creditText, buyerId: _ruid, decision: 'rejected' }, telegramHtml: pkgNotifTelegram('❌ បដិសេធ · Purchase rejected', _pkgR, r.email, _ruid) });
+      markPurchaseRequestDecided(r.email, r.packageId, 'rejected', now);
       return sendJSON(res, 200, { ok: true, request: r });
     }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
     return;
