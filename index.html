@@ -1463,6 +1463,11 @@ html[data-smooth="1"] .brand-frame,html[data-smooth="1"] .acct-chip,html[data-sm
             <div class="tool-group">
               <div id="songVoiceChips"></div>
             </div>
+            <div class="tool-group" id="songInstrGroup" style="flex-wrap:wrap;row-gap:4px">
+              <span class="chip-label" data-i18n="lblSongInstr">Instrumental · ភ្លេងសុទ្ធ</span>
+              <button type="button" class="push-switch" id="songInstrSwitch" role="switch" aria-checked="false" aria-label="Instrumental" onclick="songSetInstr()"><span class="push-knob"></span></button>
+              <span id="songInstrHint" style="flex-basis:100%;font-size:0.8125rem;color:var(--muted);line-height:1.5"></span>
+            </div>
           </div>
           <div class="tool-group" id="songDurGroup">
             <span class="chip-label" data-i18n="lblSongDur">រយៈពេលបទ</span>
@@ -1905,6 +1910,7 @@ km:{
  lblSongLyrics:'អត្ថបទចម្រៀង',songLyricsPh:'សរសេរអត្ថបទចម្រៀង (lyrics) របស់អ្នកនៅទីនេះ...',
  lblSongStyle:'ស្ទាយបទចម្រៀង',btnAddStyle:'Add',songStylePh:'ឧ. Pop, Rock, សំឡេងខ្មែរបុរាណ...',
  lblSongVoice:'សំឡេង',voiceMale:'ប្រុស',voiceFemale:'ស្រី',voiceRandom:'ចៃដន្យ',
+ lblSongInstr:'Instrumental · ភ្លេងសុទ្ធ',songInstrOn:'បើក · ភ្លេងសុទ្ធ — គ្មានអ្នកច្រៀង មានតែភ្លេង',songInstrOff:'បិទ · មានអ្នកច្រៀង — មានទាំងសំឡេងច្រៀង ទាំងភ្លេង',
  msgEnterLyrics:'សូមសរសេរអត្ថបទចម្រៀងជាមុនសិន',
  promptLabelSong:'Prompt · អត្ថបទបទចម្រៀង / Lyrics',promptPhSong:'ឧ. សរសេរអត្ថបទបទចម្រៀង (lyrics) របស់អ្នកនៅទីនេះ...',
  songCostSuno:'MovAi · កាត់ 12 Credit ក្នុងមួយដង · បាន 2 បទ · Model v6',
@@ -2103,6 +2109,7 @@ en:{
  lblSongLyrics:'Lyrics',songLyricsPh:'Write your song lyrics here...',
  lblSongStyle:'Style',btnAddStyle:'Add',songStylePh:'e.g. Pop, Rock, Khmer traditional...',
  lblSongVoice:'Voice',voiceMale:'Male',voiceFemale:'Female',voiceRandom:'Random',
+ lblSongInstr:'Instrumental',songInstrOn:'On · Music only — no singer, just the music',songInstrOff:'Off · With a singer — vocals and music together',
  msgEnterLyrics:'Please write the song lyrics first',
  promptLabelSong:'Prompt · Song lyrics',promptPhSong:'e.g. Write your song lyrics here...',
  songCostSuno:'MovAi · 12 credits per generation · 2 songs · Model v6',
@@ -3436,7 +3443,7 @@ var GEN_KEY_PROVIDERS=[
  {id:'masterpiecex',name:'Masterpiece X',limit:{km:'3D តែប៉ុណ្ណោះ · ហ្វ្រី 250 credits',en:'3D only · Free 250 credits'},url:'https://www.masterpiecex.com',fields:[{k:'key',ph:'API Key'}],hint:{km:'សម្រាប់រូប 3D Design តែប៉ុណ្ណោះ — យក API Key ពី masterpiecex.com ក្រោយចុះឈ្មោះ (ហ្វ្រី 250 credits = 5 models)។',en:'For 3D Design only — get an API key from masterpiecex.com after signing up (free 250 credits = 5 models).'}},
  {id:'hunyuan3d',name:'Hunyuan3D',limit:{km:'3D តែប៉ុណ្ណោះ · ហ្វ្រី 200 credits',en:'3D only · Free 200 credits'},url:'https://cloud.tencent.com',fields:[{k:'secretId',ph:'Secret ID'},{k:'secretKey',ph:'Secret Key'}],hint:{km:'សម្រាប់រូប 3D Design តែប៉ុណ្ណោះ — យក Secret ID + Secret Key ពី Tencent Cloud (ហ្វ្រី 200 credits)។',en:'For 3D Design only — get a Secret ID + Secret Key from Tencent Cloud (free 200 credits).'}}
 ];
-var gen={mode:'image',provider:'pollinations',aspect:'16:9',duration:5,res:720,songDur:3,songVoice:'random',progTimer:null,progSec:0,progPct:0,keyIdx:{},lastImg:null,lastVideo:null,lastSongs:null,mhModel:'z-image-turbo',mhVidModel:'default',sunoModel:'v6',novaiImgModel:'cogview-3-flash',novaiVidModel:'cogvideox-flash'};
+var gen={mode:'image',provider:'pollinations',aspect:'16:9',duration:5,res:720,songDur:3,songVoice:'random',songInstr:false,progTimer:null,progSec:0,progPct:0,keyIdx:{},lastImg:null,lastVideo:null,lastSongs:null,mhModel:'z-image-turbo',mhVidModel:'default',sunoModel:'v6',novaiImgModel:'cogview-3-flash',novaiVidModel:'cogvideox-flash'};
 try{var _mhm=localStorage.getItem('movai-mh-img-model');if(_mhm)gen.mhModel=_mhm;}catch(e){}
 try{var _mhv=localStorage.getItem('movai-mh-vid-model');if(_mhv)gen.mhVidModel=_mhv;}catch(e){}
 try{var _snm=localStorage.getItem('movai-suno-model');if(_snm)gen.sunoModel=_snm;}catch(e){}
@@ -3946,7 +3953,12 @@ async function genGenerate(){
   var prompt;
   if(gen.mode==='song'){
     prompt=(document.getElementById('songLyrics').value||'').trim();
-    if(!prompt){genMsg(tx('msgEnterLyrics'));return;}
+    if(!prompt){
+      /* Instrumental songs have no lyrics to sing — the style text
+         (or the title) describes the music instead. */
+      if(gen.songInstr){prompt=songStyleFullText()||(document.getElementById('songTitle').value||'').trim()||'Instrumental music';}
+      else{genMsg(tx('msgEnterLyrics'));return;}
+    }
   }else{
     prompt=(document.getElementById('genPrompt').value||'').trim();
     if(!prompt){genMsg(tx('msgEnterPrompt'));return;}
@@ -4340,9 +4352,19 @@ function songRenderOpts(){
   if(box)box.innerHTML=SONG_DURS.map(function(m){return '<button class="kbtn '+(gen.songDur===m?'kbtn-black':'kbtn-white')+'" onclick="songSetDur('+m+')">'+m+' '+tx('unitM')+'</button>';}).join('');
   var vb=document.getElementById('songVoiceChips');
   if(vb)vb.innerHTML=[['male','voiceMale'],['female','voiceFemale'],['random','voiceRandom']].map(function(v){return '<button class="kbtn '+(gen.songVoice===v[0]?'kbtn-black':'kbtn-white')+'" onclick="songSetVoice(\''+v[0]+'\')">'+tx(v[1])+'</button>';}).join('');
+  /* Instrumental toggle: ON = music only, no singer; OFF = vocals +
+     music. While it is ON the voice chips do nothing (there is no
+     voice to pick), so they are dimmed and made inert. */
+  var isw=document.getElementById('songInstrSwitch');
+  if(isw){isw.classList.toggle('on',!!gen.songInstr);isw.setAttribute('aria-checked',gen.songInstr?'true':'false');}
+  var ih=document.getElementById('songInstrHint');
+  if(ih)ih.textContent=tx(gen.songInstr?'songInstrOn':'songInstrOff');
+  if(vb){vb.style.opacity=gen.songInstr?'.4':'';
+  vb.style.pointerEvents=gen.songInstr?'none':'';}
 }
 function songSetDur(m){gen.songDur=m;songRenderOpts();}
 function songSetVoice(v){gen.songVoice=v;songRenderOpts();}
+function songSetInstr(){gen.songInstr=!gen.songInstr;songRenderOpts();}
 /* Collect audio URLs out of a proxy status reply, whatever nesting the
    provider result arrives in: audio-specific keys anywhere in the
    payload first, then a generic url/link that names an audio file. */
@@ -4444,13 +4466,17 @@ async function genDoSong(p,prompt,keyEntry){
   var sTitle=(document.getElementById('songTitle').value||'').trim();
   var sStyle=songStyleFullText();
   var sVoice=gen.songVoice||'random';
-  var voiceTag=sVoice==='male'?'male vocals':(sVoice==='female'?'female vocals':'');
+  /* Instrumental ON: the song is music only — no singer — so no
+     vocal tag goes into the style and each provider gets its
+     instrumental flag. OFF: vocals + music, as before. */
+  var sInstr=!!gen.songInstr;
+  var voiceTag=sInstr?'':(sVoice==='male'?'male vocals':(sVoice==='female'?'female vocals':''));
   var styleFull=[sStyle,voiceTag].filter(function(x){return !!x;}).join(', ');
   histCtx={prompt:prompt,provider:p.name,title:sTitle};
   if(p.id==='magichour'){
     var key=(typeof keyEntry==='string')?keyEntry:(keyEntry&&keyEntry.key);
     var secs=Math.round(gen.songDur*60);
-    var rm=await fetch('https://api.magichour.ai/v1/ai-music-generator',{method:'POST',headers:{'Authorization':'Bearer '+key,'Content-Type':'application/json'},body:JSON.stringify({name:sTitle||'MovAi song',duration:secs,style:{prompt:styleFull,lyrics:prompt,instrumental:false}})});
+    var rm=await fetch('https://api.magichour.ai/v1/ai-music-generator',{method:'POST',headers:{'Authorization':'Bearer '+key,'Content-Type':'application/json'},body:JSON.stringify({name:sTitle||'MovAi song',duration:secs,style:{prompt:styleFull,lyrics:prompt,instrumental:sInstr}})});
     var jm=await rm.json().catch(function(){return null;});
     if(!jm||!jm.id)throw new Error('Magic Hour: '+genErrText(jm,'HTTP '+rm.status));
     var t0=Date.now();
@@ -4476,7 +4502,7 @@ async function genDoSong(p,prompt,keyEntry){
     else if(keyEntry&&typeof keyEntry==='object'){skey=keyEntry.key||null;base=String(keyEntry.endpoint||'');}
     if(!base){throw new Error(tx('sunoNoEndpoint'));}
     base=base.replace(/\/+$/,'');
-    var rs=await fetch(base+'/api/generate',{method:'POST',headers:{'Authorization':'Bearer '+skey,'Content-Type':'application/json'},body:JSON.stringify({prompt:prompt,tags:styleFull,title:sTitle,make_instrumental:false,model:(gen.sunoModel||'v6'),wait_audio:false})});
+    var rs=await fetch(base+'/api/generate',{method:'POST',headers:{'Authorization':'Bearer '+skey,'Content-Type':'application/json'},body:JSON.stringify({prompt:prompt,tags:styleFull,title:sTitle,make_instrumental:sInstr,model:(gen.sunoModel||'v6'),wait_audio:false})});
     var js=await rs.json().catch(function(){return null;});
     var clips=[];
     if(Array.isArray(js))clips=js;
@@ -4582,7 +4608,7 @@ async function genDoSong(p,prompt,keyEntry){
        clip carries audio_url + image_url (picked up, kept together,
        by songProxySongs). One create returns 2 song variants. */
     var PROXY_SONG='https://movai-proxy.onrender.com/api/gen/song';
-    var mBody={provider:'musicapi',key:mkey,prompt:prompt,title:sTitle,style:sStyle,tags:sStyle,voice:sVoice};
+    var mBody={provider:'musicapi',key:mkey,prompt:prompt,title:sTitle,style:sStyle,tags:sStyle,voice:sVoice,make_instrumental:sInstr,instrumental:sInstr};
     if(sVoice==='male')mBody.vocal_gender='m';
     else if(sVoice==='female')mBody.vocal_gender='f';
     var jmapi=null,createErr=null,t0c=Date.now();
@@ -10351,7 +10377,7 @@ async function genDoSongServer(cfg,prompt){
   var sStyle=songStyleFullText();
   var sVoice=gen.songVoice||'random';
   histCtx={prompt:prompt,provider:cfg.provider,title:sTitle};
-  var j=await adminGenPost('/api/gen/song',{provider:cfg.provider,title:sTitle,lyrics:prompt,style:sStyle,voice:sVoice,prompt:prompt,model:cfg.model},60000);
+  var j=await adminGenPost('/api/gen/song',{provider:cfg.provider,title:sTitle,lyrics:prompt,style:sStyle,voice:sVoice,prompt:prompt,model:cfg.model,instrumental:!!gen.songInstr,make_instrumental:!!gen.songInstr},60000);
   var songs=adminSongsFrom(j);
   if(!songs.length){
     var jobId=adminJobId(j);
