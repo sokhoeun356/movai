@@ -2347,8 +2347,12 @@ function apiRoute(req, res, urlPath) {
           name: typeof body.name === 'string' ? body.name.trim().slice(0, 100) : '',
           firstName: typeof body.firstName === 'string' ? body.firstName.trim().slice(0, 50) : '',
           lastName: typeof body.lastName === 'string' ? body.lastName.trim().slice(0, 50) : '',
-          credits: numOr(body.credits, FREE_MEDIA_CREDITS),
-          songCredits: numOr(body.songCredits, FREE_SONG_CREDITS),
+          // SECURITY: never trust the client's balance. A hacked browser
+          // could send credits:10000 here. Cap new accounts at the free
+          // grant (250 media / 24 song). The Admin/server balance is the
+          // only truth; the Profile number is display-only.
+          credits: Math.min(Math.max(0, numOr(body.credits, FREE_MEDIA_CREDITS)), FREE_MEDIA_CREDITS),
+          songCredits: Math.min(Math.max(0, numOr(body.songCredits, FREE_SONG_CREDITS)), FREE_SONG_CREDITS),
           plan: typeof body.plan === 'string' ? body.plan.slice(0, 50) : '',
           songPlan: typeof body.songPlan === 'string' ? body.songPlan.slice(0, 50) : '',
           createdAt: now, updatedAt: now,
