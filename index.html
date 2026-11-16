@@ -4900,10 +4900,25 @@ async function dlSaveSongMp3(src,title,fallback){
   var fname=dlCleanName(title,fallback||'movai-song')+'.mp3';
   mp3ProgStart();
   try{
-    var rp;
-    try{
-      rp=await fetch(GEN_API+'/gen/song/mp3?u='+encodeURIComponent(src)+'&name='+encodeURIComponent(fname));
-    }catch(fe){mp3ProgDone();mp3FailShow('mp3FailNet');return;}
+    var rp=null;
+    /* Wake the server first (Render free tier sleeps after 15 min idle):
+       a light request that absorbs the ~40s cold start, so the
+       conversion request below does not die while the server boots.
+       Then retry the conversion on network failure (a cold server drops
+       the first connection). The server caches/queues conversions, so
+       a retry never converts twice. */
+    try{ await fetch(GEN_API+'/public/vapid-key'); }catch(e){}
+    var attempt=0;
+    while(attempt<3&&!rp){
+      attempt++;
+      try{
+        rp=await fetch(GEN_API+'/gen/song/mp3?u='+encodeURIComponent(src)+'&name='+encodeURIComponent(fname));
+      }catch(fe){
+        rp=null;
+        if(attempt<3) await new Promise(function(r){setTimeout(r,5000);});
+      }
+    }
+    if(!rp){mp3ProgDone();mp3FailShow('mp3FailNet');return;}
     if(!rp.ok){
       /* Server failed — surface its REAL reason (JSON error or
          plain text) and save NOTHING (never the big WAV). */
