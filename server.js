@@ -1558,7 +1558,7 @@ function apiRoute(req, res, urlPath) {
     'FREE download limit: a free user can download songs 2 times for free — after 2 downloads they must buy a song package; package buyers can download freely (unlimited).',
     'Providers: Magic Hour, NovAI, MusicAPI, MovAi (Suno v6). ACE Music is LOCKED (no new API keys).',
     'The creator/admin is YEM SOKHOEUN, phone 081 914 728, Gmail sokhoeun7788@gmail.com, Telegram @yemsokhoeun_9999. For problems the user can contact the admin on Telegram @yemsokhoeun_9999.',
-    'RULES: Answer DIRECTLY and appropriately in the language the user writes (Khmer if they write Khmer, English if they write English). NEVER use pre-prepared or canned answers — every reply must be generated live from this prompt and the live context. NEVER invent prices, limits or features that are not in this prompt. If asked whether the system is down, slow or broken, use the live context (server uptime and provider status) to answer honestly and tell the user what is wrong.',
+    'RULES: Answer DIRECTLY and appropriately in the language the user writes (Khmer if they write Khmer, English if they write English). NEVER use pre-prepared or canned answers — every reply must be generated live from this prompt and the live context. NEVER invent prices, limits or features that are not in this prompt. If asked whether the system is down, slow or broken, use the live context (server uptime and provider status) to answer honestly and tell the user what is wrong. NAME: the chat header shows "MovAi AI" (the app name), NEVER the user\'s name — use the user\'s first name ONLY inside the chat when greeting them (for example "សួស្តី So Khoeun9"). STYLE: NEVER use markdown or formatting symbols — no asterisks (* **), no square brackets ([ ]), no backticks (`), no # headings, no > quotes, no (link) markup. Write plain natural text only. Instead of symbols, use EMOJIS to express emotion and make replies friendly (🤖 😂 😊 ❤️ 👍 🎵 🎬 ✨).',
   ].join('\n');
   function chatLeaderValidate(body) {
     if (!body || typeof body !== 'object') return { ok: false, error: 'សូមសរសេរសំណួរជាមុនសិន · Please write a message first' };
@@ -1580,7 +1580,7 @@ function apiRoute(req, res, urlPath) {
     let userText = 'guest (no Gmail given)';
     if (email) {
       const u = loadUsers()[email];
-      if (u) userText = email + ' — Image/Video Credit ' + Math.max(0, Math.floor(numOr(u.credits, 0))) + ', Song Credit ' + Math.max(0, Math.floor(numOr(u.songCredits, 0))) + ', media plan ' + (u.plan || 'free') + ', song plan ' + (u.songPlan || 'free');
+      if (u) { const nm = [u.firstName, u.lastName].filter(Boolean).join(' ').trim(); userText = email + (nm ? ' — name "' + nm + '"' : '') + ' — Image/Video Credit ' + Math.max(0, Math.floor(numOr(u.credits, 0))) + ', Song Credit ' + Math.max(0, Math.floor(numOr(u.songCredits, 0))) + ', media plan ' + (u.plan || 'free') + ', song plan ' + (u.songPlan || 'free'); }
       else userText = email + ' — no account on this server yet';
     }
     const gk = adminProviderKey('groq');

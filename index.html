@@ -841,9 +841,11 @@ html[data-smooth="1"] .dock{background-color:rgba(var(--glass-tint),.96)}
    (owner order 2026-11-16): the panel stretches from the very top
    of the screen to the bottom, covering the Public/Create area,
    and a full-screen blurred backdrop hides everything behind it —
-   only the chat is visible. The header shows the signed-in user's
-   name two-tone (white + lime #ADDC29, like the «MovAi» logo) with
-   a green online dot beside it (see aiChatSetUserName).
+   only the chat is visible. The header shows the app name
+   «MovAi AI» two-tone (white + lime #ADDC29, like the «MovAi»
+   logo) with a green online dot beside it — never the user's
+   name; the user's name is used only inside the chat itself,
+   where the AI greets and addresses them by name.
    Chat is login-only: guests are sent to the log-in sheet instead
    (see aiChatOpen in the script). Every reply comes live from the
    MovAi proxy server (POST /api/chat) — nothing is pre-written. */
@@ -1436,7 +1438,7 @@ html[data-smooth="1"] .brand-frame,html[data-smooth="1"] .acct-chip,html[data-sm
 <div id="chatPanel" class="chat-panel" role="dialog" aria-modal="true" aria-label="AI Chat">
   <div class="chat-head">
     <span class="chat-avatar" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 7V3"/><circle cx="12" cy="2.4" r="0.6" fill="currentColor"/><rect x="4.5" y="7" width="15" height="11.5" rx="3.5"/><path d="M2.5 12.5v2"/><path d="M21.5 12.5v2"/><circle cx="9.3" cy="12.3" r="0.4" fill="currentColor"/><circle cx="14.7" cy="12.3" r="0.4" fill="currentColor"/><path d="M9.8 15.6c.7.6 1.4.9 2.2.9s1.5-.3 2.2-.9"/></svg></span>
-    <span class="chat-head-main"><span class="chat-head-title"><span id="chatUserName">Mov<span class="chat-name-lime">Ai</span></span><span class="chat-online-dot" role="status" aria-label="អនឡាញ · Online"></span></span><span class="chat-head-sub" style="display:block">MovAi AI · ជំនួយការ AI — សួរអ្វីក៏បានអំពី MovAi</span></span>
+    <span class="chat-head-main"><span class="chat-head-title"><span id="chatUserName">Mov<span class="chat-name-lime">Ai</span> AI</span><span class="chat-online-dot" role="status" aria-label="អនឡាញ · Online"></span></span><span class="chat-head-sub" style="display:block">MovAi AI · ជំនួយការ AI — សួរអ្វីក៏បានអំពី MovAi</span></span>
     <button type="button" class="chat-close" onclick="aiChatClose()" aria-label="បិទឆាត · Close">✕</button>
   </div>
   <div class="chat-msgs" id="chatMsgs">
@@ -8828,21 +8830,16 @@ function aiChatToggle(){
   if(p&&p.classList.contains('open')){aiChatClose();return;}
   aiChatOpen();
 }
-/* Chat header name (owner order 2026-11-16): the signed-in user's
-   name, two-tone like the «MovAi» logo — first part in the normal
-   (white) text colour, the rest in lime #ADDC29 (.chat-name-lime) —
-   with the green online dot beside it in the header markup. Falls
-   back to the Gmail prefix, then to the two-tone MovAi wordmark. */
+/* Chat header name (owner order 2026-11-16): the header always
+   shows the app name «MovAi AI», two-tone like the «MovAi» logo —
+   «Mov» in the normal (white) text colour, «Ai» in lime #ADDC29
+   (.chat-name-lime) — with the green online dot beside it in the
+   header markup. The signed-in user's name is NEVER shown in the
+   header; it is used only inside the chat, where the AI greets
+   and addresses the user by name. */
 function aiChatSetUserName(){
   var el=document.getElementById('chatUserName');if(!el)return;
-  var u=aiChatUser();
-  var name=(u&&u.name)?String(u.name).trim():'';
-  if(!name&&u&&u.email)name=String(u.email).split('@')[0].trim();
-  if(!name){el.innerHTML='Mov<span class="chat-name-lime">Ai</span>';return;}
-  var parts=name.split(/\s+/),first,rest;
-  if(parts.length>1){first=parts[0];rest=parts.slice(1).join(' ');}
-  else{var half=Math.ceil(name.length/2);first=name.slice(0,half);rest=name.slice(half);}
-  el.innerHTML=escHtml(first)+(rest?' <span class="chat-name-lime">'+escHtml(rest)+'</span>':'');
+  el.innerHTML='Mov<span class="chat-name-lime">Ai</span> AI';
 }
 function aiChatOpen(){
   if(!aiChatUser()){if(typeof loginSheetOpen==='function')loginSheetOpen();return;}
