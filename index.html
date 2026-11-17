@@ -1543,8 +1543,13 @@ html[data-smooth="1"] .dock{background-color:rgba(var(--glass-tint),.96)}
 .chat-name-lime{color:#ADDC29}
 .chat-online-dot{display:inline-block;width:10px;height:10px;border-radius:50%;background:#22c55e;box-shadow:0 0 0 2px rgba(34,197,94,.22),0 0 8px rgba(34,197,94,.85);margin-left:8px;vertical-align:2px;animation:chatOnlinePulse 2.4s ease-in-out infinite}
 @keyframes chatOnlinePulse{0%,100%{box-shadow:0 0 0 2px rgba(34,197,94,.22),0 0 8px rgba(34,197,94,.85)}50%{box-shadow:0 0 0 4px rgba(34,197,94,.10),0 0 12px rgba(34,197,94,1)}}
-.chat-avatar{width:42px;height:42px;border-radius:50%;flex:0 0 auto;background:var(--accent-fill);color:#0d1005;display:flex;align-items:center;justify-content:center}
-.chat-avatar svg{width:25px;height:25px;display:block}
+/* Chat header logo (owner order 2026-11-17): a little BIGGER than
+   before, NOTHING decorating the top of its head (no antenna — the
+   header mark below is drawn without one), and a designed colour
+   finish: a soft lime-to-deep-lime gradient disc with a light rim
+   and a gentle glow, the robot face in deep green-black. */
+.chat-avatar{width:54px;height:54px;border-radius:50%;flex:0 0 auto;background:linear-gradient(145deg,#e3f98a 0%,#bde84a 45%,#93cc14 100%);color:#22330a;display:flex;align-items:center;justify-content:center;border:1px solid rgba(120,170,10,.45);box-shadow:0 4px 14px rgba(147,204,20,.35),inset 0 2px 3px rgba(255,255,255,.65),inset 0 -3px 6px rgba(70,110,0,.25)}
+.chat-avatar svg{width:33px;height:33px;display:block}
 .chat-head-main{flex:1 1 auto;min-width:0}
 .chat-head-title{font-size:1rem;font-weight:900;line-height:1.3}
 .chat-head-sub{font-size:0.75rem;color:var(--muted);line-height:1.4;margin-top:1px}
@@ -1578,12 +1583,22 @@ html[data-smooth="1"] .dock{background-color:rgba(var(--glass-tint),.96)}
 .chat-bubble.ai.collapsible.expanded .chat-txt{max-height:none;overflow-y:visible}
 .chat-more{display:none;margin-top:7px;padding-top:6px;border-top:1px solid var(--line);font-size:0.75rem;font-weight:800;color:var(--accent-text);text-align:center;line-height:1.3}
 .chat-bubble.ai.collapsible .chat-more{display:block}
-/* Copy button inside every AI answer bubble (owner order 2026-11-16):
-   a small pill at the bottom-right of the bubble, BELOW the answer
-   text and OUTSIDE the collapsible .chat-txt scroll area, so it is
-   always visible and tappable without expanding the answer. Tapping
-   it copies the FULL answer text and flashes «Copied ✓». */
-.chat-copy-row{display:flex;justify-content:flex-end;align-items:center;gap:6px;margin-top:8px}
+/* Action row inside every AI answer bubble (owner order 2026-11-17):
+   HIDDEN by default — the answer shows on its own. Tapping the
+   answer reveals the row (Listen / Share / Copy / Like / Dislike);
+   if nothing is tapped for 5 seconds the row hides itself again
+   (aiChatRevealActions in the script drives the timer). The row
+   sits BELOW the answer text and OUTSIDE the collapsible .chat-txt
+   scroll area. */
+.chat-copy-row{display:flex;justify-content:flex-end;align-items:center;gap:6px;margin-top:0;max-height:0;opacity:0;overflow:hidden;transform:translateY(-3px);pointer-events:none;transition:max-height .28s ease,opacity .28s ease,margin-top .28s ease,transform .28s ease}
+.chat-bubble.ai.actions-open .chat-copy-row{max-height:48px;opacity:1;margin-top:8px;transform:none;pointer-events:auto}
+@media (prefers-reduced-motion:reduce){.chat-copy-row{transition:none}}
+/* New AI answers arrive BLURRED and sharpen into focus (owner
+   order 2026-11-17): a short blur-to-sharp reveal on the bubble
+   the moment it is added. */
+.chat-bubble.ai.reveal{animation:chatRevealIn .6s ease-out both}
+@keyframes chatRevealIn{from{filter:blur(8px);opacity:.2}to{filter:blur(0);opacity:1}}
+@media (prefers-reduced-motion:reduce){.chat-bubble.ai.reveal{animation:none}}
 /* Copy is a SMALL pill now (owner order 2026-11-16) — a touch smaller
    than before, sitting beside the new Like / Dislike pills. */
 .chat-copy-btn{border:1px solid var(--line2);background:transparent;color:var(--accent-text);border-radius:999px;padding:3px 10px;font-size:0.6875rem;font-weight:800;font-family:inherit;cursor:pointer;line-height:1.3;min-height:26px;white-space:nowrap}
@@ -1665,8 +1680,15 @@ html[data-mode="light"] .contact-red{color:#dc2626}
 .chat-txt a{color:var(--accent-text);font-weight:700;text-decoration:underline;text-underline-offset:2px}
 .chat-bubble.err{align-self:flex-start;background:rgba(248,113,113,.09);border:1px solid rgba(248,113,113,.5);color:#f87171;border-radius:17px 17px 17px 5px;font-size:0.875rem}
 html[data-mode="light"] .chat-bubble.err{color:#b91c1c;background:rgba(220,38,38,.06);border-color:rgba(220,38,38,.4)}
-.chat-typing{align-self:flex-start;display:none;align-items:center;gap:8px;background:var(--card2);border:1px solid var(--line);border-radius:17px 17px 17px 5px;padding:10px 13px;font-size:0.8125rem;color:var(--muted);font-weight:700}
+/* «កំពុងស្កេនសំណួរ…» indicator (owner order 2026-11-17): shown the
+   INSTANT a question is sent, so the user sees the AI is reading /
+   scanning their question before the answer arrives. A soft light
+   sweep runs across the bubble like a scanner while it waits. */
+.chat-typing{align-self:flex-start;display:none;align-items:center;gap:8px;background:var(--card2);border:1px solid var(--line);border-radius:17px 17px 17px 5px;padding:10px 13px;font-size:0.8125rem;color:var(--muted);font-weight:700;position:relative;overflow:hidden}
 .chat-typing.on{display:inline-flex}
+.chat-typing.on::after{content:"";position:absolute;top:0;bottom:0;left:-45%;width:45%;background:linear-gradient(100deg,transparent,rgba(var(--accent-rgb),.20),transparent);animation:chatScanSweep 1.5s ease-in-out infinite;pointer-events:none}
+@keyframes chatScanSweep{0%{left:-45%}100%{left:110%}}
+@media (prefers-reduced-motion:reduce){.chat-typing.on::after{animation:none;display:none}}
 .chat-typing .tdots{display:inline-flex;gap:4px}
 .chat-typing .tdots i{width:6px;height:6px;border-radius:50%;background:var(--muted);animation:chatDotBounce 1.1s ease-in-out infinite}
 .chat-typing .tdots i:nth-child(2){animation-delay:.16s}
@@ -2585,7 +2607,7 @@ main{padding-top:calc(3.75rem + env(safe-area-inset-top,0px))}
 <div id="chatBackdrop" class="chat-backdrop" onclick="aiChatClose()" aria-hidden="true"></div>
 <div id="chatPanel" class="chat-panel" role="dialog" aria-modal="true" aria-label="AI Chat">
   <div class="chat-head">
-    <span class="chat-avatar" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 7V3"/><circle cx="12" cy="2.4" r="0.6" fill="currentColor"/><rect x="4.5" y="7" width="15" height="11.5" rx="3.5"/><path d="M2.5 12.5v2"/><path d="M21.5 12.5v2"/><circle cx="9.3" cy="12.3" r="0.4" fill="currentColor"/><circle cx="14.7" cy="12.3" r="0.4" fill="currentColor"/><path d="M9.8 15.6c.7.6 1.4.9 2.2.9s1.5-.3 2.2-.9"/></svg></span>
+    <span class="chat-avatar" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="4.5" y="6" width="15" height="12.5" rx="3.5"/><path d="M2.5 11.5v2"/><path d="M21.5 11.5v2"/><circle cx="9.3" cy="11.8" r="0.4" fill="currentColor"/><circle cx="14.7" cy="11.8" r="0.4" fill="currentColor"/><path d="M9.8 15.1c.7.6 1.4.9 2.2.9s1.5-.3 2.2-.9"/></svg></span>
     <span class="chat-head-main"><span class="chat-head-title"><span id="chatUserName">Mov<span class="chat-name-lime">Ai</span> AI</span><span class="chat-online-dot" role="status" aria-label="អនឡាញ · Online"></span></span><span class="chat-head-sub" style="display:block">MovAi AI · ជំនួយការ AI — សួរអ្វីក៏បានអំពី MovAi</span></span>
     <button type="button" class="chat-close" onclick="aiChatClose()" aria-label="បិទឆាត · Close">✕</button>
   </div>
@@ -2598,7 +2620,7 @@ main{padding-top:calc(3.75rem + env(safe-area-inset-top,0px))}
   </div>
   <div class="chat-msgs" id="chatMsgs">
     <div class="chat-empty" id="chatEmpty"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 7V3"/><circle cx="12" cy="2.4" r="0.6" fill="currentColor"/><rect x="4.5" y="7" width="15" height="11.5" rx="3.5"/><path d="M2.5 12.5v2"/><path d="M21.5 12.5v2"/><circle cx="9.3" cy="12.3" r="0.4" fill="currentColor"/><circle cx="14.7" cy="12.3" r="0.4" fill="currentColor"/><path d="M9.8 15.6c.7.6 1.4.9 2.2.9s1.5-.3 2.2-.9"/></svg><p>សួរសំណួររបស់អ្នកនៅខាងក្រោម<br>AI នឹងឆ្លើយជូនភ្លាមៗ</p></div>
-    <div class="chat-typing" id="chatTyping" role="status"><span class="tdots" aria-hidden="true"><i></i><i></i><i></i></span><span>កំពុងវាយ…</span></div>
+    <div class="chat-typing" id="chatTyping" role="status"><span class="tdots" aria-hidden="true"><i></i><i></i><i></i></span><span>កំពុងស្កេនសំណួរ…</span></div>
   </div>
   <div class="chat-input-row">
     <textarea class="chat-input" id="chatInput" rows="1" placeholder="វាយសាររបស់អ្នក…" aria-label="វាយសារ · Type a message" onkeydown="aiChatKey(event)"></textarea>
@@ -15122,6 +15144,33 @@ function aiChatCopyText(t,btn){
   if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(t).then(function(){done(true);},function(){fallback();});}
   else fallback();
 }
+/* Share an AI answer (owner order 2026-11-17): the device share
+   sheet when the browser offers one; otherwise it falls back to
+   copying the answer, so the button always does something. */
+function aiChatShareText(t,btn){
+  if(navigator.share){
+    try{var p=navigator.share({text:String(t==null?'':t)});if(p&&p.catch)p.catch(function(){});return;}catch(e){}
+  }
+  aiChatCopyText(t,btn);
+}
+/* Tap-to-reveal answer actions (owner order 2026-11-17): the
+   Listen / Share / Copy / Like / Dislike row is hidden until the
+   answer itself is tapped; 5 seconds after the last tap on that
+   answer (or on one of its buttons) the row hides again. Only one
+   answer shows its actions at a time. */
+var aiChatActionsTimer=null;
+var aiChatActionsBubble=null;
+function aiChatRevealActions(b){
+  if(!b)return;
+  if(aiChatActionsBubble&&aiChatActionsBubble!==b)aiChatActionsBubble.classList.remove('actions-open');
+  aiChatActionsBubble=b;
+  b.classList.add('actions-open');
+  try{clearTimeout(aiChatActionsTimer);}catch(e){}
+  aiChatActionsTimer=setTimeout(function(){
+    b.classList.remove('actions-open');
+    if(aiChatActionsBubble===b)aiChatActionsBubble=null;
+  },5000);
+}
 var AI_CHAT_ROBOT_SVG='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 7V3"/><circle cx="12" cy="2.4" r="0.6" fill="currentColor"/><rect x="4.5" y="7" width="15" height="11.5" rx="3.5"/><path d="M2.5 12.5v2"/><path d="M21.5 12.5v2"/><circle cx="9.3" cy="12.3" r="0.4" fill="currentColor"/><circle cx="14.7" cy="12.3" r="0.4" fill="currentColor"/><path d="M9.8 15.6c.7.6 1.4.9 2.2.9s1.5-.3 2.2-.9"/></svg>';
 /* ===== AI action tags + proof line (owner order 2026-11-16) =====
    The server AI can end a reply with action tags:
@@ -15258,6 +15307,8 @@ function aiChatAddBubble(role,text,isErr,opts){
   var empty=document.getElementById('chatEmpty');if(empty)empty.style.display='none';
   var b=document.createElement('div');
   b.className='chat-bubble '+(isErr?'err':(role==='user'?'user':'ai'));
+  /* AI answers fade in blur-to-sharp (owner order 2026-11-17). */
+  if(role==='ai'&&!isErr)b.classList.add('reveal');
   var body=document.createElement('div');
   body.className='chat-txt';
   body.textContent=String(text==null?'':text);
@@ -15343,6 +15394,21 @@ function aiChatAddBubble(role,text,isErr,opts){
       });
     })(fullText,cbtn);
     crow.appendChild(cbtn);
+    /* Share pill beside Copy (owner order 2026-11-17): opens the
+       device share sheet with the answer text, or copies it when
+       no share sheet exists. */
+    var sbtn=document.createElement('button');
+    sbtn.type='button';
+    sbtn.className='chat-copy-btn';
+    sbtn.textContent='Share';
+    sbtn.setAttribute('aria-label','Share · ចែករំលែកចម្លើយ');
+    (function(ft,btn){
+      btn.addEventListener('click',function(ev){
+        if(ev){ev.stopPropagation();if(ev.preventDefault)ev.preventDefault();}
+        aiChatShareText(ft,btn);
+      });
+    })(fullText,sbtn);
+    crow.appendChild(sbtn);
     /* Like / Dislike pills beside Copy (owner order 2026-11-16): one
        tap selects (accent-filled), tapping the same pill again
        clears it, and picking one clears the other. State lives only
@@ -15377,6 +15443,15 @@ function aiChatAddBubble(role,text,isErr,opts){
     crow.appendChild(likeBtn);
     crow.appendChild(dislikeBtn);
     b.appendChild(crow);
+    /* The action row is hidden until the answer is tapped (owner
+       order 2026-11-17); any tap on the answer — or, via capture,
+       on one of its buttons — (re)starts the 5-second auto-hide
+       timer. Button handlers stopPropagation as before, so a
+       button tap never toggles the collapsible expand/collapse. */
+    (function(bb,cr){
+      bb.addEventListener('click',function(){aiChatRevealActions(bb);});
+      cr.addEventListener('click',function(){aiChatRevealActions(bb);},true);
+    })(b,crow);
   }
   var t=document.getElementById('chatTyping');
   if(t)m.insertBefore(node,t);else m.appendChild(node);
@@ -15395,7 +15470,11 @@ function aiChatAddBubble(role,text,isErr,opts){
           more.className='chat-more';
           more.textContent='▾ បង្ហាញទាំងអស់';
           b.appendChild(more);
-          b.addEventListener('click',function(){
+          /* Expand / collapse now lives on the «បង្ហាញទាំងអស់» strip
+             itself (owner order 2026-11-17): tapping the answer
+             reveals its action buttons instead of expanding it. */
+          more.addEventListener('click',function(ev){
+            if(ev)ev.stopPropagation();
             var ex=b.classList.toggle('expanded');
             more.textContent=ex?'▴ បង្រួម':'▾ បង្ហាញទាំងអស់';
           });
