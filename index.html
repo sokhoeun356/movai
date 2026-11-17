@@ -665,6 +665,18 @@ img.hist-media,.d3-preview{cursor:zoom-in}
 .mv-line .mv-line-tr{-webkit-text-stroke:0;text-shadow:var(--mv-oln);display:-webkit-box;-webkit-box-orient:vertical;overflow:hidden;-webkit-line-clamp:1;width:auto}
 .mv-line.on + .mv-line{margin-top:0}
 .mv-more{font-size:0.8125rem;font-weight:800;color:var(--mv-tc);opacity:.85;text-shadow:var(--mv-oln);letter-spacing:.04em}
+/* ===== Karaoke sweep (owner order 2026-11-17, latest) =====
+   The line being sung shows IN FULL up front as a dim GHOST;
+   as the voice moves through the line, a bright copy of the
+   same words sweeps over the ghost exactly with the singing
+   (each word carries a bright twin clipped to the sung
+   fraction of that word — see mvKarBuild / mvKarPaint), so
+   the viewer sees at a glance precisely how far the singing
+   has reached inside the line, like real karaoke. */
+.mv-kar{display:block;max-height:2.95em;overflow:hidden}
+.mv-kar .kw{position:relative;display:inline-block}
+.mv-kar .kw-b{opacity:.38}
+.mv-kar .kw-t{position:absolute;left:0;top:0;width:0;overflow:hidden;white-space:nowrap;color:var(--mv-tc)}
 .mv-fx{position:absolute;inset:0;width:100%;height:100%;z-index:2;pointer-events:none}
 .mv-stage[data-ps="1"] .mv-title{text-align:left}
 .mv-stage[data-ps="1"] .mv-lyrics{align-items:flex-start;text-align:left}
@@ -16789,16 +16801,18 @@ var MV_FORMATS=[
  {id:'4x3',ratio:'4:3',name:'mvFmtLandscape',w:4,h:3,bw:33,bh:25},
  {id:'21x9',ratio:'21:9',name:'mvFmtWide',w:21,h:9,bw:36,bh:16}
 ];
-var mvState={song:null,fmt:'9x16',bgMode:'auto',bgUrl:'',bgKind:'',bgName:'',lines:null,timed:false,curLine:-2,aiBusy:false,playStyle:-1,curBg:null,vizStyle:0,txtIdx:0,tcFull:''};
+var mvState={song:null,fmt:'9x16',bgMode:'auto',bgUrl:'',bgKind:'',bgName:'',lines:null,timed:false,curLine:-2,curDisp:'',kar:null,aiBusy:false,playStyle:-1,curBg:null,vizStyle:0,txtIdx:0,tcFull:''};
 var mvAudio=null,mvCache={},mvTrCache={};
-/* Karaoke sync lead (owner order 2026-11-17, latest): a line
-   must appear a little BEFORE it is sung — never after the
-   voice has already started — so the switch happens 0.6s
-   ahead of the line's start time. The switch itself is driven
-   every animation frame while playing (see mvRafKick), not
-   just on timeupdate, so fast singing still gets fast lyrics
-   and no line can ever sit late behind the singing. */
-var MV_LEAD=0.6;
+/* Karaoke sync (owner order 2026-11-17, latest — supersedes
+   the earlier 0.6s lead): the words must land EXACTLY with
+   the singing, never jump ahead of the singer. A line
+   appears at the very moment the singer starts it (lead 0),
+   stays while it is being sung, and the NEXT line is never
+   shown early — it appears only when the singer actually
+   starts it. The switch is driven every animation frame
+   while playing (see mvRafKick), not just on timeupdate,
+   so fast singing still gets fast lyrics. */
+var MV_LEAD=0;
 /* ===== Per-song auto background styles (owner order 2026-11-17) =====
    The AUTO background is NOT one fixed colour/surface for every
    song: each song deterministically gets its OWN style — its own
@@ -16975,7 +16989,7 @@ function mvOpen(song){
   if(!song||!song.url)return;
   mvBgClear();
   mvState.song={url:song.url,title:song.title||'',lyrics:song.lyrics||'',image:song.image||''};
-  mvState.fmt='9x16';mvState.bgMode='auto';mvState.curLine=-2;
+  mvState.fmt='9x16';mvState.bgMode='auto';mvState.curLine=-2;mvState.curDisp='';
   var sel=document.getElementById('mvTrLang');if(sel)sel.value='';
   mvMsgShow('','');
   mvOpenSetup();
@@ -17310,7 +17324,7 @@ function mvAiFetch(trLang,attempt){
   });
 }
 function mvApplyLines(lines,timed){
-  mvState.lines=lines;mvState.timed=!!timed;mvState.curLine=-2;
+  mvState.lines=lines;mvState.timed=!!timed;mvState.curLine=-2;mvState.curDisp='';
   mvSyncLyrics(true);
 }
 function mvPauseOthers(){
@@ -17824,14 +17838,83 @@ function mvRafLoop(){
   if(mvAudio&&!mvAudio.paused&&!mvAudio.ended)mvRaf=requestAnimationFrame(mvRafLoop);
 }
 function mvRafKick(){if(!mvRaf)mvRaf=requestAnimationFrame(mvRafLoop);}
+/* ===== Karaoke sweep (owner order 2026-11-17, latest) =====
+   The current line is shown IN FULL as a dim ghost the moment
+   the singer starts it; a bright copy of the words then runs
+   across the ghost exactly with the voice — word by word,
+   and part-way through the word being sung — so it is
+   obvious at a glance whether the words and the singing are
+   together. The sweep window is the line's own [start, end]
+   from the timed lyrics (untimed lines share the song evenly). */
+function mvKarWindow(idx){
+  var lines=mvState.lines,L=lines[idx],st=0,en=3;
+  if(mvState.timed){
+    if(typeof L.start==='number')st=L.start;
+    if(typeof L.end==='number'&&L.end>st)en=L.end;
+    else if(idx<lines.length-1&&typeof lines[idx+1].start==='number'&&lines[idx+1].start>st)en=lines[idx+1].start;
+    else en=st+3;
+  }else{
+    var d=mvAudio&&isFinite(mvAudio.duration)?mvAudio.duration:0;
+    if(d>0&&lines.length){st=idx*d/lines.length;en=(idx+1)*d/lines.length;}
+  }
+  if(en<=st)en=st+3;
+  return {start:st,end:en};
+}
+function mvKarBuild(line,idx){
+  var wrap=document.createElement('span');
+  wrap.className='mv-kar';
+  var text=String(line.text||'');
+  var total=text.length||1,cum=0,tops=[];
+  /* Split on spaces / zero-width spaces only — Khmer words
+     are never cut mid-syllable, so combining marks stay whole. */
+  var toks=text.split(/(\s+|\u200B)/);
+  for(var i=0;i<toks.length;i++){
+    var tok=toks[i];
+    if(!tok)continue;
+    if(/^\s+$/.test(tok)||tok==='\u200B'){wrap.appendChild(document.createTextNode(tok));cum+=tok.length;continue;}
+    var kw=document.createElement('span');kw.className='kw';
+    var kb=document.createElement('span');kb.className='kw-b';kb.textContent=tok;
+    var kt=document.createElement('span');kt.className='kw-t';kt.textContent=tok;
+    kw.appendChild(kb);kw.appendChild(kt);wrap.appendChild(kw);
+    tops.push({el:kt,a:cum/total,b:(cum+tok.length)/total,f:-1});
+    cum+=tok.length;
+  }
+  var win=mvKarWindow(idx);
+  mvState.kar={tops:tops,start:win.start,end:win.end};
+  return wrap;
+}
+function mvKarPaint(){
+  var k=mvState.kar;
+  if(!k||!k.tops||!mvAudio)return;
+  var t=mvAudio.currentTime||0;
+  var p=k.end>k.start?(t-k.start)/(k.end-k.start):(t>=k.start?1:0);
+  if(p<0)p=0;if(p>1)p=1;
+  for(var i=0;i<k.tops.length;i++){
+    var w=k.tops[i];
+    var f=(p-w.a)/((w.b-w.a)||1);
+    if(f<0)f=0;if(f>1)f=1;
+    f=Math.round(f*200)/200;
+    if(f===w.f)continue;
+    w.f=f;
+    w.el.style.width=(f*100)+'%';
+  }
+}
 function mvSyncLyrics(force){
   var box=document.getElementById('mvLyrics');
   if(!box)return;
   var lines=mvState.lines;
-  if(!lines||!lines.length||!mvAudio){if(force||mvState.curLine!==-2){box.innerHTML='';mvState.curLine=-2;}var stgE=document.getElementById('mvStage');if(stgE)stgE.classList.remove('mv-brand-off');return;}
-  /* A line switches on essentially WITH the voice (MV_LEAD is a
-     hair before it) — tight to the real playback time. */
-  var t=(mvAudio.currentTime||0)+MV_LEAD,idx=-1,i;
+  if(!lines||!lines.length||!mvAudio){if(force||mvState.curLine!==-2){box.innerHTML='';mvState.curLine=-2;mvState.curDisp='';mvState.kar=null;}var stgE=document.getElementById('mvStage');if(stgE)stgE.classList.remove('mv-brand-off');return;}
+  /* Exact-with-the-voice sync (owner order 2026-11-17,
+     latest): NO lead — a line becomes current at the moment
+     the singer starts it, and ONLY that line is ever on
+     screen. The next line is never previewed: while the
+     singer is still on the current line, no new text shows;
+     the new line appears only when the singer starts it.
+     Before the first line, and in a real instrumental gap
+     (current line ended, next still far off), the lyric zone
+     is EMPTY and the brand shows. */
+  var rawT=mvAudio.currentTime||0;
+  var t=rawT+MV_LEAD,idx=-1,i;
   if(mvState.timed){
     for(i=0;i<lines.length;i++){
       var s=lines[i].start;
@@ -17842,64 +17925,50 @@ function mvSyncLyrics(force){
     if(d>0)idx=Math.min(lines.length-1,Math.floor(t/d*lines.length));
     else idx=0;
   }
-  if(idx===mvState.curLine&&!force)return;
-  mvState.curLine=idx;
-  box.innerHTML='';
-  /* Brand dissolve: lyric text is on screen -> the MovAi name
-     + note melt away; a real instrumental gap (current line
-     ended, next line still far off) brings them back. */
-  var brandOff=true;
+  var gap=false;
   if(idx>=0&&mvState.timed){
-    var rawT=mvAudio.currentTime||0,clEnd=lines[idx].end;
+    var clEnd=lines[idx].end;
     if(typeof clEnd==='number'&&rawT>clEnd+0.35){
       var nxSt=(idx<lines.length-1&&typeof lines[idx+1].start==='number')?lines[idx+1].start:null;
-      if(nxSt===null||nxSt-rawT>1.4)brandOff=false;
+      if(nxSt===null||nxSt-rawT>1.4)gap=true;
     }
   }
+  var dispKey=idx+'|'+(gap?'g':'');
+  if(!force&&mvState.curDisp===dispKey){mvKarPaint();return;}
+  mvState.curDisp=dispKey;
+  mvState.curLine=idx;
+  box.innerHTML='';
+  /* Brand dissolve follows the lyric zone exactly: words on
+     screen -> the MovAi name + note melt away; no words
+     (intro / instrumental gap) -> the brand shows. */
+  var showText=idx>=0&&!gap;
   var stgB=document.getElementById('mvStage');
-  if(stgB)stgB.classList.toggle('mv-brand-off',brandOff);
-  if(idx<0){
-    var nx=document.createElement('div');
-    nx.className='mv-line';
-    var nxs=document.createElement('span');
-    nxs.className='mv-line-txt';nxs.textContent=lines[0].text;
-    nx.appendChild(nxs);
-    box.appendChild(nx);return;
-  }
-  /* The line being sung sits in the CENTRE of the screen, the
-     next line right below it — ALL at the same small size
-     (owner order 2026-11-17); only weight / brightness differ.
-     Nothing else covers them. */
+  if(stgB)stgB.classList.toggle('mv-brand-off',showText);
+  if(!showText){mvState.kar=null;return;}
+  /* ONLY the line being sung right now — centred, shown in
+     full as a ghost with the karaoke sweep running over it,
+     and its translation under it. Nothing else covers it. */
   var cl=document.createElement('div');
   cl.className='mv-line on';
-  var sp=document.createElement('span');
-  sp.className='mv-line-txt';sp.textContent=lines[idx].text;
-  cl.appendChild(sp);
+  cl.appendChild(mvKarBuild(lines[idx],idx));
   if(lines[idx].tr){
     var tr=document.createElement('span');
     tr.className='mv-line-tr';tr.textContent=lines[idx].tr;
     cl.appendChild(tr);
   }
   box.appendChild(cl);
-  /* Long line? It is CLAMPED inside its own zone (CSS: current
-     line max 2 wrapped lines, next line max 1) and a small
-     «… បន្ត» marker says it continues — the words never pile
-     up the stage into the title zone. */
+  /* Long line? It is CLAMPED inside its own zone (CSS: max 2
+     wrapped lines) and a small «… បន្ត» marker says it
+     continues — the words never pile up the stage into the
+     title zone. */
   var curTxt=lines[idx].text||'';
-  var txtEl=cl.querySelector('.mv-line-txt');
+  var txtEl=cl.querySelector('.mv-kar');
   if(curTxt.length>84||(txtEl&&txtEl.clientHeight>0&&txtEl.scrollHeight>txtEl.clientHeight+2)){
     var more=document.createElement('div');
     more.className='mv-more';more.textContent='… បន្ត · more';
     box.appendChild(more);
   }
-  if(idx<lines.length-1){
-    var n2=document.createElement('div');
-    n2.className='mv-line';
-    var n2s=document.createElement('span');
-    n2s.className='mv-line-txt';n2s.textContent=lines[idx+1].text;
-    n2.appendChild(n2s);
-    box.appendChild(n2);
-  }
+  mvKarPaint();
 }
 function mvTogglePlay(){
   if(mvExp.on)return;
@@ -18074,14 +18143,23 @@ function mvExpDraw(){
     var sc=Math.min(W*0.86/iw,H*0.86/ih),dw=iw*sc,dh=ih*sc;
     try{cx.drawImage(mvExp.cover,(W-dw)/2,(H-dh)/2,dw,dh);drew=true;}catch(e){drew=false;}
   }
-  var expLines=mvState.lines,expIdx=-1;
+  var expLines=mvState.lines,expIdx=-1,expGap=false;
   if(expLines&&expLines.length){
     var elt=t+MV_LEAD,ej;
     if(mvState.timed){for(ej=0;ej<expLines.length;ej++){var es2=expLines[ej].start;if(typeof es2==='number'&&elt>=es2)expIdx=ej;else if(typeof es2==='number'&&elt<es2)break;}}
     else if(dur>0)expIdx=Math.min(expLines.length-1,Math.floor(elt/dur*expLines.length));
     else expIdx=0;
+    /* Same exact-sync rule as the on-screen MV: in a real gap
+       (line ended, next not started) no words are showing. */
+    if(expIdx>=0&&mvState.timed){
+      var eEnd=expLines[expIdx].end;
+      if(typeof eEnd==='number'&&t>eEnd+0.35){
+        var eNx=(expIdx<expLines.length-1&&typeof expLines[expIdx+1].start==='number')?expLines[expIdx+1].start:null;
+        if(eNx===null||eNx-t>1.4)expGap=true;
+      }
+    }
   }
-  var showBrand=!(expLines&&expLines.length&&expIdx>=0);
+  var showBrand=!(expLines&&expLines.length&&expIdx>=0&&!expGap);
   if(!drew){
     var g=cx.createLinearGradient(0,0,W,H);
     g.addColorStop(0,'hsl('+sty.h+',58%,24%)');g.addColorStop(.7,'hsl('+((sty.h+55)%360)+',62%,11%)');g.addColorStop(1,'#07080a');
@@ -18135,12 +18213,23 @@ function mvExpDraw(){
       for(j=0;j<lines.length;j++){var s=lines[j].start;if(typeof s==='number'&&lt>=s)idx=j;else if(typeof s==='number'&&lt<s)break;}
     }else if(dur>0)idx=Math.min(lines.length-1,Math.floor(lt/dur*lines.length));
     else idx=0;
-    if(idx<0)idx=0;
-    var cur=lines[idx];
-    /* ALL lyric lines share ONE size (owner order 2026-11-17):
-       current and next lines alike — only weight / brightness
-       differ — and every line is outlined (strokeText under
-       the fill) so it stays clear on any background. */
+    /* Exact sync, same as on screen: before the first line
+       and in a real gap the singer is not singing — draw NO
+       lyric text at all (never the next line early). Only
+       the line being sung is drawn, outlined (strokeText
+       under the fill) so it stays clear on any background. */
+    var cur=null;
+    if(idx>=0){
+      cur=lines[idx];
+      if(mvState.timed){
+        var gEnd=cur.end;
+        if(typeof gEnd==='number'&&t>gEnd+0.35){
+          var gNx=(idx<lines.length-1&&typeof lines[idx+1].start==='number')?lines[idx+1].start:null;
+          if(gNx===null||gNx-t>1.4)cur=null;
+        }
+      }
+    }
+    if(cur){
     var fs=Math.round(W*0.05);
     var olw=Math.max(1,Math.round(fs*0.07));
     cx.lineJoin='round';cx.strokeStyle=OC;cx.lineWidth=olw;
@@ -18153,9 +18242,38 @@ function mvExpDraw(){
     var clTrunc=clAll.length>2;
     var cl=clTrunc?clAll.slice(0,2):clAll;
     var lh=fs*1.4,totalH=cl.length*lh+(clTrunc?fs*0.95:0),y0=Math.max(H*0.5,H*0.56-totalH/2);
+    /* Karaoke sweep, same as the on-screen MV: the whole
+       line is drawn first as a dim GHOST, then the part the
+       voice has already sung is drawn over it BRIGHT, clipped
+       to exactly the point the singing has reached inside
+       the line (progress across the line's [start, end]). */
+    var kSt=0,kEn=3;
+    if(mvState.timed&&typeof cur.start==='number'){
+      kSt=cur.start;
+      kEn=(typeof cur.end==='number'&&cur.end>kSt)?cur.end:((idx<lines.length-1&&typeof lines[idx+1].start==='number'&&lines[idx+1].start>kSt)?lines[idx+1].start:kSt+3);
+      if(kEn<=kSt)kEn=kSt+3;
+    }else if(dur>0){kSt=idx*dur/lines.length;kEn=(idx+1)*dur/lines.length;}
+    var kp=kEn>kSt?(t-kSt)/(kEn-kSt):1;
+    if(kp<0)kp=0;if(kp>1)kp=1;
     cl.forEach(function(L,k){cx.strokeText(L,W/2,y0+k*lh);});
-    cx.fillStyle=TC;cx.shadowColor='rgba(0,0,0,.5)';cx.shadowBlur=8;cx.shadowOffsetY=2;
+    cx.fillStyle=TC;cx.globalAlpha=0.38;
     cl.forEach(function(L,k){cx.fillText(L,W/2,y0+k*lh);});
+    cx.globalAlpha=1;
+    var totC=0;for(var ci=0;ci<cl.length;ci++)totC+=cl[ci].length+1;
+    var sungN=kp*totC,offC=0;
+    cx.shadowColor='rgba(0,0,0,.5)';cx.shadowBlur=8;cx.shadowOffsetY=2;
+    for(var cj=0;cj<cl.length;cj++){
+      var LL=cl[cj],take=sungN-offC;
+      offC+=LL.length+1;
+      if(take<=0)continue;
+      if(take>=LL.length){cx.strokeText(LL,W/2,y0+cj*lh);cx.fillText(LL,W/2,y0+cj*lh);continue;}
+      var sub=LL.slice(0,Math.max(1,Math.floor(take)));
+      var wFull=cx.measureText(LL).width,wSub=cx.measureText(sub).width;
+      cx.save();
+      cx.beginPath();cx.rect((W-wFull)/2-2,y0+cj*lh-2,wSub+2,lh+4);cx.clip();
+      cx.strokeText(LL,W/2,y0+cj*lh);cx.fillText(LL,W/2,y0+cj*lh);
+      cx.restore();
+    }
     cx.shadowBlur=0;cx.shadowOffsetY=0;
     if(clTrunc){
       cx.font='800 '+Math.round(fs*0.62)+'px system-ui,sans-serif';
@@ -18174,16 +18292,6 @@ function mvExpDraw(){
       cx.fillText(cur.tr,W/2,ny);ny+=Math.round(fs*1.5);
       cx.shadowBlur=0;
     }
-    if(idx<lines.length-1){
-      /* Next line: SAME size as the current line — only
-         slightly lighter in weight / colour. */
-      cx.font='600 '+fs+'px system-ui,sans-serif';
-      cx.lineWidth=olw;
-      var nl=mvExpWrap(cx,lines[idx+1].text,W*0.88);
-      for(var m=0;m<Math.min(2,nl.length);m++)cx.strokeText(nl[m],W/2,ny+m*lh);
-      cx.fillStyle=TCD;cx.shadowColor='rgba(0,0,0,.5)';cx.shadowBlur=6;
-      for(var m2=0;m2<Math.min(2,nl.length);m2++)cx.fillText(nl[m2],W/2,ny+m2*lh);
-      cx.shadowBlur=0;
     }
   }
 }
