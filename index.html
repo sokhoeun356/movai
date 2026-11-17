@@ -675,6 +675,22 @@ img.hist-media,.d3-preview{cursor:zoom-in}
 .mv-stage[data-ps="5"] .mv-title-txt{letter-spacing:.14em;border-bottom:none}
 .mv-stage[data-ps="5"] .mv-line{line-height:1.65}
 .mv-stage[data-ps="5"] .mv-line.on{line-height:1.65}
+/* ===== MV brand row + changing text colours (owner order
+   2026-11-17, night) =====
+   1) The centre brand is ONE row: the company name «MovAi»
+   sits BESIDE the music note, on its LEFT — never stacked
+   above / below it. The name carries order:-1 (and the note
+   order:2) so the row ALWAYS reads [MovAi] [♪] left to
+   right, whatever order the two are built in.
+   2) The lyric / title colour is NOT always white: every play
+   picks a colour from MV_TXT_PAL (see mvApplyTextColor) and
+   sets --mv-tc / --mv-tc-dim on the stage, so the words change
+   colour together with the background style. On a bright
+   background the deep variant of the same colour is used, so
+   the text still beats the background. */
+.mv-auto-grad{flex-direction:row;gap:14px}
+.mv-auto-grad .mc-note{width:46px;max-width:46px;flex:0 0 auto;order:2}
+.mv-auto-grad .mc-name{font-size:1.9rem;order:-1}
 /* ===== Fullscreen media viewer (tap any image / video / 3D preview) ===== */
 .fs-viewer{position:fixed;inset:0;z-index:90;background:rgba(0,0,0,.96);align-items:center;justify-content:center}
 .fs-body{width:100%;height:100%;display:flex;align-items:center;justify-content:center;padding:10px}
@@ -16765,7 +16781,7 @@ var MV_FORMATS=[
  {id:'4x3',ratio:'4:3',name:'mvFmtLandscape',w:4,h:3,bw:33,bh:25},
  {id:'21x9',ratio:'21:9',name:'mvFmtWide',w:21,h:9,bw:36,bh:16}
 ];
-var mvState={song:null,fmt:'9x16',bgMode:'auto',bgUrl:'',bgKind:'',bgName:'',lines:null,timed:false,curLine:-2,aiBusy:false,playStyle:-1,curBg:null,vizStyle:0};
+var mvState={song:null,fmt:'9x16',bgMode:'auto',bgUrl:'',bgKind:'',bgName:'',lines:null,timed:false,curLine:-2,aiBusy:false,playStyle:-1,curBg:null,vizStyle:0,txtIdx:0,tcFull:''};
 var mvAudio=null,mvCache={},mvTrCache={};
 /* Karaoke sync lead: a line switches on essentially WITH the
    voice — only a hair before it (0.15s) so fast singing still
@@ -16782,15 +16798,24 @@ var MV_LEAD=0.15;
    glow / rings / rays / dots / waves / grid / diag over a deep
    two-hue gradient. The accent also tints the title underline,
    the translation line and the listening spinner per song. */
+/* Style rules (owner order 2026-11-17, night): NO small-dot
+   patterns and NO firework bursts in the corners — the owner
+   does not want them. Patterns are straight, even and clean:
+   lines along the sides and across the top, soft waves / bands,
+   and one «drift» style whose smoke flies across the stage
+   from LEFT to RIGHT (drawn on the FX canvas, see mvFxStep).
+   Every pattern layer is kept DIM — never too bright. */
 var MV_BG_STYLES=[
  {h:152,pat:'glow',acc:'#34d399'},
  {h:210,pat:'waves',acc:'#38bdf8'},
  {h:262,pat:'rays',acc:'#c084fc'},
- {h:330,pat:'dots',acc:'#f472b6'},
+ {h:330,pat:'lines',acc:'#f472b6'},
  {h:16,pat:'rings',acc:'#fb923c'},
  {h:45,pat:'grid',acc:'#facc15'},
  {h:186,pat:'diag',acc:'#2dd4bf'},
- {h:288,pat:'glow',acc:'#e879f9'}
+ {h:288,pat:'drift',acc:'#e879f9'},
+ {h:96,pat:'lines',acc:'#a3e635'},
+ {h:24,pat:'aurora',acc:'#fbbf24'}
 ];
 function mvSongStyle(song){
   var s=String((song&&song.url)||'')+'|'+String((song&&song.title)||'');
@@ -16806,47 +16831,86 @@ function mvSongStyle(song){
    the SAME song always differ. mvCurStyle is what the stage,
    the centre backdrop and Export Video all paint with, so the
    export matches the play the user just watched. */
-var MV_PLAY_LAST={bg:-1,ps:-1,viz:-1};
+var MV_PLAY_LAST={bg:-1,ps:-1,viz:-1,txt:-1};
+/* ===== Changing text colours (owner order 2026-11-17, night) =====
+   The words are NOT always white: every play also picks a text
+   colour — d/dd paint on dark backgrounds, l/ld are the deep
+   variants of the SAME colour for bright backgrounds, so the
+   text changes colour with the style yet still beats the
+   background (mvAdaptText re-applies after measuring it). */
+var MV_TXT_PAL=[
+ {d:'#ffffff',dd:'rgba(255,255,255,.90)',l:'#101206',ld:'rgba(16,18,6,.88)'},
+ {d:'#ffe066',dd:'rgba(255,224,102,.90)',l:'#8a5a00',ld:'rgba(138,90,0,.90)'},
+ {d:'#8ff5c8',dd:'rgba(143,245,200,.90)',l:'#0b5d3b',ld:'rgba(11,93,59,.90)'},
+ {d:'#8fd8ff',dd:'rgba(143,216,255,.90)',l:'#0b4f8a',ld:'rgba(11,79,138,.90)'},
+ {d:'#ffb3d9',dd:'rgba(255,179,217,.90)',l:'#8a1450',ld:'rgba(138,20,80,.90)'},
+ {d:'#d9f99d',dd:'rgba(217,249,157,.90)',l:'#3f6212',ld:'rgba(63,98,18,.90)'},
+ {d:'#ffc48f',dd:'rgba(255,196,143,.90)',l:'#8a4a0b',ld:'rgba(138,74,11,.90)'}
+];
+function mvApplyTextColor(){
+  var stage=document.getElementById('mvStage');if(!stage)return;
+  var pal=MV_TXT_PAL[mvState.txtIdx||0]||MV_TXT_PAL[0];
+  var light=stage.classList.contains('mv-on-light');
+  var full=light?pal.l:pal.d;
+  stage.style.setProperty('--mv-tc',full);
+  stage.style.setProperty('--mv-tc-dim',light?pal.ld:pal.dd);
+  mvState.tcFull=full;
+}
 function mvPickPlayStyle(){
   function pick(n,last){if(n<=1)return 0;var v=last,tries=0;while(v===last&&tries<12){v=(Math.random()*n)|0;tries++;}return v;}
   var bi=pick(MV_BG_STYLES.length,MV_PLAY_LAST.bg);
   var ps=pick(6,MV_PLAY_LAST.ps);
-  var vz=pick(3,MV_PLAY_LAST.viz);
-  MV_PLAY_LAST={bg:bi,ps:ps,viz:vz};
+  var vz=pick(5,MV_PLAY_LAST.viz);
+  var tx2=pick(MV_TXT_PAL.length,MV_PLAY_LAST.txt);
+  MV_PLAY_LAST={bg:bi,ps:ps,viz:vz,txt:tx2};
   mvState.curBg=MV_BG_STYLES[bi];
-  mvState.playStyle=ps;mvState.vizStyle=vz;
+  mvState.playStyle=ps;mvState.vizStyle=vz;mvState.txtIdx=tx2;
   var stage=document.getElementById('mvStage');
   if(stage){stage.setAttribute('data-ps',String(ps));stage.style.setProperty('--mv-acc',mvState.curBg.acc);}
+  mvApplyTextColor();
   mvFxReset();
 }
 function mvCurStyle(song){return mvState.curBg||mvSongStyle(song);}
 function mvStyleLayers(st,withBase){
   var H=st.h,H2=(st.h+55)%360,L=[];
-  if(!withBase)L.push({i:'linear-gradient(160deg,hsla('+H+',80%,45%,.30),hsla('+H2+',80%,35%,.30))',s:'auto'});
+  if(!withBase)L.push({i:'linear-gradient(160deg,hsla('+H+',80%,45%,.20),hsla('+H2+',80%,35%,.20))',s:'auto'});
   switch(st.pat){
     case 'glow':
-      L.push({i:'radial-gradient(120% 90% at 18% 8%,hsla('+H+',90%,60%,.50),transparent 55%)',s:'auto'});
-      L.push({i:'radial-gradient(110% 90% at 85% 92%,hsla('+H2+',90%,55%,.45),transparent 55%)',s:'auto'});
+      /* One soft glow at the TOP CENTRE and one at the bottom
+         centre — never bursts sitting in the four corners. */
+      L.push({i:'radial-gradient(120% 90% at 50% 0%,hsla('+H+',90%,60%,.30),transparent 55%)',s:'auto'});
+      L.push({i:'radial-gradient(110% 90% at 50% 108%,hsla('+H2+',90%,55%,.26),transparent 55%)',s:'auto'});
       break;
     case 'rings':
-      L.push({i:'repeating-radial-gradient(circle at 50% 38%,hsla('+H+',85%,65%,.20) 0 2px,transparent 2px 52px)',s:'auto'});
+      L.push({i:'repeating-radial-gradient(circle at 50% 38%,hsla('+H+',85%,65%,.13) 0 2px,transparent 2px 52px)',s:'auto'});
       break;
     case 'rays':
-      L.push({i:'repeating-conic-gradient(from -12deg at 50% 34%,hsla('+H+',90%,65%,.15) 0deg 9deg,transparent 9deg 26deg)',s:'auto'});
+      L.push({i:'repeating-conic-gradient(from -12deg at 50% 34%,hsla('+H+',90%,65%,.09) 0deg 9deg,transparent 9deg 26deg)',s:'auto'});
       break;
-    case 'dots':
-      L.push({i:'radial-gradient(hsla('+H+',90%,68%,.40) 1.6px,transparent 2.4px)',s:'26px 26px'});
-      L.push({i:'radial-gradient(hsla('+H2+',90%,68%,.30) 1.6px,transparent 2.4px)',s:'26px 26px',pos:'13px 13px'});
+    case 'lines':
+      /* Straight, even lines — across the top AND down the
+         sides, evenly spaced, kept dim (owner order). */
+      L.push({i:'linear-gradient(hsla('+H+',85%,68%,.15) 1.5px,transparent 1.5px)',s:'auto 34px'});
+      L.push({i:'linear-gradient(90deg,hsla('+H2+',85%,68%,.15) 1.5px,transparent 1.5px)',s:'34px auto'});
+      break;
+    case 'drift':
+      /* Soft horizontal bands; the flying smoke itself is
+         drawn on the FX canvas (mvFxStep, left → right). */
+      L.push({i:'repeating-linear-gradient(0deg,hsla('+H+',85%,62%,.07) 0 26px,transparent 26px 64px)',s:'auto'});
+      L.push({i:'linear-gradient(90deg,hsla('+H+',85%,62%,.10),transparent 30%,transparent 70%,hsla('+H2+',85%,62%,.10))',s:'auto'});
+      break;
+    case 'aurora':
+      L.push({i:'linear-gradient(115deg,transparent 18%,hsla('+H+',90%,62%,.13) 38%,transparent 55%,hsla('+H2+',90%,62%,.10) 72%,transparent 88%)',s:'auto'});
       break;
     case 'waves':
-      L.push({i:'repeating-linear-gradient(115deg,hsla('+H+',85%,62%,.16) 0 14px,transparent 14px 44px)',s:'auto'});
+      L.push({i:'repeating-linear-gradient(115deg,hsla('+H+',85%,62%,.11) 0 14px,transparent 14px 44px)',s:'auto'});
       break;
     case 'grid':
-      L.push({i:'linear-gradient(hsla('+H+',85%,65%,.20) 1.5px,transparent 1.5px)',s:'auto 36px'});
-      L.push({i:'linear-gradient(90deg,hsla('+H+',85%,65%,.20) 1.5px,transparent 1.5px)',s:'36px auto'});
+      L.push({i:'linear-gradient(hsla('+H+',85%,65%,.13) 1.5px,transparent 1.5px)',s:'auto 36px'});
+      L.push({i:'linear-gradient(90deg,hsla('+H+',85%,65%,.13) 1.5px,transparent 1.5px)',s:'36px auto'});
       break;
     case 'diag':
-      L.push({i:'repeating-linear-gradient(45deg,hsla('+H+',85%,60%,.18) 0 10px,transparent 10px 34px)',s:'auto'});
+      L.push({i:'repeating-linear-gradient(45deg,hsla('+H+',85%,60%,.12) 0 10px,transparent 10px 34px)',s:'auto'});
       break;
   }
   if(withBase)L.push({i:'linear-gradient(155deg,hsl('+H+',58%,24%),hsl('+H2+',62%,11%) 78%)',s:'auto'});
@@ -17056,6 +17120,61 @@ function mvProgDone(){
   setTimeout(function(){var ov=document.getElementById('mvProgress');if(ov)ov.style.display='none';},450);
 }
 function mvProgHide(){clearInterval(mvProgTimer);var ov=document.getElementById('mvProgress');if(ov)ov.style.display='none';}
+/* ===== Lyric translation that actually translates (owner
+   order 2026-11-17, night) =====
+   The rule is simple: whichever language the user picks, the
+   lyrics BECOME that language — even when the song is sung in
+   a different one. The old flow only re-asked the audio
+   endpoint and trusted it to translate; when it came back
+   untranslated the user saw the original and (rightly) said
+   «translate doesn't work». So known lyric lines are now
+   translated DIRECTLY, line by line (timing and order kept),
+   via Google Translate's public endpoint with auto-detected
+   source language. Success replaces the line text itself —
+   the translation is the lyric on screen, not a small extra
+   line underneath. Failure keeps the original lines and the
+   note says the translation failed. */
+var MV_TL={km:'km',en:'en',th:'th',vi:'vi',zh:'zh-CN',ko:'ko',ja:'ja',fr:'fr'};
+function mvTrFetch(texts,tl,done){
+  var code=MV_TL[tl]||tl;
+  var out=new Array(texts.length),left=0,anyOk=false,i;
+  function fin(){left--;if(left<=0)done(anyOk?out:null);}
+  for(i=0;i<texts.length;i++){
+    if(!String(texts[i]||'').replace(/^\s+|\s+$/g,'')){out[i]=texts[i]||'';continue;}
+    left++;
+    (function(idx,txt){
+      var settled=false;
+      var to=setTimeout(function(){if(settled)return;settled=true;out[idx]=txt;fin();},15000);
+      var url='https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl='+encodeURIComponent(code)+'&dt=t&q='+encodeURIComponent(txt);
+      fetch(url).then(function(r){return r.json();}).then(function(j){
+        if(settled)return;settled=true;clearTimeout(to);
+        var s='';
+        if(j&&j[0])for(var k=0;k<j[0].length;k++){if(j[0][k]&&j[0][k][0])s+=j[0][k][0];}
+        if(s){out[idx]=s;anyOk=true;}else out[idx]=txt;
+        fin();
+      }).catch(function(){
+        if(settled)return;settled=true;clearTimeout(to);
+        out[idx]=txt;fin();
+      });
+    })(i,texts[i]);
+  }
+  if(left===0)done(null);
+}
+function mvTranslateApply(song,trLang,baseLines,timed){
+  var noteEl=document.getElementById('mvNote');
+  if(noteEl)noteEl.textContent=tx('mvTrBusy');
+  mvTrFetch(baseLines.map(function(l){return l.text;}),trLang,function(tr){
+    if(!mvState.song||mvState.song.url!==song.url)return;
+    if(tr){
+      var lines=baseLines.map(function(l,i){return {text:tr[i]||l.text,start:l.start,end:l.end,tr:''};});
+      mvTrCache[song.url+'|'+trLang]={kind:timed?'timed':'text',lines:lines};
+      if(noteEl)noteEl.textContent='';
+      mvApplyLines(lines,timed);
+    }else if(noteEl){
+      noteEl.textContent=tx('mvTrFail');
+    }
+  });
+}
 function mvAiFetch(trLang,attempt){
   attempt=attempt||0;
   var song=mvState.song;
@@ -17099,12 +17218,45 @@ function mvAiFetch(trLang,attempt){
     clearInterval(timer);mvState.aiBusy=false;
     var timed=lines.length&&typeof lines[0].start==='number';
     if(trLang){
-      mvTrCache[song.url+'|'+trLang]={kind:timed?'timed':'text',lines:lines};
-      if(viewOpen&&noteEl)noteEl.textContent='';
-    }else{
-      mvCache[song.url]={kind:timed?'timed':'text',lines:lines};
-      mvLyrRender();
+      /* The picked language WINS (owner order 2026-11-17,
+         night): the on-screen lyrics must BE that language,
+         even when the song is sung in another one. If the
+         server sent a per-line translation it becomes the
+         line itself; if it sent none, the lines are
+         translated directly (mvTrFetch) and then shown. Only
+         when translation truly fails do the original lines
+         stay, with the fail note at the bottom. */
+      var hasTr=false,i2;
+      for(i2=0;i2<lines.length;i2++)if(lines[i2].tr){hasTr=true;break;}
+      if(hasTr){
+        lines=lines.map(function(l){return {text:(l.tr||l.text),start:l.start,end:l.end,tr:''};});
+        mvTrCache[song.url+'|'+trLang]={kind:timed?'timed':'text',lines:lines};
+        if(viewOpen&&noteEl)noteEl.textContent='';
+        if(viewOpen)mvProgDone();
+        else mvMsgShow(tx('mvAiDone'),'ok');
+        if(mvState.song&&mvState.song.url===song.url)mvApplyLines(lines,timed);
+      }else{
+        var origLines=lines;
+        mvTrFetch(origLines.map(function(l){return l.text;}),trLang,function(tr){
+          if(tr){
+            var tl2=origLines.map(function(l,i3){return {text:(tr[i3]||l.text),start:l.start,end:l.end,tr:''};});
+            mvTrCache[song.url+'|'+trLang]={kind:timed?'timed':'text',lines:tl2};
+            if(viewOpen&&noteEl)noteEl.textContent='';
+            if(viewOpen)mvProgDone();
+            else mvMsgShow(tx('mvAiDone'),'ok');
+            if(mvState.song&&mvState.song.url===song.url)mvApplyLines(tl2,timed);
+          }else{
+            mvCache[song.url]={kind:timed?'timed':'text',lines:origLines};
+            if(viewOpen&&noteEl)noteEl.textContent=tx('mvTrFail');
+            if(viewOpen)mvProgDone();
+            if(mvState.song&&mvState.song.url===song.url)mvApplyLines(origLines,timed);
+          }
+        });
+      }
+      return;
     }
+    mvCache[song.url]={kind:timed?'timed':'text',lines:lines};
+    mvLyrRender();
     if(viewOpen)mvProgDone();
     else mvMsgShow(tx('mvAiDone'),'ok');
     if(mvState.song&&mvState.song.url===song.url)mvApplyLines(lines,timed);
@@ -17175,10 +17327,13 @@ function mvStart(){
     mvApplyLines(c.lines,c.kind==='timed');
   }else if(r.kind!=='none'){
     /* Creation lyrics: on screen at once. A picked translation
-       is fetched on top and swaps in when it lands — if it
-       fails, these original lines simply stay. */
+       translates THESE lines directly into the picked
+       language (mvTranslateApply) and swaps in when it lands —
+       whichever language was picked, the lyrics become that
+       language, even when the song is sung in another one. If
+       it fails, these original lines simply stay. */
     mvApplyLines(r.lines,r.kind==='timed');
-    if(trLang)mvAiFetch(trLang);
+    if(trLang)mvTranslateApply(song,trLang,r.lines,r.kind==='timed');
   }else{
     /* No creation lyrics: ask AI to listen + write them right
        away — the lines appear the moment they come back. A
@@ -17255,7 +17410,9 @@ function mvAutoGrad(song){
   var d=document.createElement('div');
   d.className='mv-auto-grad';
   mvPaintStyle(d,mvCurStyle(song),true);
-  d.innerHTML='<svg class="mc-note" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg><span class="mc-name">Mov<span>Ai</span></span>';
+  /* Name on the LEFT of the music note, side by side in one
+     row (owner order 2026-11-17, night). */
+  d.innerHTML='<span class="mc-name">Mov<span>Ai</span></span><svg class="mc-note" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg>';
   return d;
 }
 function mvFitStage(){
@@ -17316,7 +17473,7 @@ function mvAdaptText(){
   var src='';
   if(mvState.bgMode==='upload'&&mvState.bgUrl&&mvState.bgKind==='image')src=mvState.bgUrl;
   else if(mvState.bgMode!=='upload'&&mvState.song&&mvState.song.image)src=mvState.song.image;
-  if(!src)return;
+  if(!src){mvApplyTextColor();return;}
   var img=new Image();
   try{img.crossOrigin='anonymous';}catch(e){}
   img.onload=function(){
@@ -17329,6 +17486,7 @@ function mvAdaptText(){
       mvState.bgLum=lum;
       var st2=document.getElementById('mvStage');
       if(st2&&document.getElementById('mvView').style.display!=='none')st2.classList.toggle('mv-on-light',lum>0.58);
+      mvApplyTextColor();
     }catch(e){}
   };
   img.src=src;
@@ -17345,7 +17503,7 @@ function mvAdaptText(){
    simply stays off and playback is unaffected. This lives
    ONLY inside the MV — the Public cards keep their plain
    playback exactly as the owner ordered earlier. */
-var mvBeat={ctx:null,au:null,an:null,data:null,level:1,base:0};
+var mvBeat={ctx:null,au:null,an:null,data:null,level:1,base:0,gain:1};
 function mvBeatEnsure(){
   if(mvBeat.ctx||!mvAudio)return;
   try{
@@ -17378,9 +17536,17 @@ function mvBeatSyncToMain(force){
 function mvBeatStep(){
   var stage=document.getElementById('mvStage');if(!stage)return;
   var target=1;
+  /* Beat gain (owner order 2026-11-17, night): the reaction
+     HITS as hard as the music hits. A hard, fast drum slams the
+     gain up at once (instant attack — no lag, no smearing);
+     a slow / quiet passage keeps it calm at 1. The fall back is
+     fast and dry (×0.5 per frame), so each hit reads as its own
+     clean hit. mvFxStep spends the gain on the visualiser
+     height + a soft light flash — the logo never moves. */
+  var g=1;
   if(mvBeat.an&&mvAudio&&!mvAudio.paused&&!mvAudio.ended){
     if(window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches){
-      stage.style.setProperty('--mv-beat','1');return;
+      stage.style.setProperty('--mv-beat','1');mvBeat.gain=1;return;
     }
     try{
       if(mvBeat.au&&Math.abs((mvBeat.au.currentTime||0)-(mvAudio.currentTime||0))>0.6)mvBeatSyncToMain(false);
@@ -17391,8 +17557,12 @@ function mvBeatStep(){
       mvBeat.base=mvBeat.base*0.97+e*0.03;
       var ex=Math.max(0,e-Math.max(0.12,mvBeat.base*0.92));
       target=1+Math.min(0.22,ex*1.1+Math.max(0,e-0.6)*0.18);
-    }catch(e){target=1;}
+      g=1+Math.min(1.25,ex*2.8+Math.max(0,e-0.70)*1.1);
+    }catch(e){target=1;g=1;}
   }
+  if(g>mvBeat.gain)mvBeat.gain=g;
+  else mvBeat.gain+=(g-mvBeat.gain)*0.5;
+  if(mvBeat.gain<1)mvBeat.gain=1;
   if(target>mvBeat.level)mvBeat.level=target;
   else mvBeat.level+=(target-mvBeat.level)*0.32;
   if(mvBeat.level<1)mvBeat.level=1;
@@ -17411,10 +17581,24 @@ function mvBeatStep(){
    fresh random particles on every play (mvFxReset, called from
    mvPickPlayStyle) so no two plays ever match. Reduced motion
    turns the whole layer off. */
-var mvFx={parts:[],lastT:0};
+var mvFx={parts:[],lastT:0,off:0,drift:[]};
 function mvFxReset(){
   mvFx.parts=[];mvFx.lastT=0;
+  /* A fresh phase offset every play: the atmosphere sequence
+     (snow → glow orbs → rain → smoke) starts at a different
+     point each time, so no two plays run the same show. */
+  mvFx.off=Math.random();
+  mvFx.drift=[];
   for(var i=0;i<64;i++)mvFx.parts.push({x:Math.random(),y:Math.random(),s:0.35+Math.random()*1.15,v:0.25+Math.random()*0.85,ph:Math.random()*6.283});
+  /* Smoke puffs for the «drift» style — they fly across the
+     stage from LEFT to RIGHT the whole song (owner order). */
+  for(var j=0;j<12;j++)mvFx.drift.push({x:Math.random(),y:0.15+Math.random()*0.7,s:0.6+Math.random()*1.1,v:0.5+Math.random()*0.9,ph:Math.random()*6.283});
+}
+function mvHexRgb(hex){
+  var m=/^#?([0-9a-f]{6})$/i.exec(String(hex||''));
+  if(!m)return '173,220,41';
+  var n=parseInt(m[1],16);
+  return ((n>>16)&255)+','+((n>>8)&255)+','+(n&255);
 }
 function mvFxStep(){
   var cv=document.getElementById('mvFx'),stage=document.getElementById('mvStage');
@@ -17431,10 +17615,39 @@ function mvFxStep(){
   mvFx.lastT=now;
   var t=mvAudio?(mvAudio.currentTime||0):0;
   var dur=mvAudio&&isFinite(mvAudio.duration)?mvAudio.duration:0;
-  var p=dur>0?Math.max(0,Math.min(1,t/dur)):0;
+  var pRaw=dur>0?Math.max(0,Math.min(1,t/dur)):0;
+  var p=dur>0?((pRaw+(mvFx.off||0))%1):0;
   var snowA=dur>0?(p<0.36?0.9:Math.max(0,0.9*(1-(p-0.36)/0.09))):0.9;
   var rainA=p<0.40?0:(p<0.48?(p-0.40)/0.08:(p<0.70?1:Math.max(0,1-(p-0.70)/0.09)));
   var smokeA=p<0.74?0:Math.min(1,(p-0.74)/0.09)*0.9;
+  /* NOT only snow / rain / smoke (owner order 2026-11-17,
+     night): a stretch of big soft GLOW ORBS — slow floating
+     lights in the song's own accent colour — runs between the
+     snow and the rain, so the show keeps changing form. */
+  var orbA=p<0.28?0:(p<0.36?(p-0.28)/0.08:(p<0.56?1:Math.max(0,1-(p-0.56)/0.08)));
+  var accRgb=mvHexRgb(mvState.song?mvCurStyle(mvState.song).acc:'#addc29');
+  if(orbA>0.01){
+    for(i=0;i<mvFx.parts.length;i+=9){pt=mvFx.parts[i];
+      pt.y-=pt.v*0.006*dt*8;pt.x+=Math.sin(now*0.3+pt.ph)*0.0004;
+      if(pt.y<0.05){pt.y=0.98;pt.x=Math.random();}
+      var ox=pt.x*w,oy=pt.y*h,orad=(52+pt.s*64);
+      var og=cx.createRadialGradient(ox,oy,2,ox,oy,orad);
+      og.addColorStop(0,'rgba('+accRgb+','+(0.16*orbA).toFixed(3)+')');
+      og.addColorStop(1,'rgba('+accRgb+',0)');
+      cx.fillStyle=og;cx.beginPath();cx.arc(ox,oy,orad,0,6.283);cx.fill();}
+  }
+  /* «Drift» style: smoke flies across from LEFT to RIGHT for
+     the whole song (owner order 2026-11-17, night). */
+  if(mvState.curBg&&mvState.curBg.pat==='drift'&&mvFx.drift&&mvFx.drift.length){
+    for(i=0;i<mvFx.drift.length;i++){pt=mvFx.drift[i];
+      pt.x+=pt.v*0.045*dt*8;pt.y+=Math.sin(now*0.4+pt.ph)*0.0006;
+      if(pt.x>1.15){pt.x=-0.15;pt.y=0.15+Math.random()*0.7;}
+      var dx=pt.x*w,dy=pt.y*h,drad=(44+pt.s*58);
+      var dg=cx.createRadialGradient(dx,dy,2,dx,dy,drad);
+      dg.addColorStop(0,'rgba(215,215,220,0.13)');
+      dg.addColorStop(1,'rgba(215,215,220,0)');
+      cx.fillStyle=dg;cx.beginPath();cx.arc(dx,dy,drad,0,6.283);cx.fill();}
+  }
   var i,pt;
   if(snowA>0.01){
     cx.fillStyle='rgba(255,255,255,'+(0.75*snowA).toFixed(3)+')';
@@ -17464,13 +17677,44 @@ function mvFxStep(){
       cx.fillStyle=g;cx.beginPath();cx.arc(sx,sy,sr,0,6.283);cx.fill();}
   }
   /* Visualiser — only while the song actually plays; without
-     analyser data it stays calm (no fake motion). */
+     analyser data it stays calm (no fake motion). Its height
+     is multiplied by the BEAT GAIN (mvBeatStep): a hard hit
+     throws the bars up hard and fast, a slow groove keeps
+     them low and calm — exactly as hard as the music hits. */
   if(!mvBeat.an||!mvAudio||mvAudio.paused||mvAudio.ended||!mvBeat.data)return;
   var acc=(mvState.song?mvCurStyle(mvState.song).acc:'#addc29');
   var data=mvBeat.data,bins=data.length;
-  var baseY=h-5,maxH=h*0.15,x0=w*0.06,span=w*0.88;
+  var gain=mvBeat.gain||1;
+  var baseY=h-5,maxH=h*0.15*Math.min(2.2,gain),x0=w*0.06,span=w*0.88;
+  if(gain>1.06){
+    var fg=cx.createRadialGradient(w/2,baseY,4,w/2,baseY,w*0.55);
+    fg.addColorStop(0,'rgba('+accRgb+','+(Math.min(0.30,(gain-1)*0.30)).toFixed(3)+')');
+    fg.addColorStop(1,'rgba('+accRgb+',0)');
+    cx.fillStyle=fg;cx.fillRect(0,0,w,h);
+  }
   cx.fillStyle=acc;cx.strokeStyle=acc;
-  if(mvState.vizStyle===1){
+  if(mvState.vizStyle===3){
+    /* Mirror bars: throw up AND down from the baseline. */
+    cx.globalAlpha=0.55;
+    var K3=26,bw3=span/K3;
+    for(i=0;i<K3;i++){
+      var bk3=Math.floor(i/K3*bins*0.5),vh3=Math.max(2,(data[bk3]/255)*maxH);
+      cx.fillRect(x0+i*bw3+1,baseY-vh3,Math.max(1.5,bw3-2.5),vh3);
+      cx.globalAlpha=0.28;
+      cx.fillRect(x0+i*bw3+1,baseY+2,Math.max(1.5,bw3-2.5),vh3*0.45);
+      cx.globalAlpha=0.55;
+    }
+    cx.globalAlpha=1;
+  }else if(mvState.vizStyle===4){
+    /* Step blocks: chunky even steps, Avee-style. */
+    cx.globalAlpha=0.6;
+    var K4=14,bw4=span/K4,segH=Math.max(4,maxH/6);
+    for(i=0;i<K4;i++){
+      var bk4=Math.floor(i/K4*bins*0.5),segs=Math.max(1,Math.round((data[bk4]/255)*6));
+      for(var sg=0;sg<segs;sg++)cx.fillRect(x0+i*bw4+1.5,baseY-(sg+1)*segH+1,Math.max(2,bw4-3),segH-2);
+    }
+    cx.globalAlpha=1;
+  }else if(mvState.vizStyle===1){
     cx.globalAlpha=0.6;cx.lineWidth=2;cx.beginPath();
     var N=42;
     for(i=0;i<=N;i++){
@@ -17600,7 +17844,7 @@ function mvTogglePlay(){
 function mvCloseView(){
   if(mvExp.on)mvExpFinish();
   if(mvRaf){cancelAnimationFrame(mvRaf);mvRaf=0;}
-  mvBeat.level=1;mvBeat.base=0;
+  mvBeat.level=1;mvBeat.base=0;mvBeat.gain=1;
   if(mvBeat.au){try{mvBeat.au.pause();}catch(e){}}
   var bst=document.getElementById('mvStage');
   if(bst){bst.style.setProperty('--mv-beat','1');bst.classList.remove('mv-on-light');}
@@ -17744,6 +17988,9 @@ function mvExpDraw(){
      letters + black outline. */
   var expOnLight=(typeof mvState.bgLum==='number'&&mvState.bgLum>0.58&&((mvState.bgMode==='upload'&&mvState.bgKind==='image')||(mvState.bgMode!=='upload'&&!!song.image)));
   var TC=expOnLight?'#101206':'#fff',OC=expOnLight?'rgba(255,255,255,.95)':'rgba(8,8,8,.92)',TCD=expOnLight?'rgba(16,18,6,.88)':'rgba(255,255,255,.88)';
+  /* The export uses the SAME changing text colour as the play
+     on screen (mvApplyTextColor) — never plain white only. */
+  if(mvState.tcFull){TC=mvState.tcFull;TCD=mvState.tcFull;}
   var t=mvExp.audio?(mvExp.audio.currentTime||0):0;
   var dur=mvExp.dur||(mvExp.audio&&isFinite(mvExp.audio.duration)?mvExp.audio.duration:0);
   cx.fillStyle='#07080a';cx.fillRect(0,0,W,H);
