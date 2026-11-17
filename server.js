@@ -2062,11 +2062,15 @@ async function withProviderKeyRotation(provider, fn, reqKey, candidatesOverride)
     const cand = candidates[idx];
     try {
       const out = await fn(cand.key, cand.endpoint);
-      // STRICT ROUND-ROBIN (owner order 2026-11-18): after EVERY success
-      // advance to the NEXT key, so the next call uses the next key
-      // (1 → 2 → 3 → 1 …) instead of reusing this one. On a rotatable
-      // error the loop below already tries the next key.
-      _keyRotationStart.set(p, (idx + 1) % n);
+      // FAILOVER (owner order 2026-11-18, reverting strict round-robin):
+      // stick with ONE key — after a success keep using THIS key (do NOT
+      // advance to the next). Only when this key fails with a rotatable
+      // error does the loop try the next key, and the pointer then sticks
+      // with that one. (Strict round-robin spread one stuck MVSEP job
+      // across ALL keys; failover keeps the other keys clean as backups.
+      // An exhausted key is retried when the rotation wraps back to it,
+      // so it works again automatically after its quota resets.)
+      _keyRotationStart.set(p, idx);
       keyHealthSet(p, idx, 'ok', '');
       return out;
     } catch (e) {
