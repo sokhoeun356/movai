@@ -72,12 +72,12 @@ main{max-width:720px;margin:0 auto;padding:calc(4.75rem + env(safe-area-inset-to
    with the bell to its LEFT (the bell opens the log-in sheet). */
 .avatar-btn{width:46px;height:46px;border-radius:50%;padding:0;border:none;background:transparent;cursor:pointer;flex:0 0 auto;align-items:center;justify-content:center}
 .avatar-orb{width:46px;height:46px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-weight:900;font-size:1.25rem;color:#fff;background:radial-gradient(circle at 30% 24%,rgba(255,255,255,.9),rgba(255,255,255,0) 42%),linear-gradient(145deg,#38bdf8,#6366f1 45%,#b537f2 80%,#ff2e88);border:2px solid rgba(255,255,255,.4);box-shadow:inset 0 -7px 13px rgba(0,0,0,.38),inset 0 5px 9px rgba(255,255,255,.35),0 9px 22px rgba(0,0,0,.42);text-shadow:0 1px 3px rgba(0,0,0,.5);line-height:1}
-.avatar-orb.avatar-lg{width:64px;height:64px;font-size:1.75rem;flex:0 0 auto}
+.avatar-orb.avatar-lg{width:48px;height:48px;font-size:1.25rem;flex:0 0 auto}
 @media(max-width:420px){
  .topbar-right .acct-chip{padding:8px 12px}
  .avatar-btn,.avatar-orb{width:42px;height:42px}
  .avatar-orb{font-size:1.125rem}
- .avatar-orb.avatar-lg{width:64px;height:64px;font-size:1.75rem}
+ .avatar-orb.avatar-lg{width:48px;height:48px;font-size:1.25rem}
  .brand-frame .brand-name{font-size:1.125rem}
 }
 /* ===== Notifications · ដំណឹង =====
@@ -114,6 +114,20 @@ main{max-width:720px;margin:0 auto;padding:calc(4.75rem + env(safe-area-inset-to
 .nfull{display:block;font-size:0.75rem;color:var(--muted);margin-top:6px;font-variant-numeric:tabular-nums;letter-spacing:.01em}
 .drawer .nfull{color:var(--glass-muted)}
 .notif-dot{width:8px;height:8px;border-radius:50%;background:var(--accent);flex:0 0 auto;margin-top:7px}
+/* ===== Minimal notification rows (owner order 2026-11-17) =====
+   One line only: a green + sign when credit came IN, a red −
+   sign when credit went OUT, the amount with its short pool
+   name («+50 Image.Video» / «−300 Image.Video»), and the date
+   (17/11/2026). No titles, no body text, no «Balance …» line,
+   no email / ID, no relative time — see notifItemHtml. */
+.notif-mini{align-items:center;gap:10px;padding:9px 12px}
+.notif-mini .notif-dot{margin-top:0}
+.notif-sign{width:30px;height:30px;border-radius:50%;flex:0 0 auto;display:inline-flex;align-items:center;justify-content:center;font-size:1.25rem;font-weight:900;line-height:1}
+.notif-sign.in{background:rgba(74,222,128,.15);color:#4ade80}
+.notif-sign.out{background:rgba(248,113,113,.15);color:#f87171}
+.notif-mini-amt{flex:1 1 auto;min-width:0;font-size:0.9375rem;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-variant-numeric:tabular-nums}
+.notif-mini-label{flex:1 1 auto;min-width:0;font-size:0.875rem;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.notif-mini-date{flex:0 0 auto;font-size:0.75rem;color:var(--muted);font-variant-numeric:tabular-nums;white-space:nowrap}
 /* ===== New device / New user cards — neat single-line rows =====
    «ឧបករណ៍ថ្មី · New device» and «អ្នកប្រើថ្មី · New user» notices
    never show the server's raw sentence. The card is one compact
@@ -596,6 +610,50 @@ img.hist-media,.d3-preview{cursor:zoom-in}
 @container (min-width:90px){.song-cover-solid .sc-logo{width:36%}.song-cover-solid .sc-name{font-size:.875rem}}
 .song-cover-solid.creating{animation:songPulse 1.8s ease-in-out infinite}
 .song-creating-txt{margin-left:auto;font-size:0.8125rem;font-weight:700;color:var(--muted)}
+/* ===== Generating song cards — cover-card design (owner order
+   2026-11-17, image 3) =====
+   In the Create results the song cards sit SIDE BY SIDE: one song
+   takes one big full-width card, two songs take two equal 50%
+   cards. While a song is being created its card is a plain grey
+   rounded square whose cover is the MovAi logo with the circular
+   pink-orange «C» spinner turning over it — nothing else on the
+   card. When the song lands, the real cover fills the card at
+   once, the Play button sits INSIDE the cover, and the title
+   lives inside the cover at the bottom — marquee-scrolling when
+   it is too long, back to the start, then scrolling again. */
+#genResult .song-grid{flex-direction:row;gap:10px}
+#genResult .song-grid>.song-card{flex:1 1 0;min-width:0}
+.gen-spin-card{position:relative;padding:0;border-radius:18px;overflow:hidden;background:#26282e;aspect-ratio:7/5;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px}
+.gen-spin-wrap{position:relative;width:min(104px,44%);aspect-ratio:1/1;flex:0 0 auto}
+.gen-spin-note{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,.94)}
+.gen-spin-note svg{width:46%;height:auto;display:block}
+.gen-spin-c{position:absolute;inset:0;border-radius:50%;background:conic-gradient(from 210deg,#ff2e88,#ff8a3c 55%,rgba(255,138,60,0) 84%);-webkit-mask:radial-gradient(farthest-side,transparent calc(100% - 7px),#000 calc(100% - 6px));mask:radial-gradient(farthest-side,transparent calc(100% - 7px),#000 calc(100% - 6px));animation:genSpinC .9s linear infinite}
+@keyframes genSpinC{to{transform:rotate(360deg)}}
+.gen-spin-name{font-size:0.9375rem;font-weight:800;letter-spacing:.03em;color:rgba(255,255,255,.94);line-height:1}
+.gen-spin-fail{font-size:2rem;font-weight:900;color:#f87171;line-height:1}
+.gen-spin-retry{font-size:0.75rem;font-weight:700;color:var(--muted);text-align:center;padding:0 12px;line-height:1.45}
+.gen-spin-cancel-row{display:flex;justify-content:center;margin-top:10px}
+.gen-spin-cancel{min-height:34px;padding:4px 18px;border-radius:8px;border:1px solid var(--line2);background:var(--card2);color:#f87171;font-family:inherit;font-size:0.8125rem;font-weight:800;cursor:pointer}
+@media (prefers-reduced-motion:reduce){.gen-spin-c{animation-duration:2.4s}}
+.gcc-card{padding:0;border-radius:18px;overflow:hidden}
+.gcc-cover{position:relative;aspect-ratio:7/5;background:#22262c;container-type:inline-size}
+.gcc-cover .song-cover{position:absolute;inset:0;width:100%;height:100%;aspect-ratio:auto;border-radius:0}
+.gcc-play{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:17cqw;height:17cqw;min-width:40px;min-height:40px;max-width:66px;max-height:66px;font-size:1.125rem;z-index:3;box-shadow:0 6px 20px rgba(0,0,0,.35)}
+.gcc-strip{position:absolute;left:0;right:0;bottom:0;z-index:2;padding:30px 12px 10px;background:linear-gradient(rgba(0,0,0,0),rgba(0,0,0,.74));color:#fff;pointer-events:none}
+.gcc-title{font-size:1rem;font-weight:800;white-space:nowrap;overflow:hidden;line-height:1.35}
+.gcc-title-in{display:inline-block;white-space:nowrap;will-change:transform}
+.gcc-title-in.mq{animation:gccMq var(--mqdur,6s) linear infinite}
+@keyframes gccMq{0%{transform:translateX(0)}16%{transform:translateX(0)}84%{transform:translateX(var(--mqx,0))}100%{transform:translateX(var(--mqx,0))}}
+.gcc-sub{font-size:0.6875rem;font-weight:600;color:rgba(255,255,255,.88);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px;line-height:1.4;font-variant-numeric:tabular-nums}
+.gcc-sub .song-stream-badge{color:var(--accent)}
+.gcc-card .song-seek{margin:9px 12px 0;width:calc(100% - 24px)}
+.gcc-acts{display:flex;align-items:center;gap:6px;padding:8px 12px 12px}
+@media (prefers-reduced-motion:reduce){.gcc-title-in.mq{animation:none}}
+/* The Create view carries NO top header (owner order 2026-11-17,
+   image 3): the MovAi logo frame, the search bar and the top-right
+   buttons stay hidden while the Create view is open — the bottom
+   dock still navigates, and the header returns in Public. */
+body.view-create .menuwrap,body.view-create .topbar-right,body.view-create #topSearchBar{display:none!important}
 @keyframes songPulse{0%,100%{opacity:1}50%{opacity:.5}}
 @media (prefers-reduced-motion:reduce){.song-cover-solid.creating{animation:none}}
 .ep-head{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
@@ -1259,10 +1317,10 @@ html[data-mode="light"] .btn-free{color:#63910c}
    buttons under the header open the phone's photo picker; the
    picked photo is stored on the account as its avatar. */
 .prof-pic-wrap{position:relative;flex:0 0 auto}
-.prof-pic-cam{position:absolute;right:-2px;bottom:-2px;width:26px;height:26px;border-radius:50%;border:2px solid var(--card);background:var(--accent-fill);color:#0d1005;display:flex;align-items:center;justify-content:center;cursor:pointer;padding:0}
-.prof-pic-cam svg{width:14px;height:14px;display:block}
-.prof-pic-btns{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}
-.prof-pic-btns .kbtn{flex:1 1 auto;padding:10px 12px;font-size:0.8125rem;min-height:42px}
+.prof-pic-cam{position:absolute;right:-2px;bottom:-2px;width:22px;height:22px;border-radius:50%;border:2px solid var(--card);background:var(--accent-fill);color:#0d1005;display:flex;align-items:center;justify-content:center;cursor:pointer;padding:0}
+.prof-pic-cam svg{width:12px;height:12px;display:block}
+.prof-pic-btns{display:flex;gap:8px;margin-top:8px;flex-wrap:wrap}
+.prof-pic-btns .kbtn{flex:1 1 auto;padding:7px 10px;font-size:0.75rem;min-height:34px}
 .pkg-sheet-card{background:var(--card);border:1px solid var(--line2);border-radius:18px;padding:20px;width:100%;max-width:420px;max-height:88vh;overflow-y:auto;color:var(--text)}
 /* ===== Offline / server-unreachable popup =====
    Sits ABOVE every other sheet (z-index 300) and cannot be
@@ -2284,10 +2342,10 @@ main{padding-top:calc(3.75rem + env(safe-area-inset-top,0px))}
 <div id="profileSheet" class="pkg-sheet" style="display:none" role="dialog" aria-modal="true" onclick="if(event.target===this)profileClose()">
   <div class="pkg-sheet-card">
     <div style="display:flex;align-items:center;justify-content:space-between;gap:10px">
-      <h3 style="font-size:1.0625rem;font-weight:800" data-i18n="profileTitle">ប្រូហ្វាល់របស់ខ្ញុំ</h3>
+      <h3 style="font-size:1rem;font-weight:800" data-i18n="profileTitle">ប្រូហ្វាល់របស់ខ្ញុំ</h3>
       <button type="button" class="drawer-close" style="background:var(--card2);color:var(--text);border-color:var(--line2)" onclick="profileClose()" aria-label="Close">✕</button>
     </div>
-    <div id="profileBody" style="margin-top:10px"></div>
+    <div id="profileBody" style="margin-top:8px"></div>
   </div>
 </div>
 <div id="pubSheet" class="pkg-sheet" style="display:none" role="dialog" aria-modal="true" onclick="if(event.target===this)pubSheetClose()">
@@ -4754,12 +4812,10 @@ function songProgDone(){
   if(songRingState!=='work')return;
   songRingState='done';
   songCardPct=100;
-  /* The finished cards have replaced the pending / preview ones —
-     stamp the clear 100% block onto each finished card itself. */
-  var cards=document.querySelectorAll('#genResult .song-card');
-  for(var i=0;i<cards.length;i++){
-    if(!cards[i].querySelector('.song-live-prog'))cards[i].appendChild(songCardProgBlock());
-  }
+  /* The finished cover cards have replaced the pending / preview
+     ones: the real cover itself is the done signal now (owner
+     order 2026-11-17, image 3) — no progress block is stamped
+     onto the finished cards. */
   songCardProgPaint();
   if(songCardDoneTimer)clearTimeout(songCardDoneTimer);
   songCardDoneTimer=setTimeout(function(){
@@ -4779,6 +4835,20 @@ function songProgFail(){
     blocks[i].style.cursor='pointer';
     blocks[i].onclick=function(){songRingTap();};
   }
+  /* The pending spinner cards carry the failure themselves: the
+     logo + spinner give way to a ✗ on the same card, and tapping
+     the card retries the same generation (songRingTap). */
+  var spins=document.querySelectorAll('#genResult .gen-spin-card');
+  for(var k=0;k<spins.length;k++){
+    spins[k].classList.add('fail');
+    spins[k].innerHTML='<div class="gen-spin-fail" aria-hidden="true">✗</div><div class="gen-spin-retry"></div>';
+    var rt=spins[k].querySelector('.gen-spin-retry');
+    if(rt)rt.textContent=tx('songRingRetry');
+    spins[k].style.cursor='pointer';
+    spins[k].onclick=function(){songRingTap();};
+  }
+  var crow=document.querySelector('#genSongPending .gen-spin-cancel-row');
+  if(crow)crow.style.display='none';
 }
 function songProgHide(){
   songRingState='';
@@ -6418,50 +6488,47 @@ function songIcoBtn(label,svg,red){
   b.innerHTML=svg;b.setAttribute('aria-label',label);b.title=label;
   return b;
 }
-/* The "Creating..." placeholder cards shown while a song generation
-   runs — one per expected song (Suno / MusicAPI return 2, Magic Hour
-   / ACE Music return 1), in the same vertical stack the finished
-   cards will take over. Removed again if the generation fails. */
+/* The placeholder cards shown while a song generation runs — one
+   per expected song (Suno / MusicAPI return 2, Magic Hour / ACE
+   Music return 1), side by side in the same grid the finished
+   cover cards will take over (1 song = one big card, 2 songs =
+   two equal 50% cards). Each placeholder is a grey rounded square
+   carrying only the MovAi logo as its cover with the pink-orange
+   «C» spinner over it. Removed again if the generation fails. */
 function genSongPending(p){
   var box=document.getElementById('genResult');if(!box)return;
+  var wrap=document.createElement('div');
+  wrap.id='genSongPending';
   var grid=document.createElement('div');
-  grid.className='song-grid';grid.id='genSongPending';
-  var title=(document.getElementById('songTitle').value||'').trim();
+  grid.className='song-grid';
   var count=(p.id==='suno'||p.id==='musicapi')?2:1;
   for(var i=0;i<count;i++){
-    var n=i+1;
     var card=document.createElement('div');
-    card.className='hist-card song-card';
-    var prow=document.createElement('div');
-    prow.className='song-row';
-    prow.appendChild(songSolidCover(n,true));
-    var pmeta=document.createElement('div');
-    pmeta.className='song-meta';
-    var ptt=document.createElement('div');
-    ptt.className='song-title';
-    ptt.textContent=title||tx('songLabelFmt').replace('{n}',n);
-    pmeta.appendChild(ptt);
-    var psub=document.createElement('div');
-    psub.className='song-sub';
-    psub.textContent=tx('songLabelFmt').replace('{n}',n)+(p.name?(' · '+p.name):'')+' · '+tx('songCreating');
-    pmeta.appendChild(psub);
-    prow.appendChild(pmeta);
-    card.appendChild(prow);
-    /* The creation progress runs ON this card (owner order
-       2026-11-17): spinner + live % + seconds + bar, plus the
-       Cancel button — no separate progress box above. */
-    var prog=songCardProgBlock();
-    var cb=document.createElement('button');
-    cb.type='button';cb.className='scp-cancel';cb.textContent=tx('btnCancelGen');
-    cb.addEventListener('click',function(ev){ev.stopPropagation();genCancel();});
-    var pline=prog.querySelector('.scp-line');
-    if(pline)pline.appendChild(cb);
-    card.appendChild(prog);
+    card.className='hist-card song-card gen-spin-card';
+    card.setAttribute('role','status');
+    card.setAttribute('aria-label',tx('songCreating'));
+    /* While the song is being created the card shows ONE thing
+       only (owner order 2026-11-17, image 3): the MovAi logo as
+       its cover on a plain grey rounded square, with the circular
+       pink-orange «C» spinner turning over the logo — no title,
+       no %, no bar on the card. When the song lands, genShowSongs
+       replaces this card with the finished cover card at once. */
+    card.innerHTML='<div class="gen-spin-wrap"><span class="gen-spin-note"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg></span><span class="gen-spin-c" aria-hidden="true"></span></div><span class="gen-spin-name">MovAi</span>';
     grid.appendChild(card);
   }
+  wrap.appendChild(grid);
+  /* Cancel stays one shared button UNDER the cards (it cancels
+     the one running generation), so the cards themselves carry
+     nothing but the logo cover + spinner. */
+  var crow=document.createElement('div');
+  crow.className='gen-spin-cancel-row';
+  var cb=document.createElement('button');
+  cb.type='button';cb.className='gen-spin-cancel';cb.textContent=tx('btnCancelGen');
+  cb.addEventListener('click',function(ev){ev.stopPropagation();genCancel();});
+  crow.appendChild(cb);
+  wrap.appendChild(crow);
   box.innerHTML='';
-  box.appendChild(grid);
-  try{songCardProgPaint();}catch(e){}
+  box.appendChild(wrap);
   animWatchScan(box);
 }
 var genSongAudios=[];
@@ -6568,12 +6635,26 @@ function lastSongsRestore(){
   histCtxStamp();
   try{genShowSongs(j.songs,false,true);}catch(e){}
 }
+/* Marquee for a cover-card title (owner order 2026-11-17): when
+   the title is wider than its strip inside the cover, it scrolls
+   sideways until the end shows, jumps back to the start, and
+   scrolls again — endlessly. Short titles stay still. */
+function gccTitleMarquee(tt,ttIn){
+  if(!tt||!ttIn)return;
+  var diff=ttIn.scrollWidth-tt.clientWidth;
+  if(diff>4){
+    ttIn.style.setProperty('--mqx',(-(diff+8))+'px');
+    ttIn.style.setProperty('--mqdur',Math.max(3.5,Math.round(diff/38))+'s');
+    ttIn.classList.add('mq');
+  }
+}
 function genSongCard(song,n,it,title,prov,prompt,streaming){
   var u=song.url;
   mp3Warm(u);
   var card=document.createElement('div');
-  card.className='hist-card song-card';
-  /* ONE compact row: small cover · Play · title · duration · icons.
+  card.className='hist-card song-card gcc-card';
+  /* Cover card: the real cover fills the card, Play sits inside
+     the cover, the title lives inside the cover at the bottom.
      Player: this card's own Audio element, so each song plays on its
      own Play button; starting one card pauses the other result cards. */
   var au=new Audio();
@@ -6595,25 +6676,36 @@ function genSongCard(song,n,it,title,prov,prompt,streaming){
       pubMiniSet(au,au._miniIt,list);
     }catch(e){}
   });
-  var rowEl=document.createElement('div');
-  rowEl.className='song-row';
-  rowEl.appendChild(songCoverEl(song,n));
+  var coverWrap=document.createElement('div');
+  coverWrap.className='gcc-cover';
+  coverWrap.appendChild(songCoverEl(song,n));
   var play=document.createElement('button');
-  play.type='button';play.className='song-play';
+  play.type='button';play.className='song-play gcc-play';
   play.textContent='▶';play.setAttribute('aria-label',tx('histPlay'));
-  rowEl.appendChild(play);
-  var meta=document.createElement('div');
-  meta.className='song-meta';
+  coverWrap.appendChild(play);
+  /* Title strip INSIDE the cover, along its bottom (owner order
+     2026-11-17, image 3): the title on top — marquee-scrolling
+     when too long — and the Song n · provider · time line under
+     it, over a dark gradient so it stays readable on any cover. */
+  var strip=document.createElement('div');
+  strip.className='gcc-strip';
   var tt=document.createElement('div');
-  tt.className='song-title';
-  tt.textContent=title||tx('songLabelFmt').replace('{n}',n);
-  meta.appendChild(tt);
+  tt.className='gcc-title';
+  var ttIn=document.createElement('span');
+  ttIn.className='gcc-title-in';
+  ttIn.textContent=title||tx('songLabelFmt').replace('{n}',n);
+  tt.appendChild(ttIn);
+  strip.appendChild(tt);
   var sub=document.createElement('div');
-  sub.className='song-sub';
+  sub.className='gcc-sub';
   var time=document.createElement('span');
   time.textContent='0:00';
   sub.textContent=tx('songLabelFmt').replace('{n}',n)+(prov?(' · '+prov):'')+' · ';
   sub.appendChild(time);
+  var dur=document.createElement('span');
+  dur.textContent='0:00';
+  sub.appendChild(document.createTextNode(' / '));
+  sub.appendChild(dur);
   if(streaming){
     /* Suno preview: the song can be played already, but it is still
        being generated — say so on the card until the final render. */
@@ -6623,12 +6715,18 @@ function genSongCard(song,n,it,title,prov,prompt,streaming){
     bd.textContent=tx('songCreating');
     sub.appendChild(bd);
   }
-  meta.appendChild(sub);
-  rowEl.appendChild(meta);
-  var dur=document.createElement('span');
-  dur.className='song-dur';
-  dur.textContent='0:00';
-  rowEl.appendChild(dur);
+  strip.appendChild(sub);
+  coverWrap.appendChild(strip);
+  card.appendChild(coverWrap);
+  requestAnimationFrame(function(){gccTitleMarquee(tt,ttIn);});
+  var seek=document.createElement('input');
+  seek.type='range';seek.className='song-seek';seek.min='0';seek.max='1000';seek.value='0';
+  seek.setAttribute('aria-label','Seek');
+  card.appendChild(seek);
+  /* The action row keeps every existing function — Like, Download,
+     Share, Playlist, Post — under the cover, unchanged. */
+  var acts=document.createElement('div');
+  acts.className='gcc-acts';
   var lk=songIcoBtn(tx('histLike'),histHeartSvg(!!(it&&it.liked)));
   lk.classList.add('hist-like');
   if(it&&it.liked)lk.classList.add('liked');
@@ -6638,22 +6736,18 @@ function genSongCard(song,n,it,title,prov,prompt,streaming){
     var svg=lk.querySelector('svg');
     if(svg)svg.setAttribute('fill',on?'#ff2e88':'none');
   });
-  rowEl.appendChild(lk);
+  acts.appendChild(lk);
   var dl=songIcoBtn(tx('histDownload'),SONG_SVG_DL);
   dl.addEventListener('click',function(){genDownloadSong(u,n,title,dl);});
-  rowEl.appendChild(dl);
+  acts.appendChild(dl);
   var sh=songIcoBtn(tx('histShare'),SONG_SVG_SHARE);
   sh.addEventListener('click',function(){histShare(it||{type:'song',url:u,title:title,prompt:prompt},sh);});
-  rowEl.appendChild(sh);
-  rowEl.appendChild(plIcoBtn({url:u,title:(it&&it.title)||title||tx('songLabelFmt').replace('{n}',n),image:(song&&song.image)||'',name:''}));
+  acts.appendChild(sh);
+  acts.appendChild(plIcoBtn({url:u,title:(it&&it.title)||title||tx('songLabelFmt').replace('{n}',n),image:(song&&song.image)||'',name:''}));
   var pb=songIcoBtn(tx('pubPostBtn'),SONG_SVG_POST);
   pb.addEventListener('click',function(){pubOpenSheet(it||{type:'song',url:u,title:title,prompt:prompt});});
-  rowEl.appendChild(pb);
-  card.appendChild(rowEl);
-  var seek=document.createElement('input');
-  seek.type='range';seek.className='song-seek';seek.min='0';seek.max='1000';seek.value='0';
-  seek.setAttribute('aria-label','Seek');
-  card.appendChild(seek);
+  acts.appendChild(pb);
+  card.appendChild(acts);
   if(streaming){
     /* A streaming preview is still being created — the creation
        progress (% + seconds) runs on THIS card, not in a separate
@@ -8665,6 +8759,10 @@ function appSetView(v){
   var nv=(v==='create')?'create':'public';
   var changed=(APP_VIEW!==nv);
   APP_VIEW=nv;
+  /* The Create view shows no top header (owner order 2026-11-17):
+     body.view-create hides the logo frame, search bar and the
+     top-right buttons; they come back in the Public view. */
+  try{document.body.classList.toggle('view-create',nv==='create');}catch(e){}
   var onPub=(nv==='public');
   var pub=document.getElementById('page-public');
   var gen=document.getElementById('page-gen');
@@ -11497,12 +11595,11 @@ function acctNameHtml(u){
 }
 function profileIdRow(u){
   if(!u||!acctValidUserId(u.id))return '';
-  /* Two lines, so the Copy button can NEVER spill past the card or
-     the ☰ drawer edge (owner fix 2026-11-16): line 1 is the label +
-     the ID itself (the ID may ellipsis-shrink on very narrow
-     screens, it never pushes anything out), line 2 holds the small
-     Copy pill, right-aligned, entirely inside the card. */
-  return '<div style="margin-top:12px;background:rgba(140,150,170,.10);border:1px solid var(--line);border-radius:12px;padding:10px 13px"><div style="display:flex;align-items:center;gap:10px;min-width:0"><span style="font-size:0.8125rem;font-weight:800;color:var(--muted);flex:0 0 auto">'+escHtml(tx('profileUserId'))+'</span><b style="font-size:0.875rem;font-weight:900;letter-spacing:.05em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0">'+escHtml(u.id)+'</b></div><div style="display:flex;justify-content:flex-end;margin-top:8px"><button type="button" class="uid-copy" data-uid="'+escHtml(u.id)+'" onclick="profileCopyId(this)">'+escHtml(tx('profileCopy'))+'</button></div></div>';
+  /* Compact single line (owner order 2026-11-17): label + ID +
+     the small Copy pill on ONE row — no big box any more. The ID
+     may ellipsis-shrink on very narrow screens, so the Copy
+     button can never spill past the card or the ☰ drawer edge. */
+  return '<div style="display:flex;align-items:center;gap:8px;margin-top:10px"><span style="font-size:0.75rem;font-weight:800;color:var(--muted);flex:0 0 auto">'+escHtml(tx('profileUserId'))+'</span><b style="font-size:0.8125rem;font-weight:900;letter-spacing:.05em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0">'+escHtml(u.id)+'</b><button type="button" class="uid-copy" style="margin-left:auto" data-uid="'+escHtml(u.id)+'" onclick="profileCopyId(this)">'+escHtml(tx('profileCopy'))+'</button></div>';
 }
 /* The signed-in user's own IP shows in exactly TWO places (owner
    order 2026-11-16): as a row in the drawer's account / Profile box
@@ -11690,14 +11787,18 @@ function creditHistHtml(email){
        (charged / deducted) is red. */
     var c=pos?'#4ade80':'#f87171';
     var poolC=e.pool==='song'?'#ADDC29':'#b537f2';
-    var poolName=e.pool==='song'?tx('acctSongCredit'):tx('acctMediaCredit');
-    var when='';try{when=new Date(e.t).toLocaleString();}catch(err){}
-    h+='<div style="display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--line)">';
-    h+='<span style="font-weight:900;font-size:0.9375rem;color:'+c+';min-width:58px;font-variant-numeric:tabular-nums">'+(pos?'+':'−')+acctFmtBal(Math.abs(e.delta))+'</span>';
-    h+='<span style="flex:1;min-width:0"><span style="display:block;font-size:0.8125rem;font-weight:700;overflow-wrap:break-word">'+escHtml(creditHistLabel(e))+'</span>';
-    h+='<span style="display:block;font-size:0.6875rem;color:var(--muted);margin-top:1px">'+escHtml(when)+'</span></span>';
-    h+='<span style="text-align:right;flex:0 0 auto"><span style="display:block;font-size:0.6875rem;color:'+poolC+';font-weight:700">'+escHtml(poolName)+'</span>';
-    h+='<span style="display:block;font-size:0.6875rem;color:var(--muted);margin-top:1px">'+escHtml(tx('histBalanceAfter'))+' '+acctFmtBal(e.bal)+'</span></span>';
+    /* Short pool names ONLY (owner order 2026-11-17). */
+    var poolName=e.pool==='song'?'Song':'Image.Video';
+    /* Minimal rows ONLY (owner order 2026-11-17) — the same rule
+       as the bell notifications: green + / red − sign, amount,
+       short pool name and the date (17/11/2026). NO long labels
+       («Admin deducted credit», «Credit top-up · Admin/package»,
+       «Admin gift · New user bonus»…) and NO «Balance …» line. */
+    var when='';try{when=notifDateStr(e.t);}catch(err){}
+    h+='<div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--line)">';
+    h+='<span style="font-weight:900;font-size:0.875rem;color:'+c+';font-variant-numeric:tabular-nums">'+(pos?'+':'−')+acctFmtBal(Math.abs(e.delta))+'</span>';
+    h+='<span style="font-size:0.75rem;font-weight:700;color:'+poolC+'">'+escHtml(poolName)+'</span>';
+    if(when)h+='<span style="margin-left:auto;font-size:0.75rem;color:var(--muted);font-variant-numeric:tabular-nums;white-space:nowrap">'+escHtml(when)+'</span>';
     h+='</div>';
   });
   return h+'</div>';
@@ -12857,11 +12958,13 @@ function notifDefTitle(n){
   return tx('notifInfo');
 }
 function notifAmountLine(n){
+  /* Short pool names ONLY (owner order 2026-11-17): «+50
+     Image.Video» / «−300 Image.Video» / «+24 Song» — no «Credit»
+     word and no package name in the row. */
   var parts=[];
   var sign=(n.type==='deduct')?'−':'+';
-  if(n.media!=null&&n.media!==0)parts.push(sign+acctFmtBal(Math.abs(n.media))+' '+tx('acctMediaCredit'));
-  if(n.song!=null&&n.song!==0)parts.push(sign+acctFmtBal(Math.abs(n.song))+' '+tx('acctSongCredit'));
-  if(n.pkg)parts.push(n.pkg);
+  if(n.media!=null&&n.media!==0)parts.push(sign+acctFmtBal(Math.abs(n.media))+' Image.Video');
+  if(n.song!=null&&n.song!==0)parts.push(sign+acctFmtBal(Math.abs(n.song))+' Song');
   return parts.join(' · ');
 }
 function notifIcon(n){
@@ -12902,6 +13005,14 @@ function notifFullTimeStr(ts){
   /* Fallback: Phnom Penh is UTC+7 year-round (no DST). */
   var u=new Date(ts+7*3600000),p=function(x){return (x<10?'0':'')+x;};
   return p(u.getUTCDate())+'/'+p(u.getUTCMonth()+1)+'/'+u.getUTCFullYear()+' '+p(u.getUTCHours())+':'+p(u.getUTCMinutes())+':'+p(u.getUTCSeconds());
+}
+/* Date ONLY (owner order 2026-11-17): the minimal notification
+   rows and the Profile credit history show just day/month/year —
+   17/11/2026 — no clock time. Derived from notifFullTimeStr so
+   the Phnom Penh timezone handling stays identical. */
+function notifDateStr(ts){
+  var f=notifFullTimeStr(ts);
+  return f?f.split(' ')[0]:'';
 }
 /* ===== New device / New user cards: exactly 5 rows =====
    A notice is one of these cards when it is a sign-in notice
@@ -13063,30 +13174,28 @@ function notifPkgItemHtml(n,i){
   return h;
 }
 function notifItemHtml(n,i){
-  /* noIp is ALWAYS on (owner order 2026-11-16): no notification
-     card anywhere shows an IP row — the user's IP lives only in
-     the account / Profile box and the Settings box. */
-  if(notifIsDevCard(n))return notifDevItemHtml(n,i,true);
-  /* Purchase approved / rejected: the big clean package card —
-     name, price, Credit, nothing else (owner order 2026-11-16).
-     Falls back to the plain card when no package info exists. */
-  if(n.type==='approved'||n.type==='rejected'){
-    var pi=notifPkgInfo(n);
-    if(pi.name||pi.price||pi.credit)return notifPkgItemHtml(n,i);
-  }
-  var h='<button type="button" class="notif-item'+(n.read?'':' unread')+'" onclick="notifItemClick('+i+')">';
-  h+=notifIcon(n);
-  h+='<span class="notif-main"><span class="nt">'+escHtml(n.title||notifDefTitle(n))+'</span>';
-  if(n.body)h+='<span class="nb">'+escHtml(n.body)+'</span>';
+  /* Minimal rows ONLY (owner order 2026-11-17): one line per
+     notice — a green + sign when credit came IN, a red − sign
+     when credit went OUT, the amount with its short pool name
+     («+50 Image.Video» / «−300 Image.Video»), and the date
+     (17/11/2026). NO long titles («Admin deducted credits…»,
+     «Gift claimed»…), NO body text, NO «Balance …» line, NO
+     email / ID, NO «3 hr ago», NO full clock time. A notice
+     with no credit amount keeps just its icon + the short
+     default label + the date. Tap behaviour is unchanged
+     (notifItemClick: mark read + go to the place it is about). */
   var amt=notifAmountLine(n);
-  /* Owner rule 2026-11-16: credit OUT shows red, credit IN
-     shows green — in the bell just like in the History. */
-  if(amt){var amtC=(n.type==='deduct')?'#f87171':((n.type==='grant'||n.type==='gift'||n.type==='approved')?'#4ade80':'');h+='<span class="nb notif-amt"'+(amtC?' style="color:'+amtC+';font-weight:800"':'')+'>'+escHtml(amt)+'</span>';}
-  var t=notifTimeStr(n.ts);
-  if(t)h+='<span class="ntime">'+escHtml(t)+'</span>';
-  var ft=notifFullTimeStr(n.ts);
-  if(ft)h+='<span class="nfull">'+escHtml(ft)+'</span>';
-  h+='</span>';
+  var out=(n.type==='deduct');
+  var h='<button type="button" class="notif-item notif-mini'+(n.read?'':' unread')+'" onclick="notifItemClick('+i+')">';
+  if(amt){
+    h+='<span class="notif-sign '+(out?'out':'in')+'" aria-hidden="true">'+(out?'−':'+')+'</span>';
+    h+='<span class="notif-mini-amt" style="color:'+(out?'#f87171':'#4ade80')+'">'+escHtml(amt)+'</span>';
+  }else{
+    h+=notifIcon(n);
+    h+='<span class="notif-mini-label">'+escHtml(notifDefTitle(n))+'</span>';
+  }
+  var d=notifDateStr(n.ts);
+  if(d)h+='<span class="notif-mini-date">'+escHtml(d)+'</span>';
   if(!n.read)h+='<span class="notif-dot" aria-hidden="true"></span>';
   h+='</button>';
   return h;
@@ -13398,36 +13507,40 @@ function profileBalRow(kind,label,val){
   /* The balance row is a BUY button too (owner rule): tapping it —
      above all when the balance has run out — opens the Packages
      sheet on this pool's tab so the user can buy more Credit. */
-  return '<div role="button" tabindex="0" onclick="profileBuyCredits(\''+kind+'\')" style="display:flex;align-items:center;gap:9px;margin-top:10px;background:rgba(140,150,170,.10);border:1px solid var(--line);border-radius:12px;padding:11px 13px;cursor:pointer"><span style="width:11px;height:11px;border-radius:50%;flex:0 0 auto;background:'+c+';box-shadow:0 0 8px '+c+'"></span><span style="font-size:0.875rem;font-weight:700">'+escHtml(label)+'</span><b style="margin-left:auto;font-size:1.0625rem;font-weight:900;color:'+c+';font-variant-numeric:tabular-nums">'+acctFmtBal(val)+'</b><span style="font-size:0.6875rem;font-weight:800;color:var(--muted);white-space:nowrap">+ '+escHtml(tx('histBuyMore'))+'</span></div>';
+  /* Compact (owner order 2026-11-17): name + number ONLY — the
+     «+ Buy more» text is gone; tapping the row still opens the
+     Packages sheet on this pool's tab, exactly as before. */
+  return '<div role="button" tabindex="0" onclick="profileBuyCredits(\''+kind+'\')" style="display:flex;align-items:center;gap:8px;margin-top:8px;background:rgba(140,150,170,.10);border:1px solid var(--line);border-radius:12px;padding:8px 11px;cursor:pointer"><span style="width:9px;height:9px;border-radius:50%;flex:0 0 auto;background:'+c+';box-shadow:0 0 8px '+c+'"></span><span style="font-size:0.8125rem;font-weight:700">'+escHtml(label)+'</span><b style="margin-left:auto;font-size:0.9375rem;font-weight:900;color:'+c+';font-variant-numeric:tabular-nums">'+acctFmtBal(val)+'</b></div>';
 }
 function profileInfoRow(label,val){
-  return '<div style="display:flex;justify-content:space-between;gap:12px;padding:8px 0;border-bottom:1px solid var(--line)"><span style="font-size:0.8125rem;color:var(--muted);flex:0 0 auto">'+escHtml(label)+'</span><b style="font-size:0.8125rem;text-align:right;overflow-wrap:break-word;min-width:0">'+escHtml(val)+'</b></div>';
+  return '<div style="display:flex;justify-content:space-between;gap:12px;padding:6px 0;border-bottom:1px solid var(--line)"><span style="font-size:0.75rem;color:var(--muted);flex:0 0 auto">'+escHtml(label)+'</span><b style="font-size:0.75rem;text-align:right;overflow-wrap:break-word;min-width:0">'+escHtml(val)+'</b></div>';
 }
 /* Same row, but the value is already-safe HTML (used for the account
    name so plan holders get the .premium-name treatment there too). */
 function profileInfoRowHtml(label,valHtml){
-  return '<div style="display:flex;justify-content:space-between;gap:12px;padding:8px 0;border-bottom:1px solid var(--line)"><span style="font-size:0.8125rem;color:var(--muted);flex:0 0 auto">'+escHtml(label)+'</span><b style="font-size:0.8125rem;text-align:right;overflow-wrap:break-word;min-width:0">'+valHtml+'</b></div>';
+  return '<div style="display:flex;justify-content:space-between;gap:12px;padding:6px 0;border-bottom:1px solid var(--line)"><span style="font-size:0.75rem;color:var(--muted);flex:0 0 auto">'+escHtml(label)+'</span><b style="font-size:0.75rem;text-align:right;overflow-wrap:break-word;min-width:0">'+valHtml+'</b></div>';
 }
 function profileRender(){
   var u=acctCurrent();var body=document.getElementById('profileBody');if(!u||!body)return;
   var h='';
   var pic=acctPicture(u);
-  h+='<div style="display:flex;align-items:center;gap:14px">';
+  h+='<div style="display:flex;align-items:center;gap:10px">';
   h+='<span class="prof-pic-wrap"><span class="avatar-orb avatar-lg">'+(pic?'<img src="'+escHtml(pic)+'" alt="" referrerpolicy="no-referrer" style="width:100%;height:100%;border-radius:50%;object-fit:cover;display:block">':escHtml(acctInitial(u)))+'</span><button type="button" class="prof-pic-cam" onclick="profPicPick()" aria-label="'+escHtml(tx(pic?'profPicChange':'profPicUpload'))+'"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg></button></span>';
-  h+='<div style="min-width:0"><div style="font-size:1.125rem;font-weight:900;overflow-wrap:break-word">'+acctNameHtml(u)+'</div>';
-  h+='<div style="font-size:0.8125rem;color:var(--muted);overflow-wrap:break-word;margin-top:2px">'+escHtml(u.email)+'</div></div></div>';
+  h+='<div style="min-width:0"><div style="font-size:1rem;font-weight:900;overflow-wrap:break-word">'+acctNameHtml(u)+'</div>';
+  h+='<div style="font-size:0.75rem;color:var(--muted);overflow-wrap:break-word;margin-top:1px">'+escHtml(u.email)+'</div></div></div>';
   /* Profile picture: the Google photo arrives automatically; with
      no Google photo the user picks one from their phone here. A
      self-picked photo can be changed any time, and removed to go
-     back to the Google photo / initial. */
+     back to the Google photo / initial. The long explanatory
+     paragraph is GONE (owner order 2026-11-17) — only the small
+     «Change profile photo» button stays. */
   h+='<div class="prof-pic-btns"><button type="button" class="kbtn kbtn-white" onclick="profPicPick()">'+escHtml(tx(pic?'profPicChange':'profPicUpload'))+'</button>';
   if(u.customPicture)h+='<button type="button" class="kbtn kbtn-white" onclick="profPicRemove()">'+escHtml(tx('profPicRemove'))+'</button>';
   h+='</div>';
-  h+='<p style="font-size:0.75rem;color:var(--muted);line-height:1.6;margin-top:8px">'+escHtml(tx('profPicNote'))+'</p>';
-  h+='<p id="profPicMsg" style="font-size:0.8125rem;margin-top:6px;min-height:16px;line-height:1.5"></p>';
+  h+='<p id="profPicMsg" style="font-size:0.75rem;margin-top:4px;line-height:1.5"></p>';
   h+=profileIdRow(u);
-  h+='<div style="margin-top:16px;border-top:1px solid var(--line);padding-top:12px">';
-  h+='<div style="font-size:0.8125rem;font-weight:800;color:var(--muted)">'+escHtml(tx('profileBalance'))+'</div>';
+  h+='<div style="margin-top:12px;border-top:1px solid var(--line);padding-top:10px">';
+  h+='<div style="font-size:0.75rem;font-weight:800;color:var(--muted)">'+escHtml(tx('profileBalance'))+'</div>';
   h+=profileBalRow('song',tx('acctSongCredit'),u.songCredits);
   h+=profileBalRow('media',tx('acctMediaCredit'),u.credits);
   h+='</div>';
@@ -13436,11 +13549,11 @@ function profileRender(){
      top-ups / package approvals, Admin deductions — with the
      amount, the date and the balance after it. It belongs to the
      account, so it is here on log in, every time. */
-  h+='<div style="margin-top:16px;border-top:1px solid var(--line);padding-top:12px">';
-  h+='<div style="font-size:0.8125rem;font-weight:800;color:var(--muted)">'+escHtml(tx('histTitle'))+'</div>';
+  h+='<div style="margin-top:12px;border-top:1px solid var(--line);padding-top:10px">';
+  h+='<div style="font-size:0.75rem;font-weight:800;color:var(--muted)">'+escHtml(tx('histTitle'))+'</div>';
   h+=creditHistHtml(u.email);
   h+='</div>';
-  h+='<div style="margin-top:14px;border-top:1px solid var(--line);padding-top:6px">';
+  h+='<div style="margin-top:12px;border-top:1px solid var(--line);padding-top:4px">';
   h+=profileInfoRowHtml(tx('profileAccount'),acctNameHtml(u));
   h+=profileInfoRow(tx('profileEmail'),u.email);
   var plan=pkgGet();var pp=plan?pkgPlanById(plan.id):null;
@@ -13451,7 +13564,7 @@ function profileRender(){
   if(u.created)h+=profileInfoRow(tx('profileSince'),new Date(u.created).toLocaleDateString());
   h+='</div>';
   h+='<button type="button" class="prof-pkg-open" onclick="profileGoPackages()"><span>'+escHtml(tx('navPackages'))+'</span><span class="ppo-sub">'+escHtml(tx('navPackagesSub'))+'</span><span class="ppo-arrow" aria-hidden="true">›</span></button>';
-  h+='<button type="button" class="kbtn" style="margin-top:18px;width:100%;background:rgba(248,113,113,.10);color:#f87171;border:1px solid rgba(248,113,113,.45)" onclick="acctLogout()">'+escHtml(tx('acctLogout'))+'</button>';
+  h+='<button type="button" class="kbtn" style="margin-top:14px;width:100%;background:rgba(248,113,113,.10);color:#f87171;border:1px solid rgba(248,113,113,.45)" onclick="acctLogout()">'+escHtml(tx('acctLogout'))+'</button>';
   body.innerHTML=h;
 }
 /* Packages are NOT listed inside the profile sheet (owner rule):
@@ -13516,7 +13629,7 @@ function acctRenderUser(u){
   }
   h+=profileIdRow(u);
   h+='<div id="acctIpSlot">'+profileIpRowHtml(u)+'</div>';
-  h+='<div style="margin-top:12px"><span style="font-size:0.8125rem;font-weight:700">'+escHtml(tx('profileBalance'))+'</span>'+profileBalRow('song',tx('acctSongCredit'),u.songCredits)+profileBalRow('media',tx('acctMediaCredit'),u.credits)+'</div>';
+  h+='<div style="margin-top:10px"><span style="font-size:0.75rem;font-weight:700">'+escHtml(tx('profileBalance'))+'</span>'+profileBalRow('song',tx('acctSongCredit'),u.songCredits)+profileBalRow('media',tx('acctMediaCredit'),u.credits)+'</div>';
   var _plan=pkgGet();
   if(_plan){var _pp=pkgPlanById(_plan.id);h+='<p style="font-size:0.8125rem;margin-top:10px;font-weight:700;color:var(--accent-text);line-height:1.6">'+escHtml(tx('pkgYourPlan'))+': '+escHtml(_pp?loc(_pp.name):String(_plan.id))+' · '+escHtml(tx('pkgActiveUntil').replace('{d}',new Date(_plan.until).toLocaleDateString()))+'</p>';}
   /* No Magic Hour API key place in the ☰ drawer (owner order):
