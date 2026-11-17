@@ -1865,7 +1865,7 @@ function mvsepUsageList() {
 const MVSEP_CREATE_URL = 'https://mvsep.com/api/separation/create';
 const MVSEP_GET_URL = 'https://mvsep.com/api/separation/get';
 const MVSEP_SEP_TYPE = 20;
-const MVSEP_MODEL_OPT = 0; // htdemucs_ft
+const MVSEP_MODEL_OPT = 2; // htdemucs_6s — 6 stems: vocals, drums, bass, other, piano, guitar (owner asked for 6, not 4; 8 is not available in one MVSEP call)
 const MVSEP_POLL_INTERVAL_MS = 10000;
 const MVSEP_POLL_TIMEOUT_MS = 240000; // 4 min server-side; the Studio resumes longer jobs via /api/studio/separate/status
 const MVSEP_STEM_ORDER = ['vocals', 'drums', 'bass', 'other', 'piano', 'guitar'];
