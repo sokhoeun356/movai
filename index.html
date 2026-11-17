@@ -580,6 +580,24 @@ img.hist-media,.d3-preview{cursor:zoom-in}
 .mv-time{flex:0 0 auto;font-size:0.75rem;font-weight:700;color:rgba(255,255,255,.85);font-variant-numeric:tabular-nums;white-space:nowrap}
 .mv-note{padding:0 14px 10px;background:#0b0c0e;font-size:0.75rem;color:rgba(255,255,255,.55);line-height:1.5}
 .mv-note:empty{display:none}
+/* Timed transcript under the video (owner order 2026-11-17):
+   the proof panel — every lyric line with the exact second
+   it is sung, the line being sung highlighted in step with
+   the words inside the video. Screen-only evidence: it is
+   never drawn into Export Video. */
+.mv-transcript{background:#0b0c0e;border-top:1px solid rgba(255,255,255,.09);display:flex;flex-direction:column;flex:0 1 auto;max-height:34vh;min-height:0}
+.mv-transcript[hidden]{display:none}
+.mv-tr-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;padding:8px 14px 4px}
+.mv-tr-title{font-size:0.78rem;font-weight:800;color:rgba(255,255,255,.88);line-height:1.5}
+.mv-tr-hint{font-size:0.68rem;color:rgba(255,255,255,.45);line-height:1.5;margin-top:1px}
+.mv-tr-toggle{flex:0 0 auto;background:rgba(255,255,255,.08);color:rgba(255,255,255,.85);border:1px solid rgba(255,255,255,.14);border-radius:8px;width:30px;height:30px;font-size:0.8rem;cursor:pointer}
+.mv-transcript.closed .mv-tr-list{display:none}
+.mv-tr-list{position:relative;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:2px 8px 10px;min-height:0}
+.mv-tr-row{display:flex;gap:10px;align-items:flex-start;width:100%;text-align:left;background:transparent;border:0;border-radius:8px;padding:6px 8px;cursor:pointer;color:rgba(255,255,255,.60);font:inherit}
+.mv-tr-time{flex:0 0 auto;min-width:86px;font-size:0.72rem;font-weight:700;font-variant-numeric:tabular-nums;color:rgba(255,255,255,.45);padding-top:3px;white-space:nowrap}
+.mv-tr-text{font-size:0.85rem;line-height:1.55;overflow-wrap:break-word;min-width:0}
+.mv-tr-row.on{background:rgba(255,255,255,.12);color:#fff}
+.mv-tr-row.on .mv-tr-time{color:#ffd34d}
 /* Auto background: the MovAi logo / cover sits CENTRED and fitted
    whole inside the stage (contain — never cropped); a blurred copy
    of the same picture (NOT darkened — no black shadow behind the
@@ -2759,6 +2777,16 @@ main{padding-top:calc(3.75rem + env(safe-area-inset-top,0px))}
     <button type="button" class="mv-cbtn" id="mvOptBtn" aria-label="MV options"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3.2"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33h0a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51h0a1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82v0a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></button>
     <button type="button" class="mv-cbtn" id="mvCloseBtn" aria-label="Close">✕</button>
   </div>
+  <div class="mv-transcript" id="mvTranscript" hidden>
+    <div class="mv-tr-head">
+      <div>
+        <div class="mv-tr-title" data-i18n="mvTrTitle">🎧 Transcript · អត្ថបទតាមពេលច្រៀង</div>
+        <div class="mv-tr-hint" data-i18n="mvTrHint">បន្ទាត់នីមួយៗមានវិនាទីដែលគេច្រៀងពិត — ចុចលើបន្ទាត់ ដើម្បីលោតទៅវិនាទីនោះ</div>
+      </div>
+      <button type="button" class="mv-tr-toggle" id="mvTrToggle" aria-label="Transcript">▾</button>
+    </div>
+    <div class="mv-tr-list" id="mvTrList"></div>
+  </div>
 </div>
 <div id="pkgSheet" class="pkg-sheet" style="display:none" role="dialog" aria-modal="true" onclick="if(event.target===this)pkgSheetClose()">
   <div class="pkg-sheet-card">
@@ -3258,7 +3286,7 @@ km:{
  histEmptyStory:'មិនទាន់មាន Story ទេ — Story ដែលអ្នកបង្កើតនឹងរក្សាទុកនៅទីនេះជាប់រហូត',
  mvBtn:'MV',mvFormat:'ទម្រង់អេក្រង់ · Screen format',mvFmtPortrait:'បញ្ឈរ',mvFmtLandscape:'ផ្ដេក',mvFmtSquare:'ការ៉េ',mvFmtWide:'ធំទូលាយ',
  mvBg:'ផ្ទៃខាងក្រោយ · Background',mvBgAuto:'អូតូ',mvBgUpload:'Upload វីដេអូ / រូបភាព',mvBgAutoNote:'អូតូ — ប្រើរូប cover របស់បទ ឬផ្ទៃ MovAi ដែលបង្កើតឲ្យ',
- mvLyricsLbl:'អត្ថបទចម្រៀង · Lyrics',mvLyricsHave:'មានអត្ថបទរួច — អក្សរនឹងរត់តាមពេលច្រៀង (karaoke)',mvLyricsNone:'បទនេះមិនទាន់មានអត្ថបទទេ — ឲ្យ AI ស្ដាប់ហើយសរសេរឲ្យ',
+ mvLyricsLbl:'អត្ថបទចម្រៀង · Lyrics',mvLyricsHave:'មានអត្ថបទរួច — អក្សរនឹងរត់តាមពេលច្រៀង (karaoke)',mvLyricsNone:'បទនេះមិនទាន់មានអត្ថបទទេ — ឲ្យ AI ស្ដាប់ហើយសរសេរឲ្យ',mvTrTitle:'🎧 Transcript · អត្ថបទតាមពេលច្រៀង',mvTrHint:'បន្ទាត់នីមួយៗមានវិនាទីដែលគេច្រៀងពិត — ចុចលើបន្ទាត់ ដើម្បីលោតទៅវិនាទីនោះ',
  mvAiBtn:'AI ស្ដាប់ + សរសេរអត្ថបទ',mvAiBusy:'AI កំពុងស្ដាប់… {s} វិនាទី',mvAiDone:'AI សរសេរអត្ថបទរួចរាល់ ✓',mvAiFail:'AI ស្ដាប់មិនបានទេ — server អាចមិនទាន់មានមុខងារនេះ ឬអ៊ីនធឺណិតមានបញ្ហា។ សូមព្យាយាមម្ដងទៀត',
  mvTrLabel:'បកប្រែអត្ថបទទៅ (បើចង់)',mvTrNone:'អត់បកប្រែ',mvTrBusy:'កំពុងបកប្រែអត្ថបទ…',mvTrFail:'បកប្រែមិនបាន — បង្ហាញអត្ថបទដើមវិញ',
  mvStart:'ចាប់ផ្ដើម MV',mvNoSong:'រកបទចម្រៀងមិនឃើញទេ',
@@ -3487,7 +3515,7 @@ en:{
  histEmptyStory:'No stories yet — stories you create will be saved here permanently',
  mvBtn:'MV',mvFormat:'Screen format',mvFmtPortrait:'Portrait',mvFmtLandscape:'Landscape',mvFmtSquare:'Square',mvFmtWide:'Ultra-wide',
  mvBg:'Background',mvBgAuto:'Auto',mvBgUpload:'Upload video / image',mvBgAutoNote:'Auto — uses the song cover, or a generated MovAi backdrop',
- mvLyricsLbl:'Lyrics',mvLyricsHave:'Lyrics found — they will run karaoke-style with the singing',mvLyricsNone:'This song has no lyrics yet — let AI listen and write them',
+ mvLyricsLbl:'Lyrics',mvLyricsHave:'Lyrics found — they will run karaoke-style with the singing',mvLyricsNone:'This song has no lyrics yet — let AI listen and write them',mvTrTitle:'🎧 Transcript · lyrics by sung time',mvTrHint:'Every line carries the exact second it is sung — tap a line to jump to that second',
  mvAiBtn:'AI listen + write lyrics',mvAiBusy:'AI is listening… {s}s',mvAiDone:'AI wrote the lyrics ✓',mvAiFail:'AI could not listen — the server may not have this feature yet, or the connection failed. Please try again',
  mvTrLabel:'Translate lyrics to (optional)',mvTrNone:'No translation',mvTrBusy:'Translating lyrics…',mvTrFail:'Translation failed — showing the original lyrics',
  mvStart:'Start MV',mvNoSong:'Song not found',
@@ -17130,6 +17158,45 @@ function mvResolveAudioUrl(song,cb){
    when a translation language is picked: the lines then carry
    a translation in that language. The reply's lines keep the
    language actually sung — no translation is ever forced. */
+/* ===== Vocables are NOT lyrics (owner order 2026-11-17, latest) =====
+   The owner's rule, from the very first section of the song:
+   when the singer only goes «oh-oh» (អូហូ) at the entrance,
+   they have NOT started singing — that sound is just their
+   way in, not a lyric, and it must never be counted as one.
+   So a timed segment whose whole text is nothing but
+   non-word sounds (oh / ooh / ah / mm / la… or Khmer
+   អូហូ / អូ / អា / ឡា…) is dropped here, before it can ever
+   reach the screen; and a run of those sounds at the START
+   of a real line is trimmed off the line's word timings, so
+   the line's start becomes the first REAL word's mouth-open,
+   not the entrance hum. Only whole-line / leading runs are
+   touched — a vocable inside a real line stays. */
+var MV_VOC_KM=['អូហូ','អើយ','អ៊ឺ','ហ៊ឺម','ហ៊ឺ','អូ','អ៊ូ','អា','ហូ','ឡា','ណា'];
+function mvVocKm(s){
+  var guard=0;
+  while(s.length&&guard++<120){
+    var hit='';
+    for(var i=0;i<MV_VOC_KM.length;i++){if(s.indexOf(MV_VOC_KM[i])===0){hit=MV_VOC_KM[i];break;}}
+    if(!hit)return false;
+    s=s.slice(hit.length);
+  }
+  return s.length===0;
+}
+function mvVocTok(t){
+  var s=String(t||'');
+  var km=s.replace(/[^\u1780-\u17FF]/g,'');
+  var la=s.toLowerCase().replace(/[^a-z]/g,'');
+  if(!km&&!la)return true; /* punctuation / space only: nothing */
+  if(km&&!la)return mvVocKm(km);
+  if(la&&!km)return /^(o+h+|oo+h*|a+h+|u+h+|e+h+|m+|h+m+|la+|na+|da+|doo+|wh+oa+h*|woa+h+)$/.test(la);
+  return false; /* mixed scripts: a real word, keep it */
+}
+function mvVocLine(text){
+  var toks=String(text||'').split(/[\s\u200B]+/).filter(function(x){return x.length;});
+  if(!toks.length)return false;
+  for(var i=0;i<toks.length;i++)if(!mvVocTok(toks[i]))return false;
+  return true;
+}
 function mvNormLines(j){
   if(!j)return null;
   var arr=j.lines||j.lyrics||j.segments||j.result||null;
@@ -17143,6 +17210,9 @@ function mvNormLines(j){
     var it=arr[i]||{};
     var text=String(it.text||it.line||it.lyric||'').replace(/^\s+|\s+$/g,'');
     if(!text)continue;
+    /* Entrance sounds only («oh oh oh», «អូហូ…»): NOT a lyric
+       line — never shown, never counted (see mvVocLine). */
+    if(mvVocLine(text))continue;
     var ws=null;
     var rawW=it.words||it.wordTimings||it.tokens;
     if(Array.isArray(rawW)&&rawW.length){
@@ -17157,8 +17227,24 @@ function mvNormLines(j){
       }
       if(!ws.length)ws=null;
     }
+    /* A run of entrance sounds at the head of the word list
+       («oh oh …» before the first real word) is trimmed, and
+       the line start moves to the first REAL word — the line
+       must not appear while the singer is only humming in. */
+    var fStart=(typeof it.start==='number'&&isFinite(it.start))?it.start:null;
+    if(ws&&ws.length>2){
+      var trimN=0;
+      while(trimN<ws.length-1&&mvVocTok(ws[trimN].t))trimN++;
+      if(trimN>=2){
+        var wsN=ws.length;
+        ws=ws.slice(trimN);
+        if(fStart===null||fStart<ws[0].start)fStart=ws[0].start;
+        var tk=text.split(/\s+/).filter(function(x){return x.length;});
+        if(tk.length===wsN)text=ws.map(function(w){return w.t;}).join(' ');
+      }
+    }
     out.push({text:text,
-      start:(typeof it.start==='number'&&isFinite(it.start))?it.start:null,
+      start:fStart,
       end:(typeof it.end==='number'&&isFinite(it.end))?it.end:null,
       tr:it.translation?String(it.translation):'',words:ws});
   }
@@ -17357,6 +17443,7 @@ function mvApplyLines(lines,timed){
   mvPrepLines(lines);
   mvVoiceReset();
   mvState.lines=lines;mvState.timed=!!timed;mvState.curLine=-2;mvState.curDisp='';mvState.kar=null;
+  mvTrRender();
   mvSyncLyrics(true);
   /* Precise listen: decode the real audio, find the exact
      second every mouth-open happens, and snap these lines +
@@ -17907,8 +17994,8 @@ function mvRafKick(){if(!mvRaf)mvRaf=requestAnimationFrame(mvRafLoop);}
    - ALL of this state is PER SONG: mvApplyLines resets it, so
      nothing learned on one song (noise floor, onsets) leaks
      into another song's MV — every song is followed fresh. */
-var mvVoice={avail:false,raw:false,on:false,level:0,floor:0.02,offDur:9,onsetT:-10,lastMainT:-1,zeroT:0};
-function mvVoiceReset(){mvVoice.avail=false;mvVoice.raw=false;mvVoice.on=false;mvVoice.level=0;mvVoice.floor=0.02;mvVoice.offDur=9;mvVoice.onsetT=-10;mvVoice.lastMainT=-1;mvVoice.zeroT=0;}
+var mvVoice={avail:false,raw:false,on:false,level:0,floor:0.02,offDur:9,onsetT:-10,phraseT:-10,lastMainT:-1,zeroT:0};
+function mvVoiceReset(){mvVoice.avail=false;mvVoice.raw=false;mvVoice.on=false;mvVoice.level=0;mvVoice.floor=0.02;mvVoice.offDur=9;mvVoice.onsetT=-10;mvVoice.phraseT=-10;mvVoice.lastMainT=-1;mvVoice.zeroT=0;}
 function mvVoiceStep(){
   if(!mvAudio)return;
   var mt=mvAudio.currentTime||0;
@@ -17941,6 +18028,11 @@ function mvVoiceStep(){
   var raw=v>th;
   if(raw){
     if(!mvVoice.raw&&mvVoice.offDur>=0.22)mvVoice.onsetT=mt;
+    /* A mouth-open after a real breath (>= 0.45 s of quiet)
+       is a PHRASE start: a new line can only begin there.
+       Any shorter blip — one «oh» of the entrance hum, a
+       mid-line breath — never moves a line. */
+    if(!mvVoice.raw&&mvVoice.offDur>=0.45)mvVoice.phraseT=mt;
     mvVoice.offDur=0;mvVoice.on=true;
   }else{
     mvVoice.offDur+=dt;
@@ -18111,7 +18203,7 @@ function mvKarBuild(line,idx){
     cum+=tok.length;
   }
   var win=mvKarWindow(idx);
-  var kar={tops:tops,start:win.start,end:win.end,idx:idx,vp:0,lastT:-1,mode:'gate'};
+  var kar={tops:tops,start:win.start,end:win.end,idx:idx,vp:0,lastT:-1,vt:-1,wpT:-1,mode:'gate'};
   if(line.words&&line.words.length&&tops.length){
     /* Word timings present: every display token gets its own
        [ts,te] slice of the word timeline, so it lights at the
@@ -18131,12 +18223,28 @@ function mvKarPaint(){
   var t=mvAudio.currentTime||0;
   var i,w,f;
   if(k.mode==='words'){
-    /* Each token fills across its OWN word window — the
-       colour reaches exactly the word being sung, part-way
-       through that word included. */
+    /* Voice-gated like the plain sweep (owner order
+       2026-11-17, latest): the colour follows a SUNG clock
+       that advances only while the voice is actually heard.
+       The singer stops — the colour stops dead with them,
+       even mid-word; the voice returns — the clock catches
+       up to the word being sung. Without a live analyser it
+       is plain time, exactly as before. Each token then
+       fills across its OWN word window — the colour reaches
+       exactly the word being sung, part-way through that
+       word included. */
+    if(typeof k.vt!=='number'||k.vt<0||Math.abs(t-k.vt)>1.5)k.vt=t;
+    else{
+      var dt2=t-(typeof k.wpT==='number'&&k.wpT>=0?k.wpT:t);
+      if(dt2<0)dt2=0;if(dt2>0.25)dt2=0.25;
+      if(mvVoice.avail&&!mvVoice.on){/* singer silent: sung clock frozen */}
+      else if(mvVoice.avail){k.vt+=dt2+Math.max(0,t-k.vt)*0.18;if(k.vt>t)k.vt=t;}
+      else k.vt=t;
+    }
+    k.wpT=t;
     for(i=0;i<k.tops.length;i++){
       w=k.tops[i];
-      f=(typeof w.ts==='number')?((t-w.ts)/((w.te-w.ts)||0.2)):0;
+      f=(typeof w.ts==='number')?((k.vt-w.ts)/((w.te-w.ts)||0.2)):0;
       if(f<0)f=0;if(f>1)f=1;
       f=Math.round(f*200)/200;
       if(f===w.f)continue;
@@ -18181,6 +18289,65 @@ function mvKarPaint(){
     w.el.style.width=(f*100)+'%';
   }
 }
+/* ===== Timed transcript — the proof under the video (owner
+   order 2026-11-17, latest) =====
+   The owner does not trust the sync until they can SEE the
+   evidence: under the video (never inside it, never in
+   Export Video) sits the full transcript — every lyric line
+   with the exact second it is sung, counted ONLY from real
+   sung words: the entrance «oh-oh» is not a line and never
+   appears here (mvVocLine dropped it), so the first row is
+   the first line the singer actually sings. The row being
+   sung is highlighted by the SAME decision that puts the
+   words on the video (mvSyncLyrics calls mvTrSync with the
+   line it is showing, or -1 when the video shows nothing),
+   so the proof below and the words inside the video always
+   move together. Tapping a row jumps the song to that
+   line's second and plays, so any line can be checked
+   against the voice on the spot. Rows are rebuilt whenever
+   lines are applied and again after the precise listen
+   (mvAlignLines) refines the times. */
+var mvTrCur=-2;
+function mvTrRender(){
+  var panel=document.getElementById('mvTranscript'),list=document.getElementById('mvTrList');
+  if(!panel||!list)return;
+  var lines=mvState.lines;
+  if(!mvState.timed||!lines||!lines.length){panel.hidden=true;list.innerHTML='';mvTrCur=-2;return;}
+  panel.hidden=false;
+  list.innerHTML='';
+  mvTrCur=-2;
+  lines.forEach(function(L,i){
+    var s=(typeof L._s==='number')?L._s:L.start;
+    var e=(typeof L._e==='number')?L._e:L.end;
+    var row=document.createElement('button');
+    row.type='button';row.className='mv-tr-row';
+    var tm=document.createElement('span');tm.className='mv-tr-time';
+    tm.textContent=(typeof s==='number'?histFmtTime(s):'–')+((typeof s==='number'&&typeof e==='number'&&e>s)?' – '+histFmtTime(e):'');
+    var txEl=document.createElement('span');txEl.className='mv-tr-text';txEl.textContent=L.text||'';
+    row.appendChild(tm);row.appendChild(txEl);
+    row.addEventListener('click',function(){
+      if(!mvAudio||typeof s!=='number')return;
+      try{mvAudio.currentTime=Math.max(0,s);}catch(e2){}
+      mvPauseOthers();
+      var pr=mvAudio.play();if(pr&&pr.catch)pr.catch(function(){});
+      mvState.curDisp='';mvSyncLyrics(true);mvSyncBtns();
+    });
+    list.appendChild(row);
+  });
+}
+function mvTrSync(idx){
+  if(idx===mvTrCur)return;
+  mvTrCur=idx;
+  var list=document.getElementById('mvTrList');
+  if(!list)return;
+  var rows=list.children;
+  for(var i=0;i<rows.length;i++)rows[i].classList.toggle('on',i===idx);
+  if(idx>=0&&rows[idx]){
+    var r=rows[idx],lt=list.scrollTop,lb=lt+list.clientHeight,rt=r.offsetTop,rb=rt+r.offsetHeight;
+    if(rt<lt)list.scrollTop=Math.max(0,rt-4);
+    else if(rb>lb)list.scrollTop=rb-list.clientHeight+4;
+  }
+}
 function mvSyncLyrics(force){
   var box=document.getElementById('mvLyrics');
   if(!box)return;
@@ -18213,7 +18380,7 @@ function mvSyncLyrics(force){
       var nxS=(typeof lines[idx+1]._s==='number')?lines[idx+1]._s:lines[idx+1].start;
       if(typeof nxS==='number'&&nxS>t){
         if(mvState.curLine===idx+1&&rawT<nxS+0.3)idx=idx+1;
-        else if(nxS-t<=1.0&&mvVoice.onsetT>=0&&rawT-mvVoice.onsetT<=0.55){
+        else if(nxS-t<=1.0&&mvVoice.phraseT>=0&&rawT-mvVoice.phraseT<=0.55){
           var curE=(typeof lines[idx]._e==='number')?lines[idx]._e:lines[idx].end;
           if(typeof curE!=='number'||rawT>=curE-1.2)idx=idx+1;
         }
@@ -18237,7 +18404,7 @@ function mvSyncLyrics(force){
        missed detection can never hide the words for good. */
     if(!gap&&mvVoice.avail&&!mvVoice.on&&mvState.curLine!==idx){
       var myS=(typeof lines[idx]._s==='number')?lines[idx]._s:lines[idx].start;
-      if(typeof myS==='number'&&rawT>=myS&&rawT<myS+0.9&&mvVoice.onsetT<myS-1.1)hold=true;
+      if(typeof myS==='number'&&rawT>=myS&&rawT<myS+0.9&&mvVoice.phraseT<myS-0.15)hold=true;
     }
   }
   var dispKey=idx+'|'+(gap?'g':(hold?'h':''));
@@ -18251,7 +18418,7 @@ function mvSyncLyrics(force){
   var showText=idx>=0&&!gap&&!hold;
   var stgB=document.getElementById('mvStage');
   if(stgB)stgB.classList.toggle('mv-brand-off',showText);
-  if(!showText){mvState.kar=null;mvMoodLine(null);return;}
+  if(!showText){mvState.kar=null;mvMoodLine(null);mvTrSync(-1);return;}
   mvMoodLine(lines[idx]);
   /* ONLY the line being sung right now — centred, shown in
      full as a ghost with the karaoke sweep running over it,
@@ -18276,6 +18443,7 @@ function mvSyncLyrics(force){
     more.className='mv-more';more.textContent='… បន្ត · more';
     box.appendChild(more);
   }
+  mvTrSync(idx);
   mvKarPaint();
 }
 function mvTogglePlay(){
@@ -18381,7 +18549,7 @@ function mvAlignCompute(buf){
   var sorted=env.slice().sort();
   var p20=sorted[Math.floor(frames*0.20)]||0,p90=sorted[Math.floor(frames*0.90)]||0;
   var th=Math.max(p20*1.7,p20+(p90-p20)*0.16,0.004);
-  var onsets=[],offRun=1e9,on=false;
+  var onsets=[],phrases=[],offRun=1e9,on=false;
   for(f=0;f<frames;f++){
     if(env[f]>th){
       if(!on&&offRun>=12){
@@ -18390,12 +18558,22 @@ function mvAlignCompute(buf){
            ticks and one-frame spikes never become onsets. */
         var cnt2=0,q;
         for(q=f;q<Math.min(frames,f+6);q++)if(env[q]>th)cnt2++;
-        if(cnt2>=4)onsets.push(f*hop/sr);
+        if(cnt2>=4){
+          var ot=f*hop/sr;
+          onsets.push(ot);
+          /* An onset that follows a real breath (at least
+             0.45 s of quiet in the vocal band) is a PHRASE
+             start — the moment the singer opens their mouth
+             for a new line. Lyric lines begin at phrase
+             starts, not at mid-line word onsets, so line
+             starts anchor to these (see mvAlignLines). */
+          if(offRun*hop/sr>=0.45)phrases.push(ot);
+        }
       }
       on=true;offRun=0;
     }else{on=false;offRun++;}
   }
-  return {sr:sr,hopSec:hop/sr,env:env,th:th,onsets:onsets,dur:buf.duration};
+  return {sr:sr,hopSec:hop/sr,env:env,th:th,onsets:onsets,phrases:phrases,dur:buf.duration};
 }
 function mvAlignNearest(ons,t,lo,hi){
   var best=null,bd=Infinity;
@@ -18411,17 +18589,32 @@ function mvAlignNearest(ons,t,lo,hi){
 function mvAlignLines(lines,data){
   if(!lines||!data||!data.onsets||!data.onsets.length)return;
   var ons=data.onsets,i,L;
-  /* 1) Snap every line START to the real mouth-open second:
-     the onset nearest the stamp, searched a little before
-     it (stamps run early) and a little after, never crossing
-     the previous line or the next line's stamp. */
+  /* 1) Snap every line START to the real mouth-open second.
+     A lyric line begins where the singer opens their mouth
+     after a breath — a PHRASE start — so the nearest phrase
+     start wins, searched over a wide window (stamps can sit
+     seconds off the singing, which is how a line showed
+     while another line was being sung). Mid-line onsets are
+     only the fallback when no phrase start is near. The
+     search never crosses the previous line or the next
+     line's stamp. Entrance humming («oh-oh») is its own
+     phrase, but it carries no lyric line (mvVocLine dropped
+     it), so no line can snap onto it: the first line snaps
+     to the phrase where real words start. */
   var prevS=-Infinity;
   for(i=0;i<lines.length;i++){
     L=lines[i];
     if(typeof L._s!=='number')continue;
     var nx=(i<lines.length-1)?((typeof lines[i+1]._s==='number')?lines[i+1]._s:lines[i+1].start):null;
-    var hi=(typeof nx==='number')?Math.min(L._s+0.8,nx-0.12):L._s+0.8;
-    var o=mvAlignNearest(ons,L._s,Math.max(prevS+0.05,L._s-0.5),hi);
+    var o=null;
+    if(data.phrases&&data.phrases.length){
+      var pHi=(typeof nx==='number')?Math.min(L._s+2.2,nx-0.12):L._s+2.2;
+      o=mvAlignNearest(data.phrases,L._s,Math.max(prevS+0.05,L._s-2.2),pHi);
+    }
+    if(o===null){
+      var hi=(typeof nx==='number')?Math.min(L._s+0.8,nx-0.12):L._s+0.8;
+      o=mvAlignNearest(ons,L._s,Math.max(prevS+0.05,L._s-0.5),hi);
+    }
     if(o!==null&&o>prevS)L._s=o;
     prevS=L._s;
   }
@@ -18500,7 +18693,7 @@ function mvAlignKick(lines){
   mvAlignFor(url).then(function(data){
     if(!data)return;
     try{mvAlignLines(lines,data);}catch(e){return;}
-    if(mvState.lines===lines)mvSyncLyrics(true);
+    if(mvState.lines===lines){mvTrRender();mvSyncLyrics(true);}
   });
 }
 /* ===== Export MV as a video file (owner order 2026-11-17) =====
@@ -19249,6 +19442,12 @@ function mvMuxMp4(vSamp,aSamp,vInf,aInf){
   var exb=document.getElementById('mvExpBtn');if(exb)exb.addEventListener('click',mvExportToggle);
   var ob=document.getElementById('mvOptBtn');if(ob)ob.addEventListener('click',mvOpenSetup);
   var cl=document.getElementById('mvCloseBtn');if(cl)cl.addEventListener('click',mvCloseView);
+  var tt2=document.getElementById('mvTrToggle');
+  if(tt2)tt2.addEventListener('click',function(){
+    var p=document.getElementById('mvTranscript');if(!p)return;
+    var closed=p.classList.toggle('closed');
+    tt2.textContent=closed?'▸':'▾';
+  });
   window.addEventListener('resize',function(){
     var v=document.getElementById('mvView');
     if(v&&v.style.display!=='none'){mvFitStage();mvFitTitle();}
