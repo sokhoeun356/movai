@@ -1952,7 +1952,11 @@ async function mvsepCreateSeparation(keyValue, audioUrl) {
   fd.append('output_format', '0');
   fd.append('is_demo', '0');
   const r = await fetch(MVSEP_CREATE_URL, { method: 'POST', body: fd, headers: { 'User-Agent': 'MovAi/1.0 (https://movai-1.onrender.com)' }, signal: AbortSignal.timeout(120000) });
-  const j = await r.json().catch(() => null);
+  const rawBody = await r.text().catch(() => '');
+  let j = null; try { j = JSON.parse(rawBody); } catch (_) { j = null; }
+  // DEBUG (temporary): log the raw MVSEP create response so a bare 400
+  // can be diagnosed. The api_token is NEVER logged.
+  try { console.log('[mvsep-create] status=' + r.status + ' body=' + String(rawBody).slice(0, 500)); } catch (_) {}
   const text = mvsepErrText(j) || ('HTTP ' + r.status);
   if (r.status === 429 || (j && j.success === false && mvsepIsLimitText(text))) throw mvsepQuotaErr(text, r.status);
   if (r.status === 401 || r.status === 403) throw rotErr('MVSEP: invalid API key (HTTP ' + r.status + ')', r.status);
