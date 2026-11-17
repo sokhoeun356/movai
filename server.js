@@ -4305,7 +4305,36 @@ function apiRoute(req, res, urlPath) {
     if (/api_secret mismatch|invalid api key|unauthorized|invalid signature/i.test(m)) return 'auth';
     if (/quota|credit|exceed.*plan|rate limit|too many requests/i.test(m)) return 'quota';
     if (/404|410|not found|gone|forbidden|403/i.test(m)) return 'gone';
+    // Large file: Cloudinary accepts the upload but finishes it in the
+    // background ("Resource is too large to process synchronously,
+    // processing in background"). The asset WILL exist at the public_id
+    // we chose, so this is NOT a failure — the caller waits for it.
+    if (/too large.*process.*synchronously|processing in background/i.test(m)) return 'async';
+    if (/already exists|public_id.*exist/i.test(m)) return 'exists';
     return 'other';
+  }
+  // Deterministic public_id for a source URL, so the SAME song URL is
+  // always stored under the SAME asset (no duplicate large uploads, and
+  // the MP3 URL is known even when Cloudinary finishes the upload in
+  // the background). Hash only — never the URL itself (it holds a
+  // signed query string).
+  function cloudinaryPublicIdForUrl(u) {
+    const h = require('crypto').createHash('sha256').update(String(u)).digest('hex').slice(0, 24);
+    return 'movai/songs/' + h;
+  }
+  // Wait until a Cloudinary video asset exists (background processing
+  // done) — poll the Admin API, up to `ms` total. Returns true when the
+  // asset is visible, false on timeout.
+  async function cloudinaryWaitForAsset(c, publicId, ms) {
+    const deadline = Date.now() + ms;
+    while (Date.now() < deadline) {
+      try {
+        const r = await c.api.resource(publicId, { resource_type: 'video' });
+        if (r && r.public_id) return true;
+      } catch (e) { /* not ready yet */ }
+      await new Promise((r) => setTimeout(r, 3000));
+    }
+    return false;
   }
   // Mark an admin account exhausted/invalid in the data file (the env
   // account is not stored, so it is only logged). Never throws.
@@ -4355,7 +4384,8 @@ function apiRoute(req, res, urlPath) {
             const c = cloudinaryConfigFor(a);
             if (!c) continue;
             memLog('cloudinary-upload ' + (a.label || a.cloudName) + ' attempt ' + attempt + ' ' + String(u).slice(0, 60));
-            const res = await c.uploader.upload(u, { resource_type: 'video', folder: 'movai/songs' });
+            const detId = cloudinaryPublicIdForUrl(u);
+            const res = await c.uploader.upload(u, { resource_type: 'video', public_id: detId, overwrite: false });
             const publicId = res && res.public_id;
             if (!publicId) continue;
             const mp3Url = cloudinaryMp3UrlFor(a, publicId, title);
@@ -4366,6 +4396,20 @@ function apiRoute(req, res, urlPath) {
             const msg = String((e && e.message) || e);
             const kind = cloudinaryClassifyUploadError(msg);
             console.error('[cloudinary] upload via ' + (a.label || a.cloudName) + ' attempt ' + attempt + ' failed (' + kind + '):', msg.slice(0, 200));
+            if (kind === 'exists') {
+              // Asset already stored under our deterministic public_id.
+              const mp3Url = cloudinaryMp3UrlFor(a, cloudinaryPublicIdForUrl(u), title);
+              if (mp3Url) { cloudinaryClearAccountMarks(a); return { publicId: cloudinaryPublicIdForUrl(u), mp3Url, accountId: a.id, accountLabel: a.label || a.cloudName }; }
+            }
+            if (kind === 'async') {
+              // Background processing: wait for the asset, then hand back
+              // its MP3 URL. Do NOT mark the account (nothing is wrong).
+              const detId = cloudinaryPublicIdForUrl(u);
+              const ready = await cloudinaryWaitForAsset(c, detId, 25000);
+              const mp3Url = cloudinaryMp3UrlFor(a, detId, title);
+              if (mp3Url && ready) { cloudinaryClearAccountMarks(a); return { publicId: detId, mp3Url, accountId: a.id, accountLabel: a.label || a.cloudName }; }
+              if (mp3Url) { cloudinaryClearAccountMarks(a); return { publicId: detId, mp3Url, accountId: a.id, accountLabel: a.label || a.cloudName }; }
+            }
             if (kind === 'gone') return 'gone';
             if (kind === 'quota') { cloudinaryMarkAccount(a, 'quota', msg); break; }
             if (kind === 'auth') { cloudinaryMarkAccount(a, 'auth', msg); break; }
