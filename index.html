@@ -1906,12 +1906,13 @@ html[data-smooth="1"] .brand-frame,html[data-smooth="1"] .acct-chip,html[data-sm
   </div>
 </div>
 <input type="file" id="profPicInput" accept="image/*" style="display:none" onchange="profPicPicked(this)">
-<div id="giftSheet" class="pkg-sheet" style="display:none" role="dialog" aria-modal="true">
+<div id="giftSheet" class="pkg-sheet" style="display:none" role="dialog" aria-modal="true" onclick="if(event.target===this)giftDismiss()">
   <div class="pkg-sheet-card" style="text-align:center">
     <div style="font-size:3rem;line-height:1.1" aria-hidden="true">🎁</div>
     <h3 style="font-size:1.25rem;font-weight:900;margin-top:12px" data-i18n="giftTitle">កាដូពី Admin</h3>
     <p style="font-size:0.9375rem;line-height:1.75;margin-top:10px" data-i18n="giftBody">Free 250 Image.Video Credit + 24 Song Credit សម្រាប់អ្នកប្រើថ្មី</p>
     <button type="button" class="kbtn kbtn-black" style="margin-top:20px;width:100%" onclick="giftClaim()" data-i18n="giftClaim">ទទួលយក · Claim</button>
+    <button type="button" class="kbtn kbtn-white" style="margin-top:10px;width:100%" onclick="giftDismiss()" data-i18n="giftNotNow">មិនបាច់ទេ · Not now</button>
   </div>
 </div>
 <div id="pushSheet" class="pkg-sheet" style="display:none" role="dialog" aria-modal="true" onclick="if(event.target===this)pushAskDismiss()">
@@ -2134,7 +2135,7 @@ km:{
  pubDlFreeLeft:'ទាញយកបទដោយសេរី · Unlimited downloads',
  pubDlLimit:'អ្នកបានប្រើអស់ការទាញយកហ្វ្រី {p} 2 ដងហើយ — សូមទិញកញ្ចប់បទចម្រៀង ដើម្បីទាញយកបន្ត',
  acctGotFree:'អបអរសាទរ! អ្នកទទួលបាន Credit ហ្វ្រី — Image.Video Credit 250 និង Song Credit 24 ក្នុងគណនីរបស់អ្នកហើយ',
- giftTitle:'កាដូពី Admin',giftBody:'Free 250 Image.Video Credit + 24 Song Credit សម្រាប់អ្នកប្រើថ្មី',giftClaim:'ទទួលយក · Claim',blockedTitle:'គណនីនេះត្រូវបានប្លុក · This account is blocked',blockedBody:'គណនី / IP / ឧបករណ៍នេះត្រូវបាន Admin ប្លុក — អ្នកចូលប្រើ ឬបង្កើតអ្វីមិនបានទេ។ បើចង់ដោះស្រាយ សូមទាក់ទង Admin។',blockedContact:'ទាក់ទង Admin តាម Telegram',blockedLogout:'ចេញពីគណនី · Log out',
+ giftTitle:'កាដូពី Admin',giftBody:'Free 250 Image.Video Credit + 24 Song Credit សម្រាប់អ្នកប្រើថ្មី',giftClaim:'ទទួលយក · Claim',giftNotNow:'មិនបាច់ទេ · Not now',blockedTitle:'គណនីនេះត្រូវបានប្លុក · This account is blocked',blockedBody:'គណនី / IP / ឧបករណ៍នេះត្រូវបាន Admin ប្លុក — អ្នកចូលប្រើ ឬបង្កើតអ្វីមិនបានទេ។ បើចង់ដោះស្រាយ សូមទាក់ទង Admin។',blockedContact:'ទាក់ទង Admin តាម Telegram',blockedLogout:'ចេញពីគណនី · Log out',
  navNotif:'ដំណឹង',notifTitle:'ដំណឹង · Notifications',notifEmpty:'មិនទាន់មានដំណឹងទេ',notifGuest:'សូម Log in ដើម្បីមើលដំណឹងរបស់អ្នក',notifLoading:'កំពុងផ្ទុក…',notifJustNow:'ទើបតែឥឡូវនេះ',notifMinAgo:'{n} នាទីមុន',notifHourAgo:'{n} ម៉ោងមុន',notifDayAgo:'{n} ថ្ងៃមុន',notifApproved:'កញ្ចប់របស់អ្នកត្រូវបានអនុម័ត ✓',notifRejected:'កញ្ចប់របស់អ្នកត្រូវបានបដិសេធ',notifLogin:'មានអ្នកប្រើថ្មី Log in',notifRequest:'មានសំណើទិញកញ្ចប់ថ្មី',notifGrant:'Admin បានបន្ថែម Credit ឲ្យអ្នក',notifDeduct:'Admin បានកាត់ Credit របស់អ្នក',notifInfo:'ដំណឹងពី MovAi',notifPost:'បានផុសថ្មីទៅ Public',notifGenCharge:'បានកាត់ Credit ពីការបង្កើត',notifGenRefund:'បានសង Credit វិញ · បង្កើតមិនបាន',
  pushAskTitle:'បើកដំណឹងពីទូរស័ព្ទ?',pushAskBody:'ទទួលដំណឹងពិតៗចេញពីទូរស័ព្ទរបស់អ្នកផ្ទាល់ — ពេលកញ្ចប់ត្រូវបានអនុម័ត ពេល Admin បន្ថែម ឬកាត់ Credit និងពេលមានកាដូ — ទោះបីអ្នកមិនបានបើក website ក៏ដោយ',pushAllow:'បើកដំណឹង · Enable',pushNotNow:'មិនបាច់ទេ · Not now',pushSetLabel:'ដំណឹងពីទូរស័ព្ទ · Push notifications',pushStateOn:'បើកហើយ — ដំណឹងនឹងលោតលើទូរស័ព្ទរបស់អ្នក',pushStateOff:'បិទ — បើកដើម្បីទទួលដំណឹងលើទូរស័ព្ទ',pushStateBlocked:'Browser បានបិទដំណឹងឲ្យ website នេះ — សូមបើក Notification ក្នុង Settings របស់ browser',pushStateUnsupported:'Browser នេះមិនគាំទ្រ Web Push ទេ',pushStateGuest:'សូម Log in ជាមុនសិន',pushBlockedTitle:'Browser បានបិទដំណឹង · Notifications blocked',pushBlockedBody:'អ្នកធ្លាប់ចុច «Block» ពីមុន ទើប browser លែងលោតសួរ «Allow ឬអត់» ទៀត ហើយ website ក៏សុំសិទ្ធិឡើងវិញអត់បានដែរ។ សូមបើកវាដោយខ្លួនឯងតាមជំហានខាងក្រោម — មិនដល់ ១ នាទីទេ៖',pushBlockedStep1:'ចុចរូបសោ 🔒 នៅខាងឆ្វេងអាសយដ្ឋាន website នេះ លើ address bar ខាងលើ',pushBlockedStep2:'ចុច «Site settings» (ការកំណត់គេហទំព័រ)',pushBlockedStep3:'ចុច «Notifications» (ដំណឹង) រួចជ្រើស «Allow» (អនុញ្ញាត)',pushBlockedStep4:'ត្រឡប់មក website នេះវិញ រួចបើក switch «Push notifications» ម្ដងទៀត — វានឹងដំណើរការភ្លាម',pushBlockedAlt:'រករូបសោ 🔒 អត់ឃើញ? ចុច ⋮ (ចំណុច ៣ នៅខាងលើស្ដាំនៃ browser) → Settings → Site settings → Notifications → រក website នេះក្នុងបញ្ជី «Blocked» → Allow',pushBlockedDone:'ខ្ញុំបើករួចហើយ · I turned it on',pushBlockedClose:'បិទ · Close',pushBlockedStill:'នៅតែ Block នៅឡើយ — សូមពិនិត្យជំហានខាងលើម្ដងទៀត',
  acctErrFill:'សូមបំពេញឲ្យគ្រប់ — អ៊ីមែលត្រូវមាន @ ហើយពាក្យសម្ងាត់យ៉ាងតិច 4 តួ',
@@ -2362,7 +2363,7 @@ en:{
  pubDlFreeLeft:'Unlimited song downloads',
  pubDlLimit:'You have used your 2 free {p} downloads — please buy a Song package to keep downloading',
  acctGotFree:'Welcome! You received free credits — 250 Image.Video Credit and 24 Song Credit in your account',
- giftTitle:'A Gift from Admin',giftBody:'Free 250 Image.Video Credit + 24 Song Credit for new users',giftClaim:'Claim · ទទួលយក',blockedTitle:'This account is blocked · គណនីនេះត្រូវបានប្លុក',blockedBody:'This account / IP / device has been blocked by the Admin — you cannot log in or create anything. To resolve this, contact the Admin.',blockedContact:'Contact Admin on Telegram',blockedLogout:'Log out · ចេញពីគណនី',
+ giftTitle:'A Gift from Admin',giftBody:'Free 250 Image.Video Credit + 24 Song Credit for new users',giftClaim:'Claim · ទទួលយក',giftNotNow:'Not now · មិនបាច់ទេ',blockedTitle:'This account is blocked · គណនីនេះត្រូវបានប្លុក',blockedBody:'This account / IP / device has been blocked by the Admin — you cannot log in or create anything. To resolve this, contact the Admin.',blockedContact:'Contact Admin on Telegram',blockedLogout:'Log out · ចេញពីគណនី',
  navNotif:'Notifications',notifTitle:'Notifications · ដំណឹង',notifEmpty:'No notifications yet',notifGuest:'Log in to see your notifications',notifLoading:'Loading…',notifJustNow:'Just now',notifMinAgo:'{n} min ago',notifHourAgo:'{n} hr ago',notifDayAgo:'{n} days ago',notifApproved:'Your package was approved ✓',notifRejected:'Your package was rejected',notifLogin:'New user signed in',notifRequest:'New package purchase request',notifGrant:'Admin added credits to your account',notifDeduct:'Admin deducted credits from your account',notifInfo:'MovAi notification',notifPost:'New post on Public',notifGenCharge:'Credit charged for a creation',notifGenRefund:'Credit refunded · creation failed',
  pushAskTitle:'Turn on phone notifications?',pushAskBody:'Get real alerts on your phone — when a package is approved, when Admin adds or deducts credits, and when a gift arrives — even when the website is closed',pushAllow:'Enable · បើកដំណឹង',pushNotNow:'Not now · មិនបាច់ទេ',pushSetLabel:'Push notifications · ដំណឹងពីទូរស័ព្ទ',pushStateOn:'On — alerts will pop up on your phone',pushStateOff:'Off — turn on to get alerts on your phone',pushStateBlocked:'This browser has blocked notifications for this site — allow Notifications in the browser settings',pushStateUnsupported:'This browser does not support Web Push',pushStateGuest:'Log in first',pushBlockedTitle:'Notifications blocked · Browser បានបិទដំណឹង',pushBlockedBody:'You tapped "Block" before, so the browser no longer shows the "Allow?" prompt — and the website cannot ask again. Turn it back on yourself with the steps below; it takes under a minute:',pushBlockedStep1:'Tap the 🔒 lock icon at the left end of the address bar at the top',pushBlockedStep2:'Tap "Site settings"',pushBlockedStep3:'Tap "Notifications", then choose "Allow"',pushBlockedStep4:'Come back to this website and turn the "Push notifications" switch on again — it will work right away',pushBlockedAlt:'Cannot find the 🔒? Tap ⋮ (the 3 dots at the top right of the browser) → Settings → Site settings → Notifications → find this site under "Blocked" → Allow',pushBlockedDone:'I turned it on · ខ្ញុំបើករួចហើយ',pushBlockedClose:'Close · បិទ',pushBlockedStill:'Still blocked — please check the steps above once more',
  acctErrFill:'Please fill everything — email must contain @ and password at least 4 characters',
@@ -5882,6 +5883,9 @@ function histOnAccountChange(){
   try{if(plAudio){plAudio.pause();plAudioUrl=null;}}catch(e){}
   histMigrateLegacy();
   histRender();
+  /* History sync (owner order 2026-11-17): after a sign-in, pull
+     the server copy for this Gmail so old creations appear here. */
+  try{histSyncPull();}catch(e){}
   try{plRender();plSyncSaveBtns();}catch(e){}
   /* The Create results are per-account too: a sign in / out
      clears the previous account's restored results (and stops
@@ -5909,13 +5913,98 @@ function histSaveTo(key,a){
   for(var v=0;v<variants.length;v++){
     var arr=variants[v];
     while(arr.length){
-      try{localStorage.setItem(key,JSON.stringify(arr));return true;}
+      try{localStorage.setItem(key,JSON.stringify(arr));histSyncPushFor(key);return true;}
       catch(e){arr=arr.slice(0,arr.length-1);}
     }
   }
   return false;
 }
 function histGetFrom(key){try{var a=JSON.parse(localStorage.getItem(key)||'[]');return Array.isArray(a)?a:[];}catch(e){return[];}}
+/* ===== History sync — ONE Gmail, ONE History, EVERYWHERE =====
+   Owner order 2026-11-17: a creation must be saved on the SERVER
+   tied to the Gmail, not only in this phone's localStorage — so the
+   SAME Gmail shows ALL old creations on ANY device / country, and
+   there is only ONE account, never two. The server holds the shared
+   copy; each device MERGES (union by id) so nothing is ever lost
+   by overwriting. Guests (no Gmail) keep local-only History. */
+var histSyncTimer=null, histSyncPulling=false, histSyncApplying=false, histSyncPending={};
+function histSyncEmail(){
+  var em='';try{em=(localStorage.getItem('movai-session')||'').trim().toLowerCase();}catch(e){}
+  return em;
+}
+function histSyncKey(it){
+  if(!it||typeof it!=='object')return '';
+  if(it.id)return 'id:'+it.id;
+  if(it.src)return 'src:'+it.src;
+  if(it.url)return 'url:'+it.url;
+  return '';
+}
+function histSyncMerge(a,b){
+  var map={}, out=[];
+  var all=(a||[]).concat(b||[]);
+  for(var i=0;i<all.length;i++){
+    var it=all[i];var k=histSyncKey(it);if(!k)continue;
+    var prev=map[k];
+    if(!prev||(it.ts||0)>(prev.ts||0))map[k]=it;
+  }
+  for(var key in map)out.push(map[key]);
+  out.sort(function(x,y){return (y.ts||0)-(x.ts||0);});
+  return out.slice(0,300);
+}
+function histSyncStrip(items){
+  return (items||[]).map(function(it){
+    var c={};for(var k in it){if(k!=='thumb')c[k]=it[k];}return c;
+  });
+}
+function histSyncPull(){
+  var em=histSyncEmail();if(!em||histSyncPulling)return;
+  histSyncPulling=true;
+  fetch(GEN_API+'/public/history?email='+encodeURIComponent(em))
+    .then(function(r){return r.json();})
+    .then(function(j){
+      histSyncPulling=false;
+      if(!j||!j.ok||!Array.isArray(j.items))return;
+      var local=histGet();
+      var merged=histSyncMerge(local,j.items);
+      if(JSON.stringify(merged)!==JSON.stringify(local)){
+        histSyncApplying=true;
+        try{histSaveTo(histKey(),merged);}catch(e){}
+        histSyncApplying=false;
+        try{histRender();}catch(e){}
+        /* Local had items the server lacked — push the merged
+           copy up so the other devices get them too. */
+        if(merged.length>j.items.length)histSyncPushFor(histKey());
+      }
+    })
+    .catch(function(){histSyncPulling=false;});
+}
+function histSyncPushFor(key){
+  if(histSyncApplying)return;
+  var em=String(key||'').replace(/^movai-history-/,'');
+  if(!em||em==='guest')return;
+  histSyncPending[em]=true;
+  if(histSyncTimer)clearTimeout(histSyncTimer);
+  histSyncTimer=setTimeout(function(){
+    histSyncTimer=null;
+    var emails=Object.keys(histSyncPending);histSyncPending={};
+    emails.forEach(function(em2){
+      var items=histSyncStrip(histGetFrom('movai-history-'+em2));
+      fetch(GEN_API+'/public/history',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:em2,items:items})})
+        .then(function(r){return r.json();})
+        .then(function(j){
+          if(!j||!j.ok||!Array.isArray(j.items))return;
+          var local=histGetFrom('movai-history-'+em2);
+          var merged=histSyncMerge(local,j.items);
+          if(JSON.stringify(merged)!==JSON.stringify(local)){
+            histSyncApplying=true;
+            try{histSaveTo('movai-history-'+em2,merged);}catch(e){}
+            histSyncApplying=false;
+            if(em2===histSyncEmail()){try{histRender();}catch(e){}}
+          }
+        }).catch(function(){});
+    });
+  },2000);
+}
 function histAdd(item){
   histAddTo(item,histKey());
 }
@@ -11276,14 +11365,14 @@ function verifyTokenFromUrl(){
    offered again (after the same delay) on the next app open. */
 var giftTimer=null;
 function giftSchedule(){
-  if(giftTimer)return;
+  if(giftTimer||giftDismissedSession)return;
   var u=null;try{u=acctCurrent();}catch(e){}
   if(!u||!u.giftPending)return;
   giftTimer=setTimeout(function(){giftTimer=null;giftShow();},7000);
 }
 function giftShow(){
   var u=null;try{u=acctCurrent();}catch(e){}
-  if(!u||!u.giftPending)return;
+  if(!u||!u.giftPending||giftDismissedSession)return;
   /* The mandatory name gate always comes first — the gift popup
      never stacks on top of it; it is offered again after the
      name is saved (nameGateSave calls giftSchedule). */
@@ -11301,6 +11390,19 @@ function giftClaim(){
   acctRender();
   acctSyncGiftFlag=true;
   acctAdminSync();
+}
+/* «មិនបាច់ទេ · Not now»: close the gift popup WITHOUT claiming.
+   The gift is NOT lost — giftPending stays true, so the popup is
+   offered again on the next app open (same as closing the app
+   before claiming). Dismissing only hides it for THIS session so
+   it never blocks Play / Download. Without this, the popup had
+   no close button at all and its overlay intercepted every tap —
+   the user could not play or download anything while it was up. */
+var giftDismissedSession=false;
+function giftDismiss(){
+  if(giftTimer){clearTimeout(giftTimer);giftTimer=null;}
+  giftDismissedSession=true;
+  var s=document.getElementById('giftSheet');if(s)sheetHideAnim(s);
 }
 /* ===== Web Push · ដំណឹងចេញពីទូរស័ព្ទ (the phone's own notifications) =====
    Separate from Telegram: these alerts arrive through Web Push and
@@ -13049,6 +13151,9 @@ function genInit(){
   storyUpdateTotal();
   try{histMigrateLegacy();}catch(e){}
   histRender();
+  /* History sync (owner order 2026-11-17): pull the server copy
+     for this Gmail so old creations show on ANY device. */
+  try{histSyncPull();}catch(e){}
   d3SetProvider('hunyuan3d');
   uiInit();
   try{verifyTokenFromUrl();}catch(e){}
