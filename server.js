@@ -957,6 +957,39 @@ function getEmailTransporter() {
     return emailTransporter;
   } catch (e) { return null; }
 }
+// Brevo send counter (server-side, for the live usage display).
+// A Restricted Brevo key (Transactional email — All) can SEND email but
+// cannot read Brevo's account/statistics APIs (403), so the usage
+// endpoint cannot rely on Brevo's statistics. Instead the server counts
+// every successful Brevo send itself, per day (Phnom Penh), persisted to
+// brevo-usage.json so it survives restarts. This counts exactly the
+// emails MovAi sends through Brevo (the only use of this Brevo account).
+const BREVO_USAGE_FILE = path.join(DATA_DIR, 'brevo-usage.json');
+let _brevoUsage = null;
+function brevoUsageLoad() {
+  if (_brevoUsage && typeof _brevoUsage === 'object') return _brevoUsage;
+  try { const j = JSON.parse(fs.readFileSync(BREVO_USAGE_FILE, 'utf8')); if (j && typeof j === 'object' && typeof j.date === 'string') { _brevoUsage = j; return _brevoUsage; } } catch (e) {}
+  _brevoUsage = { date: '', sent: 0 };
+  return _brevoUsage;
+}
+function brevoUsageSave() {
+  try { fs.mkdirSync(DATA_DIR, { recursive: true }); fs.writeFileSync(BREVO_USAGE_FILE, JSON.stringify(_brevoUsage, null, 2)); ghPersistFile(BREVO_USAGE_FILE); } catch (e) {}
+}
+function brevoUsageRecordSent() {
+  try {
+    const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Phnom_Penh' });
+    const u = brevoUsageLoad();
+    if (u.date !== today) { u.date = today; u.sent = 0; }
+    u.sent = (Number(u.sent) || 0) + 1;
+    brevoUsageSave();
+  } catch (e) {}
+}
+function brevoUsageToday() {
+  const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Phnom_Penh' });
+  const u = brevoUsageLoad();
+  if (u.date !== today) { u.date = today; u.sent = 0; }
+  return { date: today, sent: Number(u.sent) || 0 };
+}
 // Brevo HTTPS email API (replaces Gmail SMTP, which is blocked from
 // Render — all SMTP ports time out). Brevo sends over HTTPS (port
 // 443), so it works from Render. Free tier: 300 emails/day. The API
@@ -988,6 +1021,7 @@ async function sendViaBrevo(toEmail, fromEmail, subject, html, text) {
       const t = await r.text().catch(() => '');
       return { ok: false, error: 'Brevo error ' + r.status + ': ' + String(t).slice(0, 200) };
     }
+    brevoUsageRecordSent();
     return { ok: true };
   } catch (e) {
     clearTimeout(timer);
@@ -3677,23 +3711,22 @@ function apiRoute(req, res, urlPath) {
         const timer = setTimeout(() => { try { ctrl.abort(); } catch (e) {} }, 15000);
         // Today's date in Phnom Penh (the user's day) for the report.
         const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Phnom_Penh' });
-        const [accR, repR] = await Promise.all([
-          fetch('https://api.brevo.com/v3/account', { headers: { 'api-key': apiKey, 'Accept': 'application/json' }, signal: ctrl.signal }),
-          fetch('https://api.brevo.com/v3/smtp/statistics/aggregatedReport?startDate=' + today + '&endDate=' + today, { headers: { 'api-key': apiKey, 'Accept': 'application/json' }, signal: ctrl.signal }),
-        ]);
+        // Plan name from Brevo's account API when the key allows it
+        // (a Restricted key may 403 here — fall back to 'Free').
+        let planName = 'Free';
+        try {
+          const accR = await fetch('https://api.brevo.com/v3/account', { headers: { 'api-key': apiKey, 'Accept': 'application/json' }, signal: ctrl.signal });
+          if (accR.ok) {
+            const acc = await accR.json().catch(() => ({}));
+            const planType = (acc && Array.isArray(acc.plan) && acc.plan[0] && typeof acc.plan[0].type === 'string') ? acc.plan[0].type : 'free';
+            planName = planType.toLowerCase().includes('free') ? 'Free' : planType;
+          }
+        } catch (e) {}
         clearTimeout(timer);
-        if (!accR.ok) {
-          const t = await accR.text().catch(() => '');
-          return sendJSON(res, 200, { ok: false, error: 'Brevo error ' + accR.status + ': ' + String(t).slice(0, 200) });
-        }
-        const acc = await accR.json().catch(() => ({}));
-        let usedToday = 0;
-        if (repR.ok) {
-          const rep = await repR.json().catch(() => ({}));
-          usedToday = Number(rep.requests) || 0;
-        }
-        const planType = (acc && Array.isArray(acc.plan) && acc.plan[0] && typeof acc.plan[0].type === 'string') ? acc.plan[0].type : 'free';
-        const planName = planType.toLowerCase().includes('free') ? 'Free' : planType;
+        // Used today comes from the server's own send counter (see
+        // brevoUsageToday) — a Restricted key cannot read Brevo's
+        // statistics API, so Brevo's numbers are not used here.
+        const usedToday = brevoUsageToday().sent;
         const dailyLimit = 300;
         return sendJSON(res, 200, { ok: true, provider: 'brevo', plan: planName, dailyLimit, usedToday, remainingToday: Math.max(0, dailyLimit - usedToday), date: today });
       } catch (e) {
