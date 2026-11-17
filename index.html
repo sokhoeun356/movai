@@ -4506,6 +4506,50 @@ function songPkgGet(){
   try{var p=JSON.parse(localStorage.getItem('movai-song-plan')||'null');if(p&&p.until&&p.until>Date.now())return p;}catch(e){}
   return null;
 }
+/* ===== Plan expiry → automatic return to Free (owner order
+   2026-11-17) =====
+   The getters above already treat a plan whose `until` has passed
+   as no plan, but the expired copy itself stayed stored on the
+   account record and in the localStorage mirrors, and a page left
+   open kept showing the Pro state it had already rendered. This
+   sweep makes the return to Free real and automatic: the moment
+   now passes plan.until / songPlan.until, the expired plan is
+   REMOVED from the account record and from both mirrors (the
+   account is back to its original Free form, not just displayed
+   that way), and every surface that shows Free/Pro — My Profile,
+   the ☰ drawer account box, the Packages status line and the
+   song package cards — re-renders at once. It runs when the app
+   opens, on every account / profile render, when Packages opens,
+   and on a 30-second timer, so an open page flips to Free by
+   itself at expiry without a reload. */
+function planActive(p){return !!(p&&p.until&&p.until>Date.now());}
+var planSweepBusy=false;
+function planExpireSweep(){
+  if(planSweepBusy)return false;
+  var changed=false;
+  try{
+    var u=(typeof acctCurrent==='function')?acctCurrent():null;
+    if(u&&u.email&&typeof acctUsersGet==='function'){
+      var us=acctUsersGet();var rec=us?us[u.email]:null;
+      if(rec){
+        if(rec.plan&&!planActive(rec.plan)){delete rec.plan;changed=true;}
+        if(rec.songPlan&&!planActive(rec.songPlan)){delete rec.songPlan;changed=true;}
+        if(changed)acctUsersSave(us);
+      }
+    }
+    var keys=['movai-plan','movai-song-plan'];
+    for(var i=0;i<keys.length;i++){
+      try{var p=JSON.parse(localStorage.getItem(keys[i])||'null');if(p&&!planActive(p)){localStorage.removeItem(keys[i]);changed=true;}}catch(e){}
+    }
+  }catch(e){}
+  if(changed){
+    planSweepBusy=true;
+    try{balRenderAll();}catch(e){}
+    try{songPkgRender();}catch(e){}
+    planSweepBusy=false;
+  }
+  return changed;
+}
 function songPkgRender(){
   var grid=document.getElementById('songPkgGrid');if(!grid)return;
   var plan=songPkgGet();
@@ -8295,6 +8339,7 @@ function pkgPopScheduleNext(){
   },7000);
 }
 function packagesShow(){
+  try{planExpireSweep();}catch(e){}
   var p=document.getElementById('page-packages');
   /* A manual open (drawer / dock / Profile / locked-model notice)
      always shows the FULL panel — clear any single-package filter
@@ -11931,8 +11976,10 @@ function acctApplyServerData(data){
   if(sc!==null&&!giftHold){var sv=Math.max(0,Math.floor(sc));if(rec.songCredits!==sv){try{creditHistSyncDelta(rec.email,'song',sv-rec.songCredits,sv);}catch(e){}rec.songCredits=sv;changed=true;}}
   var sp=acctSyncPlanCopy(srv.plan);
   if(sp&&(sp.until>Date.now())){rec.plan=sp;try{localStorage.setItem('movai-plan',JSON.stringify({id:sp.id,until:sp.until,email:rec.email}));}catch(e){}changed=true;}
+  else if(sp&&sp.id){/* Server reports this plan already expired — drop the local copy too, so the account returns to Free everywhere. */if(rec.plan){delete rec.plan;changed=true;}try{localStorage.removeItem('movai-plan');}catch(e){}}
   var ssp=acctSyncPlanCopy(srv.songPlan);
   if(ssp&&(ssp.until>Date.now())){rec.songPlan=ssp;try{localStorage.setItem('movai-song-plan',JSON.stringify({id:ssp.id,until:ssp.until,email:rec.email}));}catch(e){}changed=true;}
+  else if(ssp&&ssp.id){if(rec.songPlan){delete rec.songPlan;changed=true;}try{localStorage.removeItem('movai-song-plan');}catch(e){}}
   /* Every balance surface re-renders at the server's number at
      the same moment — header, Profile, drawer, Create, Packages. */
   if(changed){acctUsersSave(us);try{balRenderAll();}catch(e){}}
@@ -13523,6 +13570,7 @@ function profileInfoRowHtml(label,valHtml){
   return '<div style="display:flex;justify-content:space-between;gap:12px;padding:6px 0;border-bottom:1px solid var(--line)"><span style="font-size:0.75rem;color:var(--muted);flex:0 0 auto">'+escHtml(label)+'</span><b style="font-size:0.75rem;text-align:right;overflow-wrap:break-word;min-width:0">'+valHtml+'</b></div>';
 }
 function profileRender(){
+  try{planExpireSweep();}catch(e){}
   var u=acctCurrent();var body=document.getElementById('profileBody');if(!u||!body)return;
   var h='';
   var pic=acctPicture(u);
@@ -13583,6 +13631,7 @@ function profileOpen(){
 }
 function profileClose(){var s=document.getElementById('profileSheet');sheetHideAnim(s);}
 function acctRender(){
+  try{planExpireSweep();}catch(e){}
   var u=acctCurrent();
   acctRenderTopbar(u);
   acctApplyAdminGate();
@@ -14336,6 +14385,11 @@ function genInit(){
      enforces it — session cleared + blocked sheet — instead of
      the block only landing on the next app open. */
   setInterval(function(){try{acctAdminSync();}catch(e){}},60000);
+  /* Plan-expiry sweep: once on open, then every 30 s — the moment
+     a bought plan passes its plan.until / songPlan.until, the
+     account falls back to Free on every surface by itself. */
+  try{planExpireSweep();}catch(e){}
+  setInterval(function(){try{planExpireSweep();}catch(e){}},30000);
   try{nameGateCheck();}catch(e){}
   try{giftSchedule();}catch(e){}
   /* Packages popup (owner order 2026-11-17): ~10 s after every
