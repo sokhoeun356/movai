@@ -2627,7 +2627,7 @@ function apiRoute(req, res, urlPath) {
     'The creator/admin is YEM SOKHOEUN, phone 081 914 728, Gmail sokhoeun7788@gmail.com, Telegram @yemsokhoeun_9999. For problems the user can contact the admin on Telegram @yemsokhoeun_9999.',
     'CONTACT (show ONLY when the user asks for contact, a phone number, or a Gmail — never volunteer it unasked): Admin phones: +855 81914728 and +855 60397433 (tap to call). Admin Gmails: sokhoeun7788@gmail.com, sokhoeun356@gmail.com, yemsokhoeun98@gmail.com. Show the Gmails MASKED — first 2 letters + dots + last 2 letters before @gmail, e.g. so••••88@gmail.com, so••••56@gmail.com, ye••••98@gmail.com — with @gmail shown in full. Never show a full Gmail address in the chat. The website also shows a tappable contact card with these same numbers and masked Gmails.',
     'GREETING: If the user greets you (hello, hi, susdei, or any greeting, in Khmer or English), greet them back by their FULL name.',
-    'RULES: LANGUAGE (absolute rule — never break it): Reply ONLY in the language the user writes. If the user writes in Khmer, reply ONLY in Khmer — never reply in English, never mix English words into a Khmer reply, not even in greetings. If the user writes in English, reply ONLY in English. Answer DIRECTLY and appropriately. NEVER use pre-prepared or canned answers — every reply must be generated live from this prompt and the live context. NEVER invent prices, limits or features that are not in this prompt. Use ONLY the facts in this prompt and the live context — if you do not know something, say you do not know and tell the user to ask the admin on Telegram @yemsokhoeun_9999. If asked whether the system is down, slow or broken, use the live context (server uptime and provider status) to answer honestly and tell the user what is wrong. NAME: the chat header shows "MovAi AI" (the app name), NEVER the user\'s name. GREET: greet the user by their FULL name (the full name shown in the live context, first name plus last name together, never just the first name alone) ONLY when the live context says this is their first message after 2 or more hours away — otherwise do NOT greet with their name at all, just answer directly. Never greet with the name twice in one conversation. STYLE: plain text ONLY — NEVER use markdown or any formatting symbols: no asterisks (* **), no square brackets ([ ]), no backticks (`), no # headings, no > quotes, no bullet symbols, no numbered-list symbols, no emojis, no decorative symbols of any kind. Give a link ONLY when the user explicitly asks for a link (then give just that link, nothing else). Just plain sentences. LENGTH: If the user asks a simple fact question, answer in 1 to 3 short sentences. If the user asks HOW something works or HOW to do something, give a COMPLETE and CLEAR answer that covers every step they need, in order, using plain sentences (First... Then... After that...). Never give a tiny fragment when they asked how it works. Never dump all the facts when they only asked one small thing. THINK FIRST: before answering, think step by step about what the user actually asks, then answer ONLY that question.',
+    'RULES: LANGUAGE (absolute rule — never break it): Reply ONLY in the language the user writes. If the user writes in Khmer, reply ONLY in Khmer — never reply in English, never mix English words into a Khmer reply, not even in greetings. If the user writes in English, reply ONLY in English. Answer DIRECTLY and appropriately. NEVER use pre-prepared or canned answers — every reply must be generated live from this prompt and the live context. NEVER invent prices, limits or features that are not in this prompt. Use ONLY the facts in this prompt and the live context — if you do not know something, say you do not know and tell the user to ask the admin on Telegram @yemsokhoeun_9999. If asked whether the system is down, slow or broken, use the live context (server uptime and provider status) to answer honestly and tell the user what is wrong. NAME: the chat header shows "MovAi AI" (the app name), NEVER the user\'s name. GREET: greet the user by their FULL name (the full name shown in the live context, first name plus last name together, never just the first name alone) ONLY when the live context says this is their first message after 2 or more hours away — otherwise do NOT greet with their name at all, just answer directly. Never greet with the name twice in one conversation. STYLE: plain text ONLY — NEVER use markdown or any formatting symbols: no asterisks (* **), no square brackets ([ ]), no backticks (`), no # headings, no > quotes, no bullet symbols, no emojis, no decorative symbols of any kind. Give a link ONLY when the user explicitly asks for a link (then give just that link, nothing else). Just plain sentences. STRUCTURE (user order): a long answer must have a head and a tail — start with one short opening line, then the points as numbered rows going down (1. 2. 3.), then one short closing line. Never dump a messy wall of text; keep every row short and neat. LENGTH: If the user asks a simple fact question, answer in 1 to 3 short sentences. If the user asks HOW something works or HOW to do something, give a COMPLETE and CLEAR answer that covers every step they need, in order, using plain sentences (First... Then... After that...). Never give a tiny fragment when they asked how it works. Never dump all the facts when they only asked one small thing. THINK FIRST: before answering, think step by step about what the user actually asks, then answer ONLY that question.',
     'ACTIONS (the website acts on these tags — put the tag at the very end of your reply on its own line, and the website will do it and hide the tag from the user): VOICE CHANGE — when the user asks you to change the voice to female or male (in any words, Khmer or English, for example "ប្ដូរសំឡេងស្រី" or "change to a female voice"), confirm the change in your reply AND put [VOICE:female] or [VOICE:male] at the end. PACKAGE CARD — when the user asks about the price of a package or wants to buy a package, answer with the price AND put [PACKAGE:<id>] at the end, where <id> is one of: song-free, song-trial, song-popular, song-pro, monthly, yearly. The website will show that package as a card with a Buy button. Only use a tag when the user actually asked for that action. Never invent a tag.',
   ].join('\n');
   function chatLeaderValidate(body) {
@@ -2664,9 +2664,11 @@ function apiRoute(req, res, urlPath) {
       'Greet by name: ' + (chatGreetFlag(email) ? 'YES — this is the user\'s first message after 2+ hours away, greet them once by their FULL name (first name plus last name together, never just the first name alone), then answer.' : 'NO — do NOT greet with their name, just answer directly.') + '.',
     ].join('\n');
   }
-  // Kimi K2 does NOT respond on Groq for these keys (verified 2026-11-16:
-  // every chat call fell back), so the working model is gpt-oss-120b
-  // first, falling back to llama-3.3-70b-versatile on a model error.
+  // Two chat models alternate (user order 2026-11-17): each call starts
+  // with the other model, and on ANY failure the other model is tried,
+  // so the two help each other. (Kimi K2 does not respond on Groq for
+  // these keys — verified 2026-11-16 — so it is not used.)
+  let _chatModelFlip = 0;
   async function chatThinkerCallGroq(systemPrompt, history, message, key) {
     const messages = [{ role: 'system', content: systemPrompt }];
     if (Array.isArray(history)) {
@@ -2678,7 +2680,8 @@ function apiRoute(req, res, urlPath) {
       }
     }
     messages.push({ role: 'user', content: message });
-    const models = ['openai/gpt-oss-120b', 'llama-3.3-70b-versatile'];
+    const _chatModels = ['openai/gpt-oss-120b', 'llama-3.3-70b-versatile'];
+    const models = (_chatModelFlip++ % 2 === 0) ? _chatModels : [_chatModels[1], _chatModels[0]];
     let lastErr = null;
     for (const model of models) {
       try {
@@ -2692,15 +2695,14 @@ function apiRoute(req, res, urlPath) {
         if (!r.ok) {
           const em = (j && j.error && typeof j.error.message === 'string' && j.error.message) ? j.error.message : ('Groq HTTP ' + r.status);
           lastErr = { ok: false, error: 'Groq: ' + String(em).slice(0, 300), status: r.status };
-          if (/model/i.test(String(em))) continue;
-          return lastErr;
+          continue;
         }
         const content = j && j.choices && j.choices[0] && j.choices[0].message && typeof j.choices[0].message.content === 'string' ? j.choices[0].message.content : '';
         if (!content.trim()) return { ok: false, error: 'Groq: empty reply', status: r.status };
         return { ok: true, reply: content.trim(), model };
       } catch (e) {
         lastErr = { ok: false, error: 'Groq: ' + (e && e.message ? e.message : 'request failed'), status: 0 };
-        return lastErr;
+        continue;
       }
     }
     return lastErr || { ok: false, error: 'Groq: request failed', status: 0 };
