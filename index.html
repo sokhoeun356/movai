@@ -538,26 +538,37 @@ img.hist-media,.d3-preview{cursor:zoom-in}
 .mv-view{position:fixed;inset:0;z-index:96;background:#000;flex-direction:column}
 .pkg-sheet.mv-above{z-index:98}
 .mv-stage-wrap{flex:1 1 auto;min-height:0;display:flex;align-items:center;justify-content:center;padding:12px}
-.mv-stage{position:relative;border-radius:14px;overflow:hidden;background:#07080a;box-shadow:0 18px 50px rgba(0,0,0,.6)}
+.mv-stage{position:relative;border-radius:14px;overflow:hidden;background:#07080a;box-shadow:0 18px 50px rgba(0,0,0,.6);--mv-oln:-2px 0 0 rgba(8,8,8,.94),2px 0 0 rgba(8,8,8,.94),0 -2px 0 rgba(8,8,8,.94),0 2px 0 rgba(8,8,8,.94),-2px -2px 0 rgba(8,8,8,.94),2px -2px 0 rgba(8,8,8,.94),-2px 2px 0 rgba(8,8,8,.94),2px 2px 0 rgba(8,8,8,.94),-1px -2px 0 rgba(8,8,8,.94),1px -2px 0 rgba(8,8,8,.94),-1px 2px 0 rgba(8,8,8,.94),1px 2px 0 rgba(8,8,8,.94),-2px -1px 0 rgba(8,8,8,.94),2px -1px 0 rgba(8,8,8,.94),-2px 1px 0 rgba(8,8,8,.94),2px 1px 0 rgba(8,8,8,.94),0 3px 12px rgba(0,0,0,.5)}
 .mv-bg{position:absolute;inset:0;overflow:hidden}
 .mv-bg img,.mv-bg video{width:100%;height:100%;object-fit:cover;display:block}
 .mv-auto-grad{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;color:#fff}
 .mv-auto-grad .mc-note{width:22%;max-width:110px;height:auto;display:block;opacity:.92}
-.mv-auto-grad .mc-name{font-weight:900;font-size:1.75rem;letter-spacing:-.01em;line-height:1;text-shadow:0 2px 14px rgba(0,0,0,.45)}
+.mv-auto-grad .mc-name{font-weight:900;font-size:1.75rem;letter-spacing:-.01em;line-height:1;text-shadow:var(--mv-oln);-webkit-text-stroke:1px rgba(8,8,8,.9)}
 .mv-auto-grad .mc-name span{color:var(--accent)}
 /* NO black shade / dark plates anywhere on the MV stage (owner
    order 2026-11-17): the background stays clean — only the name
-   + music note sit in the centre — and the title / lyrics are
-   plain karaoke text (YouTube style) with a soft text shadow
-   for legibility, never a black box behind them. */
+   + music note sit in the centre — and there is never a black
+   box behind the title / lyrics. BUT the letters themselves
+   carry a solid dark OUTLINE (owner order 2026-11-17, later the
+   same day): some backgrounds are very bright (e.g. the lime
+   MovAi cover), where plain white text with a soft shadow was
+   washed out and unreadable. The outline is part of the letter,
+   not a plate or shade layer, so the text now beats ANY
+   background — bright or dark — and always reads clearly. */
 .mv-title{position:absolute;top:5%;left:6%;right:6%;text-align:center;color:#fff;pointer-events:none;z-index:3}
-.mv-title-txt{display:inline-block;max-width:100%;padding:0 4px 7px;font-size:1.3125rem;font-weight:900;line-height:1.3;letter-spacing:.01em;color:#fff;text-shadow:0 1px 4px rgba(0,0,0,.55),0 2px 12px rgba(0,0,0,.4);border-bottom:3px solid var(--mv-acc,var(--accent));overflow-wrap:break-word}
+.mv-title-txt{display:inline-block;max-width:100%;padding:0 4px 7px;font-size:1.3125rem;font-weight:900;line-height:1.3;letter-spacing:.01em;color:#fff;text-shadow:var(--mv-oln);-webkit-text-stroke:1.3px rgba(8,8,8,.92);border-bottom:3px solid var(--mv-acc,var(--accent));overflow-wrap:break-word}
 .mv-bg-style{position:absolute;inset:0;pointer-events:none}
 .mv-lyrics{position:absolute;left:6%;right:6%;top:56%;transform:translateY(-50%);text-align:center;pointer-events:none;z-index:3}
-.mv-line{font-size:0.875rem;line-height:1.55;color:rgba(255,255,255,.55);font-weight:600;text-shadow:0 1px 4px rgba(0,0,0,.55),0 2px 10px rgba(0,0,0,.4);transition:color .25s ease,font-size .25s ease;overflow-wrap:break-word}
-.mv-line.on{color:#fff;font-size:1.1875rem;font-weight:800;line-height:1.5;text-shadow:0 1px 4px rgba(0,0,0,.6),0 3px 14px rgba(0,0,0,.45)}
-.mv-line.on + .mv-line{margin-top:12px}
-.mv-line .mv-line-tr{display:block;width:fit-content;max-width:100%;margin:6px auto 0;font-size:0.8125rem;font-weight:700;color:var(--mv-acc,var(--accent));text-shadow:0 1px 4px rgba(0,0,0,.55)}
+/* ALL lyric lines are the SAME small size (owner order
+   2026-11-17): the line being sung, the next line and the
+   pre-first line never change size — only weight / brightness
+   mark the current line — so the text never jumps around, and
+   every line carries the dark outline so it stays clear on
+   any background. */
+.mv-line{font-size:0.9375rem;line-height:1.5;color:rgba(255,255,255,.88);font-weight:600;text-shadow:var(--mv-oln);-webkit-text-stroke:.8px rgba(8,8,8,.9);transition:color .25s ease;overflow-wrap:break-word}
+.mv-line.on{color:#fff;font-size:0.9375rem;font-weight:800;line-height:1.5;text-shadow:var(--mv-oln);-webkit-text-stroke:.8px rgba(8,8,8,.9)}
+.mv-line.on + .mv-line{margin-top:10px}
+.mv-line .mv-line-tr{display:block;width:fit-content;max-width:100%;margin:6px auto 0;font-size:0.875rem;font-weight:700;color:#fff;text-shadow:var(--mv-oln);-webkit-text-stroke:.7px rgba(8,8,8,.9)}
 .mv-bigplay{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:72px;height:72px;border-radius:50%;border:1px solid rgba(255,255,255,.55);background:rgba(8,10,6,.48);-webkit-backdrop-filter:blur(4px);backdrop-filter:blur(4px);color:#fff;font-size:1.5rem;display:none;align-items:center;justify-content:center;cursor:pointer;padding:0;z-index:4;font-family:inherit}
 .mv-bigplay.show{display:inline-flex}
 .mv-controls{display:flex;align-items:center;gap:9px;flex-wrap:wrap;padding:10px 14px calc(12px + env(safe-area-inset-bottom,0px));background:#0b0c0e;border-top:1px solid rgba(255,255,255,.09)}
@@ -17204,8 +17215,10 @@ function mvSyncLyrics(force){
     nx.appendChild(nxs);
     box.appendChild(nx);return;
   }
-  /* The line being sung: big, in the CENTRE of the screen.
-     The next line sits right below it. Nothing else covers them. */
+  /* The line being sung sits in the CENTRE of the screen, the
+     next line right below it — ALL at the same small size
+     (owner order 2026-11-17); only weight / brightness differ.
+     Nothing else covers them. */
   var cl=document.createElement('div');
   cl.className='mv-line on';
   var sp=document.createElement('span');
@@ -17391,7 +17404,11 @@ function mvExpDraw(){
     cx.font='900 '+Math.round(W*0.11)+'px system-ui,sans-serif';
     cx.textBaseline='middle';
     var wMov=cx.measureText('Mov').width,wAi=cx.measureText('Ai').width,x0=(W-(wMov+wAi))/2;
-    cx.textAlign='left';cx.fillStyle='#fff';cx.fillText('Mov',x0,H*0.30);
+    /* Dark outline under the fill so the name beats any
+       background brightness (owner order 2026-11-17). */
+    cx.lineJoin='round';cx.strokeStyle='rgba(8,8,8,.92)';cx.lineWidth=Math.max(2,Math.round(W*0.11*0.14));
+    cx.textAlign='left';cx.strokeText('Mov',x0,H*0.30);cx.strokeText('Ai',x0+wMov,H*0.30);
+    cx.fillStyle='#fff';cx.fillText('Mov',x0,H*0.30);
     cx.fillStyle=sty.acc;cx.fillText('Ai',x0+wMov,H*0.30);
     cx.textAlign='center';
   }
@@ -17401,9 +17418,11 @@ function mvExpDraw(){
   cx.fillStyle=tg;cx.fillRect(0,0,W,H);
   /* NO black shade overlay and NO dark plates (owner order
      2026-11-17) — the export matches the on-screen MV: clean
-     background, plain karaoke text. */
+     background, plain karaoke text. The letters DO carry a
+     dark outline (strokeText under the fill) so the text
+     beats bright backgrounds and always reads clearly. */
   /* Title: MODERATE size, auto-shrunk to fit ONE line (never
-     wraps down over the lyrics), accent underline, soft shadow. */
+     wraps down over the lyrics), accent underline, outlined. */
   cx.textAlign='center';cx.textBaseline='top';
   var tTitle=String(song.title||'MovAi');
   var tSize=Math.round(W*0.052);
@@ -17414,9 +17433,11 @@ function mvExpDraw(){
   else{tl=mvExpWrap(cx,tTitle,W*0.86);tLines=Math.min(2,tl.length);tTw=0;for(var tm=0;tm<tLines;tm++)tTw=Math.max(tTw,cx.measureText(tl[tm]).width);}
   tLh=tSize*1.3;
   var tPlateY=H*0.05,tPlateH=tLines*tLh;
+  cx.lineJoin='round';cx.strokeStyle='rgba(8,8,8,.92)';cx.lineWidth=Math.max(2,Math.round(tSize*0.16));
+  for(var ti=0;ti<tLines;ti++)cx.strokeText(tl[ti],W/2,tPlateY+ti*tLh);
   cx.fillStyle='#fff';
-  cx.shadowColor='rgba(0,0,0,.55)';cx.shadowBlur=8;cx.shadowOffsetY=2;
-  for(var ti=0;ti<tLines;ti++)cx.fillText(tl[ti],W/2,tPlateY+ti*tLh);
+  cx.shadowColor='rgba(0,0,0,.5)';cx.shadowBlur=8;cx.shadowOffsetY=2;
+  for(var ti2=0;ti2<tLines;ti2++)cx.fillText(tl[ti2],W/2,tPlateY+ti2*tLh);
   cx.shadowBlur=0;cx.shadowOffsetY=0;
   cx.fillStyle=sty.acc;
   cx.fillRect((W-Math.min(tTw,W*0.3))/2,tPlateY+tPlateH+W*0.008,Math.min(tTw,W*0.3),W*0.006);
@@ -17429,28 +17450,38 @@ function mvExpDraw(){
     else idx=0;
     if(idx<0)idx=0;
     var cur=lines[idx];
+    /* ALL lyric lines share ONE size (owner order 2026-11-17):
+       current and next lines alike — only weight / brightness
+       differ — and every line is outlined (strokeText under
+       the fill) so it stays clear on any background. */
     var fs=Math.round(W*0.042);
+    var olw=Math.max(2,Math.round(fs*0.16));
+    cx.lineJoin='round';cx.strokeStyle='rgba(8,8,8,.92)';cx.lineWidth=olw;
     cx.font='800 '+fs+'px system-ui,sans-serif';
     var cl=mvExpWrap(cx,cur.text,W*0.88);
     var lh=fs*1.4,totalH=cl.length*lh,y0=H*0.56-totalH/2;
-    /* Current line: plain karaoke text, NO dark plate — bright
-       white, bold, soft shadow only. */
-    cx.fillStyle='#fff';cx.shadowColor='rgba(0,0,0,.55)';cx.shadowBlur=8;cx.shadowOffsetY=2;
+    cl.forEach(function(L,k){cx.strokeText(L,W/2,y0+k*lh);});
+    cx.fillStyle='#fff';cx.shadowColor='rgba(0,0,0,.5)';cx.shadowBlur=8;cx.shadowOffsetY=2;
     cl.forEach(function(L,k){cx.fillText(L,W/2,y0+k*lh);});
     cx.shadowBlur=0;cx.shadowOffsetY=0;
     var ny=y0+totalH+16;
     if(cur.tr){
-      cx.font='700 '+Math.round(W*0.034)+'px system-ui,sans-serif';
-      cx.fillStyle=sty.acc;cx.shadowColor='rgba(0,0,0,.55)';cx.shadowBlur=6;
-      cx.fillText(cur.tr,W/2,ny);ny+=Math.round(W*0.05);
+      cx.font='700 '+Math.round(fs*0.85)+'px system-ui,sans-serif';
+      cx.lineWidth=Math.max(2,Math.round(fs*0.85*0.16));
+      cx.strokeText(cur.tr,W/2,ny);
+      cx.fillStyle='#fff';cx.shadowColor='rgba(0,0,0,.5)';cx.shadowBlur=6;
+      cx.fillText(cur.tr,W/2,ny);ny+=Math.round(fs*1.5);
       cx.shadowBlur=0;
     }
     if(idx<lines.length-1){
-      /* Next line: smaller and lighter than the current one. */
-      cx.font='600 '+Math.round(W*0.032)+'px system-ui,sans-serif';
-      cx.fillStyle='rgba(255,255,255,.55)';cx.shadowColor='rgba(0,0,0,.55)';cx.shadowBlur=6;
+      /* Next line: SAME size as the current line — only
+         slightly lighter in weight / colour. */
+      cx.font='600 '+fs+'px system-ui,sans-serif';
+      cx.lineWidth=olw;
       var nl=mvExpWrap(cx,lines[idx+1].text,W*0.88);
-      for(var m=0;m<Math.min(2,nl.length);m++)cx.fillText(nl[m],W/2,ny+m*W*0.044);
+      for(var m=0;m<Math.min(2,nl.length);m++)cx.strokeText(nl[m],W/2,ny+m*lh);
+      cx.fillStyle='rgba(255,255,255,.88)';cx.shadowColor='rgba(0,0,0,.5)';cx.shadowBlur=6;
+      for(var m2=0;m2<Math.min(2,nl.length);m2++)cx.fillText(nl[m2],W/2,ny+m2*lh);
       cx.shadowBlur=0;
     }
   }
