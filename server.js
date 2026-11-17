@@ -1680,8 +1680,12 @@ function rotErr(message, httpStatus) {
   return e;
 }
 // Per-provider "next start" index for key rotation (in-memory only;
-// resets on restart). The key that last succeeded is pinned as the next
-// start, so a working key keeps being tried first.
+// resets on restart). STRICT ROUND-ROBIN (owner order 2026-11-18):
+// after every successful call the pointer advances to the NEXT key,
+// so usage spreads evenly across all keys (call 1 → key 1, call 2 →
+// key 2, call 3 → key 3, then back to key 1) instead of draining one
+// account until it fails. Applies to ALL providers (Groq, Suno, Magic
+// Hour, NovAI, MusicAPI, Tavus, MVSEP, Whisper, Translate).
 const _keyRotationStart = new Map();
 // ---- API key health (red/green) ----
 // Per provider + key index: 'ok' (green, working) or 'exhausted' (red,
@@ -2013,7 +2017,11 @@ async function withProviderKeyRotation(provider, fn, reqKey, candidatesOverride)
     const cand = candidates[idx];
     try {
       const out = await fn(cand.key, cand.endpoint);
-      _keyRotationStart.set(p, idx);
+      // STRICT ROUND-ROBIN (owner order 2026-11-18): after EVERY success
+      // advance to the NEXT key, so the next call uses the next key
+      // (1 → 2 → 3 → 1 …) instead of reusing this one. On a rotatable
+      // error the loop below already tries the next key.
+      _keyRotationStart.set(p, (idx + 1) % n);
       keyHealthSet(p, idx, 'ok', '');
       return out;
     } catch (e) {
