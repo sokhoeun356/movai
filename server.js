@@ -1605,7 +1605,7 @@ function publicSettings(s) {
 // Providers: novai, magichour, masterpiecex, hunyuan3d, suno, acemusic,
 // musicapi, groq (the AI chat key), tavus kept for the legacy proxy branch).
 const ADMIN_KEYS_FILE = path.join(DATA_DIR, 'admin-keys.json');
-const KNOWN_KEY_PROVIDERS = ['novai', 'magichour', 'masterpiecex', 'hunyuan3d', 'suno', 'acemusic', 'musicapi', 'tavus', 'groq'];
+const KNOWN_KEY_PROVIDERS = ['novai', 'magichour', 'masterpiecex', 'hunyuan3d', 'suno', 'acemusic', 'musicapi', 'tavus', 'groq', 'mvsep'];
 function normProvider(v) {
   if (typeof v !== 'string') return '';
   let p = v.trim().toLowerCase().replace(/[\s_-]+/g, '');
@@ -1716,7 +1716,7 @@ function keyHealthList() {
   // Also include providers that have keys configured but no health record
   // yet (shown as 'unknown' until first use).
   try {
-    for (const p of ['suno', 'magichour', 'musicapi', 'novai', 'groq']) {
+    for (const p of ['suno', 'magichour', 'musicapi', 'novai', 'groq', 'mvsep']) {
       const n = adminProviderKeyList(p).length;
       if (!n) continue;
       if (!out[p]) out[p] = [];
@@ -1787,6 +1787,193 @@ function groqUsageList() {
     out.push({ key: i + 1, usedToday: used, remainingToday: remaining, percentRemaining: pct, status });
   }
   return { date: today, dailyLimit: GROQ_DAILY_LIMIT, keys: out };
+}
+// ---- MVSEP stem separation usage (per-key daily count) ----
+// MVSEP has no quota API, so the server counts its own successful
+// separations per key (by 1-based index) per day. Free Registered plan =
+// 50 separations/day per key. Persisted to mvsep-usage.json so it
+// survives restarts; the day rolls over in Phnom Penh time. Key VALUES
+// are never stored or exposed — only the 1-based index + counts.
+const MVSEP_USAGE_FILE = path.join(DATA_DIR, 'mvsep-usage.json');
+const MVSEP_DAILY_LIMIT = 50;
+let _mvsepUsage = null;
+function mvsepUsageLoad() {
+  if (_mvsepUsage && typeof _mvsepUsage === 'object') return _mvsepUsage;
+  try { const j = JSON.parse(fs.readFileSync(MVSEP_USAGE_FILE, 'utf8')); if (j && typeof j === 'object' && typeof j.date === 'string') { _mvsepUsage = j; return _mvsepUsage; } } catch (e) {}
+  _mvsepUsage = { date: '', keys: {} };
+  return _mvsepUsage;
+}
+function mvsepUsageSave() {
+  try { fs.mkdirSync(DATA_DIR, { recursive: true }); fs.writeFileSync(MVSEP_USAGE_FILE, JSON.stringify(_mvsepUsage, null, 2)); ghPersistFile(MVSEP_USAGE_FILE); } catch (e) {}
+}
+function mvsepUsageTodayDate() {
+  return new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Phnom_Penh' });
+}
+function recordMvsepSeparation(keyValue, hash) {
+  try {
+    if (hash) {
+      if (_mvsepCountedHashes.has(hash)) return; // already counted — never count one separation twice
+      if (_mvsepCountedHashes.size > 10000) _mvsepCountedHashes.clear();
+      _mvsepCountedHashes.add(hash);
+    }
+    const today = mvsepUsageTodayDate();
+    const u = mvsepUsageLoad();
+    if (u.date !== today) { u.date = today; u.keys = {}; }
+    const list = adminProviderKeyList('mvsep');
+    let idx = -1;
+    for (let i = 0; i < list.length; i++) { if (list[i].key === keyValue) { idx = i; break; } }
+    if (idx < 0) return; // not an admin-stored key
+    const k = String(idx);
+    const prev = (u.keys[k] && Number(u.keys[k].used)) || 0;
+    u.keys[k] = { used: prev + 1 };
+    mvsepUsageSave();
+  } catch (e) {}
+}
+function mvsepUsageList() {
+  // Returns {date, dailyLimit, keys:[{key, usedToday, remainingToday,
+  // status}]} — status: green (separations left), red (0 left / daily
+  // limit reached). Keys are 1-based.
+  const today = mvsepUsageTodayDate();
+  const u = mvsepUsageLoad();
+  if (u.date !== today) { u.date = today; u.keys = {}; }
+  const n = adminProviderKeyList('mvsep').length;
+  const out = [];
+  for (let i = 0; i < n; i++) {
+    const used = (u.keys[String(i)] && Number(u.keys[String(i)].used)) || 0;
+    const remaining = Math.max(0, MVSEP_DAILY_LIMIT - used);
+    out.push({ key: i + 1, usedToday: used, remainingToday: remaining, status: remaining <= 0 ? 'red' : 'green' });
+  }
+  return { date: today, dailyLimit: MVSEP_DAILY_LIMIT, keys: out };
+}
+// ---- MVSEP stem separation (Demucs4 HT) ----
+// Official API (mvsep.com/en/full_api + ZFTurbo/MVSep-API-Examples):
+// Create: POST https://mvsep.com/api/separation/create with multipart
+// form fields api_token, url (audio link — no file upload), sep_type=20,
+// add_opt1=0, output_format=0. Response {success, data:{hash, link}}.
+// Poll: GET https://mvsep.com/api/separation/get?hash=<hash> until
+// data.files appears: [{url, download}] — download is the stem filename
+// (e.g. vocals.mp3). sep_type 20 = Demucs4 HT (vocals, drums, bass,
+// other); add_opt1 0 = htdemucs_ft (High Quality, Slow). output_format 0
+// = mp3 320kbps. Free Registered plan: 50 separations/day per key, audio
+// <=10 min, file <=100 MB, 1 concurrent job. The server never stores
+// stem files — it returns MVSEP's download URLs and the website fetches
+// them directly. Key VALUES are never logged or returned.
+const MVSEP_CREATE_URL = 'https://mvsep.com/api/separation/create';
+const MVSEP_GET_URL = 'https://mvsep.com/api/separation/get';
+const MVSEP_SEP_TYPE = 20;
+const MVSEP_MODEL_OPT = 0; // htdemucs_ft
+const MVSEP_POLL_INTERVAL_MS = 10000;
+const MVSEP_POLL_TIMEOUT_MS = 240000; // 4 min server-side; the Studio resumes longer jobs via /api/studio/separate/status
+const MVSEP_STEM_ORDER = ['vocals', 'drums', 'bass', 'other', 'piano', 'guitar'];
+// hash -> key value that created it (in-memory only; used to count a
+// separation against the right key when it finishes via the status
+// endpoint after a poll timeout).
+const _mvsepHashKey = new Map();
+// Hashes already counted, so one separation is never counted twice (e.g.
+// if the Studio checks the status of a separation that already succeeded
+// through /api/studio/separate). In-memory only; capped so it cannot
+// grow without bound.
+const _mvsepCountedHashes = new Set();
+function mvsepStemNameFromFile(download) {
+  const base = String(download || '').toLowerCase().replace(/\\+/g, '/').split('/').pop().replace(/\.[a-z0-9]+$/, '');
+  // Filenames look like "vocals.mp3" or "<title>_vocals.mp3" — match the stem keyword inside.
+  for (const name of MVSEP_STEM_ORDER) { if (base.includes(name)) return name; }
+  if (base.includes('instrumental') || base.includes('instrum') || base.includes('music')) return 'other';
+  return base ? base.slice(0, 40) : 'other';
+}
+function mvsepParseStems(files) {
+  // files: [{url, download}] -> [{name, url}] in stem order, deduped by name.
+  const out = [];
+  const seen = {};
+  for (const f of (Array.isArray(files) ? files : [])) {
+    const url = f && typeof f.url === 'string' ? f.url.replace(/\\\//g, '/') : '';
+    if (!url) continue;
+    const name = mvsepStemNameFromFile(f.download);
+    if (seen[name]) continue;
+    seen[name] = true;
+    out.push({ name, url });
+  }
+  out.sort((a, b) => {
+    const ia = MVSEP_STEM_ORDER.indexOf(a.name); const ib = MVSEP_STEM_ORDER.indexOf(b.name);
+    return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib);
+  });
+  return out;
+}
+function mvsepErrText(j) {
+  if (!j || typeof j !== 'object') return '';
+  const d = j.data;
+  if (typeof j.error === 'string' && j.error) return j.error;
+  if (j.error && typeof j.error === 'object' && typeof j.error.message === 'string') return j.error.message;
+  if (typeof j.message === 'string' && j.message) return j.message;
+  if (typeof d === 'string' && d) return d;
+  if (d && typeof d === 'object' && typeof d.error === 'string' && d.error) return d.error;
+  if (d && typeof d === 'object' && typeof d.message === 'string' && d.message) return d.message;
+  return '';
+}
+function mvsepIsLimitText(s) {
+  return /limit|quota|exceed|daily|too many/i.test(String(s || ''));
+}
+function mvsepQuotaErr(detail, httpStatus) {
+  // Message MUST contain "quota" so _isRotatableError treats it as a
+  // rotate-to-next-key error (the key's 50/day is spent).
+  return rotErr('MVSEP quota exceeded — daily limit 50 reached for this key' + (detail ? ': ' + String(detail).slice(0, 120) : ''), httpStatus || 429);
+}
+async function mvsepCreateSeparation(keyValue, audioUrl) {
+  // POST multipart form (mirrors the official curl / python examples).
+  const fd = new FormData();
+  fd.append('api_token', keyValue);
+  fd.append('url', audioUrl);
+  fd.append('sep_type', String(MVSEP_SEP_TYPE));
+  fd.append('add_opt1', String(MVSEP_MODEL_OPT));
+  fd.append('output_format', '0');
+  const r = await fetch(MVSEP_CREATE_URL, { method: 'POST', body: fd, signal: AbortSignal.timeout(60000) });
+  const j = await r.json().catch(() => null);
+  const text = mvsepErrText(j) || ('HTTP ' + r.status);
+  if (r.status === 429 || (j && j.success === false && mvsepIsLimitText(text))) throw mvsepQuotaErr(text, r.status);
+  if (r.status === 401 || r.status === 403) throw rotErr('MVSEP: invalid API key (HTTP ' + r.status + ')', r.status);
+  if (!r.ok || !j || j.success !== true) throw new Error('MVSEP: ' + text);
+  const hash = (j.data && typeof j.data.hash === 'string' && j.data.hash) || (typeof j.hash === 'string' && j.hash) || '';
+  if (!hash) throw new Error('MVSEP: no separation hash returned');
+  return hash;
+}
+async function mvsepGetSeparation(hash) {
+  // GET .../separation/get?hash=<hash> — no api_token needed (the official
+  // example passes only the hash). Returns {done, stems} when the files
+  // are ready, {done:false} while still processing, and THROWS on a
+  // failed separation.
+  const r = await fetch(MVSEP_GET_URL + '?hash=' + encodeURIComponent(hash), { signal: AbortSignal.timeout(30000) });
+  const j = await r.json().catch(() => null);
+  if (!j || typeof j !== 'object') throw new Error('MVSEP: bad status response (HTTP ' + r.status + ')');
+  if (j.success !== true) {
+    const text = mvsepErrText(j) || ('HTTP ' + r.status);
+    throw new Error('MVSEP separation failed: ' + text);
+  }
+  const files = j.data && Array.isArray(j.data.files) ? j.data.files : null;
+  if (!files) return { done: false };
+  const stems = mvsepParseStems(files);
+  if (!stems.length) return { done: false };
+  return { done: true, stems };
+}
+async function mvsepSeparateWithKey(keyValue, audioUrl) {
+  // Create + poll with ONE key. Only the create step can trigger key
+  // rotation (quota errors); a poll timeout / failure is a plain error so
+  // a second separation is never created (and no second quota spent).
+  const hash = await mvsepCreateSeparation(keyValue, audioUrl);
+  // Remember which key created this hash (in-memory) so a later status
+  // check can count the separation against the right key.
+  try { _mvsepHashKey.set(hash, keyValue); } catch (e) {}
+  const deadline = Date.now() + MVSEP_POLL_TIMEOUT_MS;
+  for (;;) {
+    const res = await mvsepGetSeparation(hash);
+    if (res.done) return { hash, stems: res.stems, keyUsed: keyValue };
+    if (Date.now() >= deadline) {
+      const e = new Error('MVSEP separation still processing after ' + Math.round(MVSEP_POLL_TIMEOUT_MS / 1000) + ' seconds');
+      e.code = 'mvsep_timeout';
+      e.hash = hash;
+      throw e;
+    }
+    await new Promise((resolve) => setTimeout(resolve, MVSEP_POLL_INTERVAL_MS));
+  }
 }
 function _isRotatableError(e) {
   if (!e) return false;
@@ -3294,6 +3481,77 @@ function apiRoute(req, res, urlPath) {
   // Cloudinary section (after the /api/gen/song/mp3 endpoint), because
   // it calls cloudinaryStoreSong — helpers defined after this point
   // would be in TDZ from here (apiRoute returns at the first match).
+  // POST /api/studio/separate — {email, audioUrl, songTitle?} — requires logged-in email.
+  // MVSEP Demucs4 HT stem separation for MOVAI STUDIO: creates a separation
+  // (vocals/drums/bass/other) for the song's audio URL, polls MVSEP until it
+  // finishes, and returns {ok, stems:[{name,url}], hash}. Keys rotate on
+  // daily-limit errors (50/day/key); if every key is exhausted returns
+  // error 'mvsep_limit'. If the job is still processing after the
+  // server-side poll timeout, returns error 'mvsep_timeout' WITH the hash
+  // so the Studio can resume via GET /api/studio/separate/status without
+  // creating (and paying quota for) a second separation. The server never
+  // stores stem files — it returns MVSEP's download URLs.
+  if (req.method === 'POST' && urlPath === '/api/studio/separate') {
+    readJSONBody(req, 64 * 1024).then(async (body) => {
+      try {
+        const email = normEmail(body && body.email);
+        if (!email) return sendJSON(res, 200, { ok: false, error: 'សូមចូលគណនេយ្យជាមុនសិន · Please sign in first', needLogin: true });
+        const audioUrl = body && typeof body.audioUrl === 'string' ? body.audioUrl.trim() : '';
+        if (!audioUrl || !/^https?:\/\//i.test(audioUrl)) return sendJSON(res, 200, { ok: false, error: 'មិនមាន Link បទចម្រៀងទេ · No song audio URL' });
+        const songTitle = body && typeof body.songTitle === 'string' ? body.songTitle.trim().slice(0, 200) : '';
+        let out;
+        try {
+          out = await withProviderKeyRotation('mvsep', async (k) => {
+            const r = await mvsepSeparateWithKey(k, audioUrl);
+            return { hash: r.hash, stems: r.stems, keyUsed: k };
+          });
+        } catch (e) {
+          if (e && e.noKey) return sendJSON(res, 200, { ok: false, error: 'mvsep_no_key', message: { km: 'Admin មិនទាន់ដាក់ MVSEP API Key ទេ', en: 'Admin has not added an MVSEP API key yet' } });
+          if (e && e.code === 'mvsep_timeout') return sendJSON(res, 200, { ok: false, error: 'mvsep_timeout', hash: e.hash || '', message: { km: 'MVSEP កំពុងបំបែកបទនេះ — សូមរង់ចាំបន្តិច ហើយចុច Split (AI) ម្តងទៀត', en: 'MVSEP is still separating this song — please wait a bit and tap Split (AI) again' } });
+          if (e && /quota exceeded/i.test(String(e.message || ''))) return sendJSON(res, 200, { ok: false, error: 'mvsep_limit', message: { km: 'MVSEP ដល់កំណត់ 50 បទ/ថ្ងៃ លើ Key ទាំងអស់ហើយ — សូមសាកល្បងម្តងទៀតនៅថ្ងៃស្អែក', en: 'MVSEP daily limit of 50 songs/day reached on all keys — please try again tomorrow' } });
+          return sendJSON(res, 200, { ok: false, error: (e && e.message) || 'MVSEP: request failed' });
+        }
+        // Success: count it against the key that did the work (server-side daily counter for the Admin display).
+        recordMvsepSeparation(out.keyUsed, out.hash);
+        return sendJSON(res, 200, { ok: true, provider: 'mvsep', hash: out.hash, songTitle, stems: out.stems });
+      } catch (e) { return sendJSON(res, 200, { ok: false, error: 'MVSEP: ' + (e && e.message ? String(e.message).slice(0, 200) : 'request failed') }); }
+    }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
+    return;
+  }
+  // GET /api/studio/separate/status?hash=<hash>&email=<email> — requires logged-in email.
+  // Checks one MVSEP separation created earlier (e.g. after an mvsep_timeout)
+  // WITHOUT creating a new separation, so no extra daily quota is spent.
+  // Tries each stored MVSEP key until one returns the separation. Returns
+  // {ok, done:true, stems, hash} when finished, {ok, done:false, status, hash}
+  // while still processing, or an error.
+  if (req.method === 'GET' && urlPath === '/api/studio/separate/status') {
+    (async () => {
+      try {
+        const qp = new URL(req.url, 'http://localhost').searchParams;
+        const email = normEmail(qp.get('email') || '');
+        if (!email) return sendJSON(res, 200, { ok: false, error: 'សូមចូលគណនេយ្យជាមុនសិន · Please sign in first', needLogin: true });
+        const hash = String(qp.get('hash') || '').trim().slice(0, 200);
+        if (!hash) return sendJSON(res, 200, { ok: false, error: 'មិនមាន hash ទេ · No separation hash' });
+        const keys = adminProviderKeyList('mvsep');
+        if (!keys.length) return sendJSON(res, 200, { ok: false, error: 'mvsep_no_key', message: { km: 'Admin មិនទាន់ដាក់ MVSEP API Key ទេ', en: 'Admin has not added an MVSEP API key yet' } });
+        // The GET status endpoint takes only the hash (official example
+        // passes no api_token), so one check is enough — no key loop.
+        let r;
+        try {
+          r = await mvsepGetSeparation(hash);
+        } catch (e) {
+          return sendJSON(res, 200, { ok: false, error: 'mvsep_not_found', hash, message: { km: 'រក Separation នេះមិនឃើញទេ — វាអាចបរាជ័យ ឬផុតកំណត់ហើយ', en: 'Separation not found — it may have failed or expired' } });
+        }
+        if (r.done) {
+          const kv = _mvsepHashKey.get(hash);
+          if (kv) recordMvsepSeparation(kv, hash);
+          return sendJSON(res, 200, { ok: true, done: true, hash, stems: r.stems });
+        }
+        return sendJSON(res, 200, { ok: true, done: false, status: 'processing', hash });
+      } catch (e) { return sendJSON(res, 200, { ok: false, error: 'MVSEP: ' + (e && e.message ? String(e.message).slice(0, 200) : 'status check failed') }); }
+    })().catch(() => sendJSON(res, 200, { ok: false, error: 'MVSEP: status check failed' }));
+    return;
+  }
   // ---- MovAi Admin API ----
   // POST /api/admin/sync — {email, name, credits, songCredits, plan, songPlan}
   // Called by the MovAi website (no admin key). Creates the user on first
@@ -3745,6 +4003,17 @@ function apiRoute(req, res, urlPath) {
     if (!a.ok) return sendJSON(res, 200, { ok: false, error: a.error });
     const u = groqUsageList();
     return sendJSON(res, 200, { ok: true, provider: 'groq', date: u.date, dailyLimit: u.dailyLimit, keys: u.keys });
+  }
+  // GET /api/admin/mvsep-usage — admin key required. MVSEP separations used
+  // today per key for the Admin → API Keys display: daily limit (50/day/key),
+  // used today, remaining today, and status (green = separations left, red =
+  // daily limit reached). Keys are 1-based indexes only — key values are
+  // never returned.
+  if (req.method === 'GET' && urlPath === '/api/admin/mvsep-usage') {
+    const a = adminKeyOk(req);
+    if (!a.ok) return sendJSON(res, 200, { ok: false, error: a.error });
+    const u = mvsepUsageList();
+    return sendJSON(res, 200, { ok: true, provider: 'mvsep', date: u.date, dailyLimit: u.dailyLimit, keys: u.keys });
   }
   // POST /api/admin/grant — {email, credits, songCredits, note?} — admin key required.
   // credits/songCredits are DELTAS (can be negative to deduct, balance never below 0).
