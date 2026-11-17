@@ -512,6 +512,59 @@ html[data-mode="light"] .err-title{color:#b91c1c}
    the card. Fullscreen view still shows the whole original. */
 .hist-carousel .hist-media{width:calc(100% + 28px);max-width:none;margin-left:-14px;margin-right:-14px;border-radius:8px;aspect-ratio:16/9;object-fit:cover}
 img.hist-media,.d3-preview{cursor:zoom-in}
+/* ===== MV player (owner order 2026-11-17) =====
+   MV is a VIEW, not a video-file export: tapping «MV» on a song
+   opens a setup sheet (screen format + background), then a
+   full-screen stage that plays the song with its title on
+   screen and its lyrics running karaoke-style, line by line,
+   in time with the singing. The background is automatic
+   (the song's cover, or a generated MovAi backdrop) unless the
+   user uploads their own video / image. */
+.mv-sheet-card{max-width:520px}
+.mv-fmt-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:10px}
+.mv-fmt{display:flex;flex-direction:column;align-items:center;gap:7px;padding:12px 4px 10px;border:1px solid var(--line2);border-radius:12px;background:var(--card2);color:var(--text);font-family:inherit;cursor:pointer;min-height:44px}
+.mv-fmt:active{opacity:.85}
+.mv-fmt.on{border-color:var(--accent);background:rgba(var(--accent-rgb),.10)}
+.mv-fmt .mv-fmt-box{display:block;border:2px solid currentColor;border-radius:3px;opacity:.85}
+.mv-fmt .mv-fmt-ratio{font-size:0.8125rem;font-weight:900;font-variant-numeric:tabular-nums;line-height:1}
+.mv-fmt .mv-fmt-name{font-size:0.6875rem;font-weight:700;color:var(--muted);line-height:1.2;text-align:center}
+.mv-fmt.on .mv-fmt-name{color:var(--accent-text)}
+.mv-bg-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+.mv-bg-row .kbtn{flex:1 1 0;min-width:0;padding:9px 6px;font-size:0.8125rem;min-height:42px;white-space:nowrap}
+.mv-file-name{font-size:0.75rem;color:var(--muted);margin-top:8px;overflow-wrap:anywhere;line-height:1.5;min-height:16px}
+.mv-msg{font-size:0.8125rem;margin-top:10px;min-height:16px;line-height:1.6}
+.mv-msg.err{color:#f87171}
+.mv-msg.ok{color:var(--accent-text)}
+.mv-view{position:fixed;inset:0;z-index:96;background:#000;flex-direction:column}
+.mv-stage-wrap{flex:1 1 auto;min-height:0;display:flex;align-items:center;justify-content:center;padding:12px}
+.mv-stage{position:relative;border-radius:14px;overflow:hidden;background:#07080a;box-shadow:0 18px 50px rgba(0,0,0,.6)}
+.mv-bg{position:absolute;inset:0;overflow:hidden}
+.mv-bg img,.mv-bg video{width:100%;height:100%;object-fit:cover;display:block}
+.mv-bg .mv-auto-img{animation:mvKenBurns 26s ease-in-out infinite alternate}
+@keyframes mvKenBurns{from{transform:scale(1)}to{transform:scale(1.13)}}
+.mv-auto-grad{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;color:#fff}
+.mv-auto-grad .mc-note{width:22%;max-width:110px;height:auto;display:block;opacity:.92}
+.mv-auto-grad .mc-name{font-weight:900;font-size:1.75rem;letter-spacing:-.01em;line-height:1;text-shadow:0 2px 14px rgba(0,0,0,.45)}
+.mv-auto-grad .mc-name span{color:var(--accent)}
+.mv-shade{position:absolute;inset:0;background:linear-gradient(rgba(0,0,0,.34),rgba(0,0,0,0) 30%,rgba(0,0,0,0) 52%,rgba(0,0,0,.55));pointer-events:none}
+.mv-title{position:absolute;top:9%;left:7%;right:7%;text-align:center;color:#fff;font-size:1.375rem;font-weight:900;line-height:1.35;text-shadow:0 2px 12px rgba(0,0,0,.65);overflow-wrap:break-word;pointer-events:none}
+.mv-lyrics{position:absolute;left:6%;right:6%;bottom:13%;text-align:center;pointer-events:none}
+.mv-line{font-size:1rem;line-height:1.5;color:rgba(255,255,255,.48);text-shadow:0 1px 8px rgba(0,0,0,.6);transition:color .25s ease,font-size .25s ease;overflow-wrap:break-word}
+.mv-line.on{color:#fff;font-size:1.1875rem;font-weight:900}
+.mv-line.on .mv-line-txt{background:rgba(0,0,0,.38);border-radius:8px;padding:2px 10px;box-decoration-break:clone;-webkit-box-decoration-break:clone}
+.mv-line .mv-line-tr{display:block;font-size:0.8125rem;font-weight:700;color:var(--accent);margin-top:3px;text-shadow:0 1px 8px rgba(0,0,0,.7)}
+.mv-bigplay{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:72px;height:72px;border-radius:50%;border:1px solid rgba(255,255,255,.55);background:rgba(8,10,6,.48);-webkit-backdrop-filter:blur(4px);backdrop-filter:blur(4px);color:#fff;font-size:1.5rem;display:none;align-items:center;justify-content:center;cursor:pointer;padding:0;z-index:4;font-family:inherit}
+.mv-bigplay.show{display:inline-flex}
+.mv-controls{display:flex;align-items:center;gap:9px;padding:10px 14px calc(12px + env(safe-area-inset-bottom,0px));background:#0b0c0e;border-top:1px solid rgba(255,255,255,.09)}
+.mv-cbtn{flex:0 0 auto;min-width:44px;height:44px;border-radius:50%;border:1px solid rgba(255,255,255,.22);background:rgba(255,255,255,.07);color:#fff;font-family:inherit;font-size:0.9375rem;font-weight:800;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;padding:0 10px}
+.mv-cbtn:active{opacity:.8}
+.mv-cbtn.wide{border-radius:999px;font-size:0.8125rem;gap:6px}
+.mv-cbtn svg{width:17px;height:17px;display:block}
+.mv-seek{flex:1 1 auto;min-width:0;accent-color:var(--accent);cursor:pointer}
+.mv-time{flex:0 0 auto;font-size:0.75rem;font-weight:700;color:rgba(255,255,255,.85);font-variant-numeric:tabular-nums;white-space:nowrap}
+.mv-note{padding:0 14px 10px;background:#0b0c0e;font-size:0.75rem;color:rgba(255,255,255,.55);line-height:1.5}
+.mv-note:empty{display:none}
+@media (prefers-reduced-motion:reduce){.mv-bg .mv-auto-img{animation:none}.mv-line{transition:none}}
 /* ===== Fullscreen media viewer (tap any image / video / 3D preview) ===== */
 .fs-viewer{position:fixed;inset:0;z-index:90;background:rgba(0,0,0,.96);align-items:center;justify-content:center}
 .fs-body{width:100%;height:100%;display:flex;align-items:center;justify-content:center;padding:10px}
@@ -2040,28 +2093,27 @@ main{padding-top:calc(3.75rem + env(safe-area-inset-top,0px))}
 .movai-cover-tile .mc-name span{color:var(--accent)}
 .pub-card.pub-song-card .pub-song-cover-none.movai-cover-tile{background:linear-gradient(135deg,#2a3d13,#0e2a38);border-color:rgba(255,255,255,.35);color:#fff}
 /* Compact feed row: square cover thumb, Play centred on it.
-   The cover box is LARGE and the cover FILLS it edge to edge
-   (owner order 2026-11-17): the row used to carry a small 64px
-   thumb at the top of a much taller row, leaving a big empty
-   dark box under / around the MovAi logo tile. The cover now
-   spans the full height of the row's top area, and the logo
-   tile's note + wordmark scale up with the box so the logo
-   itself reads big inside it. */
-.pub-row-coverwrap{position:relative;flex:0 0 auto;width:108px;height:108px;border-radius:12px;overflow:hidden;background:#000;cursor:pointer;-webkit-tap-highlight-color:transparent}
+   ORIGINAL horizontal layout (owner correction 2026-11-17): the
+   cover box is the original 64px square at the LEFT of the row,
+   title / views at its right — and the cover (photo or MovAi
+   logo tile) FILLS that 64px box edge to edge, 100% × 100%,
+   with no empty space inside the box. */
+.pub-row-coverwrap{position:relative;flex:0 0 auto;width:64px;height:64px;border-radius:12px;overflow:hidden;background:#000;cursor:pointer;-webkit-tap-highlight-color:transparent}
 .pub-row-coverwrap img,.pub-row-coverwrap .pub-song-cover{width:100%!important;height:100%!important;margin:0;border-radius:12px;aspect-ratio:auto!important;max-width:none!important;object-fit:cover}
 .pub-row-coverwrap .movai-cover-tile{width:100%!important;height:100%!important}
-.pub-row-coverwrap .movai-cover-tile .mc-name{font-size:.95rem}
-.pub-row-coverwrap .movai-cover-tile .mc-note{width:42%}
-.pub-row-coverwrap .pub-row-play{width:38px;height:38px;background:rgba(8,10,6,.48);color:#fff;border:1px solid rgba(255,255,255,.55)}
-/* Feed row layout (owner order 2026-11-17): the Like / Dislike /
-   Share / Download / Save buttons DROP OUT of the title column
-   into ONE full-width row of their own UNDER the title / views
-   area, stretching across the whole card; the top area beside
-   the cover keeps the title, the views and the song's duration
-   (m:ss, e.g. 5:00) shown as a small pill. */
+.pub-row-coverwrap .movai-cover-tile .mc-name{font-size:.66rem}
+.pub-row-coverwrap .movai-cover-tile .mc-note{width:40%}
+.pub-row-coverwrap .pub-row-play{width:28px;height:28px;background:rgba(8,10,6,.48);color:#fff;border:1px solid rgba(255,255,255,.55)}
+.pub-row-coverwrap .pub-row-play svg{width:12px;height:12px}
+/* Feed row layout (owner correction 2026-11-17): the Like /
+   Dislike / Share / Download / Save buttons sit in ONE row of
+   their own UNDER the title / views area, but each pill keeps
+   its ORIGINAL small size — never stretched, never enlarged.
+   The top area beside the cover keeps the title, the views and
+   the song's duration (m:ss, e.g. 5:00) shown as a small pill. */
 .pub-songrow{flex-wrap:wrap}
-.pub-row-acts{flex:1 1 100%;flex-wrap:nowrap;gap:5px;margin-top:9px}
-.pub-row-acts .pub-pill,.pub-row-acts .pub-act{flex:1 1 0;min-width:0;justify-content:center;padding:4px 4px}
+.pub-row-acts{flex:1 1 100%;flex-wrap:wrap;gap:5px;margin-top:9px}
+.pub-row-acts .pub-pill,.pub-row-acts .pub-act{flex:0 0 auto;justify-content:center}
 .pub-row-dur{display:inline-flex;align-items:center;margin-left:7px;padding:1px 8px;border-radius:999px;border:1px solid var(--line2);color:var(--text2);font-size:0.6875rem;font-weight:800;font-variant-numeric:tabular-nums;white-space:nowrap}
 /* History / Playlist rows: Play centred on the small cover */
 .song-coverwrap{position:relative;flex:0 0 auto;width:40px;height:40px;border-radius:6px;overflow:hidden}
@@ -2467,6 +2519,72 @@ main{padding-top:calc(3.75rem + env(safe-area-inset-top,0px))}
 <div id="fsViewer" class="fs-viewer" style="display:none" role="dialog" aria-modal="true" onclick="if(event.target===this||event.target.id==='fsBody')fsClose()">
   <button type="button" class="fs-close" id="fsCloseBtn" onclick="fsClose()" aria-label="Close">✕</button>
   <div class="fs-body" id="fsBody"></div>
+</div>
+<!-- MV setup sheet (owner order 2026-11-17): pick the screen
+     format, keep the automatic background or upload your own
+     video / image, then start the MV view. Lyrics status lives
+     here too — songs created with lyrics run them karaoke-style;
+     songs without lyrics get the «AI listen + write lyrics»
+     button (server POST /api/mv/lyrics). -->
+<div id="mvSheet" class="pkg-sheet" style="display:none" role="dialog" aria-modal="true" onclick="if(event.target===this)mvCloseSetup()">
+  <div class="pkg-sheet-card mv-sheet-card">
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:10px">
+      <h3 style="font-size:1.0625rem;font-weight:800">MV</h3>
+      <button type="button" class="drawer-close" style="background:var(--card2);color:var(--text);border-color:var(--line2)" onclick="mvCloseSetup()" aria-label="Close">✕</button>
+    </div>
+    <p id="mvSheetSongTitle" style="font-size:0.9375rem;font-weight:800;margin-top:10px;line-height:1.55;overflow-wrap:break-word"></p>
+    <p class="chip-label" style="margin-top:14px" data-i18n="mvFormat">ទម្រង់អេក្រង់ · Screen format</p>
+    <div class="mv-fmt-grid" id="mvFmtGrid"></div>
+    <p class="chip-label" style="margin-top:16px" data-i18n="mvBg">ផ្ទៃខាងក្រោយ · Background</p>
+    <div class="mv-bg-row">
+      <button type="button" class="kbtn kbtn-black" id="mvBgAutoBtn" onclick="mvBgSetAuto()">✦ <span data-i18n="mvBgAuto">អូតូ</span></button>
+      <button type="button" class="kbtn kbtn-white" id="mvBgUploadBtn" onclick="mvBgPick()">⬆ <span data-i18n="mvBgUpload">Upload វីដេអូ / រូបភាព</span></button>
+    </div>
+    <p class="mv-file-name" id="mvBgName"></p>
+    <p class="chip-label" style="margin-top:12px" data-i18n="mvLyricsLbl">អត្ថបទចម្រៀង · Lyrics</p>
+    <div id="mvLyrBox" style="margin-top:8px"></div>
+    <label class="chip-label" for="mvTrLang" style="display:block;margin-top:14px" data-i18n="mvTrLabel">បកប្រែអត្ថបទទៅ (បើចង់)</label>
+    <select class="input" id="mvTrLang" style="margin-top:8px;min-height:44px">
+      <option value="" data-i18n="mvTrNone">អត់បកប្រែ</option>
+      <option value="km">ខ្មែរ · Khmer</option>
+      <option value="en">English</option>
+      <option value="th">ไทย · Thai</option>
+      <option value="vi">Tiếng Việt</option>
+      <option value="zh">中文 · Chinese</option>
+      <option value="ko">한국어 · Korean</option>
+      <option value="ja">日本語 · Japanese</option>
+      <option value="fr">Français</option>
+    </select>
+    <p class="mv-msg" id="mvMsg" role="status" aria-live="polite"></p>
+    <button type="button" class="btn btn-green btn-block" style="margin-top:12px" onclick="mvStart()">▶ <span data-i18n="mvStart">ចាប់ផ្ដើម MV</span></button>
+  </div>
+</div>
+<input type="file" id="mvBgInput" accept="video/*,image/*" style="display:none" onchange="mvBgPicked(this)">
+<!-- MV view (owner order 2026-11-17): a full-screen stage in the
+     chosen format — background (auto / uploaded), the song title
+     on screen, karaoke lyrics in time with the singing, and
+     Play / seek / Download (the song) / Share controls. It plays
+     the song; it does NOT export a video file. -->
+<div id="mvView" class="mv-view" style="display:none" role="dialog" aria-modal="true" aria-label="MV">
+  <div class="mv-stage-wrap" id="mvStageWrap">
+    <div class="mv-stage" id="mvStage">
+      <div class="mv-bg" id="mvBg"></div>
+      <div class="mv-shade"></div>
+      <div class="mv-title" id="mvTitle"></div>
+      <div class="mv-lyrics" id="mvLyrics"></div>
+      <button type="button" class="mv-bigplay" id="mvBigPlay" aria-label="Play">▶</button>
+    </div>
+  </div>
+  <p class="mv-note" id="mvNote"></p>
+  <div class="mv-controls">
+    <button type="button" class="mv-cbtn" id="mvPlayBtn" aria-label="Play">▶</button>
+    <span class="mv-time" id="mvCur">0:00</span>
+    <input type="range" class="mv-seek" id="mvSeek" min="0" max="1000" value="0" aria-label="Seek">
+    <span class="mv-time" id="mvDur">0:00</span>
+    <button type="button" class="mv-cbtn wide" id="mvDlBtn"></button>
+    <button type="button" class="mv-cbtn wide" id="mvShareBtn"></button>
+    <button type="button" class="mv-cbtn" id="mvCloseBtn" aria-label="Close">✕</button>
+  </div>
 </div>
 <div id="pkgSheet" class="pkg-sheet" style="display:none" role="dialog" aria-modal="true" onclick="if(event.target===this)pkgSheetClose()">
   <div class="pkg-sheet-card">
@@ -2963,7 +3081,13 @@ km:{
  histEmptyVideo:'មិនទាន់មានវីដេអូទេ — វីដេអូដែលអ្នកបង្កើតនឹងរក្សាទុកនៅទីនេះជាប់រហូត',
  histEmptySong:'មិនទាន់មានបទចម្រៀងទេ — បទចម្រៀងដែលអ្នកបង្កើតនឹងរក្សាទុកនៅទីនេះជាប់រហូត',
  histEmpty3d:'មិនទាន់មាន 3D ទេ — ម៉ូដែល 3D ដែលអ្នកបង្កើតនឹងរក្សាទុកនៅទីនេះជាប់រហូត',
- histEmptyStory:'មិនទាន់មាន Story ទេ — Story ដែលអ្នកបង្កើតនឹងរក្សាទុកនៅទីនេះជាប់រហូត'
+ histEmptyStory:'មិនទាន់មាន Story ទេ — Story ដែលអ្នកបង្កើតនឹងរក្សាទុកនៅទីនេះជាប់រហូត',
+ mvBtn:'MV',mvFormat:'ទម្រង់អេក្រង់ · Screen format',mvFmtPortrait:'បញ្ឈរ',mvFmtLandscape:'ផ្ដេក',mvFmtSquare:'ការ៉េ',mvFmtWide:'ធំទូលាយ',
+ mvBg:'ផ្ទៃខាងក្រោយ · Background',mvBgAuto:'អូតូ',mvBgUpload:'Upload វីដេអូ / រូបភាព',mvBgAutoNote:'អូតូ — ប្រើរូប cover របស់បទ ឬផ្ទៃ MovAi ដែលបង្កើតឲ្យ',
+ mvLyricsLbl:'អត្ថបទចម្រៀង · Lyrics',mvLyricsHave:'មានអត្ថបទរួច — អក្សរនឹងរត់តាមពេលច្រៀង (karaoke)',mvLyricsNone:'បទនេះមិនទាន់មានអត្ថបទទេ — ឲ្យ AI ស្ដាប់ហើយសរសេរឲ្យ',
+ mvAiBtn:'AI ស្ដាប់ + សរសេរអត្ថបទ',mvAiBusy:'AI កំពុងស្ដាប់… {s} វិនាទី',mvAiDone:'AI សរសេរអត្ថបទរួចរាល់ ✓',mvAiFail:'AI ស្ដាប់មិនបានទេ — server អាចមិនទាន់មានមុខងារនេះ ឬអ៊ីនធឺណិតមានបញ្ហា។ សូមព្យាយាមម្ដងទៀត',
+ mvTrLabel:'បកប្រែអត្ថបទទៅ (បើចង់)',mvTrNone:'អត់បកប្រែ',mvTrBusy:'កំពុងបកប្រែអត្ថបទ…',mvTrFail:'បកប្រែមិនបាន — បង្ហាញអត្ថបទដើមវិញ',
+ mvStart:'ចាប់ផ្ដើម MV',mvNoSong:'រកបទចម្រៀងមិនឃើញទេ'
 },
 en:{
  docTitle:'MovAi — Create Images & Videos',menuLabel:'Menu',closeLabel:'Close menu',
@@ -3184,7 +3308,13 @@ en:{
  histEmptyVideo:'No videos yet — videos you create will be saved here permanently',
  histEmptySong:'No songs yet — songs you create will be saved here permanently',
  histEmpty3d:'No 3D models yet — 3D models you create will be saved here permanently',
- histEmptyStory:'No stories yet — stories you create will be saved here permanently'
+ histEmptyStory:'No stories yet — stories you create will be saved here permanently',
+ mvBtn:'MV',mvFormat:'Screen format',mvFmtPortrait:'Portrait',mvFmtLandscape:'Landscape',mvFmtSquare:'Square',mvFmtWide:'Ultra-wide',
+ mvBg:'Background',mvBgAuto:'Auto',mvBgUpload:'Upload video / image',mvBgAutoNote:'Auto — uses the song cover, or a generated MovAi backdrop',
+ mvLyricsLbl:'Lyrics',mvLyricsHave:'Lyrics found — they will run karaoke-style with the singing',mvLyricsNone:'This song has no lyrics yet — let AI listen and write them',
+ mvAiBtn:'AI listen + write lyrics',mvAiBusy:'AI is listening… {s}s',mvAiDone:'AI wrote the lyrics ✓',mvAiFail:'AI could not listen — the server may not have this feature yet, or the connection failed. Please try again',
+ mvTrLabel:'Translate lyrics to (optional)',mvTrNone:'No translation',mvTrBusy:'Translating lyrics…',mvTrFail:'Translation failed — showing the original lyrics',
+ mvStart:'Start MV',mvNoSong:'Song not found'
 }};
 function tx(k){var d=I18N[LANG]||I18N.km;return (k in d)?d[k]:(I18N.km[k]||k);}
 function loc(o){return (o&&typeof o==='object')?(o[LANG]||o.km||''):o;}
@@ -6710,6 +6840,7 @@ var SONG_SVG_DL='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stro
 var SONG_SVG_SHARE='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="6" cy="12" r="2.5"/><circle cx="18" cy="6" r="2.5"/><circle cx="18" cy="18" r="2.5"/><path d="M8.2 10.9l7.6-3.7M8.2 13.1l7.6 3.7"/></svg>';
 var SONG_SVG_POST='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3c2.7 2.6 4 5.6 4 9s-1.3 6.4-4 9c-2.7-2.6-4-5.6-4-9s1.3-6.4 4-9z"/></svg>';
 var SONG_SVG_DEL='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16"/><path d="M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/><path d="M6.5 7l.9 12.1A1 1 0 0 0 8.4 20h7.2a1 1 0 0 0 1-.9L17.5 7"/><path d="M10 11v5M14 11v5"/></svg>';
+var SONG_SVG_MV='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2.5" y="5" width="19" height="14" rx="3"/><path d="M10 9.5l5 2.5-5 2.5z" fill="currentColor" stroke="none"/></svg>';
 function songIcoBtn(label,svg,red){
   var b=document.createElement('button');
   b.type='button';b.className='song-ico-btn';
@@ -6969,6 +7100,9 @@ function genSongCard(song,n,it,title,prov,prompt,streaming){
   var dl=songIcoBtn(tx('histDownload'),SONG_SVG_DL);
   dl.addEventListener('click',function(){genDownloadSong(u,n,title,dl);});
   acts.appendChild(dl);
+  var mvb=songIcoBtn(tx('mvBtn'),SONG_SVG_MV);
+  mvb.addEventListener('click',function(){mvOpen({url:u,title:title||'',lyrics:prompt||'',image:(song&&song.image)||''});});
+  acts.appendChild(mvb);
   var sh=songIcoBtn(tx('histShare'),SONG_SVG_SHARE);
   sh.addEventListener('click',function(){histShare(it||{type:'song',url:u,title:title,prompt:prompt},sh);});
   acts.appendChild(sh);
@@ -7696,6 +7830,9 @@ function histSongCard(it){
     var dl=songIcoBtn(tx('histDownload'),SONG_SVG_DL);
     dl.addEventListener('click',function(){histDownload(it,dl);});
     rowEl.appendChild(dl);
+    var mvb=songIcoBtn(tx('mvBtn'),SONG_SVG_MV);
+    mvb.addEventListener('click',function(){mvOpen({url:it.url,title:it.title||'',lyrics:it.prompt||'',image:it.image||''});});
+    rowEl.appendChild(mvb);
     var sh=songIcoBtn(tx('histShare'),SONG_SVG_SHARE);
     sh.addEventListener('click',function(){histShare(it,sh);});
     rowEl.appendChild(sh);
@@ -9954,6 +10091,9 @@ function plRowEl(en){
   var dur=document.createElement('span');
   dur.className='song-dur pl-dur';dur.textContent='0:00';
   rowEl.appendChild(dur);
+  var mvb=songIcoBtn(tx('mvBtn'),SONG_SVG_MV);
+  mvb.addEventListener('click',function(){mvOpen({url:en.url,title:en.title||'',lyrics:'',image:en.image||''});});
+  rowEl.appendChild(mvb);
   var rm=songIcoBtn(tx('plRemove'),SONG_SVG_DEL,true);
   rm.addEventListener('click',function(){plRemove(en.url);});
   rowEl.appendChild(rm);
@@ -10396,6 +10536,12 @@ function pubSongRowEl(it){
   rdl.setAttribute('aria-label',tx('histDownload'));
   rdl.addEventListener('click',function(){pubDownloadPost(it,rdl);});
   acts.appendChild(rdl);
+  var rmv=document.createElement('button');
+  rmv.type='button';rmv.className='pub-pill';
+  rmv.innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2.5" y="5" width="19" height="14" rx="3"/><path d="M10 9.5l5 2.5-5 2.5z" fill="currentColor" stroke="none"/></svg><span>'+escHtml(tx('mvBtn'))+'</span>';
+  rmv.setAttribute('aria-label',tx('mvBtn'));
+  rmv.addEventListener('click',function(){mvOpen({url:it.url,title:it.title||'',lyrics:it.lyrics||it.prompt||'',image:it.image||''});});
+  acts.appendChild(rmv);
   acts.appendChild(plPillBtn({url:it.url,title:it.title||'',image:it.image||'',name:pubDisplayName(it)}));
   /* The action row is NOT inside the title column any more
      (owner order 2026-11-17): it is appended to the row itself
@@ -10751,6 +10897,12 @@ function pubCardEl(it){
     adl.setAttribute('aria-label',tx('histDownload'));
     adl.addEventListener('click',function(){pubDownloadPost(it,adl);});
     arow.appendChild(adl);
+    var amv=document.createElement('button');
+    amv.type='button';amv.className='pub-pill';
+    amv.innerHTML='<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2.5" y="5" width="19" height="14" rx="3"/><path d="M10 9.5l5 2.5-5 2.5z" fill="currentColor" stroke="none"/></svg><span>'+escHtml(tx('mvBtn'))+'</span>';
+    amv.setAttribute('aria-label',tx('mvBtn'));
+    amv.addEventListener('click',function(){mvOpen({url:it.url,title:it.title||'',lyrics:it.lyrics||it.prompt||'',image:it.image||''});});
+    arow.appendChild(amv);
     arow.appendChild(plPillBtn({url:it.url,title:it.title||'',image:it.image||'',name:pubDisplayName(it)}));
     /* Hidden by default (owner order 2026-11-17): the action row
        sits inside a collapsible wrap — the card stays clean and
@@ -16432,6 +16584,410 @@ function aiChatSpeak(text,btn){
 }
 aiChatVoiceUI();
 try{if('speechSynthesis' in window){speechSynthesis.getVoices();if(speechSynthesis.onvoiceschanged!==undefined)speechSynthesis.addEventListener('voiceschanged',function(){try{speechSynthesis.getVoices();}catch(e){}});}}catch(e){}
+</script>
+<script>
+/* ===== MV view (owner order 2026-11-17) =====
+   MV is a PLAYER / VIEW, not a video-file export. Tapping «MV»
+   on any song card (Create results, History, Playlist, Public
+   big card + compact rows) opens a setup sheet: screen format
+   (9:16 / 16:9 / 1:1 / 4:5 / 3:4 / 4:3 / 21:9), background
+   (automatic — the song's cover or a generated MovAi backdrop —
+   or the user's own uploaded video / image). Starting the MV
+   plays the song full-screen in that format with the song
+   title on screen and the lyrics running karaoke-style: the
+   line being sung is highlighted in time with the playback.
+   Lyrics come from the text the song was created with when it
+   has some; when it has none, the «AI listen + write lyrics»
+   button asks the server (POST /api/mv/lyrics {audioUrl}) for
+   timed lines in the language actually sung (never translated
+   unless the user picks a translation language). Download in
+   the MV saves the SONG (MP3, the existing flow); Share is the
+   existing share flow. Nothing else changes. */
+var MV_FORMATS=[
+ {id:'9x16',ratio:'9:16',name:'mvFmtPortrait',w:9,h:16,bw:20,bh:34},
+ {id:'16x9',ratio:'16:9',name:'mvFmtLandscape',w:16,h:9,bw:34,bh:20},
+ {id:'1x1',ratio:'1:1',name:'mvFmtSquare',w:1,h:1,bw:28,bh:28},
+ {id:'4x5',ratio:'4:5',name:'mvFmtPortrait',w:4,h:5,bw:26,bh:32},
+ {id:'3x4',ratio:'3:4',name:'mvFmtPortrait',w:3,h:4,bw:25,bh:33},
+ {id:'4x3',ratio:'4:3',name:'mvFmtLandscape',w:4,h:3,bw:33,bh:25},
+ {id:'21x9',ratio:'21:9',name:'mvFmtWide',w:21,h:9,bw:36,bh:16}
+];
+var mvState={song:null,fmt:'9x16',bgMode:'auto',bgUrl:'',bgKind:'',bgName:'',lines:null,timed:false,curLine:-2,aiBusy:false};
+var mvAudio=null,mvCache={},mvTrCache={};
+function mvFmtById(id){for(var i=0;i<MV_FORMATS.length;i++)if(MV_FORMATS[i].id===id)return MV_FORMATS[i];return MV_FORMATS[0];}
+function mvTextLines(text){
+  return String(text||'').split(/\r?\n/).map(function(s){return s.replace(/^\s+|\s+$/g,'');}).filter(function(s){return s&&!/^\[[^\]]*\]$/.test(s);});
+}
+function mvResolveLines(song){
+  if(!song||!song.url)return {kind:'none',lines:null};
+  var c=mvCache[song.url];
+  if(c)return c;
+  var txt=String(song.lyrics||'');
+  var lines=mvTextLines(txt);
+  /* A real lyrics text (several lines) is used as-is; a one-line
+     style prompt is NOT lyrics — the song counts as lyric-less
+     and gets the AI button instead. */
+  if(lines.length>=2||(lines.length===1&&lines[0].length>60)){
+    var r={kind:'text',lines:lines.map(function(t){return {text:t,start:null,end:null,tr:''};})};
+    mvCache[song.url]=r;return r;
+  }
+  return {kind:'none',lines:null};
+}
+function mvOpen(song){
+  if(!song||!song.url)return;
+  mvBgClear();
+  mvState.song={url:song.url,title:song.title||'',lyrics:song.lyrics||'',image:song.image||''};
+  mvState.fmt='9x16';mvState.bgMode='auto';mvState.curLine=-2;
+  var tt=document.getElementById('mvSheetSongTitle');
+  if(tt)tt.textContent=mvState.song.title||'MovAi';
+  var sel=document.getElementById('mvTrLang');if(sel)sel.value='';
+  mvMsgShow('','');
+  mvFmtRender();mvBgUiRender();mvLyrRender();
+  var s=document.getElementById('mvSheet');if(s)sheetShowAnim(s);
+}
+function mvCloseSetup(){var s=document.getElementById('mvSheet');sheetHideAnim(s);}
+function mvMsgShow(txt,cls){
+  var m=document.getElementById('mvMsg');if(!m)return;
+  m.textContent=txt||'';m.className='mv-msg'+(cls?(' '+cls):'');
+}
+function mvFmtRender(){
+  var g=document.getElementById('mvFmtGrid');if(!g)return;
+  g.innerHTML='';
+  MV_FORMATS.forEach(function(f){
+    var b=document.createElement('button');
+    b.type='button';b.className='mv-fmt'+(mvState.fmt===f.id?' on':'');
+    b.setAttribute('aria-pressed',mvState.fmt===f.id?'true':'false');
+    b.innerHTML='<span class="mv-fmt-box" style="width:'+f.bw+'px;height:'+f.bh+'px"></span><span class="mv-fmt-ratio">'+f.ratio+'</span><span class="mv-fmt-name">'+escHtml(tx(f.name))+'</span>';
+    b.addEventListener('click',function(){mvState.fmt=f.id;mvFmtRender();});
+    g.appendChild(b);
+  });
+}
+function mvBgClear(){
+  if(mvState.bgUrl){try{URL.revokeObjectURL(mvState.bgUrl);}catch(e){}}
+  mvState.bgUrl='';mvState.bgKind='';mvState.bgName='';
+  var inp=document.getElementById('mvBgInput');if(inp)inp.value='';
+}
+function mvBgUiRender(){
+  var a=document.getElementById('mvBgAutoBtn'),u=document.getElementById('mvBgUploadBtn'),n=document.getElementById('mvBgName');
+  if(a)a.className='kbtn '+(mvState.bgMode==='auto'?'kbtn-black':'kbtn-white');
+  if(u)u.className='kbtn '+(mvState.bgMode==='upload'?'kbtn-black':'kbtn-white');
+  if(n)n.textContent=mvState.bgMode==='upload'?(mvState.bgName||''):tx('mvBgAutoNote');
+}
+function mvBgSetAuto(){mvBgClear();mvState.bgMode='auto';mvBgUiRender();}
+function mvBgPick(){var inp=document.getElementById('mvBgInput');if(inp)inp.click();}
+function mvBgPicked(inp){
+  var f=inp&&inp.files&&inp.files[0];if(!f)return;
+  mvBgClear();
+  mvState.bgUrl=URL.createObjectURL(f);
+  mvState.bgKind=/^video\//i.test(f.type)?'video':'image';
+  mvState.bgName=f.name||'';
+  mvState.bgMode='upload';
+  mvBgUiRender();
+}
+function mvLyrRender(){
+  var box=document.getElementById('mvLyrBox');if(!box)return;
+  box.innerHTML='';
+  var r=mvResolveLines(mvState.song);
+  if(r.kind!=='none'){
+    var p=document.createElement('p');
+    p.style.cssText='font-size:0.875rem;line-height:1.6;color:var(--accent-text);font-weight:700';
+    p.textContent=tx('mvLyricsHave')+' ('+r.lines.length+')';
+    box.appendChild(p);
+    return;
+  }
+  var p2=document.createElement('p');
+  p2.style.cssText='font-size:0.875rem;line-height:1.6;color:var(--muted)';
+  p2.textContent=tx('mvLyricsNone');
+  box.appendChild(p2);
+  var b=document.createElement('button');
+  b.type='button';b.className='kbtn kbtn-black';b.style.cssText='margin-top:10px;width:100%';
+  b.textContent='🎧 '+tx('mvAiBtn');
+  b.disabled=mvState.aiBusy;
+  b.addEventListener('click',function(){mvAiFetch('');});
+  box.appendChild(b);
+}
+/* Ask the server to listen to the song and write timed lyrics.
+   POST /api/mv/lyrics {audioUrl} — or {audioUrl, translateTo}
+   when a translation language is picked: the lines then carry
+   a translation in that language. The reply's lines keep the
+   language actually sung — no translation is ever forced. */
+function mvNormLines(j){
+  if(!j)return null;
+  var arr=j.lines||j.lyrics||j.segments||j.result||null;
+  if(typeof arr==='string'){
+    var ls=mvTextLines(arr);
+    return ls.length?ls.map(function(t){return {text:t,start:null,end:null,tr:''};}):null;
+  }
+  if(!Array.isArray(arr)||!arr.length)return null;
+  var out=[];
+  for(var i=0;i<arr.length;i++){
+    var it=arr[i]||{};
+    var text=String(it.text||it.line||it.lyric||'').replace(/^\s+|\s+$/g,'');
+    if(!text)continue;
+    out.push({text:text,
+      start:(typeof it.start==='number'&&isFinite(it.start))?it.start:null,
+      end:(typeof it.end==='number'&&isFinite(it.end))?it.end:null,
+      tr:it.translation?String(it.translation):''});
+  }
+  return out.length?out:null;
+}
+function mvAiFetch(trLang){
+  var song=mvState.song;
+  if(!song||!song.url||mvState.aiBusy)return;
+  if(!/^https:/i.test(song.url)){mvMsgShow(tx('mvAiFail'),'err');return;}
+  mvState.aiBusy=true;
+  mvLyrRender();
+  var t0=Date.now();
+  var noteEl=document.getElementById('mvNote');
+  var viewOpen=document.getElementById('mvView')&&document.getElementById('mvView').style.display!=='none';
+  var timer=setInterval(function(){
+    var s=Math.round((Date.now()-t0)/1000);
+    if(viewOpen&&noteEl)noteEl.textContent=tx(trLang?'mvTrBusy':'mvAiBusy').replace('{s}',s);
+    else mvMsgShow(tx(trLang?'mvTrBusy':'mvAiBusy').replace('{s}',s),'');
+  },500);
+  function finish(){
+    clearInterval(timer);mvState.aiBusy=false;
+    if(viewOpen&&noteEl)noteEl.textContent='';
+  }
+  var body={audioUrl:song.url};
+  if(trLang)body.translateTo=trLang;
+  var timeout=new Promise(function(_,rej){setTimeout(function(){rej(new Error('timeout'));},120000);});
+  Promise.race([fetch(GEN_API+'/mv/lyrics',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}),timeout])
+  .then(function(r){if(!r.ok)throw new Error('http '+r.status);return r.json();})
+  .then(function(j){
+    finish();
+    var lines=mvNormLines(j);
+    if(!lines)throw new Error('bad shape');
+    var timed=lines.length&&typeof lines[0].start==='number';
+    if(trLang){
+      mvTrCache[song.url+'|'+trLang]={kind:timed?'timed':'text',lines:lines};
+      mvMsgShow(tx('mvAiDone'),'ok');
+    }else{
+      mvCache[song.url]={kind:timed?'timed':'text',lines:lines};
+      mvMsgShow(tx('mvAiDone'),'ok');
+      mvLyrRender();
+    }
+    if(mvState.song&&mvState.song.url===song.url)mvApplyLines(lines,timed);
+  })
+  .catch(function(){
+    finish();
+    if(viewOpen&&noteEl)noteEl.textContent=tx(trLang?'mvTrFail':'mvAiFail');
+    else mvMsgShow(tx(trLang?'mvTrFail':'mvAiFail'),'err');
+    mvLyrRender();
+  });
+}
+function mvApplyLines(lines,timed){
+  mvState.lines=lines;mvState.timed=!!timed;mvState.curLine=-2;
+  mvSyncLyrics(true);
+}
+function mvPauseOthers(){
+  try{genSongAudios.forEach(function(a){if(a!==mvAudio){try{a.pause();}catch(e){}}});}catch(e){}
+  try{if(histAudio&&histAudio!==mvAudio)histAudio.pause();}catch(e){}
+  try{if(plAudio&&plAudio!==mvAudio)plAudio.pause();}catch(e){}
+  try{var all=document.querySelectorAll('#pubFeed audio');for(var i=0;i<all.length;i++){try{all[i].pause();}catch(e){}}}catch(e){}
+}
+function mvStart(){
+  var song=mvState.song;
+  if(!song||!song.url){mvMsgShow(tx('mvNoSong'),'err');return;}
+  var sel=document.getElementById('mvTrLang');
+  var trLang=sel?sel.value:'';
+  mvCloseSetup();
+  var view=document.getElementById('mvView');
+  view.style.display='flex';
+  document.body.style.overflow='hidden';
+  mvBuildBg();
+  var tt=document.getElementById('mvTitle');if(tt)tt.textContent=song.title||'MovAi';
+  var note=document.getElementById('mvNote');if(note)note.textContent='';
+  /* Lyrics: a picked translation goes through the AI endpoint
+     (its timed lines replace the plain ones when they land);
+     otherwise the song's own lines run at once. */
+  var r=mvResolveLines(song);
+  if(trLang&&mvTrCache[song.url+'|'+trLang]){
+    var c=mvTrCache[song.url+'|'+trLang];
+    mvApplyLines(c.lines,c.kind==='timed');
+  }else if(r.kind!=='none'){
+    mvApplyLines(r.lines,r.kind==='timed');
+  }else{
+    mvApplyLines(null,false);
+  }
+  if(trLang&&!mvTrCache[song.url+'|'+trLang])mvAiFetch(trLang);
+  /* Audio: one dedicated element for the MV view. */
+  if(!mvAudio){
+    mvAudio=new Audio();
+    mvAudio.preload='metadata';
+    mvAudio.addEventListener('timeupdate',mvSync);
+    mvAudio.addEventListener('loadedmetadata',mvSync);
+    mvAudio.addEventListener('durationchange',mvSync);
+    mvAudio.addEventListener('play',mvSyncBtns);
+    mvAudio.addEventListener('pause',mvSyncBtns);
+    mvAudio.addEventListener('ended',mvSyncBtns);
+  }
+  if(mvAudio.getAttribute('src')!==song.url){mvAudio.src=song.url;mvAudio.currentTime=0;}
+  mvPauseOthers();
+  mvFitStage();mvSync();mvSyncBtns();
+  var pr=mvAudio.play();if(pr&&pr.catch)pr.catch(function(){mvSyncBtns();});
+  var dl=document.getElementById('mvDlBtn');
+  if(dl)dl.innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v11"/><path d="M7 10l5 5 5-5"/><path d="M4 21h16"/></svg><span>'+escHtml(tx('histDownload'))+'</span>';
+  var sh=document.getElementById('mvShareBtn');
+  if(sh)sh.innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="6" cy="12" r="2.5"/><circle cx="18" cy="6" r="2.5"/><circle cx="18" cy="18" r="2.5"/><path d="M8.2 10.9l7.6-3.7M8.2 13.1l7.6 3.7"/></svg><span>'+escHtml(tx('histShare'))+'</span>';
+}
+function mvBuildBg(){
+  var bg=document.getElementById('mvBg');if(!bg)return;
+  bg.innerHTML='';
+  var song=mvState.song;
+  if(mvState.bgMode==='upload'&&mvState.bgUrl){
+    if(mvState.bgKind==='video'){
+      var vd=document.createElement('video');
+      vd.src=mvState.bgUrl;vd.muted=true;vd.loop=true;vd.playsInline=true;vd.autoplay=true;
+      bg.appendChild(vd);
+      var pv=vd.play();if(pv&&pv.catch)pv.catch(function(){});
+    }else{
+      var im=document.createElement('img');
+      im.src=mvState.bgUrl;im.alt='';
+      bg.appendChild(im);
+    }
+    return;
+  }
+  if(song&&song.image&&/^https:/i.test(song.image)){
+    var cv=document.createElement('img');
+    cv.src=song.image;cv.alt='';cv.className='mv-auto-img';
+    cv.addEventListener('error',function(){bg.innerHTML='';bg.appendChild(mvAutoGrad(song));});
+    bg.appendChild(cv);
+    return;
+  }
+  bg.appendChild(mvAutoGrad(song));
+}
+function mvAutoGrad(song){
+  var d=document.createElement('div');
+  d.className='mv-auto-grad';
+  var h=0,t=String((song&&song.title)||'MovAi');
+  for(var i=0;i<t.length;i++)h=(h*31+t.charCodeAt(i))%360;
+  d.style.background='linear-gradient(150deg,hsl('+h+',52%,26%),hsl('+((h+70)%360)+',58%,12%) 70%,#07080a)';
+  d.innerHTML='<svg class="mc-note" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg><span class="mc-name">Mov<span>Ai</span></span>';
+  return d;
+}
+function mvFitStage(){
+  var wrap=document.getElementById('mvStageWrap'),stage=document.getElementById('mvStage');
+  if(!wrap||!stage)return;
+  var f=mvFmtById(mvState.fmt);
+  var aw=wrap.clientWidth-24,ah=wrap.clientHeight-24;
+  if(aw<=0||ah<=0)return;
+  var w=aw,h=w*f.h/f.w;
+  if(h>ah){h=ah;w=h*f.w/f.h;}
+  stage.style.width=Math.floor(w)+'px';
+  stage.style.height=Math.floor(h)+'px';
+}
+function mvSync(){
+  if(!mvAudio)return;
+  var d=isFinite(mvAudio.duration)?mvAudio.duration:0,c=mvAudio.currentTime||0;
+  var cur=document.getElementById('mvCur'),dur=document.getElementById('mvDur'),seek=document.getElementById('mvSeek');
+  if(cur)cur.textContent=histFmtTime(c);
+  if(dur)dur.textContent=histFmtTime(d);
+  if(seek&&d>0)seek.value=String(Math.round(c/d*1000));
+  mvSyncLyrics(false);
+}
+function mvSyncBtns(){
+  if(!mvAudio)return;
+  var playing=!mvAudio.paused&&!mvAudio.ended;
+  var pb=document.getElementById('mvPlayBtn'),big=document.getElementById('mvBigPlay');
+  if(pb){pb.textContent=playing?'❚❚':'▶';pb.setAttribute('aria-label',playing?'Pause':'Play');}
+  if(big){big.textContent='▶';big.classList.toggle('show',!playing);}
+}
+function mvSyncLyrics(force){
+  var box=document.getElementById('mvLyrics');
+  if(!box)return;
+  var lines=mvState.lines;
+  if(!lines||!lines.length||!mvAudio){if(force||mvState.curLine!==-2){box.innerHTML='';mvState.curLine=-2;}return;}
+  var t=mvAudio.currentTime||0,idx=-1,i;
+  if(mvState.timed){
+    for(i=0;i<lines.length;i++){
+      var s=lines[i].start;
+      if(typeof s==='number'&&t>=s)idx=i;else if(typeof s==='number'&&t<s)break;
+    }
+  }else{
+    var d=isFinite(mvAudio.duration)?mvAudio.duration:0;
+    if(d>0)idx=Math.min(lines.length-1,Math.floor(t/d*lines.length));
+    else idx=0;
+  }
+  if(idx===mvState.curLine&&!force)return;
+  mvState.curLine=idx;
+  box.innerHTML='';
+  if(idx<0){
+    var nx=document.createElement('div');
+    nx.className='mv-line';nx.textContent=lines[0].text;
+    box.appendChild(nx);return;
+  }
+  if(idx>0){
+    var pv=document.createElement('div');
+    pv.className='mv-line';pv.textContent=lines[idx-1].text;
+    box.appendChild(pv);
+  }
+  var cl=document.createElement('div');
+  cl.className='mv-line on';
+  var sp=document.createElement('span');
+  sp.className='mv-line-txt';sp.textContent=lines[idx].text;
+  cl.appendChild(sp);
+  if(lines[idx].tr){
+    var tr=document.createElement('span');
+    tr.className='mv-line-tr';tr.textContent=lines[idx].tr;
+    cl.appendChild(tr);
+  }
+  box.appendChild(cl);
+  if(idx<lines.length-1){
+    var n2=document.createElement('div');
+    n2.className='mv-line';n2.textContent=lines[idx+1].text;
+    box.appendChild(n2);
+  }
+}
+function mvTogglePlay(){
+  if(!mvAudio)return;
+  if(mvAudio.paused){mvPauseOthers();var pr=mvAudio.play();if(pr&&pr.catch)pr.catch(function(){});}
+  else mvAudio.pause();
+  mvSyncBtns();
+}
+function mvCloseView(){
+  if(mvAudio){try{mvAudio.pause();}catch(e){}}
+  var view=document.getElementById('mvView');
+  if(view){
+    var vd=view.querySelector('.mv-bg video');
+    if(vd){try{vd.pause();}catch(e){}}
+    view.style.display='none';
+  }
+  document.body.style.overflow='';
+}
+function mvDownload(){
+  var song=mvState.song;if(!song||!song.url)return;
+  dlSaveSongMp3(song.url,song.title||'','movai-song',document.getElementById('mvDlBtn'));
+}
+function mvShare(){
+  var song=mvState.song;if(!song)return;
+  histShare({type:'song',url:song.url,title:song.title||''},document.getElementById('mvShareBtn'));
+}
+(function(){
+  var pb=document.getElementById('mvPlayBtn');if(pb)pb.addEventListener('click',mvTogglePlay);
+  var big=document.getElementById('mvBigPlay');if(big)big.addEventListener('click',mvTogglePlay);
+  var st=document.getElementById('mvStage');
+  if(st)st.addEventListener('click',function(ev){if(ev.target&&ev.target.closest&&ev.target.closest('button'))return;mvTogglePlay();});
+  var sk=document.getElementById('mvSeek');
+  if(sk)sk.addEventListener('input',function(){
+    if(!mvAudio)return;
+    var d=isFinite(mvAudio.duration)?mvAudio.duration:0;
+    if(d>0){try{mvAudio.currentTime=d*(parseInt(sk.value,10)||0)/1000;}catch(e){}}
+    mvSyncLyrics(true);
+  });
+  var dl=document.getElementById('mvDlBtn');if(dl)dl.addEventListener('click',mvDownload);
+  var sh=document.getElementById('mvShareBtn');if(sh)sh.addEventListener('click',mvShare);
+  var cl=document.getElementById('mvCloseBtn');if(cl)cl.addEventListener('click',mvCloseView);
+  window.addEventListener('resize',function(){
+    var v=document.getElementById('mvView');
+    if(v&&v.style.display!=='none')mvFitStage();
+  });
+  document.addEventListener('keydown',function(e){
+    if(e.key!=='Escape')return;
+    var v=document.getElementById('mvView');
+    if(v&&v.style.display!=='none')mvCloseView();
+  });
+})();
 </script>
 <script>
 /* ===== Top-bar search (SONAR style bar) =====
