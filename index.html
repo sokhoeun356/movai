@@ -2532,6 +2532,14 @@ main{padding-top:calc(3.75rem + env(safe-area-inset-top,0px))}
 .st-trim{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-top:10px;font-size:0.8125rem;color:var(--muted)}
 .st-trim input{width:78px;padding:8px;border-radius:8px;border:1px solid var(--line2);background:var(--field);color:var(--text);font-family:inherit;font-size:0.875rem;min-height:42px}
 input[type=range].st-range{accent-color:var(--accent);min-height:32px;cursor:pointer}
+/* ===== Studio auto-split additions (owner order 2026-11-18) =====
+   The drawer Studio item carries a small live «Preparing
+   Studio… X%» pill while a freshly generated song is fetched,
+   decoded and split in the background; the Studio panel shows
+   a dashed empty workspace while it holds no project. */
+.st-nav-prep{display:inline-block;margin-left:6px;padding:2px 8px;border-radius:999px;background:rgba(var(--accent-rgb),.18);color:var(--accent-text);font-size:0.6875rem;font-weight:800;white-space:nowrap;vertical-align:1px}
+.st-empty{margin-top:16px;border:1.5px dashed var(--line2);border-radius:14px;padding:26px 16px;text-align:center;font-size:0.9375rem;font-weight:700;color:var(--text2);line-height:1.65}
+.st-empty span{display:block;margin-top:4px;font-size:0.8125rem;font-weight:400;color:var(--muted)}
 @media(min-width:1024px){#page-studio .panel{max-width:1080px;margin-left:auto;margin-right:auto}}
 </style>
 </head>
@@ -2544,7 +2552,7 @@ input[type=range].st-range{accent-color:var(--accent);min-height:32px;cursor:poi
     <button onclick="menuGo('sec-create','song')"><span data-i18n="navModeSong">បង្កើតបទចម្រៀង</span></button>
     <button onclick="menuGo('sec-create','video')"><span data-i18n="navModeVI">វីដេអូ+រូបភាព</span></button>
     <button onclick="menuGo('sec-create','3d')"><span data-i18n="navMode3d">រូបភាព 3D</span></button>
-    <button onclick="menuGo('sec-studio')"><span data-i18n="navStudio">ស្ទូឌីយោ</span> <small>Studio</small></button>
+    <button onclick="menuGo('sec-studio')"><span data-i18n="navStudio">ស្ទូឌីយោ</span> <small>Studio<span id="stNavPrep" class="st-nav-prep" style="display:none"></span></small></button>
     <button onclick="menuGo('sec-history')"><span data-i18n="navHistory">ប្រវត្តិ</span> <small>History</small></button>
     <button onclick="menuGo('sec-playlist')"><span data-i18n="plTitle">Playlist · បញ្ជីចម្រៀង</span> <small>Playlist</small></button>
     <button onclick="menuGo('sec-packages')"><span data-i18n="navPackages">កញ្ចប់សេវាកម្ម</span> <small data-i18n="navPackagesSub">Packages</small></button>
@@ -2931,6 +2939,7 @@ input[type=range].st-range{accent-color:var(--accent);min-height:32px;cursor:poi
       <button type="button" class="kbtn kbtn-black" onclick="document.getElementById('stFile').click()">បើក File · Open file</button>
       <button type="button" class="kbtn kbtn-white" id="stSplitBtn" onclick="stSplit()" disabled>បំបែក Track · Split</button>
       <button type="button" class="kbtn kbtn-white" onclick="document.getElementById('stStemFile').click()">បន្ថែម Track · Add track</button>
+      <button type="button" class="kbtn kbtn-white" id="stClearBtn" onclick="stClearProject()">សម្អាត · Clear</button>
     </div>
     <div class="st-row">
       <input class="input st-url" id="stUrl" type="url" placeholder="Link បទចម្រៀង (MP3) · Song URL" aria-label="Song URL">
@@ -2940,18 +2949,20 @@ input[type=range].st-range{accent-color:var(--accent);min-height:32px;cursor:poi
     <input type="file" id="stStemFile" accept="audio/*" multiple style="display:none" onchange="stAddStems(this)">
     <p class="st-note">បំបែក Vocal / Instrumental (center-channel) — បំបែក 4 Track ពេញ (Vocal/Drums/Bass/Other) ត្រូវការសេវាបំបែកសំឡេងដាច់ដោយឡែក · Vocal / Instrumental split (center-channel) — a full 4-stem split (Vocal/Drums/Bass/Other) needs a dedicated separation service.</p>
     <p class="st-msg" id="stMsg" style="display:none"></p>
+    <p class="st-msg" id="stAutoNote" style="display:none"></p>
     <div class="st-prog" id="stProg">
       <div class="st-prog-bar"><div class="st-prog-fill" id="stProgFill"></div></div>
       <div class="st-prog-txt" id="stProgTxt"></div>
     </div>
-    <div class="st-transport">
+    <div id="stEmptyState" class="st-empty">Studio ទទេ · Studio is empty<span>បង្កើតបទចម្រៀងថ្មី — វានឹងចូល Studio ហើយបំបែកជាស្រាចដោយស្វ័យប្រវត្តិ · ឬបើក MP3/WAV ខាងលើ<br>Create a song and it lands here already split — or open an MP3/WAV above.</span></div>
+    <div class="st-transport" id="stTransport">
       <button type="button" class="st-play" id="stPlayBtn" onclick="stTogglePlay()" aria-label="Play / Pause">▶</button>
       <span class="st-time"><span id="stCur">0:00</span> / <span id="stTot">0:00</span></span>
       <button type="button" class="kbtn kbtn-white st-loop" id="stLoopBtn" onclick="stToggleLoop()" aria-pressed="false">វិលជុំ · Loop</button>
       <label class="st-master">Master <input type="range" class="st-range" id="stMasterVol" min="0" max="100" value="90" oninput="stSetMaster(this.value)"></label>
     </div>
     <div id="stTracks"></div>
-    <div class="st-row">
+    <div class="st-row" id="stExportRow">
       <button type="button" class="btn btn-green" style="flex:1" onclick="stExport()">Export Mix · ទាញយក WAV</button>
     </div>
   </div>
@@ -7579,7 +7590,8 @@ function genShowSongs(items,streaming,restored){
      mixed into someone else's History, or lost. */
   var saveKey=(histCtx&&histCtx.acctKey)?histCtx.acctKey:histKey();
   if(!streaming&&!restored){
-    songs.forEach(function(s){
+    var autoJobs=[];
+    songs.forEach(function(s,si){
       var su=/^https:/i.test(s.url)?s.url:((/^data:audio\//i.test(s.url)&&s.url.length<1200000)?s.url:null);
       if(su){
         var hit={type:'song',url:su,title:s.title||sTitle,prompt:sPrompt,provider:sProv,image:(s.image&&/^https:/i.test(s.image))?s.image:undefined};
@@ -7595,6 +7607,13 @@ function genShowSongs(items,streaming,restored){
            the expiring provider URL — is what History keeps and
            syncs to the creator's Gmail account on the server. */
         try{histStoreSongNow(hit,saveKey);}catch(e){}
+        /* MOVAI Studio AUTO-SPLIT (owner order 2026-11-18): a
+           successfully generated song is prepared for the Studio
+           in the background (fetch + decode + Vocals/Instruments
+           split) — see stAutoQueue in the Studio engine. Only the
+           FINAL render queues it: streaming previews and restored
+           results never do, and failures never reach this code. */
+        autoJobs.push({idx:si,id:hit.id||'',url:su,title:s.title||sTitle,saveKey:saveKey});
       }
     });
     /* The Create results themselves are kept too (owner rule
@@ -7616,6 +7635,16 @@ function genShowSongs(items,streaming,restored){
     grid.appendChild(genSongCard(s,i+1,it,s.title||sTitle,sProv,sPrompt,streaming));
   });
   box.appendChild(grid);
+  /* Studio auto-split: queue the background preparation now that
+     the finished cards exist (each card carries its own live
+     «Preparing Studio… X%» badge). Never switches the view. */
+  if(!streaming&&!restored){
+    try{
+      if(typeof stAutoQueue==='function'){
+        autoJobs.forEach(function(j){stAutoQueue(j,grid.children[j.idx]||null);});
+      }
+    }catch(e){}
+  }
   /* Carry playback over the re-render by matching the song URL
      (never by position — order/count can shift between the
      streaming preview and the final render, and an index match
@@ -9925,7 +9954,7 @@ function appSetView(v){
   /* Studio view hooks: redraw the waveforms once the section
      is visible (canvas widths are 0 while it is hidden), and
      stop Studio playback when the user leaves the section. */
-  if(nv==='studio'){try{stDrawAllWaves();}catch(e){}}
+  if(nv==='studio'){try{stDrawAllWaves();}catch(e){}try{stSyncEmptyUI();}catch(e){}}
   else{try{if(typeof ST!=='undefined'&&ST.playing)stPause(false);}catch(e){}}
   if(changed)window.scrollTo(0,0);
   try{dockSync();}catch(e){}
@@ -20496,7 +20525,7 @@ function topSearchApply(){
      as «<song name> - MOVAI Studio.wav», with live progress
      (% + elapsed seconds).
    No server, no login, no API keys, no provider calls. */
-var ST={ctx:null,master:null,tracks:[],mainBuffer:null,songName:'',playing:false,loop:false,pos:0,startAt:0,startPos:0,raf:0,nextId:1,masterVol:0.9,busy:false,progPct:0,progLabel:'',progT0:0,progTimer:null};
+var ST={ctx:null,master:null,tracks:[],mainBuffer:null,songName:'',playing:false,loop:false,pos:0,startAt:0,startPos:0,raf:0,nextId:1,masterVol:0.9,busy:false,progPct:0,progLabel:'',progT0:0,progTimer:null,progSink:null,autoToken:0,projectKey:'',autoNote:''};
 function stCtx(){
   if(!ST.ctx){
     var AC=window.AudioContext||window.webkitAudioContext;
@@ -20534,7 +20563,7 @@ function stProgPaint(){
   if(f)f.style.width=ST.progPct+'%';
   if(t)t.textContent=ST.progLabel+' · '+Math.round(ST.progPct)+'% · '+stFmt((Date.now()-ST.progT0)/1000);
 }
-function stProgSet(pct){ST.progPct=Math.max(0,Math.min(100,pct));stProgPaint();}
+function stProgSet(pct){ST.progPct=Math.max(0,Math.min(100,pct));if(ST.progSink){try{ST.progSink(ST.progPct);}catch(e){}}stProgPaint();}
 function stProgEnd(){
   if(ST.progTimer){clearInterval(ST.progTimer);ST.progTimer=null;}
   var p=document.getElementById('stProg');if(p)p.classList.remove('on');
@@ -20563,6 +20592,7 @@ function stRenderAllTracks(){
   for(var i=0;i<ST.tracks.length;i++)box.appendChild(stTrackEl(ST.tracks[i]));
   stDrawAllWaves();
   stPaintTime();
+  try{stSyncEmptyUI();}catch(e){}
 }
 function stTrackEl(tr){
   var wrap=document.createElement('div');wrap.className='st-track';
@@ -20765,6 +20795,8 @@ function stSetSong(name,buffer){
   ST.mainBuffer=buffer;
   ST.songName=name||'Song';
   ST.pos=0;
+  ST.projectKey='manual';
+  ST.autoNote='';
   stAddTrack(ST.songName,buffer,true);
   var info=document.getElementById('stSongInfo');
   if(info)info.textContent=ST.songName+' · '+stFmt(buffer.duration);
@@ -20775,17 +20807,26 @@ function stSetSong(name,buffer){
 function stLoadFile(inp){
   var f=inp.files&&inp.files[0];inp.value='';
   if(!f)return;
+  ST.autoToken++;
   stMsg('កំពុងបើក · Loading…');
   stFileBuffer(f).then(function(ab){return stDecode(ab);}).then(function(buffer){
     stSetSong(f.name.replace(/\.[^.]+$/,''),buffer);
   }).catch(function(){stMsg('បើក File មិនបាន · Could not open that file',true);});
 }
-function stLoadFromUrl(url,nameHint){
-  stMsg('កំពុងផ្ទុក · Loading…');
+/* Fetch + decode an audio URL into an AudioBuffer (shared by the
+   manual URL load and the background auto-split below). Throws on
+   any failure — HTTP error, network/CORS block, or undecodable
+   audio — so callers can run their own fallback. */
+function stFetchDecode(url){
   return fetch(url).then(function(r){
     if(!r.ok)throw new Error('http '+r.status);
     return r.arrayBuffer();
-  }).then(function(ab){return stDecode(ab);}).then(function(buffer){
+  }).then(function(ab){return stDecode(ab);});
+}
+function stLoadFromUrl(url,nameHint){
+  ST.autoToken++;
+  stMsg('កំពុងផ្ទុក · Loading…');
+  return stFetchDecode(url).then(function(buffer){
     var name=nameHint||'';
     if(!name){
       try{var seg=url.split('?')[0].split('#')[0].split('/').pop();if(seg)name=decodeURIComponent(seg).replace(/\.[^.]+$/,'');}catch(e){}
@@ -20814,6 +20855,7 @@ function stAddStems(inp){
   var files=[];if(inp.files)for(var i=0;i<inp.files.length;i++)files.push(inp.files[i]);
   inp.value='';
   if(!files.length)return;
+  ST.autoToken++;
   stMsg('កំពុងបន្ថែម · Adding…');
   var chain=Promise.resolve(),failed=0;
   files.forEach(function(f){
@@ -20828,6 +20870,229 @@ function stAddStems(inp){
     if(failed)stMsg('File ខ្លះបើកមិនបាន · Some files could not be opened',true);
     else stMsg('');
   });
+}
+/* ================= Studio empty state + Clear (owner order 2026-11-18) =================
+   The Studio holds ONE current project at a time and starts
+   EMPTY: while there is no project, only the Load options show
+   (plus the empty workspace note) — the transport, tracks and
+   Export stay hidden. «សម្អាត · Clear» empties the project back
+   to that blank state: playback stops, every track is removed,
+   and any background auto-split still in flight for the cleared
+   project is discarded when it lands (ST.autoToken). */
+function stSyncEmptyUI(){
+  var has=!!(ST.mainBuffer||ST.tracks.length);
+  var e=document.getElementById('stEmptyState');if(e)e.style.display=has?'none':'';
+  var t=document.getElementById('stTransport');if(t)t.style.display=has?'':'none';
+  var x=document.getElementById('stExportRow');if(x)x.style.display=has?'':'none';
+  var cb=document.getElementById('stClearBtn');if(cb)cb.disabled=!has;
+  var an=document.getElementById('stAutoNote');
+  if(an){
+    if(ST.autoNote){an.style.display='';an.textContent=ST.autoNote;an.className='st-msg';}
+    else{an.style.display='none';an.textContent='';}
+  }
+  if(!has){
+    var info=document.getElementById('stSongInfo');
+    if(info)info.textContent='មិនទាន់មានបទ · No song loaded';
+  }
+}
+function stClearProject(){
+  var pk=ST.projectKey;
+  if(pk&&stAutoSeen[pk])delete stAutoSeen[pk];
+  ST.autoToken++;
+  try{stPause(false);}catch(e){}
+  stStopSources();
+  for(var i=0;i<ST.tracks.length;i++){try{ST.tracks[i].gain.disconnect();}catch(e){}}
+  ST.tracks=[];
+  ST.mainBuffer=null;
+  ST.songName='';
+  ST.pos=0;
+  ST.projectKey='';
+  ST.autoNote='';
+  var sb=document.getElementById('stSplitBtn');if(sb)sb.disabled=true;
+  var urlInp=document.getElementById('stUrl');if(urlInp)urlInp.value='';
+  stProgEnd();
+  stMsg('');
+  stRenderAllTracks();
+  stSyncEmptyUI();
+}
+/* Install an already-split song as the Studio's current project
+   (Vocals + Instruments tracks over the song's own buffer) —
+   used by the auto-split below; mirrors stSetSong's bookkeeping. */
+function stSetSplitProject(name,mainBuffer,vocBuf,instBuf,key){
+  stPause(false);
+  for(var i=0;i<ST.tracks.length;i++){try{ST.tracks[i].gain.disconnect();}catch(e){}}
+  ST.tracks=[];
+  ST.mainBuffer=mainBuffer;
+  ST.songName=name||'Song';
+  ST.pos=0;
+  ST.projectKey=key||'';
+  ST.autoNote='';
+  var voc=stAddTrack('សំឡេងច្រៀង · Vocals',vocBuf,true);
+  var inst=stAddTrack('ភ្លេង · Instruments',instBuf,true);
+  ST.tracks=[voc,inst];
+  var info=document.getElementById('stSongInfo');
+  if(info)info.textContent=ST.songName+' · '+stFmt(mainBuffer.duration);
+  var sb=document.getElementById('stSplitBtn');if(sb)sb.disabled=false;
+  stRenderAllTracks();
+  stMsg('');
+}
+/* ================= Studio AUTO-SPLIT (owner order 2026-11-18) =================
+   When a Create Song generation COMPLETES successfully,
+   genShowSongs queues each finished song here (stAutoQueue).
+   In the background — the creation UI is never blocked and the
+   view never switches — the song is fetched + decoded, split
+   with the SAME center-channel render the manual Split button
+   uses (stSplitRenderOne, with stSplitMath as its fallback),
+   and installed as the Studio's current project, already split
+   into Vocals + Instruments. The latest generated song replaces
+   the previous project. Progress shows live on the song's own
+   card and on the drawer's Studio item («Preparing Studio… X%»).
+   Failure handling: if the split itself fails after a good
+   decode, the song is loaded as ONE single track with a note in
+   the Studio; if the provider URL cannot be fetched/decoded at
+   all (e.g. it blocks cross-origin audio) the prep first waits
+   for the song's permanent stored URL (song-store) and retries
+   once with it, and only then gives up quietly — the song and
+   the creation flow are never broken. A guard (stAutoSeen, by
+   history id / URL) stops the same song being prepared twice,
+   and ST.autoToken discards a result the owner has superseded
+   by loading or clearing the Studio manually meanwhile. */
+var stAutoSeen={};
+var stAutoChain=Promise.resolve();
+var stAutoActive=0;
+function stAutoNavShow(pct){
+  var n=document.getElementById('stNavPrep');
+  if(n){n.style.display='';n.textContent='⏳ Preparing Studio… '+Math.round(pct)+'%';}
+}
+function stAutoNavDone(){
+  if(stAutoActive>0)return;
+  var n=document.getElementById('stNavPrep');
+  if(n)n.style.display='none';
+}
+function stAutoBadgeCreate(job,cardEl){
+  var d=document.createElement('div');
+  d.className='song-card-prog st-prep-badge';
+  d.setAttribute('role','status');d.setAttribute('aria-live','polite');
+  d.innerHTML='<div class="scp-line"><span class="scp-spin" aria-hidden="true"></span><span class="scp-txt st-prep-txt">⏳ Preparing Studio… 0%</span></div><div class="scp-bar"><div class="scp-fill st-prep-fill" style="width:0%"></div></div>';
+  cardEl.appendChild(d);
+  job._badge=d;
+}
+function stAutoBadgePaint(job,pct){
+  var d=job._badge;if(!d||!document.contains(d))return;
+  var t=d.querySelector('.st-prep-txt');
+  if(t)t.textContent='⏳ កំពុងរៀបចំ Studio · Preparing Studio… '+Math.round(pct)+'%';
+  var f=d.querySelector('.st-prep-fill');
+  if(f)f.style.width=Math.round(pct)+'%';
+}
+function stAutoBadgeDone(job,txt){
+  var d=job._badge;job._badge=null;
+  if(!d||!document.contains(d))return;
+  if(!txt){if(d.parentNode)d.remove();return;}
+  d.classList.add('done');
+  var sp=d.querySelector('.scp-spin');if(sp)sp.style.display='none';
+  var t=d.querySelector('.st-prep-txt');if(t)t.textContent=txt;
+  var f=d.querySelector('.st-prep-fill');if(f)f.style.width='100%';
+  setTimeout(function(){if(d.parentNode)d.remove();},9000);
+}
+function stAutoProgress(job,pct){
+  pct=Math.max(0,Math.min(100,pct));
+  stAutoBadgePaint(job,pct);
+  stAutoNavShow(pct);
+  /* The Studio panel's own progress bar is driven by the
+     existing stProgBegin/stProgSet machinery while the split
+     renders (see stAutoPrepareOne) — nothing to paint here. */
+}
+/* If the provider URL would not decode, the song's permanent
+   stored URL may still land via song-store (histStoreSongNow):
+   poll this song's History item until its `_storing` flag clears
+   (up to ~45 s) and hand back the new URL when it changed. */
+function stAutoWaitStoredUrl(job){
+  if(!job.id||!job.saveKey)return Promise.resolve(null);
+  var t0=Date.now();
+  return new Promise(function(resolve){
+    (function poll(){
+      var found=null;
+      try{
+        var a=histGetFrom(job.saveKey);
+        for(var i=0;i<a.length;i++)if(a[i]&&a[i].id===job.id){found=a[i];break;}
+      }catch(e){}
+      if(found&&!found._storing){
+        resolve((found.url&&found.url!==job.url)?found.url:null);
+        return;
+      }
+      if(!found||Date.now()-t0>45000){resolve(null);return;}
+      setTimeout(poll,3000);
+    })();
+  });
+}
+function stAutoQueue(job,cardEl){
+  if(!job||!job.url)return;
+  var key=job.id||job.url;
+  if(stAutoSeen[key])return;
+  stAutoSeen[key]=1;
+  job.key=key;
+  if(cardEl)stAutoBadgeCreate(job,cardEl);
+  stAutoActive++;
+  stAutoNavShow(0);
+  stAutoChain=stAutoChain.then(function(){return stAutoPrepareOne(job);}).catch(function(){});
+}
+async function stAutoPrepareOne(job){
+  var token=ST.autoToken;
+  var usedProg=false;
+  try{
+    /* Drive the Studio's own progress bar through its existing
+       machinery (label + % + elapsed seconds) unless a manual
+       Studio operation is using it right now. */
+    if(!ST.busy){stProgBegin('កំពុងរៀបចំ Studio · Preparing Studio');usedProg=true;}
+    stAutoProgress(job,2);
+    var buffer=null;
+    try{
+      buffer=await stFetchDecode(job.url);
+    }catch(e1){
+      var nu=await stAutoWaitStoredUrl(job);
+      if(nu){job.url=nu;buffer=await stFetchDecode(nu);}
+      else throw e1;
+    }
+    stAutoProgress(job,15);
+    var vocBuf=null,instBuf=null,splitOk=true;
+    ST.progSink=function(p){stAutoProgress(job,15+p*0.85);};
+    try{
+      vocBuf=await stSplitRenderOne(buffer,'voc',0,50);
+      instBuf=await stSplitRenderOne(buffer,'inst',50,100);
+    }catch(e2){
+      try{var m=stSplitMath(buffer);vocBuf=m.vocals;instBuf=m.inst;}
+      catch(e3){splitOk=false;}
+    }
+    ST.progSink=null;
+    if(token!==ST.autoToken){
+      /* The owner loaded or cleared the Studio by hand while
+         this prepared — their action wins; discard the result. */
+      stAutoBadgeDone(job,'');
+      return;
+    }
+    if(splitOk&&vocBuf&&instBuf){
+      stSetSplitProject(job.title||'Song',buffer,vocBuf,instBuf,job.key);
+      stAutoProgress(job,100);
+      stAutoBadgeDone(job,'✓ Studio · បំបែករួច · Split ready');
+    }else{
+      stSetSong(job.title||'Song',buffer);
+      ST.projectKey=job.key;
+      ST.autoNote='Split failed — song loaded as one track · បំបែកមិនបាន — បទត្រូវបានផ្ទុកជា Track តែមួយ';
+      stSyncEmptyUI();
+      stAutoBadgeDone(job,'Studio · 1 Track (split failed)');
+    }
+  }catch(e){
+    ST.progSink=null;
+    stAutoBadgeDone(job,'');
+    if(!ST.mainBuffer){
+      ST.autoNote='Studio: បើកបទចូលមិនបាន (Link ប្លុក Cross-origin) — សូម Upload File ជំនួស · Could not load the song into Studio (cross-origin blocked) — please upload the file instead.';
+      try{stSyncEmptyUI();}catch(e2){}
+    }
+  }finally{
+    if(usedProg&&!ST.busy)stProgEnd();
+    stAutoActive--;
+    stAutoNavDone();
+  }
 }
 /* ---- Stem split: center-channel via OfflineAudioContext ----
    Vocals (centre) = (L+R)/2 on both channels.
@@ -20997,6 +21262,11 @@ async function stExport(){
   stProgEnd();
   ST.busy=false;
 }
+/* The Studio starts EMPTY (owner order 2026-11-18): nothing is
+   auto-loaded on open — sync the empty workspace once at load;
+   a project appears only from a manual load, «Open in Studio»,
+   or the background auto-split of a newly generated song. */
+try{stSyncEmptyUI();}catch(e){}
 /* Redraw waveforms when the window size changes (canvas widths
    follow the layout). */
 var stResizeT=null;
