@@ -1568,7 +1568,7 @@ html[data-smooth="1"] .dock{background-color:rgba(var(--glass-tint),.96)}
 .chat-msg-avatar{width:30px;height:30px;border-radius:50%;flex:0 0 auto;background:var(--accent-fill);color:#0d1005;display:flex;align-items:center;justify-content:center;margin-top:2px}
 .chat-msg-avatar svg{width:19px;height:19px;display:block}
 .chat-bubble.user{align-self:flex-end;background:var(--accent-fill);color:#0d1005;border-radius:17px 17px 5px 17px;font-weight:600}
-.chat-bubble.ai{align-self:flex-start;background:var(--card2);border:1px solid var(--line);color:var(--text);border-radius:17px 17px 17px 5px}
+.chat-bubble.ai{align-self:flex-start;background:var(--card2);border:1px solid var(--line);color:var(--text);border-radius:17px 17px 17px 5px;position:relative}
 /* Long AI answers collapse into ONE block (owner order 2026-11-16):
    only the first ~4 lines show; the rest of the answer scrolls up/down
    INSIDE the bubble, and tapping the bubble expands it to full height
@@ -1583,6 +1583,48 @@ html[data-smooth="1"] .dock{background-color:rgba(var(--glass-tint),.96)}
 .chat-bubble.ai.collapsible.expanded .chat-txt{max-height:none;overflow-y:visible}
 .chat-more{display:none;margin-top:7px;padding-top:6px;border-top:1px solid var(--line);font-size:0.75rem;font-weight:800;color:var(--accent-text);text-align:center;line-height:1.3}
 .chat-bubble.ai.collapsible .chat-more{display:block}
+/* ===== Mood picture on every AI answer (owner order 2026-11-17) =====
+   Each AI answer carries ONE small custom-drawn picture matching
+   the feeling of that answer — greeting / love → heart, happy →
+   doll, thanks → smiling heart, plus song / video / image / gift /
+   idea / success / contact pictures (see aiChatMoodFor in the
+   script). The picture is a round sticker badge pinned to the
+   bubble's top-right corner; the row gains a little top room so
+   the sticker never covers the answer above it. All artwork is
+   hand-drawn inline SVG — no emoji, no stock images. */
+.chat-row{margin-top:7px}
+.chat-mood{position:absolute;top:-11px;right:10px;width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;border:1.5px solid rgba(255,255,255,.65);box-shadow:0 3px 10px rgba(0,0,0,.35),inset 0 1px 2px rgba(255,255,255,.5);z-index:2;pointer-events:none;animation:chatMoodPop .45s ease-out both}
+.chat-mood svg{width:19px;height:19px;display:block}
+@keyframes chatMoodPop{from{transform:scale(.4);opacity:0}to{transform:scale(1);opacity:1}}
+@media (prefers-reduced-motion:reduce){.chat-mood{animation:none}}
+.chat-mood.mood-love{background:linear-gradient(135deg,#ff6a95,#ff2e63)}
+.chat-mood.mood-greet{background:linear-gradient(135deg,#ffb35c,#ff7847)}
+.chat-mood.mood-thanks{background:linear-gradient(135deg,#ff8fb5,#f2447e)}
+.chat-mood.mood-happy{background:linear-gradient(135deg,#c86bff,#ff5a8a)}
+.chat-mood.mood-doll{background:linear-gradient(135deg,#bde84a,#7fb80e)}
+.chat-mood.mood-music{background:linear-gradient(135deg,#a06bff,#6d3df0)}
+.chat-mood.mood-video{background:linear-gradient(135deg,#ff9a3d,#f0442e)}
+.chat-mood.mood-image{background:linear-gradient(135deg,#4fc3f7,#1f7fe0)}
+.chat-mood.mood-gift{background:linear-gradient(135deg,#ffc93d,#f08c00)}
+.chat-mood.mood-idea{background:linear-gradient(135deg,#ffd94d,#f5a623)}
+.chat-mood.mood-success{background:linear-gradient(135deg,#3ddc74,#12a150)}
+.chat-mood.mood-contact{background:linear-gradient(135deg,#2fd48c,#0d9d74)}
+/* ===== Structured AI answers (owner order 2026-11-17) =====
+   An answer with several points is laid out as neat rows going
+   down — never a messy wall of text: a clear HEAD (the opening
+   line, set off by a dashed rule), then one numbered row per
+   point (1. 2. 3. …) in its own strip, then a clear TAIL (the
+   closing line, set off the same way). Built by aiChatBuildBody /
+   aiChatParseList in the script; answers without points render
+   exactly as before. */
+.chat-txt.chat-fmt-wrap{white-space:normal}
+.chat-fmt{display:flex;flex-direction:column}
+.chat-fmt-head{font-weight:700;line-height:1.6;white-space:pre-wrap;overflow-wrap:break-word;padding:1px 2px 9px;margin-bottom:9px;border-bottom:1px dashed var(--line2)}
+.chat-fmt-list{display:flex;flex-direction:column;gap:6px}
+.chat-fmt-row{display:flex;gap:9px;align-items:flex-start;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:8px 10px}
+.chat-fmt-num{flex:0 0 auto;width:22px;height:22px;border-radius:50%;background:var(--accent-fill);color:#0d1005;font-size:0.75rem;font-weight:900;display:flex;align-items:center;justify-content:center;margin-top:1px;font-variant-numeric:tabular-nums;line-height:1}
+.chat-fmt-text{flex:1 1 auto;min-width:0;line-height:1.6;overflow-wrap:break-word}
+.chat-fmt-tail{margin-top:9px;padding:9px 2px 1px;border-top:1px dashed var(--line2);color:var(--text2);line-height:1.6;white-space:pre-wrap;overflow-wrap:break-word}
 /* Action row inside every AI answer bubble (owner order 2026-11-17):
    HIDDEN by default — the answer shows on its own. Tapping the
    answer reveals the row (Listen / Share / Copy / Like / Dislike);
@@ -15172,6 +15214,141 @@ function aiChatRevealActions(b){
   },5000);
 }
 var AI_CHAT_ROBOT_SVG='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 7V3"/><circle cx="12" cy="2.4" r="0.6" fill="currentColor"/><rect x="4.5" y="7" width="15" height="11.5" rx="3.5"/><path d="M2.5 12.5v2"/><path d="M21.5 12.5v2"/><circle cx="9.3" cy="12.3" r="0.4" fill="currentColor"/><circle cx="14.7" cy="12.3" r="0.4" fill="currentColor"/><path d="M9.8 15.6c.7.6 1.4.9 2.2.9s1.5-.3 2.2-.9"/></svg>';
+/* ===== Mood pictures for AI answers (owner order 2026-11-17) =====
+   Every AI answer shows ONE small picture matching its feeling:
+   greeting / love → heart, happy → doll, thanks → smiling heart,
+   and song / video / image / package / idea / success / contact
+   answers get their own picture too. All artwork is custom-drawn
+   inline SVG (no emoji, no stock images), shown as a round sticker
+   badge on the bubble's corner — see .chat-mood in the stylesheet. */
+var AI_CHAT_DOLL_SVG='<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12.6" r="7.6" fill="#ffe1c2"/><path d="M4.4 11.4C4 7 7.6 4.2 12 4.2s8 2.8 7.6 7.2c-.1 1-1.2 1.2-1.7.3-.8-1.6-1.7-2.9-3.2-3.6-1 .9-2.3 1.4-3.7 1.3-1.2 1-2.1 2.2-2.7 3.8-.4 1-1.6.8-1.7-.3z" fill="#6d4c2f"/><circle cx="9.2" cy="12.4" r="1" fill="#2b2b2b"/><circle cx="14.8" cy="12.4" r="1" fill="#2b2b2b"/><circle cx="7.4" cy="15.2" r="1.15" fill="#ff9fb2" opacity=".85"/><circle cx="16.6" cy="15.2" r="1.15" fill="#ff9fb2" opacity=".85"/><path d="M10.1 15.9c.55.5 1.2.75 1.9.75s1.35-.25 1.9-.75" fill="none" stroke="#2b2b2b" stroke-width="1.1" stroke-linecap="round"/></svg>';
+var AI_CHAT_MOOD_SVGS={
+  love:'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M11.2 19.6C6.2 16.2 3.2 13.2 3.2 9.8c0-2.5 1.9-4.4 4.3-4.4 1.6 0 3.1.8 3.9 2.2.8-1.4 2.3-2.2 3.9-2.2 2.4 0 4.3 1.9 4.3 4.4 0 3.4-3 6.4-8 9.8-.5.3-1 .3-1.4 0z" fill="#fff"/><path d="M18.7 3.2l.6 1.8 1.8.6-1.8.6-.6 1.8-.6-1.8-1.8-.6 1.8-.6z" fill="#ffe066"/></svg>',
+  greet:'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20.4C6.6 16.8 3.2 13.6 3.2 9.9 3.2 7.3 5.2 5.2 7.7 5.2c1.7 0 3.3.9 4.3 2.4 1-1.5 2.6-2.4 4.3-2.4 2.5 0 4.5 2.1 4.5 4.7 0 3.7-3.4 6.9-8.8 10.5z" fill="#fff"/><circle cx="9.4" cy="10.4" r="1" fill="#ef476f"/><circle cx="14.6" cy="10.4" r="1" fill="#ef476f"/><path d="M10.2 13.2c.5.5 1.1.7 1.8.7s1.3-.2 1.8-.7" fill="none" stroke="#ef476f" stroke-width="1.2" stroke-linecap="round"/></svg>',
+  thanks:'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20.4C6.6 16.8 3.2 13.6 3.2 9.9 3.2 7.3 5.2 5.2 7.7 5.2c1.7 0 3.3.9 4.3 2.4 1-1.5 2.6-2.4 4.3-2.4 2.5 0 4.5 2.1 4.5 4.7 0 3.7-3.4 6.9-8.8 10.5z" fill="#fff"/><circle cx="9.4" cy="10.4" r="1" fill="#ef476f"/><circle cx="14.6" cy="10.4" r="1" fill="#ef476f"/><path d="M10.2 13.2c.5.5 1.1.7 1.8.7s1.3-.2 1.8-.7" fill="none" stroke="#ef476f" stroke-width="1.2" stroke-linecap="round"/></svg>',
+  happy:AI_CHAT_DOLL_SVG,
+  doll:AI_CHAT_DOLL_SVG,
+  music:'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10.2 18.4V7.3c0-.5.3-.9.8-1.1l7.9-1.5c.6-.1 1.2.4 1.2 1v11" fill="none" stroke="#fff" stroke-width="1.9" stroke-linecap="round"/><circle cx="7.5" cy="18.4" r="2.7" fill="#fff"/><circle cx="17.4" cy="16.7" r="2.7" fill="#fff"/></svg>',
+  video:'<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="6" width="18" height="12.5" rx="3" fill="#fff"/><path d="M10.2 9.7v5.1c0 .6.7 1 1.2.7l4.2-2.5c.5-.3.5-1 0-1.3l-4.2-2.5c-.5-.3-1.2.1-1.2.5z" fill="#f0442e"/></svg>',
+  image:'<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2.6" fill="#fff"/><circle cx="9" cy="10" r="1.7" fill="#ffb020"/><path d="M5 17.6 10 12.2l3.2 3 2.3-2.2 3.5 3.4v1.2z" fill="#2ea8e0"/></svg>',
+  gift:'<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4.5" y="10.2" width="15" height="8.8" rx="1.4" fill="#fff"/><rect x="3.8" y="7" width="16.4" height="3.4" rx="1.2" fill="#fff" opacity=".92"/><rect x="10.9" y="7" width="2.2" height="12" fill="#e5322d"/><path d="M12 6.8c-1.8.2-3.2-.6-3.2-1.9 0-1.1 1-1.8 2-1.5 1.2.3 1.6 1.9 1.2 3.4zm0 0c1.8.2 3.2-.6 3.2-1.9 0-1.1-1-1.8-2-1.5-1.2.3-1.6 1.9-1.2 3.4z" fill="#ffe066"/></svg>',
+  idea:'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5a6 6 0 0 1 3.6 10.8c-.6.5-1 1.1-1.1 1.9h-5c-.1-.8-.5-1.4-1.1-1.9A6 6 0 0 1 12 3.5z" fill="#fff"/><rect x="9.6" y="17.4" width="4.8" height="1.7" rx=".85" fill="#fff" opacity=".85"/><rect x="10.2" y="19.9" width="3.6" height="1.5" rx=".75" fill="#fff" opacity=".7"/><circle cx="10" cy="9.5" r="1" fill="#f5a623"/></svg>',
+  success:'<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.6" fill="#fff"/><path d="M8.2 12.4 11 15.2 15.9 9.6" fill="none" stroke="#12a150" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  contact:'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6.62 10.79a15.05 15.05 0 0 0 6.59 6.59l2.2-2.2a1 1 0 0 1 1.02-.24 11.4 11.4 0 0 0 3.57.57 1 1 0 0 1 1 1V20a1 1 0 0 1-1 1A17 17 0 0 1 3 4a1 1 0 0 1 1-1h3.5a1 1 0 0 1 1 1c0 1.25.2 2.45.57 3.57a1 1 0 0 1-.25 1.02z" fill="#fff"/></svg>'
+};
+function aiChatMoodFor(text){
+  var t=String(text||'').toLowerCase();
+  if(/អរគុណ|thank/.test(t))return 'thanks';
+  if(/ទំនាក់ទំនង|លេខទូរសព្ទ|លេខទូរស័ព្ទ|អ៊ីមែល|contact|phone|gmail|e-?mail/.test(t))return 'contact';
+  if(/ស្រលាញ់|ស្រឡាញ់|បេះដូង|\blove\b|\bheart\b/.test(t))return 'love';
+  if(/សួស្ដី|សួស្តី|ជំរាបសួរ|ស្វាគមន៍|\bhello\b|\bhi\b|welcome/.test(t))return 'greet';
+  if(/សប្បាយ|រីករាយ|សើច|\bhappy\b|\bfun\b|\bjoy\b/.test(t))return 'happy';
+  if(/ចម្រៀង|\bsong\b|\bmusic\b|melody/.test(t))return 'music';
+  if(/វីដេអូ|ភាពយន្ត|\bvideo\b|\bmovie\b|\bfilm\b/.test(t))return 'video';
+  if(/រូបភាព|រូបថត|\bimage\b|\bphoto\b|\bpicture\b/.test(t))return 'image';
+  if(/កញ្ចប់|តម្លៃ|\bpackage\b|\bprice\b|\bcredit/.test(t))return 'gift';
+  if(/ជោគជ័យ|រួចរាល់|\bsuccess\b|\bdone\b/.test(t))return 'success';
+  if(/គំនិត|របៀបធ្វើ|\bidea\b/.test(t))return 'idea';
+  return 'doll';
+}
+function aiChatMoodBadge(text){
+  var key=aiChatMoodFor(text);
+  var s=document.createElement('span');
+  s.className='chat-mood mood-'+key;
+  s.setAttribute('aria-hidden','true');
+  s.innerHTML=AI_CHAT_MOOD_SVGS[key]||AI_CHAT_MOOD_SVGS.doll;
+  return s;
+}
+/* ===== Structured answer layout (owner order 2026-11-17) =====
+   An answer with several points is split into a HEAD (the lines
+   before the first point), one numbered ROW per point, and a TAIL
+   (the closing lines after the last point), so it reads as a neat
+   list going down — head, rows, tail — never a messy wall. Points
+   are recognised from «1.» / «2.» / «•» / «-» line starts, or from
+   an inline «1. … 2. … 3. …» run. Answers with fewer than two
+   points return null and render exactly as before. */
+function aiChatStripMd(s){
+  return String(s||'').replace(/\*\*(.+?)\*\*/g,'$1').replace(/__(.+?)__/g,'$1').replace(/^#{1,6}\s+/gm,'').replace(/`/g,'');
+}
+function aiChatParseList(text){
+  var t=String(text||'');
+  var lines=t.split('\n');
+  var itemRe=/^\s*(?:\d{1,2}\s*[\.\)]|[•▪▸\-\*])\s+(.+)$/;
+  var first=-1,last=-1,count=0,i,m;
+  for(i=0;i<lines.length;i++){if(itemRe.test(lines[i])){if(first<0)first=i;last=i;count++;}}
+  if(count>=2){
+    var head=lines.slice(0,first).join('\n').trim();
+    var items=[],tail=[];
+    for(i=first;i<lines.length;i++){
+      m=lines[i].match(itemRe);
+      if(m){items.push(m[1].trim());continue;}
+      var s=lines[i].trim();
+      if(!s)continue;
+      /* Lines BETWEEN points continue the point above them; lines
+         AFTER the last point are the answer's closing tail. */
+      if(i>last)tail.push(s);
+      else if(items.length)items[items.length-1]+=' '+s;
+    }
+    return {head:head,items:items,tail:tail.join('\n')};
+  }
+  var re=/(?:^|\s)(\d{1,2})[\.\)]\s+/g,hits=[],mm;
+  while((mm=re.exec(t))){hits.push({n:parseInt(mm[1],10),start:mm.index,end:re.lastIndex});}
+  var seq=[],expect=1,hi;
+  for(hi=0;hi<hits.length;hi++){
+    if(hits[hi].n===expect){seq.push(hits[hi]);expect++;}
+    else if(hits[hi].n===1&&seq.length===0){seq.push(hits[hi]);expect=2;}
+  }
+  if(seq.length>=3){
+    var items2=[];
+    for(hi=0;hi<seq.length;hi++){
+      var from=seq[hi].end;
+      var to=(hi+1<seq.length)?seq[hi+1].start:t.length;
+      items2.push(t.slice(from,to).trim());
+    }
+    return {head:t.slice(0,seq[0].start).trim(),items:items2,tail:''};
+  }
+  return null;
+}
+function aiChatBuildBody(body,text){
+  var parsed=aiChatParseList(text);
+  if(!parsed){body.textContent=text;aiChatLinkify(body);return;}
+  body.classList.add('chat-fmt-wrap');
+  var wrap=document.createElement('div');
+  wrap.className='chat-fmt';
+  if(parsed.head){
+    var h=document.createElement('div');
+    h.className='chat-fmt-head';
+    h.textContent=aiChatStripMd(parsed.head);
+    aiChatLinkify(h);
+    wrap.appendChild(h);
+  }
+  var list=document.createElement('div');
+  list.className='chat-fmt-list';
+  parsed.items.forEach(function(it,i){
+    var row=document.createElement('div');
+    row.className='chat-fmt-row';
+    var num=document.createElement('span');
+    num.className='chat-fmt-num';
+    num.textContent=String(i+1);
+    num.setAttribute('aria-hidden','true');
+    var tx2=document.createElement('span');
+    tx2.className='chat-fmt-text';
+    tx2.textContent=aiChatStripMd(it);
+    aiChatLinkify(tx2);
+    row.appendChild(num);
+    row.appendChild(tx2);
+    list.appendChild(row);
+  });
+  wrap.appendChild(list);
+  if(parsed.tail){
+    var tl=document.createElement('div');
+    tl.className='chat-fmt-tail';
+    tl.textContent=aiChatStripMd(parsed.tail);
+    aiChatLinkify(tl);
+    wrap.appendChild(tl);
+  }
+  body.appendChild(wrap);
+}
 /* ===== AI action tags + proof line (owner order 2026-11-16) =====
    The server AI can end a reply with action tags:
      [VOICE:male] / [VOICE:female] — switch the chat voice at once
@@ -15311,9 +15488,16 @@ function aiChatAddBubble(role,text,isErr,opts){
   if(role==='ai'&&!isErr)b.classList.add('reveal');
   var body=document.createElement('div');
   body.className='chat-txt';
-  body.textContent=String(text==null?'':text);
-  if(role==='ai'&&!isErr)aiChatLinkify(body);
+  /* AI answers are built by aiChatBuildBody: multi-point answers
+     become head + numbered rows + tail, everything else renders
+     as plain text — both paths linkify phones / Gmails. */
+  if(role==='ai'&&!isErr)aiChatBuildBody(body,String(text==null?'':text));
+  else body.textContent=String(text==null?'':text);
   b.appendChild(body);
+  /* Mood picture sticker on every AI answer (owner order
+     2026-11-17): heart / doll / song / video / … chosen from the
+     answer's own feeling by aiChatMoodFor. */
+  if(role==='ai'&&!isErr)b.appendChild(aiChatMoodBadge(String(text==null?'':text)));
   /* Every AI answer gets the robot avatar on its left (owner order
      2026-11-16) — the same robot mark as the chat header, wrapped in
      a row with the bubble so it can never go missing. */
