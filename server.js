@@ -4086,6 +4086,73 @@ function apiRoute(req, res, urlPath) {
   // server CRASHED twice (OOM) when several long songs converted at once
   // (each holds ~50 MB WAV + ~50 MB PCM). Conversions now run ONE AT A
   // TIME through a queue, and the WAV buffer is freed before encoding.
+  // ---- Cloudinary permanent song storage (owner order 2026-11-17,
+  // Hercules FINAL FIX: Magic Hour returns a 40-50 MB WAV; converting it
+  // on the 512 MB Render instance peaks at ~420 MB RSS (tested 2026-11-17)
+  // and can OOM. Cloudinary fetches the provider URL ITSELF (remote URL
+  // upload) and converts WAV->MP3 with a transformation, so Render never
+  // loads the 50 MB file. Keys ONLY in Render Environment Variables
+  // (CLOUDINARY_CLOUD_NAME / CLOUDINARY_API_KEY / CLOUDINARY_API_SECRET),
+  // NEVER in code or GitHub. If keys are missing, song-store falls back
+  // to the local convertAndCacheMp3 path (current behaviour) so the site
+  // keeps working while the owner sets Cloudinary up. Placed BEFORE
+  // convertAndCacheMp3 on purpose — song-store (below) calls these. ----
+  let _cloudinary = null;
+  function cloudinaryClient() {
+    if (_cloudinary) return _cloudinary;
+    const cn = (process.env.CLOUDINARY_CLOUD_NAME || '').trim();
+    const ck = (process.env.CLOUDINARY_API_KEY || '').trim();
+    const cs = (process.env.CLOUDINARY_API_SECRET || '').trim();
+    if (!cn || !ck || !cs) return null;
+    try {
+      const c = require('cloudinary').v2;
+      c.config({ cloud_name: cn, api_key: ck, api_secret: cs });
+      _cloudinary = c;
+      return c;
+    } catch (e) {
+      console.error('[cloudinary] SDK load failed:', String((e && e.message) || e).slice(0, 200));
+      return null;
+    }
+  }
+  function cloudinaryConfigured() { return !!cloudinaryClient(); }
+  function cloudinaryMp3Url(publicId) {
+    const c = cloudinaryClient();
+    if (!c) return null;
+    return c.url(publicId, { resource_type: 'video', format: 'mp3', audio_codec: 'mp3', bit_rate: '192k', flags: 'attachment' });
+  }
+  // One Cloudinary upload at a time (same serialisation as _mp3Queue).
+  let _cloudQueue = Promise.resolve();
+  // Remote-URL upload: Cloudinary downloads the provider URL itself, so
+  // Render never touches the 50 MB WAV. Retries 3x, then returns null
+  // (caller falls back to local conversion). Returns {publicId, mp3Url},
+  // or the marker 'gone' when Cloudinary could not fetch the source
+  // (expired provider URL), or null on failure.
+  async function cloudinaryStoreSong(u) {
+    const c = cloudinaryClient();
+    if (!c) return null;
+    const run = _cloudQueue.then(async () => {
+      for (let attempt = 1; attempt <= 3; attempt++) {
+        try {
+          memLog('cloudinary-upload attempt ' + attempt + ' ' + String(u).slice(0, 60));
+          const res = await c.uploader.upload(u, { resource_type: 'video', folder: 'movai/songs' });
+          const publicId = res && res.public_id;
+          if (!publicId) return null;
+          const mp3Url = cloudinaryMp3Url(publicId);
+          memLog('cloudinary-upload ok ' + publicId);
+          return { publicId, mp3Url };
+        } catch (e) {
+          const msg = String((e && e.message) || e);
+          console.error('[cloudinary] upload attempt ' + attempt + ' failed for', String(u).slice(0, 120), ':', msg.slice(0, 200));
+          if (/404|410|not found|gone|forbidden|403/i.test(msg)) return 'gone';
+          if (attempt === 3) return null;
+          await new Promise((r) => setTimeout(r, 2000 * attempt));
+        }
+      }
+      return null;
+    });
+    _cloudQueue = run.catch(() => {});
+    return run;
+  }
   const _mp3Converting = new Map();
   let _mp3Queue = Promise.resolve();
   async function convertAndCacheMp3(u) {
@@ -4250,7 +4317,26 @@ function apiRoute(req, res, urlPath) {
         if (url.indexOf('/uploads/') >= 0 && (url.indexOf(ownBase + '/uploads/') === 0 || url.indexOf('movai-proxy.onrender.com/uploads/') >= 0)) {
           return sendJSON(res, 200, { ok: true, url });
         }
+        // Already a Cloudinary MP3 URL? Nothing to do.
+        if (url.indexOf('res.cloudinary.com/') >= 0) {
+          return sendJSON(res, 200, { ok: true, url, provider: 'cloudinary' });
+        }
         memLog('songstore-start');
+        // CLOUDINARY FIRST (owner order 2026-11-17, Hercules FINAL FIX):
+        // Cloudinary fetches the provider URL itself and converts the
+        // 50 MB Magic Hour WAV to MP3, so Render never loads the file
+        // (the local path peaks at ~420 MB RSS and can OOM the 512 MB
+        // instance). Falls back to the local path only when Cloudinary
+        // is not configured or its upload fails after 3 tries.
+        if (cloudinaryConfigured()) {
+          const cl = await cloudinaryStoreSong(url);
+          if (cl === 'gone') return sendJSON(res, 200, { ok: false, error: 'gone', url });
+          if (cl && cl.mp3Url) {
+            memLog('song-store-end');
+            return sendJSON(res, 200, { ok: true, url: cl.mp3Url, provider: 'cloudinary', publicId: cl.publicId });
+          }
+          console.error('[songstore] cloudinary upload failed for', url.slice(0, 120), '— falling back to local conversion');
+        }
         const fname = await convertAndCacheMp3(url);
         if (fname === 'gone') return sendJSON(res, 200, { ok: false, error: 'gone', url });
         if (!fname) return sendJSON(res, 200, { ok: false, error: 'store failed', url });

@@ -2193,6 +2193,7 @@ km:{
  badImgUrl:'Provider បានផ្ដល់ URL រូបភាពមិនត្រឹមត្រូវទេ',badVidUrl:'Provider បានផ្ដល់ URL វីដេអូមិនត្រឹមត្រូវទេ',
  dlFailed:'ទាញយកមិនបានទេ — សូមព្យាយាមម្ដងទៀត',
  mp3Converting:'កំពុងបម្លែងទៅជា MP3…',
+ mp3Preparing:'កំពុងរៀបចំបទចម្រៀង… · Preparing song…',
  mp3FailNet:'ទាញយកបទមិនបានទេ — បញ្ហាបណ្ដាញ ឬ server មិនឆ្លើយ សូមព្យាយាមម្ដងទៀត',
  mp3FailGone:'បទចម្រៀងនេះលែងមានទៀតហើយ · សូមបង្កើតបទថ្មី',
  mp3InAppHint:'សូមបើកក្នុង Chrome ដើម្បីដោនឡូត · Open in Chrome to download',
@@ -2423,6 +2424,7 @@ en:{
  badImgUrl:'The provider returned an invalid image URL',badVidUrl:'The provider returned an invalid video URL',
  dlFailed:'Download failed — please try again',
  mp3Converting:'Converting to MP3…',
+ mp3Preparing:'Preparing song… · កំពុងរៀបចំបទចម្រៀង…',
  mp3FailNet:'Could not fetch the song — network problem or the server did not answer, please try again',
  mp3FailGone:'This song is no longer available · Please create a new song',
  mp3InAppHint:'Open in Chrome to download · សូមបើកក្នុង Chrome ដើម្បីដោនឡូត',
@@ -4936,6 +4938,17 @@ async function dlSaveSongMp3(src,title,fallback){
   }
   try{
     if(mp3IsOffline()){ mp3ProgDone(); mp3FailShow('mp3FailOffline'); return; }
+    /* CLOUDINARY (owner order 2026-11-17, Hercules FINAL FIX): the song
+       is already a permanent Cloudinary MP3 with the attachment flag —
+       open it DIRECTLY (plain anchor click), no fetch, no CORS, no
+       server work. Instant. The fl_attachment flag forces the browser
+       to download it instead of playing it. */
+    if(/res\.cloudinary\.com\//i.test(src)){
+      var ca=document.createElement('a');
+      ca.href=src; ca.download=fname; ca.rel='noopener';
+      document.body.appendChild(ca); ca.click(); ca.remove();
+      mp3ProgSet(100); mp3ProgDone(); return;
+    }
     var rp=null, directErr='';
     /* FAST PATH (owner order 2026-11-16): the audio is already an MP3
        (Public feed songs, uploads/*.mp3) — download it DIRECTLY from
@@ -6122,7 +6135,7 @@ function histStorePermanent(item,saveKey){
       var arr=histGetFrom(saveKey||histKey());
       var changed=false;
       for(var i=0;i<arr.length;i++){
-        if(arr[i]&&arr[i].id===item.id){arr[i].url=j.url;arr[i].perm=true;arr[i].gone=false;changed=true;break;}
+        if(arr[i]&&arr[i].id===item.id){arr[i].url=j.url;arr[i].perm=true;arr[i].gone=false;arr[i].status='ready';if(j.provider)arr[i].provider=j.provider;changed=true;break;}
       }
       if(!changed)return;
       histSyncApplying=true;
@@ -6146,6 +6159,15 @@ function histAddTo(item,key){
   item.id='h'+Date.now().toString(36)+Math.floor(Math.random()*1000000).toString(36);
   item.ts=Date.now();
   if(item.liked!==true)item.liked=false;
+  /* Song status (Hercules FINAL FIX Step 5): a new song whose URL is
+     still the provider's temporary link is 'saving' (being stored
+     permanently in the background); a song already on a permanent
+     URL (/uploads/ or Cloudinary) is 'ready'. The Download button is
+     only enabled when status is 'ready'. */
+  if(item.type==='song'){
+    var _u=String(item.url||'');
+    item.status=(/movai-proxy\.onrender\.com\/uploads\//i.test(_u)||/res\.cloudinary\.com\//i.test(_u))?'ready':'saving';
+  }
   var a=histGetFrom(key);a.unshift(item);
   if(a.length>300)a=a.slice(0,300);
   histSaveTo(key,a);
@@ -6503,8 +6525,15 @@ function histSongCard(it){
     if(it.liked)lk.classList.add('liked');
     lk.addEventListener('click',function(){histToggleLike(it.id,lk);});
     rowEl.appendChild(lk);
-    var dl=songIcoBtn(tx('histDownload'),SONG_SVG_DL);
-    dl.addEventListener('click',function(){histDownload(it);});
+    var dl=songIcoBtn(it.status==='saving'?tx('mp3Preparing'):tx('histDownload'),SONG_SVG_DL);
+    dl.addEventListener('click',function(){
+      /* Download is enabled only when the song is 'ready' (permanent
+         URL stored). While it is still 'saving', show "Preparing
+         song..." instead of downloading a temporary provider link
+         (Hercules FINAL FIX Step 5). */
+      if(it.status==='saving'){ mp3FailShow('mp3Preparing'); return; }
+      histDownload(it);
+    });
     rowEl.appendChild(dl);
     var sh=songIcoBtn(tx('histShare'),SONG_SVG_SHARE);
     sh.addEventListener('click',function(){histShare(it,sh);});
