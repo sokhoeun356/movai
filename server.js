@@ -1909,6 +1909,9 @@ function mvsepErrText(j) {
   if (typeof j.error === 'string' && j.error) return j.error;
   if (j.error && typeof j.error === 'object' && typeof j.error.message === 'string') return j.error.message;
   if (typeof j.message === 'string' && j.message) return j.message;
+  // MVSEP returns some errors as an `errors` array, e.g.
+  // {"success":false,"errors":["You already have unprocessed file in queue. ..."]}
+  if (Array.isArray(j.errors) && j.errors.length) return j.errors.filter((e) => typeof e === 'string' && e).join(' ');
   if (typeof d === 'string' && d) return d;
   if (d && typeof d === 'object' && typeof d.error === 'string' && d.error) return d.error;
   if (d && typeof d === 'object' && typeof d.message === 'string' && d.message) return d.message;
@@ -1952,11 +1955,7 @@ async function mvsepCreateSeparation(keyValue, audioUrl) {
   fd.append('output_format', '0');
   fd.append('is_demo', '0');
   const r = await fetch(MVSEP_CREATE_URL, { method: 'POST', body: fd, headers: { 'User-Agent': 'MovAi/1.0 (https://movai-1.onrender.com)' }, signal: AbortSignal.timeout(120000) });
-  const rawBody = await r.text().catch(() => '');
-  let j = null; try { j = JSON.parse(rawBody); } catch (_) { j = null; }
-  // DEBUG (temporary): log the raw MVSEP create response so a bare 400
-  // can be diagnosed. The api_token is NEVER logged.
-  try { console.log('[mvsep-create] status=' + r.status + ' body=' + String(rawBody).slice(0, 500)); } catch (_) {}
+  const j = await r.json().catch(() => null);
   const text = mvsepErrText(j) || ('HTTP ' + r.status);
   if (r.status === 429 || (j && j.success === false && mvsepIsLimitText(text))) throw mvsepQuotaErr(text, r.status);
   if (r.status === 401 || r.status === 403) throw rotErr('MVSEP: invalid API key (HTTP ' + r.status + ')', r.status);
@@ -1967,7 +1966,7 @@ async function mvsepCreateSeparation(keyValue, audioUrl) {
   // failed on the user's phone even though the job was created.)
   const hash = (j && j.data && typeof j.data.hash === 'string' && j.data.hash) || (j && typeof j.hash === 'string' && j.hash) || '';
   if (hash) return hash;
-  if (!r.ok || !j || !mvsepIsSuccess(j)) throw new Error('MVSEP: ' + text + ' | raw=' + String(rawBody).slice(0, 300));
+  if (!r.ok || !j || !mvsepIsSuccess(j)) throw new Error('MVSEP: ' + text);
   throw new Error('MVSEP: no separation hash returned');
 }
 async function mvsepGetSeparation(hash) {
