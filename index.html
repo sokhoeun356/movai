@@ -2300,6 +2300,81 @@ main{padding-top:calc(3.75rem + env(safe-area-inset-top,0px))}
 .song-coverwrap .song-play{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:23px;height:23px;font-size:.55rem;background:rgba(8,10,6,.52);color:#fff;border-color:rgba(255,255,255,.55);-webkit-backdrop-filter:blur(3px);backdrop-filter:blur(3px);z-index:2;box-shadow:0 3px 10px rgba(0,0,0,.35)}
 /* Create results: the centred Play turns translucent like everywhere else */
 .gcc-play{background:rgba(8,10,6,.48);color:#fff;border:1px solid rgba(255,255,255,.55);-webkit-backdrop-filter:blur(4px);backdrop-filter:blur(4px)}
+/* ===== Desktop / laptop layout (owner order 2026-11-17) =====
+   On a phone MovAi keeps the mobile-app form exactly as it is:
+   one centred 720px column, floating header pills and the bottom
+   dock. On a laptop / computer screen (1024px and wider) the SAME
+   page becomes a real computer website instead:
+   · a fixed LEFT SIDEBAR (the dock turned vertical, icon + label
+     rows) — the bottom app dock is gone;
+   · a proper TOP BAR strip across the top — MovAi pill at the
+     left over the sidebar, notifications + account at the right
+     of the content area;
+   · the content uses the wide screen: centred at up to 1240px
+     beside the sidebar, never stretched edge to edge;
+   · the Public feed's big song cards form a two-column grid
+     (no sideways swipe carousel), History media becomes a
+     three-column grid, and the Packages popup opens wide with
+     its cards side by side;
+   · the ☰ drawer becomes a full-height side panel, the AI chat
+     becomes a right-side panel, and the mini player / toasts
+     anchor to the content area instead of the app bottom.
+   Everything below 1024px is untouched — phone layout, MV view,
+   sheets, players and every function work exactly as before. */
+.dock-label{display:none}
+@media(min-width:1024px){
+ body::before{content:"";position:fixed;top:0;left:0;right:0;height:78px;background:var(--bg);border-bottom:1px solid var(--line);z-index:25}
+ main{max-width:none;width:calc(100% - 248px);margin:0 0 0 248px;padding:104px 40px 64px}
+ .nav-row,#page-public,#page-gen,#page-history{max-width:1240px;margin-left:auto;margin-right:auto;width:100%}
+ .menuwrap{left:22px;top:15px}
+ .topbar-right{right:40px;top:15px}
+ #topSearchBar{left:calc(248px + 40px);right:40px;top:90px;max-width:1240px;margin-left:auto;margin-right:auto}
+ .nav-row .create-modebar{max-width:780px}
+ .panel{padding:28px;border-radius:20px}
+ /* Sidebar: the dock, vertical */
+ .dock{left:0;right:auto;top:0;bottom:0;width:248px;height:100dvh;flex-direction:column;justify-content:flex-start;align-items:stretch;gap:6px;padding:96px 16px 20px;border-radius:0;border-left:none;border-top:none;border-bottom:none}
+ .dock-item{flex:0 0 auto;width:100%;height:52px;justify-content:flex-start;gap:13px;padding:0 16px;border-radius:12px}
+ .dock-item svg{width:24px;height:24px;flex:0 0 auto}
+ .dock-item:hover{background:rgba(255,255,255,.16)}
+ .dock-label{display:inline;font-size:0.9375rem;font-weight:800;white-space:nowrap;letter-spacing:.01em}
+ .dock-badge{top:50%;right:14px;transform:translateY(-50%)}
+ /* ☰ drawer: full-height side panel */
+ .drawer{top:0;left:0;width:min(360px,34vw);height:100dvh;max-height:none;border-radius:0 22px 22px 0;padding-top:26px}
+ /* Public feed: two-column card grid, no swipe carousel */
+ .pub-carousel{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px;overflow:visible;padding:6px 0 12px;scroll-snap-type:none}
+ .pub-slide{flex:none;min-width:0}
+ .pub-card{margin-top:14px}
+ .pub-slide .pub-card{margin-top:0;height:100%}
+ /* Create: form panel centred at a readable width */
+ #page-gen .panel{max-width:980px;margin-left:auto;margin-right:auto}
+ .threed-grid{grid-template-columns:1fr 1fr}
+ /* History: wider lists, media as a three-column grid */
+ .hist-tabs{max-width:780px}
+ .hist-scroll-list{max-height:760px}
+ .hist-scroll-media{max-height:680px}
+ .hist-carousel{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;overflow:visible;padding:14px 0 12px;scroll-snap-type:none}
+ .hist-carousel>.hist-card{flex:none;transform:none;opacity:1;margin-top:0;min-width:0}
+ .hist-carousel .hist-media{width:100%;max-width:100%;margin-left:0;margin-right:0}
+ /* Packages popup: wide, cards side by side (auto popup stays single) */
+ .pkg-pop-wrap{width:min(94vw,920px)}
+ #page-packages:not(.pop-auto) .pkg-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;overflow:visible;padding:6px 0 10px}
+ #page-packages:not(.pop-auto) .pkg-grid>.pkg-card{flex:none;width:auto}
+ .pkg-sheet-card{max-width:540px}
+ /* AI chat: right-side panel; its robot button rests at the sidebar foot */
+ .chat-fab{left:95px;bottom:22px}
+ .chat-panel{left:auto;right:24px;top:24px;bottom:24px;margin:0;width:min(480px,calc(100vw - 48px));border:1px solid var(--line2);border-radius:20px}
+ /* Mini player + toasts anchor to the content area */
+ .mini-logo{right:28px;bottom:28px}
+ .mini-panel{left:auto;right:28px;bottom:100px;width:420px;max-width:420px;margin:0}
+ .mini-drop{left:calc(50% + 124px)}
+ .wake-pill{left:calc(50% + 124px);bottom:28px}
+ .net-ready-toast,.dl-fail-toast,.mp3-prog-toast{left:calc(50% + 124px)}
+}
+@media(min-width:1600px){
+ main{padding-left:56px;padding-right:56px}
+ .topbar-right{right:56px}
+ #topSearchBar{left:calc(248px + 56px);right:56px}
+}
 </style>
 </head>
 <body>
@@ -2988,12 +3063,12 @@ main{padding-top:calc(3.75rem + env(safe-area-inset-top,0px))}
   <div class="wake-bar"><div class="wake-fill" id="wakeFill"></div></div>
 </div>
 <nav class="dock" id="dockBar" aria-label="Dock">
-  <button type="button" class="dock-item on" id="dockPublic" onclick="dockGo('public')" aria-label="Public · សាធារណៈ"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.6 3.9 5.7 3.9 9S14.5 18.4 12 21c-2.5-2.6-3.9-5.7-3.9-9S9.5 5.6 12 3z"/></svg></button>
-  <button type="button" class="dock-item" id="dockCreate" onclick="dockGo('create')" aria-label="Create · បង្កើត"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button>
-  <button type="button" class="dock-item" id="dockHistory" onclick="dockGo('history')" aria-label="History · ប្រវត្តិ"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/><path d="M12 7v5l3 3"/></svg></button>
-  <button type="button" class="dock-item" id="dockPlaylist" onclick="dockGo('playlist')" aria-label="Playlist · បញ្ជីចម្រៀង"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15V6"/><path d="M18.5 18a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5Z"/><path d="M12 12H3"/><path d="M16 6H3"/><path d="M12 18H3"/></svg></button>
-  <button type="button" class="dock-item" id="dockPackages" onclick="dockGo('packages')" aria-label="Packages · កញ្ចប់សេវាកម្ម"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="8" width="18" height="4" rx="1"/><path d="M12 8v13"/><path d="M19 12v7a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-7"/><path d="M7.5 8a2.5 2.5 0 0 1 0-5C11 3 12 8 12 8s1-5 4.5-5a2.5 2.5 0 0 1 0 5"/></svg></button>
-  <button type="button" class="dock-item" id="dockNotif" onclick="dockGo('notif')" aria-label="Notifications · ដំណឹង"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg><span class="dock-badge" id="dockNotifBadge" style="display:none">0</span></button>
+  <button type="button" class="dock-item on" id="dockPublic" onclick="dockGo('public')" aria-label="Public · សាធារណៈ"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.6 3.9 5.7 3.9 9S14.5 18.4 12 21c-2.5-2.6-3.9-5.7-3.9-9S9.5 5.6 12 3z"/></svg><span class="dock-label">សាធារណៈ · Public</span></button>
+  <button type="button" class="dock-item" id="dockCreate" onclick="dockGo('create')" aria-label="Create · បង្កើត"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg><span class="dock-label">បង្កើត · Create</span></button>
+  <button type="button" class="dock-item" id="dockHistory" onclick="dockGo('history')" aria-label="History · ប្រវត្តិ"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/><path d="M12 7v5l3 3"/></svg><span class="dock-label">ប្រវត្តិ · History</span></button>
+  <button type="button" class="dock-item" id="dockPlaylist" onclick="dockGo('playlist')" aria-label="Playlist · បញ្ជីចម្រៀង"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15V6"/><path d="M18.5 18a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5Z"/><path d="M12 12H3"/><path d="M16 6H3"/><path d="M12 18H3"/></svg><span class="dock-label">បញ្ជីចម្រៀង · Playlist</span></button>
+  <button type="button" class="dock-item" id="dockPackages" onclick="dockGo('packages')" aria-label="Packages · កញ្ចប់សេវាកម្ម"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="8" width="18" height="4" rx="1"/><path d="M12 8v13"/><path d="M19 12v7a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-7"/><path d="M7.5 8a2.5 2.5 0 0 1 0-5C11 3 12 8 12 8s1-5 4.5-5a2.5 2.5 0 0 1 0 5"/></svg><span class="dock-label">កញ្ចប់ · Packages</span></button>
+  <button type="button" class="dock-item" id="dockNotif" onclick="dockGo('notif')" aria-label="Notifications · ដំណឹង"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg><span class="dock-label">ដំណឹង · News</span><span class="dock-badge" id="dockNotifBadge" style="display:none">0</span></button>
 </nav>
 <!-- Now-playing player (owner rule 2026-11-16): while a song is
      loaded, the player panel below stays FIXED (sticky) at the
