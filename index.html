@@ -3263,7 +3263,7 @@ km:{
  mvTrLabel:'បកប្រែអត្ថបទទៅ (បើចង់)',mvTrNone:'អត់បកប្រែ',mvTrBusy:'កំពុងបកប្រែអត្ថបទ…',mvTrFail:'បកប្រែមិនបាន — បង្ហាញអត្ថបទដើមវិញ',
  mvStart:'ចាប់ផ្ដើម MV',mvNoSong:'រកបទចម្រៀងមិនឃើញទេ',
  mvProgListen:'AI កំពុងស្ដាប់ + សរសេរអត្ថបទ…',
- mvExpBtn:'ទាញយកជា Video',mvExpStop:'បញ្ឈប់',mvExpRec:'កំពុងថត MV… {p}% · {t}',mvExpDone:'ថតរួចរាល់ ✓',mvExpDl:'Download Video',mvExpFail:'Export មិនបានទេ — browser នេះមិនគាំទ្រ ឬសំឡេងបទមិនអាចថតបាន'
+ mvExpBtn:'ទាញយកជា Video',mvExpStop:'បញ្ឈប់',mvExpRec:'កំពុងថត MV… {p}% · {t}',mvExpDone:'ថតរួចរាល់ ✓',mvExpDl:'Download Video',mvExpFail:'Export មិនបានទេ — browser នេះមិនគាំទ្រ ឬសំឡេងបទមិនអាចថតបាន',mvExpFast:'កំពុងបង្កើតវីដេអូ… {p}% · {t}',mvExpListen:'AI កំពុងស្ដាប់បទ + ចាប់ពេលគេច្រៀង…'
 },
 en:{
  docTitle:'MovAi — Create Images & Videos',menuLabel:'Menu',closeLabel:'Close menu',
@@ -3492,7 +3492,7 @@ en:{
  mvTrLabel:'Translate lyrics to (optional)',mvTrNone:'No translation',mvTrBusy:'Translating lyrics…',mvTrFail:'Translation failed — showing the original lyrics',
  mvStart:'Start MV',mvNoSong:'Song not found',
  mvProgListen:'AI is listening + writing lyrics…',
- mvExpBtn:'Export Video',mvExpStop:'Stop',mvExpRec:'Recording MV… {p}% · {t}',mvExpDone:'Recording done ✓',mvExpDl:'Download Video',mvExpFail:'Export failed — this browser does not support recording, or the song audio cannot be captured'
+ mvExpBtn:'Export Video',mvExpStop:'Stop',mvExpRec:'Recording MV… {p}% · {t}',mvExpDone:'Recording done ✓',mvExpDl:'Download Video',mvExpFail:'Export failed — this browser does not support recording, or the song audio cannot be captured',mvExpFast:'Building video… {p}% · {t}',mvExpListen:'AI is listening + catching the singing…'
 }};
 function tx(k){var d=I18N[LANG]||I18N.km;return (k in d)?d[k]:(I18N.km[k]||k);}
 function loc(o){return (o&&typeof o==='object')?(o[LANG]||o.km||''):o;}
@@ -17358,6 +17358,11 @@ function mvApplyLines(lines,timed){
   mvVoiceReset();
   mvState.lines=lines;mvState.timed=!!timed;mvState.curLine=-2;mvState.curDisp='';mvState.kar=null;
   mvSyncLyrics(true);
+  /* Precise listen: decode the real audio, find the exact
+     second every mouth-open happens, and snap these lines +
+     words onto the voice itself (see mvAlignLines). Runs in
+     the background; the stamps refine the moment it lands. */
+  if(typeof mvAlignKick==='function')mvAlignKick(lines);
 }
 function mvPauseOthers(){
   try{genSongAudios.forEach(function(a){if(a!==mvAudio){try{a.pause();}catch(e){}}});}catch(e){}
@@ -18307,6 +18312,197 @@ function mvShare(){
   var song=mvState.song;if(!song)return;
   histShare({type:'song',url:song.url,title:song.title||''},document.getElementById('mvShareBtn'));
 }
+/* ===== AI listen + align (owner order 2026-11-17, latest) =====
+   The complaint: the words still jumped ahead of the singing,
+   in every language — and the beat-following was already
+   great, so the stamps themselves were the weak point.
+   Server segment stamps include the silence BEFORE the
+   mouth opens, so lines showed early. The MV now does its
+   own precise listen of the REAL audio, once per song: it
+   decodes the song, measures vocal-band energy (about
+   250 Hz – 3.4 kHz) every 10 ms and marks every VOCAL
+   ONSET — the exact second the singer's mouth opens. Each
+   lyric line start is then SNAPPED to the nearest real
+   onset, and word timings are snapped the same way (or
+   BUILT from the onsets when the server sent none), so a
+   word lights at the second it is actually sung — Khmer,
+   English, any language — because it follows the sound
+   itself, not the text. The same refined timings drive
+   the on-screen MV and Export Video. Per song, cached;
+   any failure (no CORS, decode error) silently keeps the
+   previous stamps — sync never gets worse. */
+var mvAlignCache={};
+function mvAlignFor(url){
+  if(!url)return Promise.resolve(null);
+  if(mvAlignCache[url])return mvAlignCache[url];
+  mvAlignCache={};
+  var p=(async function(){
+    try{
+      var resp=await fetch(url);
+      if(!resp||!resp.ok)return null;
+      var ab=await resp.arrayBuffer();
+      var AC=window.OfflineAudioContext||window.webkitOfflineAudioContext;
+      if(!AC)return null;
+      var octx=new AC(1,1,44100);
+      var buf=null;
+      try{buf=await octx.decodeAudioData(ab);}catch(e1){
+        buf=await new Promise(function(res,rej){octx.decodeAudioData(ab,res,rej);});
+      }
+      if(!buf||!buf.duration)return null;
+      var data=mvAlignCompute(buf);
+      data.buf=buf;
+      return data;
+    }catch(e){return null;}
+  })();
+  mvAlignCache[url]=p;
+  return p;
+}
+function mvAlignCompute(buf){
+  var sr=buf.sampleRate,n=buf.length;
+  var ch0=buf.getChannelData(0);
+  var ch1=buf.numberOfChannels>1?buf.getChannelData(1):null;
+  var hop=Math.max(1,Math.round(sr*0.01)),frames=Math.max(1,Math.ceil(n/hop));
+  var env=new Float32Array(frames);
+  /* One-pole high-pass (~250 Hz) into a one-pole low-pass
+     (~3.4 kHz): the vocal band, computed sample by sample
+     over the mono mix — cheap, no second render needed. */
+  var aHP=Math.exp(-2*Math.PI*250/sr),bLP=1-Math.exp(-2*Math.PI*3400/sr);
+  var hpY=0,prevX=0,lpY=0,i,f;
+  for(f=0;f<frames;f++){
+    var st=f*hop,en=Math.min(n,st+hop),sum=0,cnt=0;
+    for(i=st;i<en;i++){
+      var x=ch1?(ch0[i]+ch1[i])*0.5:ch0[i];
+      hpY=aHP*(hpY+x-prevX);prevX=x;
+      lpY+=bLP*(hpY-lpY);
+      sum+=lpY*lpY;cnt++;
+    }
+    env[f]=Math.sqrt(sum/Math.max(1,cnt));
+  }
+  var sorted=env.slice().sort();
+  var p20=sorted[Math.floor(frames*0.20)]||0,p90=sorted[Math.floor(frames*0.90)]||0;
+  var th=Math.max(p20*1.7,p20+(p90-p20)*0.16,0.004);
+  var onsets=[],offRun=1e9,on=false;
+  for(f=0;f<frames;f++){
+    if(env[f]>th){
+      if(!on&&offRun>=12){
+        /* A real mouth-open stays up: at least 4 of the next
+           6 frames (60 ms) above threshold — clicks, drum
+           ticks and one-frame spikes never become onsets. */
+        var cnt2=0,q;
+        for(q=f;q<Math.min(frames,f+6);q++)if(env[q]>th)cnt2++;
+        if(cnt2>=4)onsets.push(f*hop/sr);
+      }
+      on=true;offRun=0;
+    }else{on=false;offRun++;}
+  }
+  return {sr:sr,hopSec:hop/sr,env:env,th:th,onsets:onsets,dur:buf.duration};
+}
+function mvAlignNearest(ons,t,lo,hi){
+  var best=null,bd=Infinity;
+  for(var i=0;i<ons.length;i++){
+    var o=ons[i];
+    if(o<lo)continue;
+    if(o>hi)break;
+    var d=Math.abs(o-t);
+    if(d<bd){bd=d;best=o;}
+  }
+  return best;
+}
+function mvAlignLines(lines,data){
+  if(!lines||!data||!data.onsets||!data.onsets.length)return;
+  var ons=data.onsets,i,L;
+  /* 1) Snap every line START to the real mouth-open second:
+     the onset nearest the stamp, searched a little before
+     it (stamps run early) and a little after, never crossing
+     the previous line or the next line's stamp. */
+  var prevS=-Infinity;
+  for(i=0;i<lines.length;i++){
+    L=lines[i];
+    if(typeof L._s!=='number')continue;
+    var nx=(i<lines.length-1)?((typeof lines[i+1]._s==='number')?lines[i+1]._s:lines[i+1].start):null;
+    var hi=(typeof nx==='number')?Math.min(L._s+0.8,nx-0.12):L._s+0.8;
+    var o=mvAlignNearest(ons,L._s,Math.max(prevS+0.05,L._s-0.5),hi);
+    if(o!==null&&o>prevS)L._s=o;
+    prevS=L._s;
+  }
+  /* 2) Ends: a line never runs far past the next line's
+     real (snapped) start. */
+  for(i=0;i<lines.length;i++){
+    L=lines[i];
+    if(typeof L._s!=='number'||typeof L._e!=='number')continue;
+    var nx2=(i<lines.length-1&&typeof lines[i+1]._s==='number')?lines[i+1]._s:null;
+    if(nx2!==null&&L._e>nx2+0.6)L._e=nx2+0.6;
+    if(L._e<L._s+0.25)L._e=(nx2!==null&&nx2>L._s)?Math.min(nx2,L._s+0.25):L._s+0.25;
+  }
+  /* 3) Words: the mouth opens ON a word, so every word
+     start snaps to its own nearest onset too; lines the
+     server sent without word timings get them BUILT from
+     the onsets inside the line. */
+  for(i=0;i<lines.length;i++){
+    L=lines[i];
+    if(typeof L._s!=='number'||typeof L._e!=='number')continue;
+    if(L.words&&L.words.length){
+      var pw=L._s-0.05,wi,w,wo;
+      for(wi=0;wi<L.words.length;wi++){
+        w=L.words[wi];
+        if(typeof w.start!=='number')continue;
+        wo=mvAlignNearest(ons,w.start,Math.max(pw,w.start-0.35),Math.min(w.start+0.4,L._e));
+        if(wo!==null)w.start=wo;
+        if(w.start<pw)w.start=pw;
+        if(typeof w.end!=='number'||w.end<w.start+0.06)w.end=w.start+0.06;
+        pw=w.start+0.03;
+      }
+      var lw=L.words[L.words.length-1];
+      if(lw&&typeof lw.end==='number'&&lw.end>L._e&&lw.end<=L._e+1.2)L._e=lw.end;
+    }else{
+      mvAlignMakeWords(L,ons);
+    }
+  }
+}
+/* Build word timings from the real onsets inside a line:
+   token 1 starts at the line's own onset, each following
+   onset starts the next token, and any tokens left over
+   are spread by character length between the anchors —
+   so the karaoke sweep still lands word by word on the
+   voice itself, in any language. */
+function mvAlignMakeWords(L,ons){
+  var text=String(L.text||'');
+  var toks=text.split(/\s+|\u200B+/).filter(function(x){return x.length;});
+  if(toks.length<2)return;
+  var s=L._s,e=L._e;
+  if(!(e-s>=0.7))return;
+  var inside=[],i;
+  for(i=0;i<ons.length;i++){if(ons[i]>s+0.03&&ons[i]<e-0.03)inside.push(ons[i]);}
+  var anchors=[{k:0,t:s}],j;
+  for(j=0;j<inside.length&&j+1<toks.length;j++)anchors.push({k:j+1,t:inside[j]});
+  anchors.push({k:toks.length,t:e});
+  var starts=new Array(toks.length),a,k2;
+  for(a=0;a<anchors.length-1;a++){
+    var a0=anchors[a],a1=anchors[a+1],segChars=0,acc=0;
+    for(k2=a0.k;k2<a1.k;k2++)segChars+=Math.max(1,toks[k2].length);
+    for(k2=a0.k;k2<a1.k;k2++){
+      starts[k2]=a0.t+(a1.t-a0.t)*(segChars?acc/segChars:0);
+      acc+=Math.max(1,toks[k2].length);
+    }
+  }
+  var words=[],m;
+  for(m=0;m<toks.length;m++){
+    var st=(typeof starts[m]==='number')?starts[m]:s;
+    var en=(m<toks.length-1&&typeof starts[m+1]==='number')?starts[m+1]:e;
+    if(en<st+0.05)en=st+0.05;
+    words.push({t:toks[m],start:st,end:en});
+  }
+  L.words=words;
+}
+function mvAlignKick(lines){
+  if(!lines||!lines.length||!mvState.song||!mvState.song.url)return;
+  var url=mvState.song.url;
+  mvAlignFor(url).then(function(data){
+    if(!data)return;
+    try{mvAlignLines(lines,data);}catch(e){return;}
+    if(mvState.lines===lines)mvSyncLyrics(true);
+  });
+}
 /* ===== Export MV as a video file (owner order 2026-11-17) =====
    «Export Video» records the MV itself — background, song title,
    karaoke lyrics in time with the singing, and the song audio —
@@ -18317,7 +18513,7 @@ function mvShare(){
    shows under the stage and the button becomes Stop. The export
    uses its OWN audio element (crossOrigin anonymous, routed
    through an AudioContext) so normal MV playback is untouched. */
-var mvExp={on:false,rec:null,ctx:null,audio:null,chunks:[],raf:0,timer:0,url:'',mime:'',cv:null,cx:null,bgVid:null,bgImg:null,cover:null,dur:0};
+var mvExp={on:false,rec:null,ctx:null,audio:null,chunks:[],raf:0,timer:0,url:'',mime:'',cv:null,cx:null,bgVid:null,bgImg:null,cover:null,dur:0,vt:null,vdur:0,fast:false,cancel:false,wake:null,watchdog:0,blurCv:null,enc:null,earlyCtx:null};
 function mvExpMime(){
   if(typeof MediaRecorder==='undefined')return '';
   var list=['video/mp4;codecs=avc1.42E01E,mp4a.40.2','video/mp4','video/webm;codecs=vp9,opus','video/webm;codecs=vp8,opus','video/webm'];
@@ -18330,13 +18526,80 @@ function mvExpBtnLabel(rec){
   if(rec)b.innerHTML='<span>⏹ '+escHtml(tx('mvExpStop'))+'</span>';
   else b.innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2.5" y="5" width="19" height="14" rx="3"/><path d="M10 9.5l5 2.5-5 2.5z" fill="currentColor" stroke="none"/></svg><span>'+escHtml(tx('mvExpBtn'))+'</span>';
 }
+function mvExpWake(){
+  try{
+    if(navigator.wakeLock&&navigator.wakeLock.request){
+      var p=navigator.wakeLock.request('screen');
+      if(p&&p.then)p.then(function(w){mvExp.wake=w;},function(){});
+    }
+  }catch(e){}
+}
+function mvExpWakeRelease(){
+  if(mvExp.wake){try{var r=mvExp.wake.release();if(r&&r.catch)r.catch(function(){});}catch(e){}mvExp.wake=null;}
+}
+function mvExpResetUi(){
+  mvExp.on=false;mvExp.fast=false;mvExp.cancel=false;mvExp.vt=null;mvExp.vdur=0;
+  if(mvExp.earlyCtx){try{mvExp.earlyCtx.close();}catch(e){}mvExp.earlyCtx=null;}
+  mvExpWakeRelease();
+  mvExpBtnLabel(false);
+  mvExpNote('');
+}
+function mvExpStartRealtime(song){
+  var mime=mvExpMime();
+  if(!mime){mvExpResetUi();mvExpNote(escHtml(tx('mvExpFail')));return;}
+  try{mvExpStart(song,mime);}catch(e){mvExpCleanup();mvExpResetUi();mvExpNote(escHtml(tx('mvExpFail')));}
+}
 function mvExportToggle(){
-  if(mvExp.on){mvExpFinish();return;}
+  if(mvExp.on){
+    /* Stop: the fast builder cancels (nothing is kept); the
+       real-time recorder finishes and keeps what it has. */
+    if(mvExp.fast||!mvExp.rec)mvExp.cancel=true;
+    else mvExpFinish();
+    return;
+  }
   var song=mvState.song;
   if(!song||!song.url)return;
-  var mime=mvExpMime();
-  if(!mime){mvExpNote(escHtml(tx('mvExpFail')));return;}
-  try{mvExpStart(song,mime);}catch(e){mvExpCleanup();mvExpBtnLabel(false);mvExpNote(escHtml(tx('mvExpFail')));}
+  /* Create the fallback recorder's AudioContext NOW, inside
+     the tap itself, so autoplay policy lets it run even
+     though the export only starts after the listen pass. */
+  try{var ACw=window.AudioContext||window.webkitAudioContext;if(ACw)mvExp.earlyCtx=new ACw();}catch(e){}
+  mvExpBegin(song);
+}
+/* Export start (owner order 2026-11-17, latest): the old
+   export RECORDED the song playing in real time — five
+   minutes of playback, sound blaring, and on the phone it
+   came back short (about 1:39 of a 5:00 song) and stuttery
+   whenever the browser throttled the hidden work. Now the
+   export first LISTENS to the whole song (mvAlignFor — the
+   same decode that snaps the lyrics to the voice), then
+   BUILDS the video on a virtual clock: no playback at all,
+   no sound, every frame drawn and encoded deliberately at
+   exactly 30 fps for the song's FULL length, as fast as
+   the encoder can go. When the browser cannot do that
+   (no WebCodecs, or a background VIDEO was uploaded), the
+   old real-time recorder remains as the fallback — now
+   silent, wake-locked and watchdog-guarded. */
+async function mvExpBegin(song){
+  mvExp.on=true;mvExp.fast=false;mvExp.cancel=false;mvExp.vt=null;mvExp.vdur=0;
+  mvExpBtnLabel(true);
+  mvExpNote(escHtml(tx('mvExpListen')));
+  mvExpWake();
+  var data=null;
+  try{data=await mvAlignFor(song.url);}catch(e){data=null;}
+  if(mvExp.cancel||!mvExp.on){mvExpResetUi();return;}
+  if(data&&mvState.lines){try{mvAlignLines(mvState.lines,data);}catch(e){}}
+  var canFast=!!(data&&data.buf&&typeof VideoEncoder!=='undefined'&&typeof AudioEncoder!=='undefined'&&typeof VideoFrame!=='undefined'&&typeof AudioData!=='undefined'&&!(mvState.bgMode==='upload'&&mvState.bgKind==='video'));
+  if(canFast){
+    var r='fail';
+    try{r=await mvExpFastStart(song,data);}catch(e){r='fail';}
+    if(r==='ok')return;
+    mvExpFastCleanup();
+    if(r==='cancel'||mvExp.cancel||!mvExp.on){mvExpResetUi();return;}
+    /* The fast builder failed — fall through to the
+       real-time recorder rather than failing the export. */
+    mvExpNote(escHtml(tx('mvExpListen')));
+  }
+  mvExpStartRealtime(song);
 }
 function mvExpStart(song,mime){
   var f=mvFmtById(mvState.fmt);
@@ -18345,7 +18608,8 @@ function mvExpStart(song,mime){
   W-=W%2;H-=H%2;
   var cv=document.createElement('canvas');cv.width=W;cv.height=H;
   mvExp.cv=cv;mvExp.cx=cv.getContext('2d');mvExp.mime=mime;mvExp.chunks=[];mvExp.dur=0;
-  mvExp.bgVid=null;mvExp.bgImg=null;mvExp.cover=null;
+  mvExp.bgVid=null;mvExp.bgImg=null;mvExp.cover=null;mvExp.blurCv=null;
+  mvExp.fast=false;mvExp.vt=null;mvExp.vdur=0;
   if(mvState.bgMode==='upload'&&mvState.bgUrl){
     if(mvState.bgKind==='video'){
       var vd=document.createElement('video');
@@ -18357,18 +18621,24 @@ function mvExpStart(song,mime){
   }else if(song.image&&/^https:/i.test(song.image)){
     var ci=new Image();ci.crossOrigin='anonymous';ci.src=song.image;mvExp.cover=ci;
   }
+  mvExpPrepBlur();
   var AC=window.AudioContext||window.webkitAudioContext;
   if(!AC)throw new Error('no audio context');
   if(mvAudio){try{mvAudio.pause();}catch(e){}}
   mvPauseOthers();
-  var ctx=new AC();
+  var ctx=mvExp.earlyCtx||new AC();
+  mvExp.earlyCtx=null;
   mvExp.ctx=ctx;
   var au=new Audio();
   au.crossOrigin='anonymous';au.preload='auto';au.src=song.url;
   mvExp.audio=au;
   var srcNode=ctx.createMediaElementSource(au);
   var dest=ctx.createMediaStreamDestination();
-  srcNode.connect(dest);srcNode.connect(ctx.destination);
+  /* SILENT export (owner order 2026-11-17, latest): the
+     audio feeds ONLY the recording stream — it is never
+     connected to the speakers, so nothing is heard while
+     the video is being made. */
+  srcNode.connect(dest);
   var vs=cv.captureStream(30);
   var tracks=[];
   vs.getVideoTracks().forEach(function(t){tracks.push(t);});
@@ -18378,6 +18648,18 @@ function mvExpStart(song,mime){
   rec.ondataavailable=function(ev){if(ev.data&&ev.data.size)mvExp.chunks.push(ev.data);};
   rec.onstop=mvExpStopped;
   au.addEventListener('ended',function(){if(mvExp.on)mvExpFinish();});
+  au.addEventListener('error',function(){if(mvExp.on&&!mvExp.fast)mvExpErrorStop();});
+  /* Watchdog: if the OS pauses the hidden playback or
+     suspends the context mid-export, nudge both back every
+     2 s — the recording only ever ends at the song's real
+     end (or the user's Stop). */
+  mvExp.watchdog=setInterval(function(){
+    if(!mvExp.on||mvExp.fast||!mvExp.audio)return;
+    var a=mvExp.audio;
+    if(a.ended)return;
+    if(a.paused){var wp=a.play();if(wp&&wp.catch)wp.catch(function(){});}
+    if(mvExp.ctx&&mvExp.ctx.state==='suspended'){var wr=mvExp.ctx.resume();if(wr&&wr.catch)wr.catch(function(){});}
+  },2000);
   au.addEventListener('loadedmetadata',function(){mvExp.dur=isFinite(au.duration)?au.duration:0;});
   mvExp.on=true;
   mvExpBtnLabel(true);
@@ -18430,18 +18712,28 @@ function mvExpDraw(){
   /* The export uses the SAME changing text colour as the play
      on screen (mvApplyTextColor) — never plain white only. */
   if(mvState.tcFull){TC=mvState.tcFull;TCD=mvState.tcFull;}
-  var t=mvExp.audio?(mvExp.audio.currentTime||0):0;
-  var dur=mvExp.dur||(mvExp.audio&&isFinite(mvExp.audio.duration)?mvExp.audio.duration:0);
+  /* The fast builder drives this painter on a VIRTUAL
+     clock (mvExp.vt) — no audio element is playing at all;
+     the real-time recorder leaves vt null and the export
+     audio's own clock is used, exactly as before. */
+  var t=(typeof mvExp.vt==='number')?mvExp.vt:(mvExp.audio?(mvExp.audio.currentTime||0):0);
+  var dur=mvExp.vdur||mvExp.dur||(mvExp.audio&&isFinite(mvExp.audio.duration)?mvExp.audio.duration:0);
   cx.fillStyle='#07080a';cx.fillRect(0,0,W,H);
   var drew=false;
   if(mvExp.bgVid&&mvExp.bgVid.readyState>=2)drew=mvExpCoverDraw(cx,mvExp.bgVid,W,H);
   if(!drew&&mvExp.bgImg&&mvExp.bgImg.complete&&mvExp.bgImg.naturalWidth)drew=mvExpCoverDraw(cx,mvExp.bgImg,W,H);
   if(!drew&&mvExp.cover&&mvExp.cover.complete&&mvExp.cover.naturalWidth){
-    cx.save();
-    try{cx.filter='blur(30px)';}catch(e){}
-    cx.translate(W/2,H/2);cx.scale(1.18,1.18);cx.translate(-W/2,-H/2);
-    mvExpCoverDraw(cx,mvExp.cover,W,H);
-    cx.restore();
+    /* The blurred backdrop is PRE-RENDERED once per export
+       (mvExpPrepBlur) — running a 30 px blur filter on every
+       frame was a big cause of the old export's stutter. */
+    if(mvExp.blurCv){cx.drawImage(mvExp.blurCv,0,0,W,H);}
+    else{
+      cx.save();
+      try{cx.filter='blur(30px)';}catch(e){}
+      cx.translate(W/2,H/2);cx.scale(1.18,1.18);cx.translate(-W/2,-H/2);
+      mvExpCoverDraw(cx,mvExp.cover,W,H);
+      cx.restore();
+    }
     var iw=mvExp.cover.naturalWidth,ih=mvExp.cover.naturalHeight;
     var sc=Math.min(W*0.86/iw,H*0.86/ih),dw=iw*sc,dh=ih*sc;
     try{cx.drawImage(mvExp.cover,(W-dw)/2,(H-dh)/2,dw,dh);drew=true;}catch(e){drew=false;}
@@ -18628,21 +18920,39 @@ function mvExpProgress(){
 }
 function mvExpFinish(){
   if(!mvExp.on)return;
+  if(mvExp.fast){mvExp.cancel=true;return;}
   mvExp.on=false;
   clearInterval(mvExp.timer);
+  if(mvExp.watchdog){clearInterval(mvExp.watchdog);mvExp.watchdog=0;}
   if(mvExp.raf)cancelAnimationFrame(mvExp.raf);
   if(mvExp.audio){try{mvExp.audio.pause();}catch(e){}}
   if(mvExp.bgVid){try{mvExp.bgVid.pause();}catch(e){}}
   if(mvExp.rec&&mvExp.rec.state!=='inactive'){try{mvExp.rec.stop();}catch(e){mvExpStopped();}}
   else mvExpStopped();
 }
-function mvExpStopped(){
+function mvExpErrorStop(){
+  mvExp.on=false;
+  clearInterval(mvExp.timer);
+  if(mvExp.watchdog){clearInterval(mvExp.watchdog);mvExp.watchdog=0;}
+  if(mvExp.raf)cancelAnimationFrame(mvExp.raf);
+  if(mvExp.rec&&mvExp.rec.state!=='inactive'){mvExp.rec.onstop=null;try{mvExp.rec.stop();}catch(e){}}
   mvExpBtnLabel(false);
+  mvExpNote(escHtml(tx('mvExpFail')));
+  mvExpCleanup();
+}
+function mvExpStopped(){
   var isMp4=mvExp.mime.indexOf('mp4')>=0;
   var blob=new Blob(mvExp.chunks,{type:isMp4?'video/mp4':'video/webm'});
   mvExp.chunks=[];
+  mvExpPresent(blob,isMp4);
+  mvExpCleanup();
+}
+/* Present a finished export file (either pipeline) as the
+   Download button + done note under the stage. */
+function mvExpPresent(blob,isMp4){
+  mvExpBtnLabel(false);
   if(mvExp.url){try{URL.revokeObjectURL(mvExp.url);}catch(e){}mvExp.url='';}
-  if(!blob.size){mvExpNote(escHtml(tx('mvExpFail')));mvExpCleanup();return;}
+  if(!blob||!blob.size){mvExpNote(escHtml(tx('mvExpFail')));return;}
   mvExp.url=URL.createObjectURL(blob);
   var song=mvState.song||{};
   var name=String(song.title||'MovAi MV').replace(/[\\/:*?"<>|]+/g,' ').replace(/\s+/g,' ').replace(/^\s+|\s+$/g,'')||'MovAi MV';
@@ -18663,8 +18973,263 @@ function mvExpStopped(){
   mvExpCleanup();
 }
 function mvExpCleanup(){
+  if(mvExp.watchdog){clearInterval(mvExp.watchdog);mvExp.watchdog=0;}
+  mvExpWakeRelease();
   if(mvExp.ctx){try{mvExp.ctx.close();}catch(e){}}
-  mvExp.ctx=null;mvExp.audio=null;mvExp.rec=null;mvExp.cv=null;mvExp.cx=null;mvExp.bgVid=null;mvExp.bgImg=null;mvExp.cover=null;
+  mvExp.ctx=null;mvExp.audio=null;mvExp.rec=null;mvExp.cv=null;mvExp.cx=null;mvExp.bgVid=null;mvExp.bgImg=null;mvExp.cover=null;mvExp.blurCv=null;mvExp.vt=null;mvExp.vdur=0;mvExp.fast=false;
+}
+function mvExpFastCleanup(){
+  if(mvExp.enc){
+    try{if(mvExp.enc.v)mvExp.enc.v.close();}catch(e){}
+    try{if(mvExp.enc.a)mvExp.enc.a.close();}catch(e){}
+    mvExp.enc=null;
+  }
+  mvExp.cv=null;mvExp.cx=null;mvExp.bgVid=null;mvExp.bgImg=null;mvExp.cover=null;mvExp.blurCv=null;mvExp.vt=null;mvExp.vdur=0;mvExp.fast=false;
+}
+/* ===== FAST export engine (owner order 2026-11-17, latest) =====
+   Builds the whole MV without playing anything: the song is
+   already decoded (mvAlignFor), so the builder steps a
+   virtual clock from 0 to the song's FULL duration, paints
+   each frame with the very same mvExpDraw the recorder
+   uses, encodes it with WebCodecs (H.264 + AAC) and muxes
+   a standard MP4 in memory. No sound is heard, nothing
+   plays in real time, the length is the decoded length —
+   it cannot come back short — and every frame carries an
+   exact 30 fps timestamp, so the result cannot stutter.
+   Progress (percent + song time + elapsed seconds) shows
+   under the stage the whole way; Stop cancels cleanly. */
+function mvExpSleep(ms){return new Promise(function(r){setTimeout(r,ms);});}
+function mvExpPrepBlur(){
+  mvExp.blurCv=null;
+  var img=mvExp.cover;
+  if(!img)return;
+  function build(){
+    if(!img.naturalWidth||!mvExp.cv)return;
+    try{
+      var bc=document.createElement('canvas');
+      bc.width=mvExp.cv.width;bc.height=mvExp.cv.height;
+      var bx=bc.getContext('2d');if(!bx)return;
+      bx.save();
+      try{bx.filter='blur(30px)';}catch(e){}
+      bx.translate(bc.width/2,bc.height/2);bx.scale(1.18,1.18);bx.translate(-bc.width/2,-bc.height/2);
+      mvExpCoverDraw(bx,img,bc.width,bc.height);
+      bx.restore();
+      mvExp.blurCv=bc;
+    }catch(e){}
+  }
+  if(img.complete&&img.naturalWidth)build();
+  else img.addEventListener('load',build);
+}
+function mvExpImgReady(img,ms){
+  return new Promise(function(res){
+    if(!img||(img.complete&&img.naturalWidth)){res();return;}
+    var done=false;
+    function fin(){if(!done){done=true;res();}}
+    img.addEventListener('load',fin);
+    img.addEventListener('error',fin);
+    setTimeout(fin,ms||1500);
+  });
+}
+async function mvExpFastStart(song,data){
+  var buf=data.buf;
+  var f=mvFmtById(mvState.fmt);
+  var W,H;
+  if(f.w>=f.h){W=1280;H=Math.round(1280*f.h/f.w);}else{H=1280;W=Math.round(1280*f.w/f.h);}
+  W-=W%2;H-=H%2;
+  var cv=document.createElement('canvas');cv.width=W;cv.height=H;
+  mvExp.cv=cv;mvExp.cx=cv.getContext('2d');mvExp.mime='video/mp4';mvExp.chunks=[];
+  mvExp.dur=buf.duration;mvExp.vdur=buf.duration;mvExp.vt=0;mvExp.fast=true;
+  mvExp.bgVid=null;mvExp.bgImg=null;mvExp.cover=null;mvExp.blurCv=null;
+  if(mvState.bgMode==='upload'&&mvState.bgUrl&&mvState.bgKind!=='video'){
+    var bim=new Image();bim.src=mvState.bgUrl;mvExp.bgImg=bim;
+  }else if(song.image&&/^https:/i.test(song.image)){
+    var cim=new Image();cim.crossOrigin='anonymous';cim.src=song.image;mvExp.cover=cim;
+  }
+  if(mvAudio){try{mvAudio.pause();}catch(e){}}
+  mvPauseOthers();
+  await mvExpImgReady(mvExp.cover||mvExp.bgImg,1800);
+  if(mvExp.cancel)return 'cancel';
+  mvExpPrepBlur();
+  var venc=null,aenc=null,vErr=null,aErr=null;
+  var vSamp=[],aSamp=[],avcC=null,asc=null;
+  try{
+    var codecs=['avc1.640028','avc1.64001f','avc1.42E01E','avc1.42001f'],vCfg=null,ci2,cand,sup;
+    for(ci2=0;ci2<codecs.length;ci2++){
+      cand={codec:codecs[ci2],width:W,height:H,bitrate:6000000,framerate:30,hardwareAcceleration:'prefer-hardware',avc:{format:'avc'}};
+      try{sup=await VideoEncoder.isConfigSupported(cand);}catch(e){sup=null;}
+      if(sup&&sup.supported){vCfg=cand;break;}
+    }
+    if(!vCfg)return 'fail';
+    venc=new VideoEncoder({
+      output:function(chunk,meta){
+        try{
+          if(meta&&meta.decoderConfig&&meta.decoderConfig.description&&!avcC)avcC=new Uint8Array(meta.decoderConfig.description);
+          var b=new Uint8Array(chunk.byteLength);chunk.copyTo(b);
+          vSamp.push({data:b,ts:chunk.timestamp,dur:chunk.duration||0,key:chunk.type==='key'});
+        }catch(e){vErr=e;}
+      },
+      error:function(e){vErr=e;}
+    });
+    venc.configure(vCfg);
+    var sr=buf.sampleRate,ch=Math.min(2,buf.numberOfChannels);
+    var aCfg={codec:'mp4a.40.2',sampleRate:sr,numberOfChannels:ch,bitrate:192000};
+    var aSup=null;
+    try{aSup=await AudioEncoder.isConfigSupported(aCfg);}catch(e){aSup=null;}
+    if(!aSup||!aSup.supported)return 'fail';
+    aenc=new AudioEncoder({
+      output:function(chunk,meta){
+        try{
+          if(meta&&meta.decoderConfig&&meta.decoderConfig.description&&!asc)asc=new Uint8Array(meta.decoderConfig.description);
+          var b=new Uint8Array(chunk.byteLength);chunk.copyTo(b);
+          aSamp.push({data:b,ts:chunk.timestamp,dur:chunk.duration||0,key:false});
+        }catch(e){aErr=e;}
+      },
+      error:function(e){aErr=e;}
+    });
+    aenc.configure(aCfg);
+    mvExp.enc={v:venc,a:aenc};
+    /* Video: step the virtual clock 0 → FULL duration. */
+    var fps=30,total=Math.max(1,Math.round(buf.duration*fps)),fi,t0=Date.now(),guard;
+    for(fi=0;fi<total;fi++){
+      if(mvExp.cancel)return 'cancel';
+      if(vErr)throw vErr;
+      mvExp.vt=fi/fps;
+      mvExpDraw();
+      var fr=new VideoFrame(cv,{timestamp:Math.round(fi*1000000/fps),duration:Math.round(1000000/fps)});
+      venc.encode(fr,{keyFrame:(fi%60===0)});
+      fr.close();
+      guard=0;
+      while(venc.encodeQueueSize>12&&guard++<600)await mvExpSleep(5);
+      if(fi%15===0||fi===total-1){
+        mvExpNote(escHtml(tx('mvExpFast').replace('{p}',String(Math.round(fi/total*88))).replace('{t}',histFmtTime(fi/fps)+' / '+histFmtTime(buf.duration)))+' · '+Math.round((Date.now()-t0)/1000)+'s');
+        await mvExpSleep(0);
+      }
+    }
+    await venc.flush();
+    if(vErr)throw vErr;
+    /* Audio: encode straight from the decoded song PCM. */
+    var pos=0,step=1024,totalSamp=buf.length,chData=[],cd;
+    for(cd=0;cd<ch;cd++)chData.push(buf.getChannelData(Math.min(cd,buf.numberOfChannels-1)));
+    while(pos<totalSamp){
+      if(mvExp.cancel)return 'cancel';
+      if(aErr)throw aErr;
+      var abuf=new ArrayBuffer(step*ch*4),view=new Float32Array(abuf),cc,seg;
+      for(cc=0;cc<ch;cc++){
+        seg=chData[cc].subarray(pos,Math.min(totalSamp,pos+step));
+        view.set(seg,cc*step);
+      }
+      var ad=new AudioData({format:'f32-planar',sampleRate:sr,numberOfFrames:step,timestamp:Math.round(pos*1000000/sr),numberOfChannels:ch,data:abuf});
+      aenc.encode(ad);ad.close();
+      pos+=step;
+      guard=0;
+      while(aenc.encodeQueueSize>16&&guard++<600)await mvExpSleep(5);
+      if((pos/step)%90===0){
+        mvExpNote(escHtml(tx('mvExpFast').replace('{p}',String(88+Math.round(pos/totalSamp*11))).replace('{t}',histFmtTime(buf.duration)+' / '+histFmtTime(buf.duration)))+' · '+Math.round((Date.now()-t0)/1000)+'s');
+        await mvExpSleep(0);
+      }
+    }
+    await aenc.flush();
+    if(aErr)throw aErr;
+    try{venc.close();}catch(e){}
+    try{aenc.close();}catch(e){}
+    mvExp.enc=null;
+    if(!vSamp.length||!aSamp.length||!avcC||!asc)return 'fail';
+    var blob=mvMuxMp4(vSamp,aSamp,{w:W,h:H,avcC:avcC},{sr:sr,ch:ch,asc:asc,bitrate:192000});
+    if(!blob||!blob.size)return 'fail';
+    mvExp.on=false;mvExp.fast=false;mvExp.vt=null;
+    mvExpPresent(blob,true);
+    mvExpCleanup();
+    return 'ok';
+  }catch(e){
+    return mvExp.cancel?'cancel':'fail';
+  }
+}
+/* ===== Minimal MP4 muxer for the fast export =====
+   ftyp + mdat + moov (moov last; every mainstream player —
+   Android gallery, Facebook, YouTube — reads it fine).
+   One chunk per track, co64 offsets, exact per-sample
+   durations from the encoder timestamps. */
+function mvU8(){var a=[],i,j,x;for(i=0;i<arguments.length;i++){x=arguments[i];if(typeof x==='number')a.push(x&255);else for(j=0;j<x.length;j++)a.push(x[j]);}return new Uint8Array(a);}
+function mvCat(){var n=0,i,o,p=0;for(i=0;i<arguments.length;i++)n+=arguments[i].length;o=new Uint8Array(n);for(i=0;i<arguments.length;i++){o.set(arguments[i],p);p+=arguments[i].length;}return o;}
+function mvB16(v){return new Uint8Array([(v>>8)&255,v&255]);}
+function mvB32(v){return new Uint8Array([(v>>>24)&255,(v>>>16)&255,(v>>>8)&255,v&255]);}
+function mvB64(v){var hi=Math.floor(v/4294967296);return mvCat(mvB32(hi),mvB32(v-hi*4294967296));}
+function mvTyp(s){return new Uint8Array([s.charCodeAt(0),s.charCodeAt(1),s.charCodeAt(2),s.charCodeAt(3)]);}
+function mvStr(s){var a=new Uint8Array(s.length);for(var i=0;i<s.length;i++)a[i]=s.charCodeAt(i)&255;return a;}
+function mvBox(t,p){return mvCat(mvB32(8+p.length),mvTyp(t),p);}
+function mvFBox(t,ver,flags,p){return mvBox(t,mvCat(new Uint8Array([ver&255,(flags>>16)&255,(flags>>8)&255,flags&255]),p));}
+function mvDesc(t,p){return mvCat(new Uint8Array([t,p.length]),p);}
+var MV_MATRIX=mvCat(mvB32(0x10000),mvB32(0),mvB32(0),mvB32(0),mvB32(0x10000),mvB32(0),mvB32(0),mvB32(0),mvB32(0x40000000));
+function mvSampDurs(samples,timescale){
+  var ds=[],i,d;
+  for(i=0;i<samples.length;i++){
+    if(i<samples.length-1)d=Math.round((samples[i+1].ts-samples[i].ts)*timescale/1000000);
+    else if(samples[i].dur)d=Math.round(samples[i].dur*timescale/1000000);
+    else d=ds.length?ds[ds.length-1]:1;
+    if(!(d>0))d=ds.length?ds[ds.length-1]:1;
+    ds.push(d);
+  }
+  return ds;
+}
+function mvStts(durs){
+  var runs=[],i,p;
+  for(i=0;i<durs.length;i++){
+    if(runs.length&&runs[runs.length-1].d===durs[i])runs[runs.length-1].n++;
+    else runs.push({n:1,d:durs[i]});
+  }
+  p=mvB32(runs.length);
+  for(i=0;i<runs.length;i++)p=mvCat(p,mvB32(runs[i].n),mvB32(runs[i].d));
+  return mvFBox('stts',0,0,p);
+}
+function mvSampleTab(samples,durs,offset){
+  var parts=[mvStts(durs)],keys=[],i,kp,sz;
+  for(i=0;i<samples.length;i++)if(samples[i].key)keys.push(i+1);
+  if(keys.length&&keys.length<samples.length){
+    kp=mvB32(keys.length);
+    for(i=0;i<keys.length;i++)kp=mvCat(kp,mvB32(keys[i]));
+    parts.push(mvFBox('stss',0,0,kp));
+  }
+  parts.push(mvFBox('stsc',0,0,mvCat(mvB32(1),mvB32(1),mvB32(samples.length),mvB32(1))));
+  sz=mvCat(mvB32(0),mvB32(samples.length));
+  for(i=0;i<samples.length;i++)sz=mvCat(sz,mvB32(samples[i].data.length));
+  parts.push(mvFBox('stsz',0,0,sz));
+  parts.push(mvFBox('co64',0,0,mvCat(mvB32(1),mvB64(offset))));
+  return mvCat.apply(null,parts);
+}
+function mvTrak(id,isVideo,durMovie,entry,tab,timescale,durTrack,w,h,vol){
+  var tkhd=mvFBox('tkhd',0,7,mvCat(mvB32(0),mvB32(0),mvB32(id),mvB32(0),mvB32(durMovie),mvB32(0),mvB32(0),mvB16(0),mvB16(0),mvB16(vol),mvB16(0),MV_MATRIX,mvB32(isVideo?w*65536:0),mvB32(isVideo?h*65536:0)));
+  var mdhd=mvFBox('mdhd',0,0,mvCat(mvB32(0),mvB32(0),mvB32(timescale),mvB32(durTrack),mvB16(0x55c4),mvB16(0)));
+  var hdlr=mvFBox('hdlr',0,0,mvCat(mvB32(0),mvTyp(isVideo?'vide':'soun'),mvB32(0),mvB32(0),mvB32(0),mvStr(isVideo?'VideoHandler\u0000':'SoundHandler\u0000')));
+  var minfHead=isVideo?mvFBox('vmhd',0,1,mvCat(mvB16(0),mvB16(0),mvB16(0),mvB16(0))):mvFBox('smhd',0,0,mvCat(mvB16(0),mvB16(0)));
+  var dinf=mvBox('dinf',mvFBox('dref',0,0,mvCat(mvB32(1),mvFBox('url ',0,1,new Uint8Array(0)))));
+  var mdia=mvBox('mdia',mvCat(mdhd,hdlr,mvBox('minf',mvCat(minfHead,dinf,mvBox('stbl',mvCat(entry,tab))))));
+  return mvBox('trak',mvCat(tkhd,mdia));
+}
+function mvMuxMp4(vSamp,aSamp,vInf,aInf){
+  var vTs=600,vDurs=mvSampDurs(vSamp,vTs),aTs=aInf.sr,aDurs=mvSampDurs(aSamp,aTs),i;
+  var vDurT=0;for(i=0;i<vDurs.length;i++)vDurT+=vDurs[i];
+  var aDurT=0;for(i=0;i<aDurs.length;i++)aDurT+=aDurs[i];
+  var durMovie=Math.round(Math.max(vDurT/vTs,aDurT/aTs)*1000);
+  var ftyp=mvBox('ftyp',mvCat(mvTyp('isom'),mvB32(0x200),mvTyp('isom'),mvTyp('iso2'),mvTyp('avc1'),mvTyp('mp41')));
+  var vBytes=0;for(i=0;i<vSamp.length;i++)vBytes+=vSamp[i].data.length;
+  var aBytes=0;for(i=0;i<aSamp.length;i++)aBytes+=aSamp[i].data.length;
+  var vOff=ftyp.length+8,aOff=vOff+vBytes;
+  var avc1=mvBox('avc1',mvCat(new Uint8Array(6),mvB16(1),mvB16(0),mvB16(0),mvB32(0),mvB32(0),mvB32(0),mvB16(vInf.w),mvB16(vInf.h),mvB32(0x480000),mvB32(0x480000),mvB32(0),mvB16(1),new Uint8Array(32),mvB16(0x18),mvB16(0xFFFF),mvBox('avcC',vInf.avcC)));
+  var vStsd=mvFBox('stsd',0,0,mvCat(mvB32(1),avc1));
+  var dsi=mvDesc(0x05,aInf.asc);
+  var dcc=mvDesc(0x04,mvCat(mvU8(0x40,0x15,0,0,0),mvB32(aInf.bitrate||192000),mvB32(aInf.bitrate||192000),dsi));
+  var esd=mvDesc(0x03,mvCat(mvB16(2),mvU8(0),dcc,mvDesc(0x06,mvU8(2))));
+  var mp4a=mvBox('mp4a',mvCat(new Uint8Array(6),mvB16(1),mvB16(0),mvB16(0),mvB32(0),mvB16(aInf.ch),mvB16(16),mvB16(0),mvB16(0),mvB32(aInf.sr*65536),mvFBox('esds',0,0,esd)));
+  var aStsd=mvFBox('stsd',0,0,mvCat(mvB32(1),mp4a));
+  var mvhd=mvFBox('mvhd',0,0,mvCat(mvB32(0),mvB32(0),mvB32(1000),mvB32(durMovie),mvB32(0x10000),mvB16(0x100),mvB16(0),mvB32(0),mvB32(0),MV_MATRIX,new Uint8Array(24),mvB32(3)));
+  var moov=mvBox('moov',mvCat(mvhd,
+    mvTrak(1,true,durMovie,vStsd,mvSampleTab(vSamp,vDurs,vOff),vTs,vDurT,vInf.w,vInf.h,0),
+    mvTrak(2,false,durMovie,aStsd,mvSampleTab(aSamp,aDurs,aOff),aTs,aDurT,0,0,0x100)));
+  var parts=[ftyp,mvB32(8+vBytes+aBytes),mvTyp('mdat')];
+  for(i=0;i<vSamp.length;i++)parts.push(vSamp[i].data);
+  for(i=0;i<aSamp.length;i++)parts.push(aSamp[i].data);
+  parts.push(moov);
+  return new Blob(parts,{type:'video/mp4'});
 }
 (function(){
   var pb=document.getElementById('mvPlayBtn');if(pb)pb.addEventListener('click',mvTogglePlay);
