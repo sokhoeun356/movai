@@ -649,11 +649,9 @@ img.hist-media,.d3-preview{cursor:zoom-in}
 .gcc-card .song-seek{margin:9px 12px 0;width:calc(100% - 24px)}
 .gcc-acts{display:flex;align-items:center;gap:6px;padding:8px 12px 12px}
 @media (prefers-reduced-motion:reduce){.gcc-title-in.mq{animation:none}}
-/* The Create view carries NO top header (owner order 2026-11-17,
-   image 3): the MovAi logo frame, the search bar and the top-right
-   buttons stay hidden while the Create view is open — the bottom
-   dock still navigates, and the header returns in Public. */
-body.view-create .menuwrap,body.view-create .topbar-right,body.view-create #topSearchBar{display:none!important}
+/* The top header (logo + profile + bell + search) is ALWAYS
+   visible (owner order 2026-11-17): it stays shown in both the
+   Public view and the Create view — never hidden. */
 @keyframes songPulse{0%,100%{opacity:1}50%{opacity:.5}}
 @media (prefers-reduced-motion:reduce){.song-cover-solid.creating{animation:none}}
 .ep-head{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
@@ -8806,10 +8804,10 @@ function appSetView(v){
   var nv=(v==='create')?'create':'public';
   var changed=(APP_VIEW!==nv);
   APP_VIEW=nv;
-  /* The Create view shows no top header (owner order 2026-11-17):
-     body.view-create hides the logo frame, search bar and the
-     top-right buttons; they come back in the Public view. */
-  try{document.body.classList.toggle('view-create',nv==='create');}catch(e){}
+  /* The top header is always visible in both views (owner order
+     2026-11-17): never hide it — clear any legacy view-create
+     marker so no hiding rule can apply. */
+  try{document.body.classList.remove('view-create');}catch(e){}
   var onPub=(nv==='public');
   var pub=document.getElementById('page-public');
   var gen=document.getElementById('page-gen');
