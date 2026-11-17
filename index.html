@@ -546,14 +546,17 @@ img.hist-media,.d3-preview{cursor:zoom-in}
 .mv-auto-grad .mc-note{width:22%;max-width:110px;height:auto;display:block;opacity:.92}
 .mv-auto-grad .mc-name{font-weight:900;font-size:1.75rem;letter-spacing:-.01em;line-height:1;text-shadow:0 2px 14px rgba(0,0,0,.45)}
 .mv-auto-grad .mc-name span{color:var(--accent)}
-.mv-shade{position:absolute;inset:0;background:linear-gradient(rgba(0,0,0,.34),rgba(0,0,0,0) 30%,rgba(0,0,0,0) 52%,rgba(0,0,0,.55));pointer-events:none}
-.mv-title{position:absolute;top:9%;left:7%;right:7%;text-align:center;color:#fff;font-size:1.375rem;font-weight:900;line-height:1.35;text-shadow:0 2px 12px rgba(0,0,0,.65);overflow-wrap:break-word;pointer-events:none}
+.mv-shade{position:absolute;inset:0;background:linear-gradient(rgba(0,0,0,.46),rgba(0,0,0,.10) 24%,rgba(0,0,0,.30) 50%,rgba(0,0,0,.12) 64%,rgba(0,0,0,.68));pointer-events:none}
+.mv-title{position:absolute;top:6%;left:6%;right:6%;text-align:center;color:#fff;pointer-events:none;z-index:3}
+.mv-title-txt{display:inline-block;max-width:100%;background:rgba(0,0,0,.55);border-radius:12px;padding:9px 20px 11px;font-size:1.3125rem;font-weight:900;line-height:1.4;letter-spacing:.01em;color:#fff;text-shadow:0 1px 3px rgba(0,0,0,.95),0 3px 14px rgba(0,0,0,.85);box-shadow:0 6px 22px rgba(0,0,0,.4),inset 0 -3px 0 var(--mv-acc,var(--accent));overflow-wrap:break-word;box-decoration-break:clone;-webkit-box-decoration-break:clone}
+.mv-bg-style{position:absolute;inset:0;pointer-events:none}
 .mv-lyrics{position:absolute;left:6%;right:6%;top:50%;transform:translateY(-50%);text-align:center;pointer-events:none;z-index:3}
-.mv-line{font-size:1.0625rem;line-height:1.55;color:rgba(255,255,255,.78);text-shadow:0 1px 8px rgba(0,0,0,.7);transition:color .25s ease,font-size .25s ease;overflow-wrap:break-word}
+.mv-line{font-size:1.0625rem;line-height:1.55;color:rgba(255,255,255,.85);text-shadow:0 1px 3px rgba(0,0,0,.95),0 2px 12px rgba(0,0,0,.85);transition:color .25s ease,font-size .25s ease;overflow-wrap:break-word}
+.mv-line .mv-line-txt{background:rgba(0,0,0,.40);border-radius:10px;padding:3px 12px;box-decoration-break:clone;-webkit-box-decoration-break:clone}
 .mv-line.on{color:#fff;font-size:1.625rem;font-weight:900;line-height:1.45}
 .mv-line.on + .mv-line{margin-top:12px}
-.mv-line.on .mv-line-txt{background:rgba(0,0,0,.42);border-radius:10px;padding:4px 14px;box-decoration-break:clone;-webkit-box-decoration-break:clone}
-.mv-line .mv-line-tr{display:block;font-size:0.8125rem;font-weight:700;color:var(--accent);margin-top:3px;text-shadow:0 1px 8px rgba(0,0,0,.7)}
+.mv-line.on .mv-line-txt{background:rgba(0,0,0,.58);padding:4px 14px;box-shadow:0 4px 18px rgba(0,0,0,.35)}
+.mv-line .mv-line-tr{display:block;width:fit-content;max-width:100%;margin:6px auto 0;font-size:0.8125rem;font-weight:700;color:var(--mv-acc,var(--accent));background:rgba(0,0,0,.5);border-radius:8px;padding:2px 10px;text-shadow:0 1px 3px rgba(0,0,0,.9)}
 .mv-bigplay{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:72px;height:72px;border-radius:50%;border:1px solid rgba(255,255,255,.55);background:rgba(8,10,6,.48);-webkit-backdrop-filter:blur(4px);backdrop-filter:blur(4px);color:#fff;font-size:1.5rem;display:none;align-items:center;justify-content:center;cursor:pointer;padding:0;z-index:4;font-family:inherit}
 .mv-bigplay.show{display:inline-flex}
 .mv-controls{display:flex;align-items:center;gap:9px;flex-wrap:wrap;padding:10px 14px calc(12px + env(safe-area-inset-bottom,0px));background:#0b0c0e;border-top:1px solid rgba(255,255,255,.09)}
@@ -574,7 +577,7 @@ img.hist-media,.d3-preview{cursor:zoom-in}
 /* Lyrics loading progress: spinner + running 0%→100% in the
    CENTRE of the MV stage until the lines arrive. */
 .mv-progress{position:absolute;inset:0;z-index:5;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;background:rgba(0,0,0,.45);text-align:center;padding:16px;pointer-events:none}
-.mv-spinner{width:46px;height:46px;border-radius:50%;border:4px solid rgba(255,255,255,.25);border-top-color:var(--accent);animation:mvSpin .8s linear infinite}
+.mv-spinner{width:46px;height:46px;border-radius:50%;border:4px solid rgba(255,255,255,.25);border-top-color:var(--mv-acc,var(--accent));animation:mvSpin .8s linear infinite}
 @keyframes mvSpin{to{transform:rotate(360deg)}}
 .mv-progress-pct{font-size:2rem;font-weight:900;color:#fff;font-variant-numeric:tabular-nums;line-height:1;text-shadow:0 2px 10px rgba(0,0,0,.6)}
 .mv-progress-txt{font-size:0.875rem;font-weight:700;color:rgba(255,255,255,.88);line-height:1.5;text-shadow:0 1px 6px rgba(0,0,0,.6)}
@@ -16638,6 +16641,74 @@ var MV_FORMATS=[
 ];
 var mvState={song:null,fmt:'9x16',bgMode:'auto',bgUrl:'',bgKind:'',bgName:'',lines:null,timed:false,curLine:-2,aiBusy:false};
 var mvAudio=null,mvCache={},mvTrCache={};
+/* Karaoke sync lead: a line switches on essentially WITH the
+   voice — only a hair before it (0.15s) so fast singing still
+   gets fast lyrics. The switch itself is driven every animation
+   frame while playing (see mvRafKick), not just on timeupdate,
+   so a line can never sit late behind the singing. */
+var MV_LEAD=0.15;
+/* ===== Per-song auto background styles (owner order 2026-11-17) =====
+   The AUTO background is NOT one fixed colour/surface for every
+   song: each song deterministically gets its OWN style — its own
+   hue pair, pattern and accent — hashed from the song URL (+
+   title), so the same song always shows its own background and
+   changing songs changes the background automatically. Styles:
+   glow / rings / rays / dots / waves / grid / diag over a deep
+   two-hue gradient. The accent also tints the title underline,
+   the translation line and the listening spinner per song. */
+var MV_BG_STYLES=[
+ {h:152,pat:'glow',acc:'#34d399'},
+ {h:210,pat:'waves',acc:'#38bdf8'},
+ {h:262,pat:'rays',acc:'#c084fc'},
+ {h:330,pat:'dots',acc:'#f472b6'},
+ {h:16,pat:'rings',acc:'#fb923c'},
+ {h:45,pat:'grid',acc:'#facc15'},
+ {h:186,pat:'diag',acc:'#2dd4bf'},
+ {h:288,pat:'glow',acc:'#e879f9'}
+];
+function mvSongStyle(song){
+  var s=String((song&&song.url)||'')+'|'+String((song&&song.title)||'');
+  var h=0;for(var i=0;i<s.length;i++)h=(h*31+s.charCodeAt(i))>>>0;
+  return MV_BG_STYLES[h%MV_BG_STYLES.length];
+}
+function mvStyleLayers(st,withBase){
+  var H=st.h,H2=(st.h+55)%360,L=[];
+  if(!withBase)L.push({i:'linear-gradient(160deg,hsla('+H+',80%,45%,.30),hsla('+H2+',80%,35%,.30))',s:'auto'});
+  switch(st.pat){
+    case 'glow':
+      L.push({i:'radial-gradient(120% 90% at 18% 8%,hsla('+H+',90%,60%,.50),transparent 55%)',s:'auto'});
+      L.push({i:'radial-gradient(110% 90% at 85% 92%,hsla('+H2+',90%,55%,.45),transparent 55%)',s:'auto'});
+      break;
+    case 'rings':
+      L.push({i:'repeating-radial-gradient(circle at 50% 38%,hsla('+H+',85%,65%,.20) 0 2px,transparent 2px 52px)',s:'auto'});
+      break;
+    case 'rays':
+      L.push({i:'repeating-conic-gradient(from -12deg at 50% 34%,hsla('+H+',90%,65%,.15) 0deg 9deg,transparent 9deg 26deg)',s:'auto'});
+      break;
+    case 'dots':
+      L.push({i:'radial-gradient(hsla('+H+',90%,68%,.40) 1.6px,transparent 2.4px)',s:'26px 26px'});
+      L.push({i:'radial-gradient(hsla('+H2+',90%,68%,.30) 1.6px,transparent 2.4px)',s:'26px 26px',pos:'13px 13px'});
+      break;
+    case 'waves':
+      L.push({i:'repeating-linear-gradient(115deg,hsla('+H+',85%,62%,.16) 0 14px,transparent 14px 44px)',s:'auto'});
+      break;
+    case 'grid':
+      L.push({i:'linear-gradient(hsla('+H+',85%,65%,.20) 1.5px,transparent 1.5px)',s:'auto 36px'});
+      L.push({i:'linear-gradient(90deg,hsla('+H+',85%,65%,.20) 1.5px,transparent 1.5px)',s:'36px auto'});
+      break;
+    case 'diag':
+      L.push({i:'repeating-linear-gradient(45deg,hsla('+H+',85%,60%,.18) 0 10px,transparent 10px 34px)',s:'auto'});
+      break;
+  }
+  if(withBase)L.push({i:'linear-gradient(155deg,hsl('+H+',58%,24%),hsl('+H2+',62%,11%) 78%)',s:'auto'});
+  return L;
+}
+function mvPaintStyle(el,st,withBase){
+  var L=mvStyleLayers(st,withBase);
+  el.style.backgroundImage=L.map(function(x){return x.i;}).join(',');
+  el.style.backgroundSize=L.map(function(x){return x.s;}).join(',');
+  el.style.backgroundPosition=L.map(function(x){return x.pos||'0 0';}).join(',');
+}
 function mvFmtById(id){for(var i=0;i<MV_FORMATS.length;i++)if(MV_FORMATS[i].id===id)return MV_FORMATS[i];return MV_FORMATS[0];}
 function mvTextLines(text){
   return String(text||'').split(/\r?\n/).map(function(s){return s.replace(/^\s+|\s+$/g,'');}).filter(function(s){return s&&!/^\[[^\]]*\]$/.test(s);});
@@ -16855,7 +16926,10 @@ function mvStart(){
   view.style.display='flex';
   document.body.style.overflow='hidden';
   mvBuildBg();
-  var tt=document.getElementById('mvTitle');if(tt)tt.textContent=song.title||'MovAi';
+  var stageEl=document.getElementById('mvStage');
+  if(stageEl)stageEl.style.setProperty('--mv-acc',mvSongStyle(song).acc);
+  var tt=document.getElementById('mvTitle');
+  if(tt){tt.innerHTML='';var tsp=document.createElement('span');tsp.className='mv-title-txt';tsp.textContent=song.title||'MovAi';tt.appendChild(tsp);}
   var note=document.getElementById('mvNote');if(note)note.textContent='';
   /* Lyrics: a picked translation goes through the AI endpoint
      (its timed lines replace the plain ones when they land);
@@ -16884,7 +16958,7 @@ function mvStart(){
     mvAudio.addEventListener('timeupdate',mvSync);
     mvAudio.addEventListener('loadedmetadata',mvSync);
     mvAudio.addEventListener('durationchange',mvSync);
-    mvAudio.addEventListener('play',mvSyncBtns);
+    mvAudio.addEventListener('play',function(){mvSyncBtns();mvRafKick();});
     mvAudio.addEventListener('pause',mvSyncBtns);
     mvAudio.addEventListener('ended',mvSyncBtns);
   }
@@ -16892,6 +16966,7 @@ function mvStart(){
   mvPauseOthers();
   mvFitStage();mvSync();mvSyncBtns();
   var pr=mvAudio.play();if(pr&&pr.catch)pr.catch(function(){mvSyncBtns();});
+  mvRafKick();
   var dl=document.getElementById('mvDlBtn');
   if(dl)dl.innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v11"/><path d="M7 10l5 5 5-5"/><path d="M4 21h16"/></svg><span>'+escHtml(tx('histDownload'))+'</span>';
   var sh=document.getElementById('mvShareBtn');
@@ -16924,6 +16999,13 @@ function mvBuildBg(){
     var blur=document.createElement('img');
     blur.src=song.image;blur.alt='';blur.className='mv-bg-blur';blur.setAttribute('aria-hidden','true');
     wrap.appendChild(blur);
+    /* This song's own style tints/patterns the backdrop, so the
+       auto background visibly differs from song to song even when
+       songs share the same cover image. */
+    var styL=document.createElement('div');
+    styL.className='mv-bg-style';styL.setAttribute('aria-hidden','true');
+    mvPaintStyle(styL,mvSongStyle(song),false);
+    wrap.appendChild(styL);
     var cv=document.createElement('img');
     cv.src=song.image;cv.alt='';cv.className='mv-fit-img';
     cv.addEventListener('error',function(){bg.innerHTML='';bg.appendChild(mvAutoGrad(song));});
@@ -16936,9 +17018,7 @@ function mvBuildBg(){
 function mvAutoGrad(song){
   var d=document.createElement('div');
   d.className='mv-auto-grad';
-  var h=0,t=String((song&&song.title)||'MovAi');
-  for(var i=0;i<t.length;i++)h=(h*31+t.charCodeAt(i))%360;
-  d.style.background='linear-gradient(150deg,hsl('+h+',52%,26%),hsl('+((h+70)%360)+',58%,12%) 70%,#07080a)';
+  mvPaintStyle(d,mvSongStyle(song),true);
   d.innerHTML='<svg class="mc-note" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg><span class="mc-name">Mov<span>Ai</span></span>';
   return d;
 }
@@ -16969,14 +17049,25 @@ function mvSyncBtns(){
   if(pb){pb.textContent=playing?'❚❚':'▶';pb.setAttribute('aria-label',playing?'Pause':'Play');}
   if(big){big.textContent='▶';big.classList.toggle('show',!playing);}
 }
+/* Frame-tight lyric sync: while the song plays, the current
+   line is re-checked on EVERY animation frame (not only on the
+   audio element's ~4Hz timeupdate), so the words switch exactly
+   with the singing — fast singing gets fast lyrics, never late. */
+var mvRaf=0;
+function mvRafLoop(){
+  mvRaf=0;
+  mvSyncLyrics(false);
+  if(mvAudio&&!mvAudio.paused&&!mvAudio.ended)mvRaf=requestAnimationFrame(mvRafLoop);
+}
+function mvRafKick(){if(!mvRaf)mvRaf=requestAnimationFrame(mvRafLoop);}
 function mvSyncLyrics(force){
   var box=document.getElementById('mvLyrics');
   if(!box)return;
   var lines=mvState.lines;
   if(!lines||!lines.length||!mvAudio){if(force||mvState.curLine!==-2){box.innerHTML='';mvState.curLine=-2;}return;}
-  /* Preload: a line appears slightly BEFORE it is sung, so the
-     words are already on screen when the voice reaches them. */
-  var t=(mvAudio.currentTime||0)+0.6,idx=-1,i;
+  /* A line switches on essentially WITH the voice (MV_LEAD is a
+     hair before it) — tight to the real playback time. */
+  var t=(mvAudio.currentTime||0)+MV_LEAD,idx=-1,i;
   if(mvState.timed){
     for(i=0;i<lines.length;i++){
       var s=lines[i].start;
@@ -16992,7 +17083,10 @@ function mvSyncLyrics(force){
   box.innerHTML='';
   if(idx<0){
     var nx=document.createElement('div');
-    nx.className='mv-line';nx.textContent=lines[0].text;
+    nx.className='mv-line';
+    var nxs=document.createElement('span');
+    nxs.className='mv-line-txt';nxs.textContent=lines[0].text;
+    nx.appendChild(nxs);
     box.appendChild(nx);return;
   }
   /* The line being sung: big, in the CENTRE of the screen.
@@ -17010,7 +17104,10 @@ function mvSyncLyrics(force){
   box.appendChild(cl);
   if(idx<lines.length-1){
     var n2=document.createElement('div');
-    n2.className='mv-line';n2.textContent=lines[idx+1].text;
+    n2.className='mv-line';
+    var n2s=document.createElement('span');
+    n2s.className='mv-line-txt';n2s.textContent=lines[idx+1].text;
+    n2.appendChild(n2s);
     box.appendChild(n2);
   }
 }
@@ -17023,6 +17120,7 @@ function mvTogglePlay(){
 }
 function mvCloseView(){
   if(mvExp.on)mvExpFinish();
+  if(mvRaf){cancelAnimationFrame(mvRaf);mvRaf=0;}
   mvProgHide();
   if(mvAudio){try{mvAudio.pause();}catch(e){}}
   var view=document.getElementById('mvView');
@@ -17154,6 +17252,7 @@ function mvExpWrap(cx,text,maxW){
 function mvExpDraw(){
   var cx=mvExp.cx,cv=mvExp.cv;if(!cx||!cv)return;
   var W=cv.width,H=cv.height,song=mvState.song||{};
+  var sty=mvSongStyle(song);
   var t=mvExp.audio?(mvExp.audio.currentTime||0):0;
   var dur=mvExp.dur||(mvExp.audio&&isFinite(mvExp.audio.duration)?mvExp.audio.duration:0);
   cx.fillStyle='#07080a';cx.fillRect(0,0,W,H);
@@ -17171,30 +17270,44 @@ function mvExpDraw(){
     try{cx.drawImage(mvExp.cover,(W-dw)/2,(H-dh)/2,dw,dh);drew=true;}catch(e){drew=false;}
   }
   if(!drew){
-    var hh=0,tt0=String(song.title||'MovAi');
-    for(var i=0;i<tt0.length;i++)hh=(hh*31+tt0.charCodeAt(i))%360;
     var g=cx.createLinearGradient(0,0,W,H);
-    g.addColorStop(0,'hsl('+hh+',52%,26%)');g.addColorStop(.7,'hsl('+((hh+70)%360)+',58%,12%)');g.addColorStop(1,'#07080a');
+    g.addColorStop(0,'hsl('+sty.h+',58%,24%)');g.addColorStop(.7,'hsl('+((sty.h+55)%360)+',62%,11%)');g.addColorStop(1,'#07080a');
     cx.fillStyle=g;cx.fillRect(0,0,W,H);
     cx.font='900 '+Math.round(W*0.11)+'px system-ui,sans-serif';
     cx.textBaseline='middle';
     var wMov=cx.measureText('Mov').width,wAi=cx.measureText('Ai').width,x0=(W-(wMov+wAi))/2;
     cx.textAlign='left';cx.fillStyle='#fff';cx.fillText('Mov',x0,H*0.30);
-    cx.fillStyle='#a3e635';cx.fillText('Ai',x0+wMov,H*0.30);
+    cx.fillStyle=sty.acc;cx.fillText('Ai',x0+wMov,H*0.30);
     cx.textAlign='center';
   }
+  /* This song's own hue tints the frame, matching the on-screen MV. */
+  var tg=cx.createRadialGradient(W*0.2,H*0.08,10,W*0.2,H*0.08,W*0.95);
+  tg.addColorStop(0,'hsla('+sty.h+',90%,55%,.20)');tg.addColorStop(1,'hsla('+sty.h+',90%,55%,0)');
+  cx.fillStyle=tg;cx.fillRect(0,0,W,H);
   var sg=cx.createLinearGradient(0,0,0,H);
-  sg.addColorStop(0,'rgba(0,0,0,.34)');sg.addColorStop(.3,'rgba(0,0,0,0)');sg.addColorStop(.52,'rgba(0,0,0,0)');sg.addColorStop(1,'rgba(0,0,0,.55)');
+  sg.addColorStop(0,'rgba(0,0,0,.46)');sg.addColorStop(.24,'rgba(0,0,0,.10)');sg.addColorStop(.5,'rgba(0,0,0,.30)');sg.addColorStop(.64,'rgba(0,0,0,.12)');sg.addColorStop(1,'rgba(0,0,0,.68)');
   cx.fillStyle=sg;cx.fillRect(0,0,W,H);
-  cx.fillStyle='#fff';cx.textAlign='center';cx.textBaseline='top';
-  cx.shadowColor='rgba(0,0,0,.65)';cx.shadowBlur=12;
+  /* Title: white bold text on its own dark plate with the song's
+     accent underline and a hard shadow — readable on any frame. */
+  cx.textAlign='center';cx.textBaseline='top';
   cx.font='900 '+Math.round(W*0.052)+'px system-ui,sans-serif';
-  var tl=mvExpWrap(cx,song.title||'MovAi',W*0.86);
-  for(var ti=0;ti<Math.min(2,tl.length);ti++)cx.fillText(tl[ti],W/2,H*0.07+ti*W*0.062);
-  cx.shadowBlur=0;
+  var tl=mvExpWrap(cx,song.title||'MovAi',W*0.82);
+  var tLines=Math.min(2,tl.length),tLh=W*0.066,tTw=0;
+  for(var tm=0;tm<tLines;tm++)tTw=Math.max(tTw,cx.measureText(tl[tm]).width);
+  var tPadX=W*0.035,tPadY=W*0.016,tPlateW=tTw+tPadX*2,tPlateH=tLines*tLh+tPadY*2,tPlateY=H*0.05;
+  cx.fillStyle='rgba(0,0,0,.55)';
+  cx.beginPath();
+  if(cx.roundRect)cx.roundRect((W-tPlateW)/2,tPlateY,tPlateW,tPlateH,14);else cx.rect((W-tPlateW)/2,tPlateY,tPlateW,tPlateH);
+  cx.fill();
+  cx.fillStyle=sty.acc;
+  cx.fillRect((W-Math.min(tTw,W*0.3))/2,tPlateY+tPlateH-W*0.006,Math.min(tTw,W*0.3),W*0.006);
+  cx.fillStyle='#fff';
+  cx.shadowColor='rgba(0,0,0,.9)';cx.shadowBlur=10;cx.shadowOffsetY=2;
+  for(var ti=0;ti<tLines;ti++)cx.fillText(tl[ti],W/2,tPlateY+tPadY+ti*tLh);
+  cx.shadowBlur=0;cx.shadowOffsetY=0;
   var lines=mvState.lines;
   if(lines&&lines.length){
-    var lt=t+0.6,idx=-1,j;
+    var lt=t+MV_LEAD,idx=-1,j;
     if(mvState.timed){
       for(j=0;j<lines.length;j++){var s=lines[j].start;if(typeof s==='number'&&lt>=s)idx=j;else if(typeof s==='number'&&lt<s)break;}
     }else if(dur>0)idx=Math.min(lines.length-1,Math.floor(lt/dur*lines.length));
@@ -17206,24 +17319,26 @@ function mvExpDraw(){
     var cl=mvExpWrap(cx,cur.text,W*0.88);
     var lh=fs*1.4,totalH=cl.length*lh,y0=H*0.52-totalH/2,maxw=0;
     cl.forEach(function(L){maxw=Math.max(maxw,cx.measureText(L).width);});
-    cx.fillStyle='rgba(0,0,0,.42)';
+    cx.fillStyle='rgba(0,0,0,.58)';
     cx.beginPath();
     if(cx.roundRect)cx.roundRect((W-maxw)/2-18,y0-10,maxw+36,totalH+20,14);else cx.rect((W-maxw)/2-18,y0-10,maxw+36,totalH+20);
     cx.fill();
-    cx.fillStyle='#fff';cx.shadowColor='rgba(0,0,0,.6)';cx.shadowBlur=8;
+    cx.fillStyle='#fff';cx.shadowColor='rgba(0,0,0,.9)';cx.shadowBlur=10;cx.shadowOffsetY=2;
     cl.forEach(function(L,k){cx.fillText(L,W/2,y0+k*lh);});
-    cx.shadowBlur=0;
+    cx.shadowBlur=0;cx.shadowOffsetY=0;
     var ny=y0+totalH+16;
     if(cur.tr){
       cx.font='700 '+Math.round(W*0.034)+'px system-ui,sans-serif';
-      cx.fillStyle='#a3e635';
+      cx.fillStyle=sty.acc;cx.shadowColor='rgba(0,0,0,.9)';cx.shadowBlur=6;
       cx.fillText(cur.tr,W/2,ny);ny+=Math.round(W*0.05);
+      cx.shadowBlur=0;
     }
     if(idx<lines.length-1){
       cx.font='500 '+Math.round(W*0.036)+'px system-ui,sans-serif';
-      cx.fillStyle='rgba(255,255,255,.75)';
+      cx.fillStyle='rgba(255,255,255,.85)';cx.shadowColor='rgba(0,0,0,.9)';cx.shadowBlur=7;
       var nl=mvExpWrap(cx,lines[idx+1].text,W*0.88);
       for(var m=0;m<Math.min(2,nl.length);m++)cx.fillText(nl[m],W/2,ny+m*W*0.048);
+      cx.shadowBlur=0;
     }
   }
 }
