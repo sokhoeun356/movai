@@ -4204,7 +4204,7 @@ function apiRoute(req, res, urlPath) {
   function cloudinaryMp3UrlFor(a, publicId, title) {
     const c = cloudinaryConfigFor(a);
     if (!c) return null;
-    const t = String(title || '').trim().replace(/[\\/:*?"<>|]/g, '').replace(/\s+/g, ' ').slice(0, 120);
+    const t = String(title || '').trim().replace(/[\\/:*?"<>|()\[\]{}#&=]/g, '').replace(/\s+/g, ' ').slice(0, 120);
     if (t) {
       // fl_attachment:<name> sets the Content-Disposition filename.
       // Use the SDK's attachment flag with a custom filename: build the
@@ -4222,7 +4222,7 @@ function apiRoute(req, res, urlPath) {
   // it is not a Cloudinary URL or has no title to apply.
   function cloudinaryUrlWithTitle(url, title) {
     const u = String(url || '');
-    const t = String(title || '').trim().replace(/[\\/:*?"<>|]/g, '').replace(/\s+/g, ' ').slice(0, 120);
+    const t = String(title || '').trim().replace(/[\\/:*?"<>|()\[\]{}#&=]/g, '').replace(/\s+/g, ' ').slice(0, 120);
     if (!t || u.indexOf('res.cloudinary.com/') < 0 || u.indexOf('fl_attachment') < 0) return u;
     return u.replace(/fl_attachment(?::[^/]*)?/, 'fl_attachment:' + encodeURIComponent(t));
   }
