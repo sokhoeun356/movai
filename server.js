@@ -1160,6 +1160,52 @@ function signinFail(email) {
   return f;
 }
 function signinClear(email) { signinFails.delete(email); }
+// ---- Remember-me (owner order 2026-11-17) ----
+// After a successful sign-in the website asks "Save password?" — if
+// the user says yes, the server issues a long-lived remember token.
+// Next time the login screen shows the saved Account (Gmail + masked
+// password); tapping it logs in automatically via the token — no
+// password typing. The token itself is a random 32-byte value; the
+// server stores ONLY its SHA-256 hash, on the user record, max 5
+// tokens (one per device). Tokens expire after 90 days and are all
+// revoked when the password is changed/reset. The website stores the
+// raw token in localStorage (per-device). A stolen token can only log
+// in as that user — it cannot reveal the password or change anything.
+const REMEMBER_TOKEN_MS = 90 * 24 * 60 * 60 * 1000; // 90 days
+const REMEMBER_TOKEN_MAX = 5;
+function rememberTokenHash(token) {
+  return crypto.createHash('sha256').update(String(token)).digest('hex');
+}
+function issueRememberToken(u) {
+  const token = crypto.randomBytes(32).toString('hex');
+  const hash = rememberTokenHash(token);
+  const now = Date.now();
+  if (!Array.isArray(u.rememberTokens)) u.rememberTokens = [];
+  u.rememberTokens = u.rememberTokens.filter((t) => t && t.hash && now - Number(t.createdAt || 0) < REMEMBER_TOKEN_MS);
+  u.rememberTokens.push({ hash, createdAt: now });
+  if (u.rememberTokens.length > REMEMBER_TOKEN_MAX) u.rememberTokens = u.rememberTokens.slice(-REMEMBER_TOKEN_MAX);
+  return token;
+}
+function findRememberToken(u, token) {
+  if (!u || !Array.isArray(u.rememberTokens) || !token) return null;
+  const hash = rememberTokenHash(token);
+  const now = Date.now();
+  const entry = u.rememberTokens.find((t) => t && t.hash === hash);
+  if (!entry) return null;
+  if (now - Number(entry.createdAt || 0) >= REMEMBER_TOKEN_MS) return null; // expired
+  return entry;
+}
+function revokeRememberToken(u, token) {
+  if (!u || !Array.isArray(u.rememberTokens) || !token) return false;
+  const hash = rememberTokenHash(token);
+  const before = u.rememberTokens.length;
+  u.rememberTokens = u.rememberTokens.filter((t) => t && t.hash !== hash);
+  return u.rememberTokens.length !== before;
+}
+function revokeAllRememberTokens(u) {
+  if (!u) return;
+  u.rememberTokens = [];
+}
 const VAPID_FILE = path.join(DATA_DIR, 'vapid.json');
 const VAPID_SUBJECT = 'mailto:sokhoeun356@gmail.com';
 const PUSH_SUBS_FILE = path.join(DATA_DIR, 'push-subs.json');
@@ -3267,6 +3313,9 @@ function apiRoute(req, res, urlPath) {
       const hp = await hashPassword(password);
       u.passwordSalt = hp.salt;
       u.passwordHash = hp.hash;
+      // A new password revokes ALL saved (remember-me) logins — the old
+      // saved Accounts must not keep working after a password change.
+      revokeAllRememberTokens(u);
       u.updatedAt = now;
       // A (re)set password clears any sign-in lock for this Gmail.
       signinClear(email);
@@ -3308,6 +3357,85 @@ function apiRoute(req, res, urlPath) {
       saveUsers(users);
       await ghFlushFile(USERS_FILE);
       return sendJSON(res, 200, { ok: true, user: pubUser(u) });
+    }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
+    return;
+  }
+  // POST /api/auth/remember — {email, password} — PUBLIC. Issues a
+  // remember-me token after a successful Gmail+password sign-in (the
+  // website calls this when the user answers "Yes" to "Save
+  // password?"). Verifies the password the same way as signin, then
+  // returns {ok:true, rememberToken} — the website stores it in
+  // localStorage (per-device) with the Gmail. The token is random;
+  // only its SHA-256 hash is stored server-side.
+  if (req.method === 'POST' && urlPath === '/api/auth/remember') {
+    readJSONBody(req, 64 * 1024).then(async (body) => {
+      const email = normEmail(body && body.email);
+      const password = body && typeof body.password === 'string' ? body.password : '';
+      if (!email || !password) return sendJSON(res, 200, { ok: false, error: 'សូមដាក់ Gmail និង Password · Please enter Gmail and password' });
+      if (signinLocked(email)) return sendJSON(res, 200, { ok: false, error: 'បញ្ចូល Password ខុសច្រើនដងពេកហើយ សាកល្បងម្តងទៀត 15 នាទីក្រោយ · Too many wrong attempts, try again in 15 minutes' });
+      const users = loadUsers();
+      const u = users[email];
+      const bad = () => sendJSON(res, 200, { ok: false, error: 'Gmail ឬ Password មិនត្រឹមត្រូវទេ · Wrong Gmail or password' });
+      if (!u || !u.passwordHash || !u.passwordSalt) { signinFail(email); return bad(); }
+      const okPw = await verifyPassword(password, u.passwordSalt, u.passwordHash);
+      if (!okPw) { signinFail(email); return bad(); }
+      signinClear(email);
+      const token = issueRememberToken(u);
+      u.updatedAt = new Date().toISOString();
+      saveUsers(users);
+      await ghFlushFile(USERS_FILE);
+      return sendJSON(res, 200, { ok: true, rememberToken: token, email });
+    }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
+    return;
+  }
+  // POST /api/auth/remember-login — {email, rememberToken} — PUBLIC.
+  // Tap-to-login with a saved Account: no password needed, the token
+  // proves the device was saved. Returns {ok:true, user} on success.
+  // Expired or revoked tokens fail with a generic error — the website
+  // then drops the saved Account and shows the password form.
+  if (req.method === 'POST' && urlPath === '/api/auth/remember-login') {
+    readJSONBody(req, 64 * 1024).then(async (body) => {
+      const email = normEmail(body && body.email);
+      const token = body && typeof body.rememberToken === 'string' ? body.rememberToken.trim() : '';
+      if (!email || !token) return sendJSON(res, 200, { ok: false, error: 'ការចូលដែលបានសេវផុតកំណត់ហើយ សូមចូលដោយ Password ម្តងទៀត · Saved login expired, please sign in with your password' });
+      const _cip0 = getClientIp(req);
+      if (_cip0 && loadBlockedIps().some((b) => b === _cip0)) return sendJSON(res, 200, { ok: false, error: 'គណនីនេះត្រូវបានប្លុក · This account is blocked' });
+      if (loadBlockedEmails().some((b) => b === email)) return sendJSON(res, 200, { ok: false, error: 'គណនីនេះត្រូវបានប្លុក · This account is blocked' });
+      const users = loadUsers();
+      const u = users[email];
+      const bad = () => sendJSON(res, 200, { ok: false, error: 'ការចូលដែលបានសេវផុតកំណត់ហើយ សូមចូលដោយ Password ម្តងទៀត · Saved login expired, please sign in with your password' });
+      if (!u) return bad();
+      const entry = findRememberToken(u, token);
+      if (!entry) return bad();
+      const now = new Date().toISOString();
+      logActivity({ at: now, mode: 'remember-login', email });
+      u.lastSeen = now;
+      if (_cip0) u.lastIp = _cip0;
+      u.updatedAt = now;
+      saveUsers(users);
+      await ghFlushFile(USERS_FILE);
+      return sendJSON(res, 200, { ok: true, user: pubUser(u) });
+    }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
+    return;
+  }
+  // POST /api/auth/forget — {email, rememberToken} — PUBLIC. Removes
+  // one saved Account (the website calls this when the user taps the
+  // X on a saved Account). Always returns ok:true — a missing token
+  // is already forgotten.
+  if (req.method === 'POST' && urlPath === '/api/auth/forget') {
+    readJSONBody(req, 64 * 1024).then(async (body) => {
+      const email = normEmail(body && body.email);
+      const token = body && typeof body.rememberToken === 'string' ? body.rememberToken.trim() : '';
+      if (!email || !token) return sendJSON(res, 200, { ok: true });
+      const users = loadUsers();
+      const u = users[email];
+      if (!u) return sendJSON(res, 200, { ok: true });
+      if (revokeRememberToken(u, token)) {
+        u.updatedAt = new Date().toISOString();
+        saveUsers(users);
+        await ghFlushFile(USERS_FILE);
+      }
+      return sendJSON(res, 200, { ok: true });
     }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
     return;
   }
