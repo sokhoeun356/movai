@@ -1705,6 +1705,12 @@ html,body{overflow-x:clip}
 button{min-width:0}
 .kbtn,.btn{overflow-wrap:break-word;line-height:1.35}
 .drawer nav button>span{min-width:0;overflow-wrap:break-word}
+/* Sidebar Public + News (desktop only): these two drawer nav
+   buttons mirror the bottom dock's Public / News destinations
+   but belong ONLY to the pinned desktop sidebar — hidden below
+   1024px so the phone drawer stays exactly as it was. */
+.drawer nav button.nav-desktop-only{display:none!important}
+@media(min-width:1024px){.drawer nav button.nav-desktop-only{display:flex!important}}
 .key-acc-head .kn{min-width:0;overflow-wrap:break-word}
 #genProviderFieldName{min-width:0;overflow-wrap:break-word}
 #genProviderField>span:last-child{flex:0 1 auto !important;min-width:0}
@@ -2339,8 +2345,19 @@ main{padding-top:calc(3.75rem + env(safe-area-inset-top,0px))}
  /* LEFT SIDEBAR: the ☰ drawer pinned open — nav, account and
     every setting stay on screen; its backdrop never shows and
     its own head (a second MovAi wordmark + close ✕) is hidden,
-    the top-bar pill above it is the sidebar's header */
- .drawer{display:block;transform:none;top:0;left:0;width:248px;height:100dvh;max-height:none;border-radius:0;border-top:none;border-bottom:none;border-left:none;z-index:24;padding:94px 12px 20px}
+    the top-bar pill above it is the sidebar's header.
+    FIX (2026-11-17): the v2 rule set only display/transform, but
+    two global drawer rules — .drawer{opacity:0;filter:blur(14px)}
+    and .drawer.open{opacity:0} — kept it fully transparent on
+    desktop, so the sidebar area rendered as empty black space.
+    The rule below now forces opacity/filter/visibility with
+    !important and gives the sidebar a solid card background +
+    right border so it reads as a real sidebar; openMenu /
+    closeMenu are also no-ops at ≥1024px so nothing can hide it
+    or lock body scroll there. Phone (<1024px) is untouched. */
+ .drawer{display:block!important;visibility:visible!important;opacity:1!important;filter:none!important;-webkit-filter:none!important;transform:none!important;pointer-events:auto!important;top:0;left:0;width:248px;height:100dvh;max-height:none;border-radius:0;border-top:none;border-bottom:none;border-left:none;border-right:1px solid var(--line2);background-color:var(--card);z-index:26;padding:94px 12px 20px;overflow-y:auto}
+ .drawer nav,.drawer .set-box,.drawer .drawer-foot{display:block!important;visibility:visible!important;opacity:1!important}
+ .drawer nav button{display:flex!important;visibility:visible!important;opacity:1!important}
  .drawer-head{display:none}
  .drawer-backdrop{display:none!important}
  /* BOTTOM DOCK: slim, small, centred iPhone-style pill */
@@ -2443,12 +2460,14 @@ main{padding-top:calc(3.75rem + env(safe-area-inset-top,0px))}
 <aside class="drawer" id="drawer" aria-label="ម៉ឺនុយ">
   <div class="drawer-head"><b>Mov<span>Ai</span></b><button class="drawer-close" onclick="closeMenu()" aria-label="បិទម៉ឺនុយ">✕</button></div>
   <nav>
+    <button class="nav-desktop-only" onclick="dockGo('public')"><span data-i18n="navPublic">សាធារណៈ</span> <small data-i18n="navPublicSub">Public</small></button>
     <button onclick="menuGo('sec-create','song')"><span data-i18n="navModeSong">បង្កើតបទចម្រៀង</span></button>
     <button onclick="menuGo('sec-create','video')"><span data-i18n="navModeVI">វីដេអូ+រូបភាព</span></button>
     <button onclick="menuGo('sec-create','3d')"><span data-i18n="navMode3d">រូបភាព 3D</span></button>
     <button onclick="menuGo('sec-history')"><span data-i18n="navHistory">ប្រវត្តិ</span> <small>History</small></button>
     <button onclick="menuGo('sec-playlist')"><span data-i18n="plTitle">Playlist · បញ្ជីចម្រៀង</span> <small>Playlist</small></button>
     <button onclick="menuGo('sec-packages')"><span data-i18n="navPackages">កញ្ចប់សេវាកម្ម</span> <small data-i18n="navPackagesSub">Packages</small></button>
+    <button class="nav-desktop-only" onclick="dockGo('notif')"><span data-i18n="navNews">ដំណឹង</span> <small data-i18n="navNewsSub">News</small></button>
   </nav>
   <div class="set-box" id="acctBox" style="margin-top:22px">
     <div id="acctUser" style="display:none"></div>
@@ -3340,7 +3359,7 @@ km:{
  puterNoImg:'Puter: មិនបានរូបភាពទេ',puterNoVid:'Puter: មិនបានវីដេអូទេ',
  novaiAcc:'គណនី NovAI',
  novaiDash:'បើក Dashboard NovAI ↗',
- navPackages:'កញ្ចប់សេវាកម្ម',navPackagesSub:'Packages',
+ navPackages:'កញ្ចប់សេវាកម្ម',navPackagesSub:'Packages',navPublic:'សាធារណៈ',navPublicSub:'Public',navNews:'ដំណឹង',navNewsSub:'News',
  pkgTitle:'កញ្ចប់សេវាកម្ម MovAi',
  pkgMonthly:'ប្រចាំខែ',pkgYearly:'ប្រចាំឆ្នាំ',pkgPerMonth:'/ខែ',pkgBilledYear:'បង់ $180/ឆ្នាំ',
  pkgCreditsMonth:'11,000 Credit',pkgCreditsYear:'140,000 Credit',
@@ -3569,7 +3588,7 @@ en:{
  puterNoImg:'Puter: no image returned',puterNoVid:'Puter: no video returned',
  novaiAcc:'NovAI Account',
  novaiDash:'Open NovAI Dashboard ↗',
- navPackages:'Packages',navPackagesSub:'កញ្ចប់សេវាកម្ម',
+ navPackages:'Packages',navPackagesSub:'កញ្ចប់សេវាកម្ម',navPublic:'Public',navPublicSub:'សាធារណៈ',navNews:'News',navNewsSub:'ដំណឹង',
  pkgTitle:'MovAi Packages',
  pkgMonthly:'Monthly',pkgYearly:'Yearly',pkgPerMonth:'/month',pkgBilledYear:'Billed $180/year',
  pkgCreditsMonth:'11,000 credits',pkgCreditsYear:'140,000 credits',
@@ -8949,6 +8968,9 @@ function toggleMenu(){
   if(d.classList.contains('shown'))closeMenu();else openMenu();
 }
 function openMenu(){
+  /* Desktop (≥1024px): the drawer is pinned open as the left
+     sidebar by CSS — the slide-in menu never runs there. */
+  if(window.matchMedia&&window.matchMedia('(min-width:1024px)').matches)return;
   var d=document.getElementById('drawer');if(!d)return;
   var b=document.getElementById('drawerBackdrop');
   try{notifLoad();}catch(e){}
@@ -8962,6 +8984,8 @@ function openMenu(){
   });});
 }
 function closeMenu(){
+  /* Desktop (≥1024px): the sidebar stays pinned — never close it. */
+  if(window.matchMedia&&window.matchMedia('(min-width:1024px)').matches)return;
   var d=document.getElementById('drawer');if(!d)return;
   var b=document.getElementById('drawerBackdrop');
   d.classList.remove('shown');if(b)b.classList.remove('shown');
