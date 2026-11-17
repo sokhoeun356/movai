@@ -2889,7 +2889,13 @@ function apiRoute(req, res, urlPath) {
   // timed lyric lines in the language the song is sung in. NO translation
   // by default; when translateTo is given, the lines are translated with
   // Groq chat (gpt-oss-120b) keeping the same timings. Groq Whisper
-  // rejects files over 25 MB, so bigger files are refused up front.
+  // rejects files over 25 MB, so bigger files are CONVERTED first (the
+  // existing Cloudinary store flow transcodes them to MP3, or a
+  // Cloudinary URL is re-fetched at 64k); only as a last resort is the
+  // audio split into <=20 MB chunks and transcribed piece by piece.
+  // NOTE: the handler itself lives AFTER the Cloudinary section (after
+  // the /api/gen/song/mp3 endpoint) because it calls cloudinaryStoreSong
+  // — helpers defined after the old spot would be in TDZ from there.
   const MV_LYRICS_MAX_BYTES = 25 * 1024 * 1024;
   const MV_LYRICS_FETCH_TIMEOUT_MS = 60000;
   const MV_LYRICS_WHISPER_TIMEOUT_MS = 120000;
@@ -2912,24 +2918,28 @@ function apiRoute(req, res, urlPath) {
     if (/\.webm$/i.test(fileName)) return 'audio/webm';
     return 'audio/mpeg';
   }
-  async function mvLyricsFetchAudio(audioUrl) {
+  async function mvLyricsFetchAudio(audioUrl, maxBytes, timeoutMs) {
     // Returns {ok:true, buf, contentType} or {ok:false, tooLarge:true} or
     // {ok:false, error}. Streams with a hard cap so a huge file is never
-    // fully loaded into memory.
+    // fully loaded into memory. maxBytes/timeoutMs are optional — the
+    // full-file (chunking) fetch passes a higher cap + longer timeout;
+    // the default is the 25 MB fast path.
+    const cap = Number(maxBytes) > 0 ? Number(maxBytes) : MV_LYRICS_MAX_BYTES;
+    const timeout = Number(timeoutMs) > 0 ? Number(timeoutMs) : MV_LYRICS_FETCH_TIMEOUT_MS;
     let r;
     try {
-      r = await fetch(audioUrl, { signal: AbortSignal.timeout(MV_LYRICS_FETCH_TIMEOUT_MS) });
+      r = await fetch(audioUrl, { signal: AbortSignal.timeout(timeout) });
     } catch (e) {
       return { ok: false, error: 'fetch' };
     }
     if (!r.ok) return { ok: false, error: 'fetch' };
     const lenHdr = r.headers && r.headers.get ? r.headers.get('content-length') : null;
     const len = lenHdr ? parseInt(lenHdr, 10) : NaN;
-    if (!Number.isNaN(len) && len > MV_LYRICS_MAX_BYTES) return { ok: false, tooLarge: true };
+    if (!Number.isNaN(len) && len > cap) return { ok: false, tooLarge: true };
     const ct = (r.headers && r.headers.get ? r.headers.get('content-type') : '') || '';
     if (!r.body || typeof r.body.getReader !== 'function') {
       const buf = Buffer.from(await r.arrayBuffer());
-      if (buf.length > MV_LYRICS_MAX_BYTES) return { ok: false, tooLarge: true };
+      if (buf.length > cap) return { ok: false, tooLarge: true };
       return { ok: true, buf, contentType: ct };
     }
     const reader = r.body.getReader();
@@ -2940,7 +2950,7 @@ function apiRoute(req, res, urlPath) {
         const { done, value } = await reader.read();
         if (done) break;
         total += value.byteLength;
-        if (total > MV_LYRICS_MAX_BYTES) { try { await reader.cancel(); } catch (e) {} return { ok: false, tooLarge: true }; }
+        if (total > cap) { try { await reader.cancel(); } catch (e) {} return { ok: false, tooLarge: true }; }
         chunks.push(Buffer.from(value));
       }
     } catch (e) {
@@ -3005,61 +3015,10 @@ function apiRoute(req, res, urlPath) {
     if (!out.length) return { ok: false, error: 'translate failed', status: 0 };
     return { ok: true, lines: out };
   }
-  if (req.method === 'POST' && urlPath === '/api/mv/lyrics') {
-    readJSONBody(req, 64 * 1024).then(async (body) => {
-      logActivity({ at: new Date().toISOString(), mode: 'mv-lyrics' });
-      const audioUrl = body && typeof body.audioUrl === 'string' ? body.audioUrl.trim() : '';
-      const translateTo = body && typeof body.translateTo === 'string' ? body.translateTo.trim().slice(0, 50) : '';
-      let u;
-      try { u = new URL(audioUrl); } catch (e) { u = null; }
-      if (!u || (u.protocol !== 'http:' && u.protocol !== 'https:') || audioUrl.length > 2000) {
-        return sendJSON(res, 200, { ok: false, error: 'សូមដាក់លីងបទចម្រៀងត្រឹមត្រូវ · Please provide a valid song audio URL' });
-      }
-      const fetched = await mvLyricsFetchAudio(audioUrl);
-      if (!fetched.ok) {
-        if (fetched.tooLarge) return sendJSON(res, 200, { ok: false, error: 'ឯកសារបទចម្រៀងធំពេកសម្រាប់បង្កើតអក្សរចម្រៀងអូតូ (លើស 25 MB) — សូមប្រើអត្ថបទដែលបានសរសេរពេលបង្កើតបទវិញ · The song file is too large for auto-lyrics (over 25 MB) — please use the lyrics written when the song was created instead' });
-        return sendJSON(res, 200, { ok: false, error: 'ទាញយកបទចម្រៀងមិនបាន · Could not download the song audio' });
-      }
-      if (!fetched.buf || !fetched.buf.length) {
-        return sendJSON(res, 200, { ok: false, error: 'ទាញយកបទចម្រៀងមិនបាន · Could not download the song audio' });
-      }
-      const fileName = mvLyricsFileName(fetched.contentType, audioUrl);
-      let tr;
-      try {
-        tr = await withProviderKeyRotation('groq', async (k) => {
-          return mvLyricsWhisper(fetched.buf, fileName, k);
-        });
-      } catch (e) {
-        if (e && e.noKey) return sendJSON(res, 200, { ok: false, error: 'Admin មិនទាន់ដាក់ Groq API Key ទេ · Admin has not set a Groq API Key yet' });
-        return sendJSON(res, 200, { ok: false, error: 'ស្ដាប់បទចម្រៀងមិនបាន (Whisper) · Could not transcribe the song (Whisper)' });
-      }
-      if (!tr.lyrics || !tr.lyrics.length) {
-        return sendJSON(res, 200, { ok: false, error: 'រកមិនឃើញអត្ថបទចម្រៀងក្នុងបទនេះទេ · No lyrics were found in this song' });
-      }
-      const language = tr.language || '';
-      if (!translateTo) {
-        return sendJSON(res, 200, { ok: true, language, lyrics: tr.lyrics });
-      }
-      // Translate, keeping timings. On translation failure, fall back to
-      // the original-language lyrics so the MV still has something to show.
-      let translated = null;
-      try {
-        translated = await withProviderKeyRotation('groq', async (k) => {
-          const t = await mvLyricsTranslate(tr.lyrics, translateTo, k);
-          if (!t.ok) throw rotErr(t.error || 'translate failed', t.status || 0);
-          return t.lines;
-        });
-      } catch (e) {
-        translated = null;
-      }
-      if (!translated) {
-        return sendJSON(res, 200, { ok: true, language, lyrics: tr.lyrics, translationFailed: true });
-      }
-      const outLyrics = tr.lyrics.map((l, i) => ({ text: (translated[i] !== undefined ? translated[i] : l.text), start: l.start, end: l.end }));
-      return sendJSON(res, 200, { ok: true, language, translatedTo: translateTo, lyrics: outLyrics });
-    }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
-    return;
-  }
+  // NOTE: the POST /api/mv/lyrics handler lives below, after the
+  // Cloudinary section (after the /api/gen/song/mp3 endpoint), because
+  // it calls cloudinaryStoreSong — helpers defined after this point
+  // would be in TDZ from here (apiRoute returns at the first match).
   // ---- MovAi Admin API ----
   // POST /api/admin/sync — {email, name, credits, songCredits, plan, songPlan}
   // Called by the MovAi website (no admin key). Creates the user on first
@@ -4868,6 +4827,388 @@ function apiRoute(req, res, urlPath) {
     })();
     return;
   }
+  // ---- MV lyrics: large-file handling (over 25 MB) ----
+  // Groq Whisper rejects files over 25 MB, so a big song is CONVERTED
+  // first (PRIMARY path, automatic on Start MV — no extra user step):
+  //  - already a Cloudinary URL  -> re-fetch it as a 64k MP3 (URL rewrite)
+  //  - any other URL + Cloudinary configured -> store/transcode it with
+  //    the EXISTING cloudinaryStoreSong flow (the same function the mp3
+  //    endpoint and song-store use for 90 MB+ files): Cloudinary fetches
+  //    the big file itself and converts WAV->MP3, so Render never
+  //    downloads it. The stored MP3 (192k, or 64k for very long songs)
+  //    is then transcribed in one Whisper call.
+  // Only as a LAST resort (Cloudinary unavailable / still too large) is
+  // the audio split into <=20 MB chunks and transcribed piece by piece,
+  // with each chunk's segment times offset by its start time.
+  // Everything stays IN-MEMORY (Buffers only) — no file is ever written
+  // to disk (the local converter was permanently removed, owner order).
+  const MV_LYRICS_CHUNK_BYTES = 20 * 1024 * 1024;
+  const MV_LYRICS_FULL_MAX_BYTES = 120 * 1024 * 1024;
+  const MV_LYRICS_FULL_FETCH_TIMEOUT_MS = 180000;
+  function mvLyricsCloudinaryLowBitrateUrl(audioUrl) {
+    // Rewrite a Cloudinary audio URL so Cloudinary serves a 64k MP3 of
+    // it (transformation change only — no upload, no new asset).
+    // Returns the rewritten URL, or null when the URL is not Cloudinary
+    // or is already at <=64k (a retry would fetch the same bytes).
+    let u;
+    try { u = new URL(String(audioUrl || '')); } catch (e) { return null; }
+    if (u.hostname !== 'res.cloudinary.com') return null;
+    const up = '/upload/';
+    const idx = u.pathname.indexOf(up);
+    if (idx < 0) return null;
+    const head = u.pathname.slice(0, idx + up.length);
+    const rest = u.pathname.slice(idx + up.length);
+    const segs = rest.split('/');
+    if (!segs.length) return null;
+    let trans = '';
+    let tail = segs;
+    if (!/^v\d+$/.test(segs[0])) { trans = segs[0]; tail = segs.slice(1); }
+    if (!tail.length) return null;
+    const brM = /(?:^|,)br_(\d+)k(?:,|$)/.exec(trans);
+    if (brM && Number(brM[1]) <= 64) return null;
+    let parts = trans ? trans.split(',') : [];
+    let hasBr = false;
+    let hasAc = false;
+    parts = parts.map((p) => {
+      if (/^br_\d+k$/.test(p)) { hasBr = true; return 'br_64k'; }
+      if (/^ac_/.test(p)) { hasAc = true; return 'ac_mp3'; }
+      return p;
+    });
+    if (!hasBr) parts.unshift('br_64k');
+    if (!hasAc) parts.unshift('ac_mp3');
+    u.pathname = head + parts.join(',') + '/' + tail.join('/');
+    return u.toString();
+  }
+  async function mvLyricsCloudinaryStoreMp3(audioUrl) {
+    // Convert a big provider audio URL to a stored Cloudinary MP3 via
+    // the EXISTING store flow (cloudinaryStoreSong — the same function
+    // the mp3 endpoint and song-store use for 90 MB+ files). Cloudinary
+    // fetches the file itself and transcodes WAV->MP3, so Render never
+    // downloads the big file. Returns {mp3Url}, 'gone' (source expired),
+    // or null (not stored / all accounts failed — caller falls back to
+    // chunking).
+    let r;
+    try {
+      r = await cloudinaryStoreSong(audioUrl, '');
+    } catch (e) {
+      return null;
+    }
+    if (r === 'gone') return 'gone';
+    if (r && r.mp3Url) return { mp3Url: r.mp3Url };
+    return null;
+  }
+  // MP3 frame tables (Layer III only) for frame-aligned splitting.
+  const MV_MP3_BITRATES = {
+    1: [0, 32, 40, 48, 56, 64, 80, 96, 112, 128, 160, 192, 224, 256, 320, 0],
+    2: [0, 8, 16, 24, 32, 40, 48, 56, 64, 80, 96, 112, 128, 144, 160, 0],
+    25: [0, 8, 16, 24, 32, 40, 48, 56, 64, 80, 96, 112, 128, 144, 160, 0],
+  };
+  const MV_MP3_SAMPLERATES = {
+    1: [44100, 48000, 32000],
+    2: [22050, 24000, 16000],
+    25: [11025, 12000, 8000],
+  };
+  function mvLyricsMp3FrameAt(buf, off) {
+    // Parse the MP3 Layer-III frame header at off. Returns
+    // {len, durationSec, bitrate} or null when it is not a valid frame.
+    if (off + 4 > buf.length) return null;
+    if (buf[off] !== 0xFF || (buf[off + 1] & 0xE0) !== 0xE0) return null;
+    const verBits = (buf[off + 1] >> 3) & 0x03;
+    if (verBits === 1) return null;
+    const version = verBits === 3 ? 1 : (verBits === 2 ? 2 : 25);
+    if (((buf[off + 1] >> 1) & 0x03) !== 1) return null;
+    const b2 = buf[off + 2];
+    const brIdx = (b2 >> 4) & 0x0F;
+    const srIdx = (b2 >> 2) & 0x03;
+    if (brIdx === 0 || brIdx === 15 || srIdx === 3) return null;
+    const bitrate = MV_MP3_BITRATES[version][brIdx];
+    const sampleRate = MV_MP3_SAMPLERATES[version][srIdx];
+    if (!bitrate || !sampleRate) return null;
+    const coef = version === 1 ? 144 : 72;
+    const len = Math.floor(coef * bitrate * 1000 / sampleRate) + ((b2 >> 1) & 0x01);
+    if (len <= 0 || off + len > buf.length) return null;
+    return { len, durationSec: (version === 1 ? 1152 : 576) / sampleRate, bitrate };
+  }
+  function mvLyricsMp3SkipId3(buf) {
+    // Offset just past an ID3v2 tag at the start (0 when there is none).
+    if (buf.length < 10 || buf[0] !== 0x49 || buf[1] !== 0x44 || buf[2] !== 0x33) return 0;
+    const size = ((buf[6] & 0x7F) << 21) | ((buf[7] & 0x7F) << 14) | ((buf[8] & 0x7F) << 7) | (buf[9] & 0x7F);
+    let off = 10 + size;
+    if (buf[5] & 0x10) off += 10;
+    return off <= buf.length ? off : 0;
+  }
+  async function mvLyricsSplitMp3(buf) {
+    // Frame-aligned split with EXACT start times (sum of frame
+    // durations). Returns {parts} or null when the stream cannot be
+    // parsed (caller falls back to the generic split).
+    const start0 = mvLyricsMp3SkipId3(buf);
+    const parts = [];
+    let off = start0;
+    let time = 0;
+    let curStart = off;
+    let curStartTime = 0;
+    let curBytes = 0;
+    let lastBitrate = 128;
+    let frames = 0;
+    while (off < buf.length) {
+      if (buf.length - off < 1024 && !mvLyricsMp3FrameAt(buf, off)) break;
+      let f = mvLyricsMp3FrameAt(buf, off);
+      if (!f) {
+        // Resync: scan forward for the next frame sync (up to 4 KB).
+        let found = -1;
+        const scanEnd = Math.min(buf.length - 1, off + 4096);
+        for (let s = off + 1; s < scanEnd; s++) {
+          if (buf[s] === 0xFF && (buf[s + 1] & 0xE0) === 0xE0 && mvLyricsMp3FrameAt(buf, s)) { found = s; break; }
+        }
+        if (found < 0) return null;
+        time += (found - off) / (lastBitrate * 125);
+        off = found;
+        f = mvLyricsMp3FrameAt(buf, off);
+        if (!f) return null;
+      }
+      lastBitrate = f.bitrate;
+      if (curBytes > 0 && curBytes + f.len > MV_LYRICS_CHUNK_BYTES) {
+        parts.push({ buf: buf.subarray(curStart, off), start: curStartTime, exact: true, bytesBefore: curStart });
+        curStart = off; curStartTime = time; curBytes = 0;
+      }
+      off += f.len; time += f.durationSec; curBytes += f.len;
+      frames++;
+      if (frames % 16384 === 0) await new Promise((r) => setImmediate(r));
+    }
+    if (curBytes > 0) parts.push({ buf: buf.subarray(curStart, off), start: curStartTime, exact: true, bytesBefore: curStart });
+    if (!parts.length) return null;
+    return { parts };
+  }
+  function mvLyricsSplitWav(buf) {
+    // Split PCM/float WAV data into <=20 MB pieces, each with a rebuilt
+    // 44-byte header so Whisper can decode every chunk on its own.
+    // Returns {parts} or null when the header cannot be parsed.
+    if (buf.length < 44) return null;
+    if (buf.toString('ascii', 0, 4) !== 'RIFF' || buf.toString('ascii', 8, 12) !== 'WAVE') return null;
+    let fmt = null;
+    let dataOff = -1;
+    let dataLen = -1;
+    let off = 12;
+    while (off + 8 <= buf.length) {
+      const id = buf.toString('ascii', off, off + 4);
+      const size = buf.readUInt32LE(off + 4);
+      if (size > buf.length) break;
+      if (id === 'data') {
+        dataOff = off + 8;
+        dataLen = Math.min(size, buf.length - dataOff);
+        break;
+      }
+      if (id === 'fmt ') {
+        if (size < 16 || off + 8 + 16 > buf.length) return null;
+        fmt = {
+          audioFormat: buf.readUInt16LE(off + 8),
+          channels: buf.readUInt16LE(off + 10),
+          sampleRate: buf.readUInt32LE(off + 12),
+          byteRate: buf.readUInt32LE(off + 16),
+          blockAlign: buf.readUInt16LE(off + 20),
+          bitsPerSample: buf.readUInt16LE(off + 22),
+        };
+      }
+      off += 8 + size + (size % 2);
+      if (off > buf.length) break;
+    }
+    if (!fmt || dataOff < 0 || dataLen < 0) return null;
+    if (fmt.audioFormat !== 1 && fmt.audioFormat !== 3) return null;
+    if (!fmt.byteRate || !fmt.blockAlign || !fmt.sampleRate) return null;
+    if (dataLen <= 0) return null;
+    const parts = [];
+    let pos = 0;
+    while (pos < dataLen) {
+      let take = Math.min(MV_LYRICS_CHUNK_BYTES, dataLen - pos);
+      take = Math.floor(take / fmt.blockAlign) * fmt.blockAlign;
+      if (take <= 0) break;
+      const head = Buffer.alloc(44);
+      head.write('RIFF', 0); head.writeUInt32LE(36 + take, 4); head.write('WAVE', 8);
+      head.write('fmt ', 12); head.writeUInt32LE(16, 16);
+      head.writeUInt16LE(fmt.audioFormat, 20); head.writeUInt16LE(fmt.channels, 22);
+      head.writeUInt32LE(fmt.sampleRate, 24); head.writeUInt32LE(fmt.byteRate, 28);
+      head.writeUInt16LE(fmt.blockAlign, 32); head.writeUInt16LE(fmt.bitsPerSample, 34);
+      head.write('data', 36); head.writeUInt32LE(take, 40);
+      parts.push({ buf: Buffer.concat([head, buf.subarray(dataOff + pos, dataOff + pos + take)]), start: pos / fmt.byteRate, exact: true, bytesBefore: dataOff + pos });
+      pos += take;
+    }
+    if (!parts.length) return null;
+    return { parts };
+  }
+  function mvLyricsSplitGeneric(buf) {
+    // Last-resort split: plain <=20 MB byte ranges. Offsets are
+    // estimated later from the first chunk's Whisper timings.
+    const parts = [];
+    for (let off = 0; off < buf.length; off += MV_LYRICS_CHUNK_BYTES) {
+      parts.push({ buf: buf.subarray(off, Math.min(off + MV_LYRICS_CHUNK_BYTES, buf.length)), start: null, exact: false, bytesBefore: off });
+    }
+    return { parts };
+  }
+  async function mvLyricsSplitAudio(buf, fileName, contentType) {
+    // Pick the splitter for the audio format (MP3/WAV first, generic
+    // fallback). Every part is {buf, start, exact, bytesBefore}; start
+    // is the chunk's start time in seconds (null = estimate later).
+    const name = String(fileName || '').toLowerCase();
+    const ct = String(contentType || '').toLowerCase();
+    const isWav = name.endsWith('.wav') || ct.includes('wav') || (buf.length >= 12 && buf.toString('ascii', 0, 4) === 'RIFF');
+    const isMp3 = name.endsWith('.mp3') || ct.includes('mpeg') || ct.includes('mp3') ||
+      (buf.length >= 3 && buf[0] === 0x49 && buf[1] === 0x44 && buf[2] === 0x33) ||
+      (buf.length >= 2 && buf[0] === 0xFF && (buf[1] & 0xE0) === 0xE0);
+    if (isWav) { const r = mvLyricsSplitWav(buf); if (r) return r; }
+    if (isMp3) { const r = await mvLyricsSplitMp3(buf); if (r) return r; }
+    return mvLyricsSplitGeneric(buf);
+  }
+  async function mvLyricsTranscribeChunked(buf, fileName, contentType) {
+    // Transcribe a large buffer piece by piece (each <=20 MB) and
+    // combine the segments with correct start-time offsets. Throws
+    // rotErr/noKey from Whisper (caller maps them). Returns
+    // {ok:true, language, lyrics}.
+    const split = await mvLyricsSplitAudio(buf, fileName, contentType);
+    const parts = split.parts || [];
+    const perChunk = [];
+    let language = '';
+    for (let i = 0; i < parts.length; i++) {
+      const part = parts[i];
+      const r = await withProviderKeyRotation('groq', async (k) => mvLyricsWhisper(part.buf, fileName, k));
+      if (!language && r.language) language = r.language;
+      perChunk.push({ lyrics: r.lyrics || [], exact: part.exact, exactStart: part.start, bytesBefore: part.bytesBefore, bufLen: part.buf.length });
+      await new Promise((res2) => setImmediate(res2));
+    }
+    // Calibrate bytes/sec from the first chunk that returned segments
+    // (only needed for non-exact splits, where offsets are estimated).
+    let bytesPerSec = 0;
+    for (const c of perChunk) {
+      if (c.lyrics.length) {
+        const lastEnd = c.lyrics[c.lyrics.length - 1].end;
+        if (lastEnd > 0 && c.bufLen > 0) { bytesPerSec = c.bufLen / lastEnd; break; }
+      }
+    }
+    if (!bytesPerSec) bytesPerSec = 16000;
+    const all = [];
+    for (const c of perChunk) {
+      const start = c.exact ? c.exactStart : (c.bytesBefore / bytesPerSec);
+      for (const s of c.lyrics) {
+        all.push({ text: s.text, start: Math.round((start + s.start) * 100) / 100, end: Math.round((start + s.end) * 100) / 100 });
+      }
+    }
+    all.sort((a, b) => a.start - b.start);
+    return { ok: true, language, lyrics: all };
+  }
+  async function mvLyricsWhisperSingle(buf, fileName) {
+    // One Whisper call through key rotation. Throws rotErr/noKey.
+    return withProviderKeyRotation('groq', async (k) => mvLyricsWhisper(buf, fileName, k));
+  }
+  async function mvLyricsTranscribeSong(audioUrl) {
+    // Full transcription flow for one audio URL. Returns
+    // {ok:true, language, lyrics} or {ok:false, error} (Khmer+English).
+    // Throws rotErr/noKey from Whisper (caller maps them to the no-key /
+    // Whisper-failed messages).
+    // 1) Fast path: small file, one Whisper call.
+    const fast = await mvLyricsFetchAudio(audioUrl);
+    if (fast.ok) {
+      return mvLyricsWhisperSingle(fast.buf, mvLyricsFileName(fast.contentType, audioUrl));
+    }
+    if (!fast.tooLarge) {
+      return { ok: false, error: 'ទាញយកបទចម្រៀងមិនបាន · Could not download the song audio' };
+    }
+    // 2) Large file — PRIMARY: MP3 conversion, automatic, inside this
+    // call (tapping Start MV). If the URL is already a Cloudinary URL,
+    // ask Cloudinary for a 64k MP3 of it (URL rewrite, no upload).
+    // Otherwise store/transcode it with the EXISTING cloudinaryStoreSong
+    // flow — Cloudinary fetches the big file itself and converts
+    // WAV->MP3, so Render never downloads it.
+    const isCld = String(audioUrl).indexOf('res.cloudinary.com/') >= 0;
+    if (isCld) {
+      const low = mvLyricsCloudinaryLowBitrateUrl(audioUrl);
+      if (low) {
+        const l = await mvLyricsFetchAudio(low);
+        if (l.ok) return mvLyricsWhisperSingle(l.buf, 'song.mp3');
+        // Low-bitrate variant unfetchable or still too large — chunking below.
+      }
+    } else if (cloudinaryConfigured()) {
+      const stored = await mvLyricsCloudinaryStoreMp3(audioUrl);
+      if (stored === 'gone') {
+        return { ok: false, error: 'ទាញយកបទចម្រៀងមិនបាន · Could not download the song audio' };
+      }
+      if (stored && stored.mp3Url) {
+        const m = await mvLyricsFetchAudio(stored.mp3Url);
+        if (m.ok) return mvLyricsWhisperSingle(m.buf, 'song.mp3');
+        if (m.tooLarge) {
+          const low = mvLyricsCloudinaryLowBitrateUrl(stored.mp3Url);
+          if (low) {
+            const l = await mvLyricsFetchAudio(low);
+            if (l.ok) return mvLyricsWhisperSingle(l.buf, 'song.mp3');
+          }
+        }
+        // Stored MP3 unfetchable or still too large — chunking below.
+      }
+      // stored === null (store failed / not ready) — chunking below.
+    }
+    // 3) Last resort: split the audio into <=20 MB chunks and transcribe
+    // each one (only when Cloudinary conversion could not produce a
+    // file under 25 MB, or Cloudinary is not configured).
+    const full = await mvLyricsFetchAudio(audioUrl, MV_LYRICS_FULL_MAX_BYTES, MV_LYRICS_FULL_FETCH_TIMEOUT_MS);
+    if (!full.ok) {
+      if (full.tooLarge) {
+        return { ok: false, error: 'ឯកសារបទចម្រៀងធំពេក (លើស 120 MB) មិនអាចបង្កើតអក្សរចម្រៀងបានទេ · The song file is too large (over 120 MB) to create lyrics' };
+      }
+      return { ok: false, error: 'ទាញយកបទចម្រៀងមិនបាន · Could not download the song audio' };
+    }
+    if (!full.buf || !full.buf.length) {
+      return { ok: false, error: 'ទាញយកបទចម្រៀងមិនបាន · Could not download the song audio' };
+    }
+    return mvLyricsTranscribeChunked(full.buf, mvLyricsFileName(full.contentType, audioUrl), full.contentType);
+  }
+  if (req.method === 'POST' && urlPath === '/api/mv/lyrics') {
+    readJSONBody(req, 64 * 1024).then(async (body) => {
+      logActivity({ at: new Date().toISOString(), mode: 'mv-lyrics' });
+      const audioUrl = body && typeof body.audioUrl === 'string' ? body.audioUrl.trim() : '';
+      const translateTo = body && typeof body.translateTo === 'string' ? body.translateTo.trim().slice(0, 50) : '';
+      let u;
+      try { u = new URL(audioUrl); } catch (e) { u = null; }
+      if (!u || (u.protocol !== 'http:' && u.protocol !== 'https:') || audioUrl.length > 2000) {
+        return sendJSON(res, 200, { ok: false, error: 'សូមដាក់លីងបទចម្រៀងត្រឹមត្រូវ · Please provide a valid song audio URL' });
+      }
+      // Transcribe (fast path, Cloudinary MP3 conversion, or chunked —
+      // see mvLyricsTranscribeSong). Throws only for Whisper/no-key.
+      let tr;
+      try {
+        tr = await mvLyricsTranscribeSong(audioUrl);
+      } catch (e) {
+        if (e && e.noKey) return sendJSON(res, 200, { ok: false, error: 'Admin មិនទាន់ដាក់ Groq API Key ទេ · Admin has not set a Groq API Key yet' });
+        return sendJSON(res, 200, { ok: false, error: 'ស្ដាប់បទចម្រៀងមិនបាន (Whisper) · Could not transcribe the song (Whisper)' });
+      }
+      if (!tr || !tr.ok) {
+        return sendJSON(res, 200, { ok: false, error: (tr && tr.error) ? tr.error : 'ទាញយកបទចម្រៀងមិនបាន · Could not download the song audio' });
+      }
+      if (!tr.lyrics || !tr.lyrics.length) {
+        return sendJSON(res, 200, { ok: false, error: 'រកមិនឃើញអត្ថបទចម្រៀងក្នុងបទនេះទេ · No lyrics were found in this song' });
+      }
+      const language = tr.language || '';
+      if (!translateTo) {
+        return sendJSON(res, 200, { ok: true, language, lyrics: tr.lyrics });
+      }
+      // Translate, keeping timings. On translation failure, fall back to
+      // the original-language lyrics so the MV still has something to show.
+      let translated = null;
+      try {
+        translated = await withProviderKeyRotation('groq', async (k) => {
+          const t = await mvLyricsTranslate(tr.lyrics, translateTo, k);
+          if (!t.ok) throw rotErr(t.error || 'translate failed', t.status || 0);
+          return t.lines;
+        });
+      } catch (e) {
+        translated = null;
+      }
+      if (!translated) {
+        return sendJSON(res, 200, { ok: true, language, lyrics: tr.lyrics, translationFailed: true });
+      }
+      const outLyrics = tr.lyrics.map((l, i) => ({ text: (translated[i] !== undefined ? translated[i] : l.text), start: l.start, end: l.end }));
+      return sendJSON(res, 200, { ok: true, language, translatedTo: translateTo, lyrics: outLyrics });
+    }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
+    return;
+  }
+
   // POST /api/public/song-store — PUBLIC. {url}. Stores a song
   // PERMANENTLY right after generation (Hercules checklist point A,
   // owner order 2026-11-17): the AI provider's audio URL is TEMPORARY
