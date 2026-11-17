@@ -691,6 +691,14 @@ img.hist-media,.d3-preview{cursor:zoom-in}
 .mv-auto-grad{flex-direction:row;gap:14px}
 .mv-auto-grad .mc-note{width:46px;max-width:46px;flex:0 0 auto;order:2}
 .mv-auto-grad .mc-name{font-size:1.9rem;order:-1}
+/* Brand dissolve (owner order 2026-11-17, latest): while lyric
+   text is on screen over the centre, the company name + music
+   note MELT AWAY (fade + blur out); when no lyric text is over
+   them — intros, instrumental gaps, lyric-less songs — they
+   show normally again. Toggled by mvSyncLyrics (.mv-brand-off). */
+.mv-auto-grad .mc-name,.mv-auto-grad .mc-note{transition:opacity .55s ease,filter .55s ease}
+.mv-stage.mv-brand-off .mv-auto-grad .mc-name,.mv-stage.mv-brand-off .mv-auto-grad .mc-note{opacity:0;filter:blur(8px)}
+@media (prefers-reduced-motion:reduce){.mv-auto-grad .mc-name,.mv-auto-grad .mc-note{transition:none}}
 /* ===== Fullscreen media viewer (tap any image / video / 3D preview) ===== */
 .fs-viewer{position:fixed;inset:0;z-index:90;background:rgba(0,0,0,.96);align-items:center;justify-content:center}
 .fs-body{width:100%;height:100%;display:flex;align-items:center;justify-content:center;padding:10px}
@@ -16783,12 +16791,14 @@ var MV_FORMATS=[
 ];
 var mvState={song:null,fmt:'9x16',bgMode:'auto',bgUrl:'',bgKind:'',bgName:'',lines:null,timed:false,curLine:-2,aiBusy:false,playStyle:-1,curBg:null,vizStyle:0,txtIdx:0,tcFull:''};
 var mvAudio=null,mvCache={},mvTrCache={};
-/* Karaoke sync lead: a line switches on essentially WITH the
-   voice — only a hair before it (0.15s) so fast singing still
-   gets fast lyrics. The switch itself is driven every animation
-   frame while playing (see mvRafKick), not just on timeupdate,
-   so a line can never sit late behind the singing. */
-var MV_LEAD=0.15;
+/* Karaoke sync lead (owner order 2026-11-17, latest): a line
+   must appear a little BEFORE it is sung — never after the
+   voice has already started — so the switch happens 0.6s
+   ahead of the line's start time. The switch itself is driven
+   every animation frame while playing (see mvRafKick), not
+   just on timeupdate, so fast singing still gets fast lyrics
+   and no line can ever sit late behind the singing. */
+var MV_LEAD=0.6;
 /* ===== Per-song auto background styles (owner order 2026-11-17) =====
    The AUTO background is NOT one fixed colour/surface for every
    song: each song deterministically gets its OWN style — its own
@@ -16798,23 +16808,25 @@ var MV_LEAD=0.15;
    glow / rings / rays / dots / waves / grid / diag over a deep
    two-hue gradient. The accent also tints the title underline,
    the translation line and the listening spinner per song. */
-/* Style rules (owner order 2026-11-17, night): NO small-dot
-   patterns and NO firework bursts in the corners — the owner
-   does not want them. Patterns are straight, even and clean:
-   lines along the sides and across the top, soft waves / bands,
-   and one «drift» style whose smoke flies across the stage
+/* Style rules (owner order 2026-11-17, latest — HARD BAN):
+   NO grid squares like notebook paper, and NO small dots
+   anywhere in the background. The background is ONE smooth,
+   even, clean surface: it only changes COLOUR from song to
+   song, with broad soft colour streaks / glows laid over it.
+   No repeating thin lines, no dot patterns, no corner bursts.
+   One «drift» style still flies soft smoke across the stage
    from LEFT to RIGHT (drawn on the FX canvas, see mvFxStep).
-   Every pattern layer is kept DIM — never too bright. */
+   Every layer is kept DIM — never too bright. */
 var MV_BG_STYLES=[
  {h:152,pat:'glow',acc:'#34d399'},
  {h:210,pat:'waves',acc:'#38bdf8'},
  {h:262,pat:'rays',acc:'#c084fc'},
- {h:330,pat:'lines',acc:'#f472b6'},
+ {h:330,pat:'bands',acc:'#f472b6'},
  {h:16,pat:'rings',acc:'#fb923c'},
- {h:45,pat:'grid',acc:'#facc15'},
+ {h:45,pat:'bands',acc:'#facc15'},
  {h:186,pat:'diag',acc:'#2dd4bf'},
  {h:288,pat:'drift',acc:'#e879f9'},
- {h:96,pat:'lines',acc:'#a3e635'},
+ {h:96,pat:'bands',acc:'#a3e635'},
  {h:24,pat:'aurora',acc:'#fbbf24'}
 ];
 function mvSongStyle(song){
@@ -16882,35 +16894,44 @@ function mvStyleLayers(st,withBase){
       L.push({i:'radial-gradient(110% 90% at 50% 108%,hsla('+H2+',90%,55%,.26),transparent 55%)',s:'auto'});
       break;
     case 'rings':
-      L.push({i:'repeating-radial-gradient(circle at 50% 38%,hsla('+H+',85%,65%,.13) 0 2px,transparent 2px 52px)',s:'auto'});
+      /* One large soft halo glow — no repeating rings. */
+      L.push({i:'radial-gradient(75% 60% at 50% 38%,hsla('+H+',85%,65%,.16),transparent 70%)',s:'auto'});
+      L.push({i:'radial-gradient(60% 45% at 50% 95%,hsla('+H2+',85%,60%,.12),transparent 70%)',s:'auto'});
       break;
     case 'rays':
-      L.push({i:'repeating-conic-gradient(from -12deg at 50% 34%,hsla('+H+',90%,65%,.09) 0deg 9deg,transparent 9deg 26deg)',s:'auto'});
+      /* One broad soft light sweep — no repeating rays. */
+      L.push({i:'conic-gradient(from -40deg at 50% 30%,transparent 0deg,hsla('+H+',90%,65%,.10) 60deg,transparent 135deg)',s:'auto'});
+      L.push({i:'radial-gradient(90% 70% at 50% 0%,hsla('+H+',90%,60%,.14),transparent 60%)',s:'auto'});
       break;
+    case 'bands':
     case 'lines':
-      /* Straight, even lines — across the top AND down the
-         sides, evenly spaced, kept dim (owner order). */
-      L.push({i:'linear-gradient(hsla('+H+',85%,68%,.15) 1.5px,transparent 1.5px)',s:'auto 34px'});
-      L.push({i:'linear-gradient(90deg,hsla('+H2+',85%,68%,.15) 1.5px,transparent 1.5px)',s:'34px auto'});
+      /* Broad soft colour streaks ONLY — never a grid, never
+         thin lines (owner ban). */
+      L.push({i:'linear-gradient(115deg,transparent 12%,hsla('+H+',88%,62%,.16) 42%,transparent 68%)',s:'auto'});
+      L.push({i:'linear-gradient(0deg,transparent 55%,hsla('+H2+',88%,66%,.12) 100%)',s:'auto'});
       break;
     case 'drift':
       /* Soft horizontal bands; the flying smoke itself is
          drawn on the FX canvas (mvFxStep, left → right). */
-      L.push({i:'repeating-linear-gradient(0deg,hsla('+H+',85%,62%,.07) 0 26px,transparent 26px 64px)',s:'auto'});
+      L.push({i:'linear-gradient(0deg,transparent 30%,hsla('+H+',85%,62%,.08) 50%,transparent 72%)',s:'auto'});
       L.push({i:'linear-gradient(90deg,hsla('+H+',85%,62%,.10),transparent 30%,transparent 70%,hsla('+H2+',85%,62%,.10))',s:'auto'});
       break;
     case 'aurora':
       L.push({i:'linear-gradient(115deg,transparent 18%,hsla('+H+',90%,62%,.13) 38%,transparent 55%,hsla('+H2+',90%,62%,.10) 72%,transparent 88%)',s:'auto'});
       break;
     case 'waves':
-      L.push({i:'repeating-linear-gradient(115deg,hsla('+H+',85%,62%,.11) 0 14px,transparent 14px 44px)',s:'auto'});
+      /* Two broad diagonal soft streaks — no repeating stripes. */
+      L.push({i:'linear-gradient(115deg,transparent 22%,hsla('+H+',85%,62%,.13) 45%,transparent 62%)',s:'auto'});
+      L.push({i:'linear-gradient(115deg,transparent 58%,hsla('+H2+',85%,62%,.09) 78%,transparent 92%)',s:'auto'});
       break;
     case 'grid':
-      L.push({i:'linear-gradient(hsla('+H+',85%,65%,.13) 1.5px,transparent 1.5px)',s:'auto 36px'});
-      L.push({i:'linear-gradient(90deg,hsla('+H+',85%,65%,.13) 1.5px,transparent 1.5px)',s:'36px auto'});
+      /* Grid is BANNED (owner order) — smooth glows instead. */
+      L.push({i:'radial-gradient(120% 90% at 50% 0%,hsla('+H+',90%,60%,.26),transparent 55%)',s:'auto'});
+      L.push({i:'radial-gradient(110% 90% at 50% 108%,hsla('+H2+',90%,55%,.22),transparent 55%)',s:'auto'});
       break;
     case 'diag':
-      L.push({i:'repeating-linear-gradient(45deg,hsla('+H+',85%,60%,.12) 0 10px,transparent 10px 34px)',s:'auto'});
+      /* One broad diagonal colour band — no repeating stripes. */
+      L.push({i:'linear-gradient(45deg,transparent 30%,hsla('+H+',85%,60%,.13) 52%,transparent 74%)',s:'auto'});
       break;
   }
   if(withBase)L.push({i:'linear-gradient(155deg,hsl('+H+',58%,24%),hsl('+H2+',62%,11%) 78%)',s:'auto'});
@@ -17581,13 +17602,13 @@ function mvBeatStep(){
    fresh random particles on every play (mvFxReset, called from
    mvPickPlayStyle) so no two plays ever match. Reduced motion
    turns the whole layer off. */
-var mvFx={parts:[],lastT:0,off:0,drift:[]};
+var mvFx={parts:[],lastT:0,off:0,drift:[],vizClock:0};
 function mvFxReset(){
   mvFx.parts=[];mvFx.lastT=0;
   /* A fresh phase offset every play: the atmosphere sequence
      (snow → glow orbs → rain → smoke) starts at a different
      point each time, so no two plays run the same show. */
-  mvFx.off=Math.random();
+  mvFx.off=Math.random();mvFx.vizClock=0;
   mvFx.drift=[];
   for(var i=0;i<64;i++)mvFx.parts.push({x:Math.random(),y:Math.random(),s:0.35+Math.random()*1.15,v:0.25+Math.random()*0.85,ph:Math.random()*6.283});
   /* Smoke puffs for the «drift» style — they fly across the
@@ -17624,7 +17645,7 @@ function mvFxStep(){
      night): a stretch of big soft GLOW ORBS — slow floating
      lights in the song's own accent colour — runs between the
      snow and the rain, so the show keeps changing form. */
-  var orbA=p<0.28?0:(p<0.36?(p-0.28)/0.08:(p<0.56?1:Math.max(0,1-(p-0.56)/0.08)));
+  var orbA=(p<0.08?p/0.08:(p<0.56?1:Math.max(0,1-(p-0.56)/0.08)));
   var accRgb=mvHexRgb(mvState.song?mvCurStyle(mvState.song).acc:'#addc29');
   if(orbA>0.01){
     for(i=0;i<mvFx.parts.length;i+=9){pt=mvFx.parts[i];
@@ -17650,11 +17671,17 @@ function mvFxStep(){
   }
   var i,pt;
   if(snowA>0.01){
-    cx.fillStyle='rgba(255,255,255,'+(0.75*snowA).toFixed(3)+')';
-    for(i=0;i<mvFx.parts.length;i++){pt=mvFx.parts[i];
-      pt.y+=pt.v*0.028*dt*8;pt.x+=Math.sin(now*0.7+pt.ph)*0.0006;
-      if(pt.y>1.02){pt.y=-0.02;pt.x=Math.random();}
-      cx.beginPath();cx.arc(pt.x*w+Math.sin(now+pt.ph)*3,pt.y*h,pt.s*1.5,0,6.283);cx.fill();}
+    /* NO small snow dots (owner ban): the opening stretch is a
+       slow drift of LARGE soft light glows instead — smooth,
+       never dotted. */
+    for(i=0;i<mvFx.parts.length;i+=6){pt=mvFx.parts[i];
+      pt.y+=pt.v*0.010*dt*8;pt.x+=Math.sin(now*0.4+pt.ph)*0.0005;
+      if(pt.y>1.05){pt.y=-0.05;pt.x=Math.random();}
+      var wx=pt.x*w,wy=pt.y*h,wrad=(46+pt.s*58);
+      var wg=cx.createRadialGradient(wx,wy,2,wx,wy,wrad);
+      wg.addColorStop(0,'rgba(255,255,255,'+(0.07*snowA).toFixed(3)+')');
+      wg.addColorStop(1,'rgba(255,255,255,0)');
+      cx.fillStyle=wg;cx.beginPath();cx.arc(wx,wy,wrad,0,6.283);cx.fill();}
   }
   if(rainA>0.01){
     cx.strokeStyle='rgba(185,215,255,'+(0.5*rainA).toFixed(3)+')';
@@ -17676,6 +17703,13 @@ function mvFxStep(){
       g.addColorStop(1,'rgba(210,210,215,0)');
       cx.fillStyle=g;cx.beginPath();cx.arc(sx,sy,sr,0,6.283);cx.fill();}
   }
+  /* The visualiser style also drifts on its own while the
+     song plays (owner order): every ~16s of playback it slips
+     to a different shape, never the one already showing. */
+  if(mvAudio&&!mvAudio.paused&&!mvAudio.ended){
+    mvFx.vizClock=(mvFx.vizClock||0)+dt;
+    if(mvFx.vizClock>16){mvFx.vizClock=0;mvState.vizStyle=(mvState.vizStyle+1+((Math.random()*4)|0))%5;}
+  }
   /* Visualiser — only while the song actually plays; without
      analyser data it stays calm (no fake motion). Its height
      is multiplied by the BEAT GAIN (mvBeatStep): a hard hit
@@ -17686,6 +17720,12 @@ function mvFxStep(){
   var data=mvBeat.data,bins=data.length;
   var gain=mvBeat.gain||1;
   var baseY=h-5,maxH=h*0.15*Math.min(2.2,gain),x0=w*0.06,span=w*0.88;
+  /* Light effect (owner order): a soft glow always breathes
+     under the visualiser, and a hard beat flashes it brighter. */
+  var ug=cx.createRadialGradient(w/2,baseY,4,w/2,baseY,w*0.52);
+  ug.addColorStop(0,'rgba('+accRgb+',0.13)');
+  ug.addColorStop(1,'rgba('+accRgb+',0)');
+  cx.fillStyle=ug;cx.fillRect(0,0,w,h);
   if(gain>1.06){
     var fg=cx.createRadialGradient(w/2,baseY,4,w/2,baseY,w*0.55);
     fg.addColorStop(0,'rgba('+accRgb+','+(Math.min(0.30,(gain-1)*0.30)).toFixed(3)+')');
@@ -17693,6 +17733,9 @@ function mvFxStep(){
     cx.fillStyle=fg;cx.fillRect(0,0,w,h);
   }
   cx.fillStyle=acc;cx.strokeStyle=acc;
+  /* Glow on the shapes themselves — the harder the beat, the
+     stronger the light halo. */
+  cx.shadowColor=acc;cx.shadowBlur=Math.round(6+11*Math.min(1.6,gain));
   if(mvState.vizStyle===3){
     /* Mirror bars: throw up AND down from the baseline. */
     cx.globalAlpha=0.55;
@@ -17724,13 +17767,23 @@ function mvFxStep(){
     }
     cx.stroke();cx.globalAlpha=1;
   }else if(mvState.vizStyle===2){
-    cx.globalAlpha=0.65;
-    var M=22;
-    for(i=0;i<M;i++){
-      var bj=Math.floor(i/M*bins*0.5),vv=data[bj]/255;
-      cx.beginPath();cx.arc(x0+span*(M===1?0:i/(M-1)),baseY-4-vv*maxH*0.5,1.6+vv*3.4,0,6.283);cx.fill();
+    /* Glowing filled wave — a smooth light ribbon, no dots. */
+    cx.globalAlpha=0.30;cx.beginPath();
+    var N2=42;
+    for(i=0;i<=N2;i++){
+      var bj2=Math.floor(i/N2*bins*0.55),vv2=data[bj2]/255;
+      var wx2=x0+span*i/N2,wy2=baseY-3-vv2*maxH;
+      if(i===0)cx.moveTo(wx2,baseY);else cx.lineTo(wx2,wy2);
+      if(i===N2)cx.lineTo(wx2,baseY);
     }
-    cx.globalAlpha=1;
+    cx.closePath();cx.fill();
+    cx.globalAlpha=0.85;cx.lineWidth=2.2;cx.beginPath();
+    for(i=0;i<=N2;i++){
+      var bj3=Math.floor(i/N2*bins*0.55),vv3=data[bj3]/255;
+      var wx3=x0+span*i/N2,wy3=baseY-3-vv3*maxH;
+      if(i===0)cx.moveTo(wx3,wy3);else cx.lineTo(wx3,wy3);
+    }
+    cx.stroke();cx.globalAlpha=1;
   }else{
     cx.globalAlpha=0.55;
     var K=26,bw=span/K;
@@ -17740,6 +17793,7 @@ function mvFxStep(){
     }
     cx.globalAlpha=1;
   }
+  cx.shadowBlur=0;
 }
 function mvSync(){
   if(!mvAudio)return;
@@ -17774,7 +17828,7 @@ function mvSyncLyrics(force){
   var box=document.getElementById('mvLyrics');
   if(!box)return;
   var lines=mvState.lines;
-  if(!lines||!lines.length||!mvAudio){if(force||mvState.curLine!==-2){box.innerHTML='';mvState.curLine=-2;}return;}
+  if(!lines||!lines.length||!mvAudio){if(force||mvState.curLine!==-2){box.innerHTML='';mvState.curLine=-2;}var stgE=document.getElementById('mvStage');if(stgE)stgE.classList.remove('mv-brand-off');return;}
   /* A line switches on essentially WITH the voice (MV_LEAD is a
      hair before it) — tight to the real playback time. */
   var t=(mvAudio.currentTime||0)+MV_LEAD,idx=-1,i;
@@ -17791,6 +17845,19 @@ function mvSyncLyrics(force){
   if(idx===mvState.curLine&&!force)return;
   mvState.curLine=idx;
   box.innerHTML='';
+  /* Brand dissolve: lyric text is on screen -> the MovAi name
+     + note melt away; a real instrumental gap (current line
+     ended, next line still far off) brings them back. */
+  var brandOff=true;
+  if(idx>=0&&mvState.timed){
+    var rawT=mvAudio.currentTime||0,clEnd=lines[idx].end;
+    if(typeof clEnd==='number'&&rawT>clEnd+0.35){
+      var nxSt=(idx<lines.length-1&&typeof lines[idx+1].start==='number')?lines[idx+1].start:null;
+      if(nxSt===null||nxSt-rawT>1.4)brandOff=false;
+    }
+  }
+  var stgB=document.getElementById('mvStage');
+  if(stgB)stgB.classList.toggle('mv-brand-off',brandOff);
   if(idx<0){
     var nx=document.createElement('div');
     nx.className='mv-line';
@@ -17847,7 +17914,7 @@ function mvCloseView(){
   mvBeat.level=1;mvBeat.base=0;mvBeat.gain=1;
   if(mvBeat.au){try{mvBeat.au.pause();}catch(e){}}
   var bst=document.getElementById('mvStage');
-  if(bst){bst.style.setProperty('--mv-beat','1');bst.classList.remove('mv-on-light');}
+  if(bst){bst.style.setProperty('--mv-beat','1');bst.classList.remove('mv-on-light');bst.classList.remove('mv-brand-off');}
   mvProgHide();
   var fxCv=document.getElementById('mvFx');
   if(fxCv){var fxCx=fxCv.getContext('2d');if(fxCx)fxCx.clearRect(0,0,fxCv.width,fxCv.height);}
@@ -18007,10 +18074,19 @@ function mvExpDraw(){
     var sc=Math.min(W*0.86/iw,H*0.86/ih),dw=iw*sc,dh=ih*sc;
     try{cx.drawImage(mvExp.cover,(W-dw)/2,(H-dh)/2,dw,dh);drew=true;}catch(e){drew=false;}
   }
+  var expLines=mvState.lines,expIdx=-1;
+  if(expLines&&expLines.length){
+    var elt=t+MV_LEAD,ej;
+    if(mvState.timed){for(ej=0;ej<expLines.length;ej++){var es2=expLines[ej].start;if(typeof es2==='number'&&elt>=es2)expIdx=ej;else if(typeof es2==='number'&&elt<es2)break;}}
+    else if(dur>0)expIdx=Math.min(expLines.length-1,Math.floor(elt/dur*expLines.length));
+    else expIdx=0;
+  }
+  var showBrand=!(expLines&&expLines.length&&expIdx>=0);
   if(!drew){
     var g=cx.createLinearGradient(0,0,W,H);
     g.addColorStop(0,'hsl('+sty.h+',58%,24%)');g.addColorStop(.7,'hsl('+((sty.h+55)%360)+',62%,11%)');g.addColorStop(1,'#07080a');
     cx.fillStyle=g;cx.fillRect(0,0,W,H);
+    if(showBrand){
     cx.font='900 '+Math.round(W*0.11)+'px system-ui,sans-serif';
     cx.textBaseline='middle';
     var wMov=cx.measureText('Mov').width,wAi=cx.measureText('Ai').width,x0=(W-(wMov+wAi))/2;
@@ -18021,6 +18097,7 @@ function mvExpDraw(){
     cx.fillStyle=TC;cx.fillText('Mov',x0,H*0.30);
     cx.fillStyle=sty.acc;cx.fillText('Ai',x0+wMov,H*0.30);
     cx.textAlign='center';
+    }
   }
   /* This song's own hue tints the frame, matching the on-screen MV. */
   var tg=cx.createRadialGradient(W*0.2,H*0.08,10,W*0.2,H*0.08,W*0.95);
