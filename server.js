@@ -1518,7 +1518,17 @@ function cleanSettings(j, base) {
   if (typeof emIn.appPassword === 'string' && emIn.appPassword.trim()) emPass = emIn.appPassword.replace(/\s+/g, '').slice(0, 200);
   else if (emIn.appPassword === null) emPass = '';
   else emPass = typeof baseEm.appPassword === 'string' ? baseEm.appPassword : '';
-  s.email = { user: emUser, appPassword: emPass };
+  // Brevo API key is a SECRET, same rule as appPassword: a non-empty
+  // string sets/rotates it; an empty string or missing field KEEPS the
+  // stored key (the Admin app leaves the field blank when it does not
+  // know it — that must never wipe it); null clears it. Without this,
+  // cleanSettings dropped the key on every save, so Brevo could never
+  // be configured (email-usage always reported "not configured").
+  let emBrevo;
+  if (typeof emIn.brevoApiKey === 'string' && emIn.brevoApiKey.trim()) emBrevo = emIn.brevoApiKey.replace(/\s+/g, '').slice(0, 200);
+  else if (emIn.brevoApiKey === null) emBrevo = '';
+  else emBrevo = typeof baseEm.brevoApiKey === 'string' ? baseEm.brevoApiKey : '';
+  s.email = { user: emUser, appPassword: emPass, brevoApiKey: emBrevo };
   return s;
 }
 function loadSettings() {
@@ -1546,7 +1556,7 @@ function publicSettings(s) {
   const tel = (s && s.telegram && typeof s.telegram === 'object' && !Array.isArray(s.telegram)) ? s.telegram : {};
   out.telegram = { hasBotToken: !!(typeof tel.botToken === 'string' && tel.botToken.trim()), chatId: typeof tel.chatId === 'string' ? tel.chatId : '' };
   const em = (s && s.email && typeof s.email === 'object' && !Array.isArray(s.email)) ? s.email : {};
-  out.email = { user: typeof em.user === 'string' ? em.user : '', hasAppPassword: !!(typeof em.appPassword === 'string' && em.appPassword.trim()) };
+  out.email = { user: typeof em.user === 'string' ? em.user : '', hasAppPassword: !!(typeof em.appPassword === 'string' && em.appPassword.trim()), hasBrevoApiKey: !!(typeof em.brevoApiKey === 'string' && em.brevoApiKey.trim()) };
   return out;
 }
 // Admin provider keys (./data/admin-keys.json). The admin puts each
