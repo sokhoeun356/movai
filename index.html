@@ -5237,11 +5237,18 @@ async function mp3ReadBody(rp){
    by inserting fl_attachment:<title> right after /upload/ —
    Cloudinary then serves the file as an attachment under that
    exact name. The title is stripped of / : * ? " < > | and
-   capped at 120 characters, then encodeURIComponent'd. */
+   capped at 120 characters, then encodeURIComponent'd. Any
+   parentheses ( ) or [ ] { } # & = in the title are REMOVED
+   entirely (never sent at all — only the name is pushed), the
+   same rule the server applies: Cloudinary rejects an
+   fl_attachment value containing them with «Invalid flag in
+   transformation». Users sometimes type a title with
+   parentheses by mistake, so Download strips them
+   automatically. */
 function dlCloudinaryAttach(url,title){
   var u=String(url||'');
   if(u.indexOf('res.cloudinary.com')<0||u.indexOf('/upload/')<0)return '';
-  var name=String(title||'').replace(/[\/:*?"<>|]+/g,' ').replace(/\s+/g,' ').trim().slice(0,120);
+  var name=String(title||'').replace(/[()\[\]{}#&=]+/g,'').replace(/[\/:*?"<>|]+/g,' ').replace(/\s+/g,' ').trim().slice(0,120);
   if(!name)return '';
   var seg='fl_attachment:'+encodeURIComponent(name);
   if(/\/fl_attachment:[^\/]*/.test(u))return u.replace(/\/fl_attachment:[^\/]*/,'/'+seg);
