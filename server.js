@@ -1967,7 +1967,7 @@ async function mvsepCreateSeparation(keyValue, audioUrl) {
   // failed on the user's phone even though the job was created.)
   const hash = (j && j.data && typeof j.data.hash === 'string' && j.data.hash) || (j && typeof j.hash === 'string' && j.hash) || '';
   if (hash) return hash;
-  if (!r.ok || !j || !mvsepIsSuccess(j)) throw new Error('MVSEP: ' + text);
+  if (!r.ok || !j || !mvsepIsSuccess(j)) throw new Error('MVSEP: ' + text + ' | raw=' + String(rawBody).slice(0, 300));
   throw new Error('MVSEP: no separation hash returned');
 }
 async function mvsepGetSeparation(hash) {
