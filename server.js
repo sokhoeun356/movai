@@ -3330,8 +3330,12 @@ function apiRoute(req, res, urlPath) {
   // password sign-in (the normal sign-in after sign-up). Verifies the
   // scrypt hash; 5 wrong passwords lock the Gmail for 15 minutes.
   // Returns {ok:true, user} (pubUser) so the website can log them in
-  // the same way as a Google sign-in. The error never says whether
-  // the Gmail exists or the password was wrong.
+  // the same way as a Google sign-in. A WRONG password returns a
+  // generic error (never says which part was wrong). BUT a Gmail with
+  // NO account yet (never did Continue with Google) returns a clear
+  // "no account yet" error + noAccount:true (owner order 2026-11-17)
+  // so the website can show "Continue with Google first" — and it
+  // does NOT count toward the lockout (it is not a wrong password).
   if (req.method === 'POST' && urlPath === '/api/auth/signin') {
     readJSONBody(req, 64 * 1024).then(async (body) => {
       const email = normEmail(body && body.email);
@@ -3345,7 +3349,13 @@ function apiRoute(req, res, urlPath) {
       const users = loadUsers();
       const u = users[email];
       const bad = () => sendJSON(res, 200, { ok: false, error: 'Gmail ឬ Password មិនត្រឹមត្រូវទេ · Wrong Gmail or password' });
-      if (!u || !u.passwordHash || !u.passwordSalt) { signinFail(email); return bad(); }
+      // No account yet, or the account never set a password (never did
+      // Continue with Google): say so clearly so the website can send
+      // them to Continue with Google first. Not a wrong-password
+      // attempt, so it does not count toward the lockout.
+      if (!u || !u.passwordHash || !u.passwordSalt) {
+        return sendJSON(res, 200, { ok: false, error: 'មិនទាន់មាន Gmail នេះទេ — សូម Continue with Google ជាមុនសិន ទើបអាច Log in បាន · No account with this Gmail yet — please Continue with Google first, then you can log in', noAccount: true });
+      }
       const okPw = await verifyPassword(password, u.passwordSalt, u.passwordHash);
       if (!okPw) { signinFail(email); return bad(); }
       signinClear(email);
