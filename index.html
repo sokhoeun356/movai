@@ -1864,6 +1864,10 @@ html[data-smooth="1"] .brand-frame,html[data-smooth="1"] .acct-chip,html[data-sm
       <span id="histCount" style="font-size:0.8125rem;color:var(--muted)"></span>
     </div>
     <button type="button" class="kbtn kbtn-white" id="histClearBtn" onclick="histClearAll(this)" style="margin-top:12px;display:none;color:#f87171" data-i18n="histClearAll">លុបប្រវត្តិទាំងអស់</button>
+    <div id="histGuestNote" style="display:none;margin-top:12px;padding:12px 14px;border:1px solid var(--line2);border-radius:12px;background:var(--card)">
+      <p style="font-size:0.8125rem;line-height:1.7;color:var(--muted);margin:0" data-i18n="histGuestSync">អ្នកមិនទាន់បាន Sign in ទេ — ប្រវត្តិរបស់អ្នកឥឡូវរក្សាទុកតែក្នុងទូរសព្ទនេះប៉ុណ្ណោះ ហើយនឹងបាត់បើអ្នកប្តូរទូរសព្ទ ឬលុបទិន្នន័យ browser។ សូម Sign in ជាមួយ Gmail ដើម្បីរក្សាទុកប្រវត្តិក្នុងគណនីរបស់អ្នក — Gmail ទៅដល់ទីណា ទិន្នន័យក៏ទៅជាមួយដែរ។</p>
+      <button type="button" class="kbtn kbtn-black" style="margin-top:10px" onclick="loginSheetOpen()" data-i18n="histGuestLogin">Sign in ជាមួយ Gmail</button>
+    </div>
     <div class="hist-tabs" role="tablist" aria-label="History sections">
       <button type="button" class="hist-tab on" data-htab="playlist" role="tab" aria-selected="true" onclick="histTabSet('playlist')" data-i18n="histTabPlaylist">Playlist</button>
       <button type="button" class="hist-tab" data-htab="song" role="tab" aria-selected="false" onclick="histTabSet('song')" data-i18n="histTabSong">បទចម្រៀង</button>
@@ -2403,6 +2407,7 @@ km:{
  histPlay:'ចាក់',histStop:'ឈប់',histVol:'កម្រិតសំឡេង',histSpeed:'ល្បឿន',
  histLinkCopied:'បានចម្លងលីងហើយ ✓',histGone:'ឯកសារនេះបើកវិញមិនបានទេ — លីងរបស់ provider អាចផុតកំណត់ហើយ',
  histClearAll:'លុបប្រវត្តិទាំងអស់',histClearConfirm:'លុបទាំងអស់មែន? ចុចម្ដងទៀត',histCountFmt:'សរុប {n} ធាតុ',
+ histGuestSync:'អ្នកមិនទាន់បាន Sign in ទេ — ប្រវត្តិរបស់អ្នកឥឡូវរក្សាទុកតែក្នុងទូរសព្ទនេះប៉ុណ្ណោះ ហើយនឹងបាត់បើអ្នកប្តូរទូរសព្ទ ឬលុបទិន្នន័យ browser។ សូម Sign in ជាមួយ Gmail ដើម្បីរក្សាទុកប្រវត្តិក្នុងគណនីរបស់អ្នក — Gmail ទៅដល់ទីណា ទិន្នន័យក៏ទៅជាមួយដែរ។',histGuestLogin:'Sign in ជាមួយ Gmail',
  fsView:'មើលពេញអេក្រង់',fsClose:'បិទ',
  histSecImage:'ប្រវត្តិរូបភាព',histSecVideo:'ប្រវត្តិវីដេអូ',histSecSong:'ប្រវត្តិបទចម្រៀង',histSec3d:'ប្រវត្តិ 3D',histSecStory:'ប្រវត្តិ Story',
  histTabPlaylist:'Playlist',histTabSong:'បទចម្រៀង',histTabImage:'រូបភាព',histTabVideo:'វីដេអូ',histTab3d:'3D',histTabStory:'Story',
@@ -2632,6 +2637,7 @@ en:{
  histPlay:'Play',histStop:'Stop',histVol:'Volume',histSpeed:'Speed',
  histLinkCopied:'Link copied ✓',histGone:'This file can no longer be opened — the provider link may have expired',
  histClearAll:'Delete all history',histClearConfirm:'Delete all? Tap again',histCountFmt:'{n} items total',
+ histGuestSync:'You are not signed in — your History is currently saved ONLY on this phone and will be lost if you change phones or clear the browser. Please sign in with Gmail to save your History into your account — your data follows your Gmail everywhere.',histGuestLogin:'Sign in with Gmail',
  fsView:'View fullscreen',fsClose:'Close',
  histSecImage:'Image History',histSecVideo:'Video History',histSecSong:'Song History',histSec3d:'3D History',histSecStory:'Story History',
  histTabPlaylist:'Playlist',histTabSong:'Songs',histTabImage:'Images',histTabVideo:'Videos',histTab3d:'3D',histTabStory:'Story',
@@ -6060,7 +6066,21 @@ function genShowSongs(items,streaming,restored){
   if(!streaming&&!restored){
     songs.forEach(function(s){
       var su=/^https:/i.test(s.url)?s.url:((/^data:audio\//i.test(s.url)&&s.url.length<1200000)?s.url:null);
-      if(su)histAddTo({type:'song',url:su,title:s.title||sTitle,prompt:sPrompt,provider:sProv,image:(s.image&&/^https:/i.test(s.image))?s.image:undefined},saveKey);
+      if(su){
+        var hit={type:'song',url:su,title:s.title||sTitle,prompt:sPrompt,provider:sProv,image:(s.image&&/^https:/i.test(s.image))?s.image:undefined};
+        /* Flagged BEFORE the save when the URL is still a
+           temporary provider URL: pushes hold the item back until
+           its permanent Cloudinary URL lands (see histPushItems),
+           so the server never receives the expiring URL first. */
+        if(/^https:/i.test(su)&&su.indexOf('res.cloudinary.com')<0&&su.indexOf('/uploads/')<0)hit._storing=1;
+        histAddTo(hit,saveKey);
+        /* The moment a song is created (owner rule 2026-11-17),
+           song-store is called AT ONCE so the song is saved into
+           Cloudinary and its permanent Cloudinary MP3 URL — not
+           the expiring provider URL — is what History keeps and
+           syncs to the creator's Gmail account on the server. */
+        try{histStoreSongNow(hit,saveKey);}catch(e){}
+      }
     });
     /* The Create results themselves are kept too (owner rule
        2026-11-16): the songs stay in the creation place,
@@ -6323,6 +6343,12 @@ function histOnAccountChange(){
      Playlist song and show the new account's own list. */
   try{if(plAudio){plAudio.pause();plAudioUrl=null;}}catch(e){}
   histMigrateLegacy();
+  /* Server sync follows the account (owner rule 2026-11-17):
+     pull the newly signed-in Gmail's server History into this
+     device and finish storing any song left mid-store. Guests
+     no-op inside both helpers — their History stays on the
+     phone only. */
+  try{histPullFor(histKey());histStoreSweep(histKey());}catch(e){}
   histRender();
   try{plRender();plSyncSaveBtns();}catch(e){}
   /* The Create results are per-account too: a sign in / out
@@ -6351,13 +6377,167 @@ function histSaveTo(key,a){
   for(var v=0;v<variants.length;v++){
     var arr=variants[v];
     while(arr.length){
-      try{localStorage.setItem(key,JSON.stringify(arr));return true;}
+      try{localStorage.setItem(key,JSON.stringify(arr));try{histPushFor(key);}catch(e){}return true;}
       catch(e){arr=arr.slice(0,arr.length-1);}
     }
   }
   return false;
 }
 function histGetFrom(key){try{var a=JSON.parse(localStorage.getItem(key)||'[]');return Array.isArray(a)?a:[];}catch(e){return[];}}
+/* ===== History server sync (owner rule 2026-11-17) =====
+   History does NOT live only on this phone: every save is pushed
+   IMMEDIATELY (no long debounce) to the server —
+   POST /api/public/history {email, items} — under the signed-in
+   Gmail, so the data follows that Gmail to any device. A failed
+   push is retried up to 3 times, waiting 2 seconds between
+   attempts, until it succeeds. On sign-in and on app start the
+   account's server History is also pulled back and merged in
+   (union by item id), so a fresh device shows the account's own
+   creations. Guests (no Gmail) stay local-only — the History
+   panel says so plainly and asks them to sign in.
+   The server merge is union-by-id and the FIRST version of an
+   item wins, so a new song is NEVER pushed with its temporary
+   provider URL: genShowSongs flags it `_storing` the moment it
+   lands, histStoreSongNow calls song-store at once, and only
+   when the permanent Cloudinary MP3 URL has replaced the
+   provider URL in the item (or storing has failed / timed out)
+   is the flag cleared and the item included in a push.
+   Locally deleted ids are kept as tombstones per account, so a
+   pull can never resurrect an item the user deleted. */
+var HIST_API='https://movai-proxy.onrender.com/api/public/history';
+var histPushSt={};
+function histKeyEmail(key){
+  var p='movai-history-';
+  if(!key||key.indexOf(p)!==0)return '';
+  var em=key.slice(p.length).trim().toLowerCase();
+  return (em&&em!=='guest'&&em.indexOf('@')>0)?em:'';
+}
+function histTombGet(key){
+  try{var a=JSON.parse(localStorage.getItem(key+'-deleted')||'[]');return Array.isArray(a)?a:[];}catch(e){return[];}
+}
+function histTombAdd(key,ids){
+  if(!ids||!ids.length)return;
+  try{
+    var t=histTombGet(key);
+    ids.forEach(function(id){if(id&&t.indexOf(id)<0)t.push(id);});
+    localStorage.setItem(key+'-deleted',JSON.stringify(t.slice(-600)));
+  }catch(e){}
+}
+function histPushItems(key){
+  var tomb=histTombGet(key);
+  return histGetFrom(key).filter(function(it){
+    return it&&it.id&&!it._storing&&tomb.indexOf(it.id)<0;
+  }).map(function(it){
+    var c={};for(var k in it){if(k!=='_storing')c[k]=it[k];}return c;
+  });
+}
+/* Push one account's History to the server NOW, with the
+   retry-3-times / 2-second rule. Pushes for the same account are
+   serialised: a save that lands while a push is in flight marks
+   the account dirty and the newest state is pushed again as soon
+   as the current push finishes. */
+function histPushFor(key){
+  var em=histKeyEmail(key);
+  if(!em)return;
+  var st=histPushSt[em]||(histPushSt[em]={busy:false,dirty:false});
+  if(st.busy){st.dirty=true;return;}
+  st.busy=true;
+  (async function(){
+    try{
+      for(var attempt=1;attempt<=3;attempt++){
+        var ok=false;
+        try{
+          var r=await fetch(HIST_API,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:em,items:histPushItems(key)})});
+          if(r&&r.ok){var j=null;try{j=await r.json();}catch(e){}ok=!j||j.ok!==false;}
+        }catch(e){}
+        if(ok)break;
+        if(attempt<3)await new Promise(function(res){setTimeout(res,2000);});
+      }
+    }catch(e){}
+    st.busy=false;
+    if(st.dirty){st.dirty=false;try{histPushFor(key);}catch(e){}}
+  })();
+}
+/* Pull the account's server History and merge in anything this
+   device does not have yet (by item id; tombstoned ids stay
+   deleted). Runs on app start and on every sign-in. */
+function histPullFor(key){
+  var em=histKeyEmail(key);
+  if(!em)return;
+  fetch(HIST_API+'?email='+encodeURIComponent(em)).then(function(r){return r&&r.ok?r.json():null;}).then(function(j){
+    if(!j||!Array.isArray(j.items)||!j.items.length)return;
+    var tomb=histTombGet(key);
+    var cur=histGetFrom(key);
+    var seen={};cur.forEach(function(it){if(it&&it.id)seen[it.id]=1;});
+    var add=j.items.filter(function(it){return it&&it.id&&it.type&&!seen[it.id]&&tomb.indexOf(it.id)<0;});
+    if(!add.length)return;
+    var merged=cur.concat(add).sort(function(x,y){return (y.ts||0)-(x.ts||0);}).slice(0,300);
+    histSaveTo(key,merged);
+    if(key===histKey()){try{histRender();}catch(e){}}
+  }).catch(function(){});
+}
+/* Store a freshly created song permanently, RIGHT NOW (owner
+   rule): POST its provider URL to song-store, which saves the
+   song into Cloudinary and answers with the permanent Cloudinary
+   MP3 URL; that URL then REPLACES the provider URL in History.
+   While storing, the item carries `_storing` and is held back
+   from pushes (see above). Any failure — or 90 seconds without
+   an answer — clears the flag and the item syncs with the
+   provider URL it already has, so a song is never lost or held
+   back forever. */
+function histStoreSongNow(item,key){
+  if(!item||!item.id||!item.url)return;
+  var u=item.url;
+  if(!/^https:/i.test(u)||u.indexOf('res.cloudinary.com')>=0||u.indexOf('/uploads/')>=0){
+    /* Nothing to store — but never leave a `_storing` flag
+       behind: clear it so the item syncs normally. */
+    try{
+      var ac=histGetFrom(key);
+      for(var ic=0;ic<ac.length;ic++){if(ac[ic].id===item.id&&ac[ic]._storing){delete ac[ic]._storing;histSaveTo(key,ac);break;}}
+    }catch(e){}
+    return;
+  }
+  try{
+    var a0=histGetFrom(key),f0=false;
+    for(var i0=0;i0<a0.length;i0++){if(a0[i0].id===item.id){a0[i0]._storing=1;f0=true;break;}}
+    if(f0)histSaveTo(key,a0);
+  }catch(e){}
+  var settled=false;
+  function finish(newUrl){
+    if(settled)return;settled=true;
+    try{
+      var a=histGetFrom(key);
+      for(var i=0;i<a.length;i++){
+        if(a[i].id===item.id){
+          delete a[i]._storing;
+          if(newUrl){a[i].url=newUrl;a[i].perm=true;}
+          histSaveTo(key,a);
+          break;
+        }
+      }
+    }catch(e){}
+    try{if(key===histKey())histRender();}catch(e){}
+  }
+  setTimeout(function(){finish(null);},90000);
+  var base=(typeof GEN_API!=='undefined'&&GEN_API)?GEN_API:'https://movai-proxy.onrender.com/api';
+  fetch(base+'/public/song-store',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({url:u})})
+    .then(function(r){return r?r.json().catch(function(){return null;}):null;})
+    .then(function(j){
+      if(j&&j.ok&&j.url&&/^https:/i.test(j.url))finish(j.url);
+      else finish(null);
+    })
+    .catch(function(){finish(null);});
+}
+/* Songs still flagged `_storing` when the app opens (it was
+   closed mid-store) get their song-store call re-run, so their
+   permanent URL — and their server sync — still lands. */
+function histStoreSweep(key){
+  try{
+    histGetFrom(key).forEach(function(it){
+      if(it&&it.type==='song'&&it._storing)histStoreSongNow(it,key);
+    });
+  }catch(e){}
+}
 function histAdd(item){
   histAddTo(item,histKey());
 }
@@ -6466,6 +6646,12 @@ function histTabSet(name){
 }
 function histRender(){
   var all=histGet();
+  /* Guests see the phone-only notice (owner rule 2026-11-17):
+     while signed out, History lives ONLY on this phone — the
+     panel says so and offers Sign in; signed-in users never see
+     it because their History syncs to their Gmail account. */
+  var gn=document.getElementById('histGuestNote');
+  if(gn){var gem='';try{gem=(localStorage.getItem('movai-session')||'').trim();}catch(e){}gn.style.display=gem?'none':'block';}
   var cnt=document.getElementById('histCount');
   if(cnt)cnt.textContent=all.length?tx('histCountFmt').replace('{n}',all.length):'';
   var cb=document.getElementById('histClearBtn');
@@ -7103,6 +7289,7 @@ function histCopyText(t,btn){
 function histDelete(id,btn){
   if(btn.getAttribute('data-arm')==='1'){
     if(histAudioId===id&&histAudio){histAudio.pause();histAudioId=null;}
+    try{histTombAdd(histKey(),[id]);}catch(e){}
     histSave(histGet().filter(function(x){return x.id!==id;}));
     histRender();
     return;
@@ -7116,6 +7303,7 @@ function histDelete(id,btn){
 function histClearAll(btn){
   if(btn.getAttribute('data-arm')==='1'){
     if(histAudio){histAudio.pause();histAudioId=null;}
+    try{histTombAdd(histKey(),histGet().map(function(x){return x.id;}));}catch(e){}
     histSave([]);
     btn.removeAttribute('data-arm');
     btn.textContent=tx('histClearAll');
@@ -13540,6 +13728,11 @@ function genInit(){
   storyRenderChips();
   storyUpdateTotal();
   try{histMigrateLegacy();}catch(e){}
+  /* History server sync on app start (owner rule 2026-11-17):
+     pull this Gmail's server History in, push this device's
+     History up at once, and finish storing any song that was
+     left mid-store — so nothing stays only on this phone. */
+  try{histPullFor(histKey());histPushFor(histKey());histStoreSweep(histKey());}catch(e){}
   histRender();
   d3SetProvider('hunyuan3d');
   uiInit();
