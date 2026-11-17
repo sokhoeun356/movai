@@ -2915,6 +2915,24 @@ function apiRoute(req, res, urlPath) {
         _modelLogins[_model] = (Number(_modelLogins[_model]) || 0) + 1;
         saveModelLogins(_modelLogins);
       }
+      // GIFT (owner order 2026-11-17, bug found 09:20): when the website
+      // sends giftClaimed:true the server must ACTUALLY grant the gift
+      // (+250 media / +24 song), once per user. The old code only sent
+      // a notification and never added the credits, so the server stayed
+      // at 0/0 and the website's sync-back showed a phantom "Admin
+      // deducted credit" for the full gift amount (user Oun Lyna2,
+      // 09:12:18). giftClaimed flag prevents a second grant; Math.max
+      // tops the balance UP to 250/24 instead of adding, so a user
+      // created with the gift already (first sync) is never double-
+      // credited. Logged to grants.json so it shows in credit history.
+      if (body && body.giftClaimed === true && !u.giftClaimed) {
+        const _gm = Math.max(0, FREE_MEDIA_CREDITS - Math.floor(numOr(u.credits, 0)));
+        const _gs = Math.max(0, FREE_SONG_CREDITS - Math.floor(numOr(u.songCredits, 0)));
+        if (_gm > 0) u.credits = Math.floor(numOr(u.credits, 0)) + _gm;
+        if (_gs > 0) u.songCredits = Math.floor(numOr(u.songCredits, 0)) + _gs;
+        u.giftClaimed = true;
+        if (_gm > 0 || _gs > 0) logGrant({ email, credits: _gm, songCredits: _gs, note: 'gift', at: now });
+      }
       u.credits = Math.max(0, Math.floor(numOr(u.credits, 0)));
       u.songCredits = Math.max(0, Math.floor(numOr(u.songCredits, 0)));
       saveUsers(users);
@@ -4461,6 +4479,27 @@ function apiRoute(req, res, urlPath) {
           res.writeHead(200, { 'Content-Type': 'audio/mpeg', 'Content-Disposition': disp, 'Content-Length': st.size, 'Cache-Control': 'public, max-age=86400', 'Access-Control-Allow-Origin': '*' });
           fs.createReadStream(cachedFp).on('error', () => { try { res.end(); } catch (e) {} }).pipe(res);
           return;
+        }
+        // CLOUDINARY FIRST (owner order 2026-11-17, bug found 09:20):
+        // a non-MP3 source (provider WAV, 40-50 MB) goes to Cloudinary
+        // — it fetches the URL itself and converts to MP3 — instead of
+        // the local lamejs path, which peaks at ~420 MB RSS and can
+        // OOM-crash the 512 MB Render instance mid-download (user hit
+        // "Server unreachable" during a 52s conversion, 09:19).
+        // Redirect the browser to the Cloudinary MP3; fetch follows the
+        // redirect and the website still saves it under the song's own
+        // filename. MP3 sources skip Cloudinary (local path is just a
+        // download + cache, no encode). Falls back to local conversion
+        // only when Cloudinary is not configured or its upload fails.
+        if (!/\.mp3(\?|#|$)/i.test(u) && cloudinaryConfigured()) {
+          const cl = await cloudinaryStoreSong(u);
+          if (cl === 'gone') return sendJSON(res, 410, { ok: false, error: 'gone', message: 'This song is no longer available' });
+          if (cl && cl.mp3Url) {
+            res.writeHead(302, { Location: cl.mp3Url, 'Access-Control-Allow-Origin': '*' });
+            res.end();
+            return;
+          }
+          console.error('[mp3] cloudinary upload failed for', u.slice(0, 120), '— falling back to local conversion');
         }
         const fname = await convertAndCacheMp3(u);
         if (fname === 'gone') return sendJSON(res, 410, { ok: false, error: 'gone', message: 'This song is no longer available' });
