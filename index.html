@@ -1526,6 +1526,32 @@ html[data-mode="light"] .btn-free{color:#63910c}
 #loginSheet .login-spin-ring{display:block;width:28px;height:28px;border-radius:50%;border:3px solid var(--line2);border-top-color:var(--accent);animation:loginSpin .7s linear infinite}
 @keyframes loginSpin{to{transform:rotate(360deg)}}
 @media (prefers-reduced-motion:reduce){#loginSheet .login-spin-ring{animation-duration:1.8s}}
+/* ===== Gmail + password auth (login sheet + create-password sheet) =====
+   The sign-in form lives at the TOP of the login sheet; the saved
+   account card (remember-me) renders above it. All scoped to the
+   auth sheets — nothing else in the app uses these classes. */
+#pwdSheet{-webkit-backdrop-filter:blur(16px) saturate(130%);backdrop-filter:blur(16px) saturate(130%)}
+#savePwdSheet{-webkit-backdrop-filter:blur(16px) saturate(130%);backdrop-filter:blur(16px) saturate(130%)}
+#pwdSheet .login-brand{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px;padding-bottom:12px;border-bottom:1px solid var(--line)}
+#pwdSheet .login-brand-name{font-size:1.75rem;font-weight:900;letter-spacing:-.02em;line-height:1;color:var(--text);white-space:nowrap}
+#pwdSheet .login-brand-name span{color:var(--accent-text)}
+#pwdSheet .login-brand-credit{text-align:right;line-height:1.3;min-width:0}
+#pwdSheet .login-brand-credit b{display:block;font-size:0.75rem;font-weight:800;letter-spacing:.04em;color:var(--text);white-space:nowrap}
+#pwdSheet .login-brand-credit i{display:block;font-style:normal;font-size:0.6875rem;font-weight:600;color:var(--muted);white-space:nowrap}
+.auth-field{margin-top:14px;text-align:left}
+.auth-field label{display:block;font-size:0.8125rem;font-weight:700;color:var(--text2);margin-bottom:6px}
+.auth-pass-wrap{position:relative}
+.auth-pass-wrap .input{padding-right:48px}
+.auth-eye{position:absolute;top:50%;right:6px;transform:translateY(-50%);display:flex;align-items:center;justify-content:center;width:38px;height:38px;border:none;background:transparent;color:var(--muted);cursor:pointer;border-radius:10px;padding:0}
+.auth-eye:active{background:var(--card2)}
+.auth-forgot{display:block;margin:12px auto 0;background:none;border:none;color:var(--accent-text);font-family:inherit;font-size:0.875rem;font-weight:700;cursor:pointer;padding:4px 8px}
+.auth-divider{display:flex;align-items:center;gap:12px;margin-top:16px;color:var(--muted);font-size:0.8125rem;font-weight:600}
+.auth-divider::before,.auth-divider::after{content:'';flex:1;height:1px;background:var(--line2)}
+.saved-acct-card{display:flex;align-items:center;gap:12px;width:100%;text-align:left;background:var(--card2);border:1px solid var(--line2);border-radius:14px;padding:12px 14px;cursor:pointer;font-family:inherit;color:var(--text)}
+.saved-acct-card:active{filter:brightness(.95)}
+.saved-acct-ava{width:42px;height:42px;border-radius:50%;object-fit:cover;flex:0 0 auto;background:var(--card)}
+.saved-acct-init{width:42px;height:42px;border-radius:50%;flex:0 0 auto;display:flex;align-items:center;justify-content:center;background:var(--accent-fill);color:#0d1005;font-weight:900;font-size:1.125rem}
+.saved-acct-x{flex:0 0 auto;width:32px;height:32px;border-radius:50%;border:1px solid var(--line2);background:var(--card);color:var(--muted);font-size:0.875rem;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;font-family:inherit}
 /* ===== Mandatory name gate =====
    Shown right after a Google sign-in whose account has NO first /
    last name yet (and on app open while the name is still missing).
@@ -3018,7 +3044,24 @@ main{padding-top:calc(3.75rem + env(safe-area-inset-top,0px))}
       <h3 style="font-size:1.0625rem;font-weight:800" data-i18n="acctLogin">ចូលគណនី</h3>
       <button type="button" class="drawer-close" style="background:var(--card2);color:var(--text);border-color:var(--line2)" onclick="loginSheetClose()" aria-label="Close">✕</button>
     </div>
-    <button type="button" class="google-btn" id="loginGoogleBtn" onclick="loginGoogleConnect()"><svg viewBox="0 0 48 48" width="20" height="20" aria-hidden="true" style="flex:0 0 auto"><path fill="#FFC107" d="M43.6 20.1H42V20H24v8h11.3C33.7 32.7 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.9 1.2 8 3l5.7-5.7C34.3 6.1 29.3 4 24 4 13 4 4 13 4 24s9 20 20 20 20-9 20-20c0-1.3-.1-2.6-.4-3.9z"/><path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.9 1.2 8 3l5.7-5.7C34.3 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.1 26.7 36 24 36c-5.2 0-9.6-3.3-11.3-8l-6.5 5C9.5 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.1H42V20H24v8h11.3c-.8 2.3-2.3 4.3-4.1 5.6l6.2 5.2C36.9 39.2 44 34 44 24c0-1.3-.1-2.6-.4-3.9z"/></svg><span data-i18n="loginGoogleBtn">Connect account Google</span></button>
+    <div id="savedAcctWrap" style="display:none;margin-top:14px"></div>
+    <p id="authUseAnother" style="display:none;font-size:0.8125rem;color:var(--muted);margin-top:14px" data-i18n="authUseAnother">ប្រើគណនីផ្សេង · Use another account</p>
+    <div class="auth-field">
+      <label for="authEmail" data-i18n="loginGmailLabel">គណនី Google (Gmail)</label>
+      <input class="input" id="authEmail" type="email" autocomplete="email" data-i18n-ph="loginGmailPh" placeholder="yourname@gmail.com" onkeydown="if(event.key==='Enter'){event.preventDefault();var p=document.getElementById('authPass');if(p)p.focus();}">
+    </div>
+    <div class="auth-field">
+      <label for="authPass" data-i18n="authPassLabel">លេខសម្ងាត់ · Password</label>
+      <div class="auth-pass-wrap">
+        <input class="input" id="authPass" type="password" autocomplete="current-password" data-i18n-ph="authPassPh" placeholder="បញ្ចូលលេខសម្ងាត់របស់អ្នក" onkeydown="if(event.key==='Enter')authSigninSubmit()">
+        <button type="button" class="auth-eye" onclick="authToggleEye('authPass',this)" aria-label="Show / hide password"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button>
+      </div>
+    </div>
+    <p id="authFormMsg" style="font-size:0.8125rem;margin-top:10px;min-height:16px;line-height:1.6"></p>
+    <button type="button" class="kbtn kbtn-black" id="authSigninBtn" style="margin-top:6px;width:100%" onclick="authSigninSubmit()" data-i18n="authSigninBtn">ចូលប្រើ · Sign-in</button>
+    <button type="button" class="auth-forgot" onclick="authForgotStart()" data-i18n="authForgot">ភ្លេចលេខសម្ងាត់?</button>
+    <div class="auth-divider" aria-hidden="true"><span data-i18n="authOr">ឬ</span></div>
+    <button type="button" class="google-btn" id="loginGoogleBtn" onclick="authGoogleSignup()"><svg viewBox="0 0 48 48" width="20" height="20" aria-hidden="true" style="flex:0 0 auto"><path fill="#FFC107" d="M43.6 20.1H42V20H24v8h11.3C33.7 32.7 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.9 1.2 8 3l5.7-5.7C34.3 6.1 29.3 4 24 4 13 4 4 13 4 24s9 20 20 20 20-9 20-20c0-1.3-.1-2.6-.4-3.9z"/><path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.9 1.2 8 3l5.7-5.7C34.3 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.1 26.7 36 24 36c-5.2 0-9.6-3.3-11.3-8l-6.5 5C9.5 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.1H42V20H24v8h11.3c-.8 2.3-2.3 4.3-4.1 5.6l6.2 5.2C36.9 39.2 44 34 44 24c0-1.3-.1-2.6-.4-3.9z"/></svg><span data-i18n="authSignupGoogle">ចុះឈ្មោះជាមួយ Google · Sign up with Google</span></button>
     <div id="loginGsiSlot" style="display:none;margin-top:14px;justify-content:center"></div>
     <div id="loginSpinner" style="display:none;justify-content:center;margin-top:16px" role="status" aria-label="Loading"><span class="login-spin-ring"></span></div>
     <p id="loginMsg" style="font-size:0.8125rem;margin-top:10px;min-height:16px;line-height:1.6"></p>
@@ -3028,6 +3071,42 @@ main{padding-top:calc(3.75rem + env(safe-area-inset-top,0px))}
       <span class="sep" aria-hidden="true">|</span>
       <a href="https://movai-1.onrender.com/privacy-policy" target="_blank" rel="noopener">Privacy Policy</a>
     </div>
+  </div>
+</div>
+<div id="pwdSheet" class="pkg-sheet" style="display:none" role="dialog" aria-modal="true">
+  <div class="pkg-sheet-card">
+    <div class="login-brand" aria-hidden="true"><span class="login-brand-name">Mov<span>Ai</span></span><span class="login-brand-credit"><b>YEM SOKHOEUN</b><i>Create by Owner</i></span></div>
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:10px">
+      <h3 style="font-size:1.0625rem;font-weight:800" data-i18n="pwdCreateTitle">បង្កើតលេខសម្ងាត់</h3>
+      <button type="button" class="drawer-close" style="background:var(--card2);color:var(--text);border-color:var(--line2)" onclick="pwdSheetCancel()" aria-label="Close">✕</button>
+    </div>
+    <p style="font-size:0.875rem;color:var(--muted);line-height:1.7;margin-top:10px" data-i18n="pwdCreateNote">គណនី Google របស់អ្នកត្រូវបានផ្ទៀងផ្ទាត់ហើយ។ សូមបង្កើតលេខសម្ងាត់សម្រាប់គណនី MovAi របស់អ្នក — លើកក្រោយអ្នកនឹងចូលប្រើដោយ Gmail និងលេខសម្ងាត់នេះ។</p>
+    <p id="pwdEmail" style="font-size:0.9375rem;font-weight:800;margin-top:8px;overflow-wrap:break-word"></p>
+    <div class="auth-field">
+      <label for="pwdNew" data-i18n="authPassLabel">លេខសម្ងាត់ · Password</label>
+      <div class="auth-pass-wrap">
+        <input class="input" id="pwdNew" type="password" autocomplete="new-password" data-i18n-ph="authPassPh" placeholder="បញ្ចូលលេខសម្ងាត់របស់អ្នក" onkeydown="if(event.key==='Enter'){event.preventDefault();var c=document.getElementById('pwdConfirm');if(c)c.focus();}">
+        <button type="button" class="auth-eye" onclick="authToggleEye('pwdNew',this)" aria-label="Show / hide password"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button>
+      </div>
+    </div>
+    <div class="auth-field">
+      <label for="pwdConfirm" data-i18n="pwdConfirmLabel">បញ្ជាក់លេខសម្ងាត់</label>
+      <div class="auth-pass-wrap">
+        <input class="input" id="pwdConfirm" type="password" autocomplete="new-password" data-i18n-ph="pwdConfirmPh" placeholder="បញ្ចូលលេខសម្ងាត់ម្ដងទៀត" onkeydown="if(event.key==='Enter')pwdCreateSubmit()">
+        <button type="button" class="auth-eye" onclick="authToggleEye('pwdConfirm',this)" aria-label="Show / hide password"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button>
+      </div>
+    </div>
+    <p id="pwdMsg" style="font-size:0.8125rem;margin-top:10px;min-height:16px;line-height:1.6"></p>
+    <button type="button" class="kbtn kbtn-black" id="pwdCreateBtn" style="margin-top:6px;width:100%" onclick="pwdCreateSubmit()" data-i18n="pwdCreateBtn">បង្កើតគណនី · Create Account</button>
+    <button type="button" class="kbtn kbtn-white" style="margin-top:10px;width:100%" onclick="pwdSheetCancel()" data-i18n="pkgCancel">បោះបង់</button>
+  </div>
+</div>
+<div id="savePwdSheet" class="pkg-sheet" style="display:none" role="dialog" aria-modal="true">
+  <div class="pkg-sheet-card" style="text-align:center">
+    <h3 style="font-size:1.125rem;font-weight:900" data-i18n="savePwdTitle">ចង់សេវ password អត់?</h3>
+    <p style="font-size:0.875rem;color:var(--muted);line-height:1.7;margin-top:10px" data-i18n="savePwdNote">បើសេវ — លើកក្រោយគ្រាន់តែចុចលើគណនីរបស់អ្នកនៅលើអេក្រង់ Log in វានឹងចូលដោយស្វ័យប្រវត្តិ មិនបាច់វាយលេខសម្ងាត់ទេ។</p>
+    <button type="button" class="kbtn kbtn-black" id="savePwdYesBtn" style="margin-top:16px;width:100%" onclick="authSavePwdYes()" data-i18n="savePwdYes">សេវ · Save</button>
+    <button type="button" class="kbtn kbtn-white" style="margin-top:10px;width:100%" onclick="authSavePwdNo()" data-i18n="savePwdNo">អត់សេវ · Not now</button>
   </div>
 </div>
 <div id="verifySheet" class="pkg-sheet" style="display:none" role="dialog" aria-modal="true" onclick="if(event.target===this)verifyCancel()">
@@ -3233,6 +3312,24 @@ km:{
  loginGoogleLive:'Google Sign-In ដំណើរការតែលើ live site ប៉ុណ្ណោះ — Origin នេះមិនទាន់បាន authorize ក្នុង Google ទេ។ សូមបើក https://movai-1.onrender.com រួចចុច «Connect account Google» នៅទីនោះដើម្បី Log in ជាមួយ Google ពិត។',
  loginGoogleFail:'ភ្ជាប់ Google មិនបានទេ — សូមព្យាយាមម្ដងទៀត',
  loginGoogleNoEmail:'Google មិនបានផ្ដល់ Gmail មកទេ — សូមព្យាយាមម្ដងទៀត',
+ authPassLabel:'លេខសម្ងាត់ · Password',authPassPh:'បញ្ចូលលេខសម្ងាត់របស់អ្នក',
+ authSigninBtn:'ចូលប្រើ · Sign-in',authForgot:'ភ្លេចលេខសម្ងាត់?',authOr:'ឬ',
+ authSignupGoogle:'ចុះឈ្មោះជាមួយ Google · Sign up with Google',
+ authUseAnother:'ប្រើគណនីផ្សេង · Use another account',authSavedTap:'ចុចដើម្បីចូលប្រើ',
+ authSavedExpired:'ការចូលដែលបានសេវផុតកំណត់ហើយ — សូមចូលដោយ Gmail និងលេខសម្ងាត់របស់អ្នក',
+ authAlready:'អ្នកមានគណនីរួចហើយ។ សូមចូលប្រើដោយ Gmail និងលេខសម្ងាត់របស់អ្នក។',
+ authErrPassEmpty:'សូមបញ្ចូលលេខសម្ងាត់',authErrNet:'ភ្ជាប់ទៅ Server មិនបានទេ — សូមព្យាយាមម្ដងទៀត',
+ authErrSignin:'ចូលប្រើមិនបានទេ — សូមពិនិត្យ Gmail និងលេខសម្ងាត់របស់អ្នក',
+ pwdCreateTitle:'បង្កើតលេខសម្ងាត់',
+ pwdCreateNote:'គណនី Google របស់អ្នកត្រូវបានផ្ទៀងផ្ទាត់ហើយ។ សូមបង្កើតលេខសម្ងាត់សម្រាប់គណនី MovAi របស់អ្នក — លើកក្រោយអ្នកនឹងចូលប្រើដោយ Gmail និងលេខសម្ងាត់នេះ។',
+ pwdConfirmLabel:'បញ្ជាក់លេខសម្ងាត់',pwdConfirmPh:'បញ្ចូលលេខសម្ងាត់ម្ដងទៀត',
+ pwdCreateBtn:'បង្កើតគណនី · Create Account',
+ pwdErrMismatch:'លេខសម្ងាត់ទាំងពីរមិនដូចគ្នាទេ — សូមបញ្ចូលឲ្យដូចគ្នា',
+ pwdErrShort:'លេខសម្ងាត់ត្រូវមានយ៉ាងតិច 6 តួអក្សរ',
+ pwdErrFail:'បង្កើតគណនីមិនបានទេ — សូមព្យាយាមម្ដងទៀត',
+ savePwdTitle:'ចង់សេវ password អត់?',
+ savePwdNote:'បើសេវ — លើកក្រោយគ្រាន់តែចុចលើគណនីរបស់អ្នកនៅលើអេក្រង់ Log in វានឹងចូលដោយស្វ័យប្រវត្តិ មិនបាច់វាយលេខសម្ងាត់ទេ។',
+ savePwdYes:'សេវ · Save',savePwdNo:'អត់សេវ · Not now',
  verifyTitle:'ផ្ទៀងផ្ទាត់ Gmail របស់អ្នក',
  verifyNote:'យើងបានផ្ញើលេខកូដ 6 ខ្ទង់ និង Link verify ទៅ Gmail ខាងក្រោម។ សូមបញ្ចូលលេខកូដ ឬចុច Link ក្នុង email ដើម្បីចូលប្រើ។',
  verifyExpiresFmt:'លេខកូដផុតកំណត់ក្នុង {t}',verifyExpired:'លេខកូដផុតកំណត់ហើយ — សូមចុច «ផ្ញើលេខកូដម្ដងទៀត» ដើម្បីយកលេខកូដថ្មី',
@@ -3462,6 +3559,24 @@ en:{
  loginGoogleLive:'Google Sign-In works on the live site only — this origin is not authorized in Google yet. Please open https://movai-1.onrender.com and tap “Connect account Google” there to sign in with real Google.',
  loginGoogleFail:'Could not connect to Google — please try again',
  loginGoogleNoEmail:'Google did not return a Gmail — please try again',
+ authPassLabel:'Password',authPassPh:'Enter your password',
+ authSigninBtn:'Sign-in',authForgot:'Forgot password?',authOr:'or',
+ authSignupGoogle:'Sign up with Google',
+ authUseAnother:'Use another account',authSavedTap:'Tap to sign in',
+ authSavedExpired:'Saved login expired, please sign in with your password.',
+ authAlready:'You already have an account. Please sign in with your Gmail and password.',
+ authErrPassEmpty:'Please enter your password',authErrNet:'Could not reach the server — please try again',
+ authErrSignin:'Could not sign in — please check your Gmail and password',
+ pwdCreateTitle:'Create Password',
+ pwdCreateNote:'Your Google account is verified. Create a password for your MovAi account — next time you will sign in with your Gmail and this password.',
+ pwdConfirmLabel:'Confirm password',pwdConfirmPh:'Re-enter your password',
+ pwdCreateBtn:'Create Account',
+ pwdErrMismatch:'The two passwords do not match — please enter the same password twice',
+ pwdErrShort:'Password must be at least 6 characters',
+ pwdErrFail:'Could not create the account — please try again',
+ savePwdTitle:'Save password?',
+ savePwdNote:'If you save it, next time just tap your account on the Log in screen and you will be signed in automatically — no password typing.',
+ savePwdYes:'Save',savePwdNo:'Not now',
  verifyTitle:'Verify your Gmail',
  verifyNote:'We sent a 6-digit code and a verification link to the Gmail below. Enter the code, or tap the link in the email, to continue.',
  verifyExpiresFmt:'Code expires in {t}',verifyExpired:'The code has expired — tap “Resend code” for a new one',
@@ -12981,7 +13096,7 @@ function acctBlockedEnforce(reason){
   try{closeMenu();}catch(e){}
   try{packagesHide();}catch(e){}
   try{profileClose();}catch(e){}
-  ['loginSheet','verifySheet','nameSheet','giftSheet','pushSheet','notifSheet','pubSheet','postSheet','pkgSheet'].forEach(function(id){
+  ['loginSheet','pwdSheet','savePwdSheet','verifySheet','nameSheet','giftSheet','pushSheet','notifSheet','pubSheet','postSheet','pkgSheet'].forEach(function(id){
     var s=document.getElementById(id);if(s&&s.style.display!=='none'){try{sheetHideAnim(s);}catch(e){s.style.display='none';}}
   });
   try{acctRender();}catch(e){}
@@ -13045,10 +13160,13 @@ var GIS_CLIENT_ID='809358546010-dspkik0o4ahg7km15dspro5cj3qjk384.apps.googleuser
 var gisInitDone=false;
 var gisWaitTries=0;
 function loginSheetOpen(){
+  authGoogleIntent='';
   var s=document.getElementById('loginSheet');if(s)sheetShowAnim(s);
   var slot=document.getElementById('loginGsiSlot');if(slot){slot.style.display='none';slot.innerHTML='';}
   var b=document.getElementById('loginGoogleBtn');if(b)b.style.display='';
   var m=document.getElementById('loginMsg');if(m)m.textContent='';
+  var fm=document.getElementById('authFormMsg');if(fm)fm.textContent='';
+  try{authSavedRender();}catch(e){}
   loginBusy(false);
 }
 function loginSheetClose(){var s=document.getElementById('loginSheet');sheetHideAnim(s);}
@@ -13176,13 +13294,22 @@ function gisOnCredential(resp){
   if(!p||!p.email){loginMsg(tx('loginGoogleNoEmail'),false);return;}
   var email=String(p.email).trim().toLowerCase();
   if(email.indexOf('@')<0){loginMsg(tx('loginGoogleNoEmail'),false);return;}
-  verifyGateStart({
+  var prof={
     email:email,
     name:(typeof p.name==='string'?p.name:'').trim(),
     firstName:(typeof p.given_name==='string'?p.given_name:'').trim(),
     lastName:(typeof p.family_name==='string'?p.family_name:'').trim(),
     picture:(typeof p.picture==='string'?p.picture:'').trim()
-  });
+  };
+  /* Gmail + password auth: when the Google popup was opened from
+     «Sign up with Google» or «Forgot password?», keep the raw ID
+     token (it proves Gmail ownership to /api/auth/set-password)
+     and branch into the password flow BEFORE the plain log-in
+     path. With no intent set, behaviour is exactly as before. */
+  authPendingIdToken=(resp&&resp.credential)?String(resp.credential):'';
+  if(authGoogleIntent==='signup'){authGoogleIntent='';authSignupGoogleFlow(prof);return;}
+  if(authGoogleIntent==='forgot'){authGoogleIntent='';authPendingProf=prof;pwdSheetShow(prof);return;}
+  verifyGateStart(prof);
 }
 function gisFinishLogin(prof){
   var email=prof.email;
@@ -13232,6 +13359,249 @@ function gisFinishLogin(prof){
   if(isNew)giftSchedule();
   try{pushMaybeAsk();}catch(e){}
   try{pushEnsureSubscribed();}catch(e){}
+}
+/* ===== Gmail + password sign-in · Sign-up · Save password =====
+   Owner flow (2026-11-17), built on the movai-proxy auth endpoints
+   (same host as ACCT_SYNC_URL — reached through authFetchJson /
+   AUTH_API like the email-verification endpoints below):
+   - The login sheet's PRIMARY form is Gmail + password →
+     POST /api/auth/signin. Server errors are shown in the form
+     as-is (the server answers in Khmer + English).
+   - «Sign up with Google» (first time) and «Forgot password?»
+     still run the real Google (GIS) popup; gisOnCredential then
+     branches on authGoogleIntent. Sign-up first asks the server
+     (through the normal sync) whether the Gmail already has a
+     password: hasPassword:true → NOT logged in via Google, the
+     sign-in form is shown with «already have an account»;
+     hasPassword:false → the Create Password sheet →
+     POST /api/auth/set-password {idToken, password,
+     passwordConfirm} → logged in via gisFinishLogin, exactly
+     like a Google log in. Forgot password goes straight to the
+     Create Password sheet (Google proved Gmail ownership).
+   - After a password sign-in OR a Create Account, the «Save
+     password?» prompt appears BEFORE entering the app. Save →
+     POST /api/auth/remember {email, password} and ONE saved
+     account is stored in localStorage `movai_saved_account` as
+     {email, rememberToken, name, avatar} — the plain password is
+     NEVER stored, only the server-issued remember token.
+   - The login sheet shows the saved account as a card at the
+     top: tap → POST /api/auth/remember-login (no password);
+     ✕ → POST /api/auth/forget + the local copy is removed. An
+     expired/revoked saved login is deleted and the form asks for
+     the password again. */
+var authGoogleIntent='';
+var authPendingIdToken='';
+var authPendingProf=null;
+var authSaveCtx=null;
+var AUTH_EYE_ON='<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>';
+var AUTH_EYE_OFF='<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>';
+function authFormMsg(t){
+  var m=document.getElementById('authFormMsg');
+  if(m){m.textContent=t||'';m.style.color='#f87171';}
+}
+function authToggleEye(inputId,btn){
+  var inp=document.getElementById(inputId);if(!inp)return;
+  var show=inp.type==='password';
+  inp.type=show?'text':'password';
+  if(btn)btn.innerHTML=show?AUTH_EYE_OFF:AUTH_EYE_ON;
+}
+function authGoogleSignup(){authGoogleIntent='signup';loginGoogleConnect();}
+function authForgotStart(){authGoogleIntent='forgot';loginGoogleConnect();}
+/* The account object out of an auth / sync response body — the
+   server nests it under user (pubUser) or returns it at the top. */
+function authSrvUser(data){
+  if(!data||typeof data!=='object')return null;
+  var subs=[data,data.user,data.account,data.data,data.result];
+  for(var i=0;i<subs.length;i++){
+    var s=subs[i];
+    if(s&&typeof s==='object'&&(typeof s.hasPassword==='boolean'||typeof s.email==='string'))return s;
+  }
+  return null;
+}
+/* Map a server user (pubUser) onto the profile shape gisFinishLogin
+   consumes, so a password log in lands EXACTLY like a Google one —
+   same session store, same sync, same credits / gift handling. */
+function authProfFromUser(u,fallbackEmail){
+  u=(u&&typeof u==='object')?u:{};
+  return {
+    email:String(u.email||fallbackEmail||'').trim().toLowerCase(),
+    name:(typeof u.name==='string'?u.name:'').trim(),
+    firstName:(typeof u.firstName==='string'?u.firstName:'').trim(),
+    lastName:(typeof u.lastName==='string'?u.lastName:'').trim(),
+    picture:(typeof u.picture==='string'?u.picture:(typeof u.avatar==='string'?u.avatar:'')).trim()
+  };
+}
+function authSigninSubmit(){
+  var emEl=document.getElementById('authEmail');
+  var pwEl=document.getElementById('authPass');
+  var email=emEl?String(emEl.value||'').trim().toLowerCase():'';
+  var pw=pwEl?String(pwEl.value||''):'';
+  if(!email||email.indexOf('@')<0){authFormMsg(tx('loginErrEmail'));return;}
+  if(!pw){authFormMsg(tx('authErrPassEmpty'));return;}
+  authFormMsg('');
+  var btn=document.getElementById('authSigninBtn');if(btn)btn.disabled=true;
+  authFetchJson('/api/auth/signin','POST',{email:email,password:pw},30000).then(function(data){
+    if(btn)btn.disabled=false;
+    if(!data){authFormMsg(tx('authErrNet'));return;}
+    if(data.ok!==true){authFormMsg(authErrText(data,'authErrSignin'));return;}
+    var prof=authProfFromUser(data.user,email);
+    if(pwEl)pwEl.value='';
+    loginSheetClose();
+    savePwdPrompt(email,pw,prof);
+  });
+}
+/* Sign-up probe: run the account's normal sync payload (a fresh
+   local record starts at 0/0, exactly like a first Google log in
+   on a new device — the server stays the only truth for balances)
+   and read hasPassword off the server's answer. */
+function authSignupGoogleFlow(prof){
+  loginBusy(true);
+  var payload={email:prof.email,name:prof.name||'',picture:prof.picture||'',id:'',firstName:prof.firstName||'',lastName:prof.lastName||'',credits:0,songCredits:0,plan:null,songPlan:null,model:''};
+  authFetchJson('/api/admin/sync','POST',payload,30000).then(function(data){
+    loginBusy(false);
+    if(data){
+      var br='';try{br=acctBlockDetect(data);}catch(e){}
+      if(br){try{acctBlockedEnforce(br);}catch(e){}return;}
+    }
+    var srv=authSrvUser(data);
+    if(srv&&srv.hasPassword===true){
+      /* The account already exists — do NOT log in via Google. */
+      var emEl=document.getElementById('authEmail');
+      if(emEl&&!emEl.value)emEl.value=prof.email;
+      authFormMsg(tx('authAlready'));
+      return;
+    }
+    /* No password yet (brand-new Gmail, or an existing Google-era
+       account that never set one): create the password now. If
+       the server could not be reached the answer is unknown —
+       Google has still proved Gmail ownership, so the Create
+       Password sheet is the safe place to land; set-password
+       itself will surface any server error in its form. */
+    authPendingProf=prof;
+    pwdSheetShow(prof);
+  });
+}
+/* ===== Create Password sheet ===== */
+function pwdMsg(t,ok){
+  var m=document.getElementById('pwdMsg');
+  if(m){m.textContent=t||'';m.style.color=ok?'var(--accent-text)':'#f87171';}
+}
+function pwdSheetShow(prof){
+  loginSheetClose();
+  var e=document.getElementById('pwdEmail');if(e)e.textContent=(prof&&prof.email)||'';
+  var a=document.getElementById('pwdNew');if(a)a.value='';
+  var b=document.getElementById('pwdConfirm');if(b)b.value='';
+  pwdMsg('',true);
+  var s=document.getElementById('pwdSheet');if(s)sheetShowAnim(s);
+  setTimeout(function(){var i=document.getElementById('pwdNew');if(i){try{i.focus();}catch(e){}}},380);
+}
+function pwdSheetCancel(){
+  authGoogleIntent='';
+  authPendingIdToken='';
+  var s=document.getElementById('pwdSheet');if(s)sheetHideAnim(s);
+  loginSheetOpen();
+}
+function pwdCreateSubmit(){
+  var prof=authPendingProf;
+  if(!prof||!prof.email){pwdSheetCancel();return;}
+  var a=document.getElementById('pwdNew');
+  var b=document.getElementById('pwdConfirm');
+  var pw=a?String(a.value||''):'';
+  var cf=b?String(b.value||''):'';
+  if(pw.length<6){pwdMsg(tx('pwdErrShort'),false);return;}
+  if(pw!==cf){pwdMsg(tx('pwdErrMismatch'),false);return;}
+  var btn=document.getElementById('pwdCreateBtn');if(btn)btn.disabled=true;
+  authFetchJson('/api/auth/set-password','POST',{idToken:authPendingIdToken,password:pw,passwordConfirm:cf},30000).then(function(data){
+    if(btn)btn.disabled=false;
+    if(!data){pwdMsg(tx('authErrNet'),false);return;}
+    if(data.ok!==true){pwdMsg(authErrText(data,'pwdErrFail'),false);return;}
+    authPendingIdToken='';
+    if(a)a.value='';if(b)b.value='';
+    var s=document.getElementById('pwdSheet');if(s)sheetHideAnim(s);
+    savePwdPrompt(prof.email,pw,prof);
+  });
+}
+/* ===== «Save password?» prompt =====
+   Shown ONCE per login — right after a successful password
+   sign-in or Create Account, before gisFinishLogin enters the
+   app. Never shown on later app opens while already logged in. */
+function savePwdPrompt(email,password,prof){
+  authSaveCtx={email:email,password:password,prof:prof};
+  var s=document.getElementById('savePwdSheet');if(s)sheetShowAnim(s);
+}
+function authSavePwdFinish(){
+  var ctx=authSaveCtx;authSaveCtx=null;
+  var s=document.getElementById('savePwdSheet');if(s)sheetHideAnim(s);
+  if(ctx&&ctx.prof)gisFinishLogin(ctx.prof);
+}
+function authSavePwdNo(){authSavePwdFinish();}
+function authSavePwdYes(){
+  var ctx=authSaveCtx;
+  if(!ctx){authSavePwdFinish();return;}
+  var btn=document.getElementById('savePwdYesBtn');if(btn)btn.disabled=true;
+  authFetchJson('/api/auth/remember','POST',{email:ctx.email,password:ctx.password},30000).then(function(data){
+    if(btn)btn.disabled=false;
+    if(data&&data.ok===true&&data.rememberToken){
+      try{localStorage.setItem('movai_saved_account',JSON.stringify({email:ctx.email,rememberToken:String(data.rememberToken),name:(ctx.prof&&ctx.prof.name)||'',avatar:(ctx.prof&&ctx.prof.picture)||''}));}catch(e){}
+    }
+    authSavePwdFinish();
+  });
+}
+/* ===== Saved account (remember-me) on the login sheet ===== */
+function authSavedGet(){
+  try{
+    var raw=localStorage.getItem('movai_saved_account');
+    if(!raw)return null;
+    var o=JSON.parse(raw);
+    if(o&&o.email&&o.rememberToken)return o;
+  }catch(e){}
+  return null;
+}
+function authSavedRender(){
+  var wrap=document.getElementById('savedAcctWrap');if(!wrap)return;
+  var ua=document.getElementById('authUseAnother');
+  var sv=authSavedGet();
+  if(!sv){wrap.style.display='none';wrap.innerHTML='';if(ua)ua.style.display='none';return;}
+  var ava=sv.avatar
+    ?'<img class="saved-acct-ava" src="'+escHtml(sv.avatar)+'" alt="" onerror="this.style.display=\'none\'">'
+    :'<span class="saved-acct-init" aria-hidden="true">'+escHtml(String(sv.email||'?').charAt(0).toUpperCase())+'</span>';
+  wrap.innerHTML='<button type="button" class="saved-acct-card" onclick="authSavedTap()">'
+    +ava
+    +'<span style="flex:1;min-width:0">'
+    +'<span style="display:block;font-weight:800;font-size:0.9375rem;overflow-wrap:break-word">'+escHtml(sv.name||sv.email)+'</span>'
+    +(sv.name?'<span style="display:block;font-size:0.8125rem;color:var(--muted);overflow-wrap:break-word">'+escHtml(sv.email)+'</span>':'')
+    +'<span style="display:block;font-size:0.8125rem;color:var(--muted);letter-spacing:.15em">••••••••</span>'
+    +'<span style="display:block;font-size:0.75rem;color:var(--accent-text);font-weight:700" data-i18n="authSavedTap">'+escHtml(tx('authSavedTap'))+'</span>'
+    +'</span>'
+    +'<span class="saved-acct-x" role="button" aria-label="Remove saved account" onclick="event.stopPropagation();authSavedRemove()">✕</span>'
+    +'</button>';
+  wrap.style.display='block';
+  if(ua)ua.style.display='block';
+}
+function authSavedTap(){
+  var sv=authSavedGet();if(!sv)return;
+  loginBusy(true);
+  authFetchJson('/api/auth/remember-login','POST',{email:sv.email,rememberToken:sv.rememberToken},30000).then(function(data){
+    loginBusy(false);
+    if(data&&data.ok===true&&data.user){
+      loginSheetClose();
+      gisFinishLogin(authProfFromUser(data.user,sv.email));
+      return;
+    }
+    if(!data){loginMsg(tx('authErrNet'),false);return;}
+    /* Expired / revoked: drop the saved account and fall back to
+       the password form with the reason showing. */
+    try{localStorage.removeItem('movai_saved_account');}catch(e){}
+    authSavedRender();
+    var emEl=document.getElementById('authEmail');if(emEl)emEl.value=sv.email;
+    authFormMsg(tx('authSavedExpired'));
+  });
+}
+function authSavedRemove(){
+  var sv=authSavedGet();
+  if(sv){try{authFetchJson('/api/auth/forget','POST',{email:sv.email,rememberToken:sv.rememberToken},15000);}catch(e){}}
+  try{localStorage.removeItem('movai_saved_account');}catch(e){}
+  authSavedRender();
 }
 /* ===== Log in email verification · verify រាល់ពេល Log in =====
    gisOnCredential no longer signs in directly: it hands the
