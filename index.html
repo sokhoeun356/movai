@@ -1393,6 +1393,32 @@ html[data-mode="light"] .offline-ico{color:#dc2626;background:rgba(220,38,38,.1)
    shown only when BOTH the direct byte fetch and the server-proxy
    fetch fail, so a failed download explains itself in-page instead
    of the tab ever navigating away to the provider's URL. */
+/* ===== Wake server pill =====
+   Shown ONLY while a wake attempt runs (see the wake script):
+   on app open / on returning to the app, one lightweight request
+   wakes the movai-proxy server on Render BEFORE the user starts
+   working. While it wakes: spinner + «កំពុងដាស់ server…» + live
+   ticking seconds and %. When it answers: green check +
+   «Server រួចរាល់ហើយ» for ~2.5 s, then it blurs away. It never
+   pings in the background — with nobody in the app, the server
+   is left to sleep. Sits at the bottom, just above the dock,
+   so it never covers the header, the mode bar or any control. */
+.wake-pill{position:fixed;bottom:calc(102px + env(safe-area-inset-bottom,0px));left:50%;transform:translateX(-50%);z-index:319;width:min(360px,calc(100vw - 32px));background:#14161a;border:1.5px solid rgba(var(--accent-rgb),.65);color:#fff;border-radius:16px;padding:10px 14px;box-shadow:0 10px 30px rgba(0,0,0,.45);font-size:0.875rem;font-weight:800;line-height:1.35}
+html[data-mode="light"] .wake-pill{background:#ffffff;color:#17181c}
+.wake-pill.ready{border-color:#22c55e}
+.wake-row{display:flex;align-items:center;gap:9px}
+.wake-spin{width:16px;height:16px;flex:0 0 auto;border-radius:50%;border:2px solid var(--line2);border-top-color:var(--accent);animation:scpSpin .7s linear infinite}
+.wake-check{width:20px;height:20px;flex:0 0 auto;border-radius:50%;background:#22c55e;color:#fff;display:flex;align-items:center;justify-content:center}
+.wake-check svg{width:12px;height:12px;display:block}
+.wake-txt{flex:1 1 auto;min-width:0;overflow-wrap:break-word}
+.wake-meta{flex:0 0 auto;font-variant-numeric:tabular-nums;color:var(--muted);font-size:0.8125rem;white-space:nowrap}
+.wake-pill.ready .wake-meta{color:#22c55e}
+.wake-bar{height:5px;border-radius:999px;background:rgba(127,127,127,.25);margin-top:8px;overflow:hidden}
+.wake-fill{height:100%;width:0%;border-radius:999px;background:var(--accent);transition:width .3s ease}
+.wake-pill.ready .wake-fill{background:#22c55e}
+.wake-pill.blur-in{animation:netReadyBlurIn .3s ease-out both}
+.wake-pill.blur-out{animation:netReadyBlurOut .25s ease-in both}
+@media (prefers-reduced-motion: reduce){.wake-pill.blur-in,.wake-pill.blur-out{animation:none}.wake-spin{animation-duration:1.8s}}
 .dl-fail-toast{position:fixed;top:calc(env(safe-area-inset-top,0px) + 14px);left:50%;transform:translateX(-50%);z-index:320;max-width:calc(100vw - 32px);background:#2a0d0d;border:1.5px solid #e5484d;color:#fff;border-radius:999px;padding:10px 18px;box-shadow:0 10px 30px rgba(0,0,0,.45);font-size:0.9375rem;font-weight:800;line-height:1.35;text-align:center}
 .mp3-prog-toast{position:fixed;top:calc(env(safe-area-inset-top,0px) + 14px);left:50%;transform:translateX(-50%);z-index:321;width:min(420px,calc(100vw - 32px));background:#14161a;border:1.5px solid rgba(var(--accent-rgb),.65);color:#fff;border-radius:16px;padding:12px 16px;box-shadow:0 10px 30px rgba(0,0,0,.45);font-size:0.9375rem;font-weight:800;line-height:1.35;text-align:center}
 .mp3-prog-toast .mp3-prog-bar{height:6px;border-radius:999px;background:rgba(255,255,255,.14);margin-top:9px;overflow:hidden}
@@ -2480,6 +2506,15 @@ main{padding-top:calc(3.75rem + env(safe-area-inset-top,0px))}
 <div id="netReadyToast" class="net-ready-toast" style="display:none" role="status" aria-live="polite">
   <span class="net-ready-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.55a11 11 0 0 1 14.08 0"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><line x1="12" y1="20" x2="12.01" y2="20"/></svg><span class="net-ready-check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></span></span>
   <span>Network ready · អ៊ីនធឺណិតមកវិញហើយ</span>
+</div>
+<div id="wakePill" class="wake-pill" style="display:none" role="status" aria-live="polite">
+  <div class="wake-row">
+    <span class="wake-spin" id="wakeSpin" aria-hidden="true"></span>
+    <span class="wake-check" id="wakeCheck" style="display:none" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></span>
+    <span class="wake-txt" id="wakeText">កំពុងដាស់ server…</span>
+    <span class="wake-meta" id="wakeMeta"></span>
+  </div>
+  <div class="wake-bar"><div class="wake-fill" id="wakeFill"></div></div>
 </div>
 <nav class="dock" id="dockBar" aria-label="Dock">
   <button type="button" class="dock-item on" id="dockPublic" onclick="dockGo('public')" aria-label="Public · សាធារណៈ"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.6 3.9 5.7 3.9 9S14.5 18.4 12 21c-2.5-2.6-3.9-5.7-3.9-9S9.5 5.6 12 3z"/></svg></button>
@@ -12953,9 +12988,9 @@ function notifNorm(raw,idx){
   if(!raw||typeof raw!=='object')return null;
   var id=raw.id||raw._id||raw.notifId||raw.notificationId||('srv'+idx);
   var type=notifType(raw.type||raw.kind||raw.event||'');
-  var media=notifNum(raw.credits!=null?raw.credits:(raw.mediaCredits!=null?raw.mediaCredits:raw.imageVideoCredits));
-  var song=notifNum(raw.songCredits);
-  var amount=notifNum(raw.amount);
+  var media=notifNum(raw.credits!=null?raw.credits:(raw.mediaCredits!=null?raw.mediaCredits:(raw.imageVideoCredits!=null?raw.imageVideoCredits:(raw.media!=null?raw.media:raw.mediaAmount))));
+  var song=notifNum(raw.songCredits!=null?raw.songCredits:(raw.song!=null?raw.song:raw.songAmount));
+  var amount=notifNum(raw.amount!=null?raw.amount:(raw.value!=null?raw.value:(raw.delta!=null?raw.delta:raw.creditAmount)));
   var pool=String(raw.creditType||raw.pool||raw.balance||'').toLowerCase();
   if(amount!=null&&media==null&&song==null){
     if(pool.indexOf('song')>=0)song=amount;else media=amount;
@@ -12976,6 +13011,15 @@ function notifNorm(raw,idx){
   var dId=pick(raw.userId,raw.user_id,raw.uid,raw.accountId,sub.id,sub.userId);
   var dIp=pick(raw.ip,raw.ipAddress,raw.ip_address,raw.userIp,sub.ip);
   var dModel=pick(raw.model,raw.deviceModel,raw.deviceName,(typeof raw.device==='string'?raw.device:''),devObj.model,devObj.name,sub.model,sub.deviceModel);
+  /* Credit amount may also live ONLY in the notice's creditText
+     («250 Media» / «+24 Song» / «1,000 Credit»): recover the number
+     + pool from it so the bell row can show the amount instead of
+     a bare «បន្ថែម Credit» / «កាត់ Credit» with no number. */
+  var creditTxt=pick(raw.creditText,raw.credit_text);
+  if((media==null||media===0)&&(song==null||song===0)&&creditTxt){
+    var cmN=creditTxt.replace(/,/g,'').match(/-?\d+(?:\.\d+)?/);
+    if(cmN){var cvN=Math.abs(parseFloat(cmN[0]));if(isFinite(cvN)&&cvN!==0){if(/song/i.test(creditTxt)){song=cvN;media=null;}else{media=cvN;song=null;}}}
+  }
   return {
     id:String(id),type:type,
     dtype:String(raw.type||raw.kind||raw.event||''),
@@ -13004,14 +13048,49 @@ function notifDefTitle(n){
   if(n.type==='deduct')return tx('notifDeduct');
   return tx('notifInfo');
 }
+/* Amount recovery from the notice TEXT (owner order 2026-11-17):
+   when a credit notice carries no structured amount fields, its
+   title / body / creditText may still name the movement —
+   «300 Media», «24 Song», «300 Credit», «Credit: 250». Pull the
+   number + pool out so the bell row NEVER falls back to a bare
+   «កាត់ Credit» / «បន្ថែម Credit» with no amount when the amount
+   is anywhere in the notice. */
+function notifTextAmt(n){
+  var res={media:null,song:null};
+  var text=((n.title||'')+' '+(n.body||'')+' '+(n.creditText||'')).replace(/\s+/g,' ').trim();
+  if(!text)return res;
+  var t=text.replace(/,/g,'');
+  var m,re=/(\d+(?:\.\d+)?)\s*(Media|Song)\b/gi,found=false;
+  while((m=re.exec(t))!==null){
+    var v=Math.abs(parseFloat(m[1]));
+    if(!isFinite(v)||v===0)continue;
+    found=true;
+    if(m[2].toLowerCase()==='song')res.song=v;else res.media=v;
+  }
+  if(found)return res;
+  var cm=t.match(/(\d+(?:\.\d+)?)\s*(?:credits?|ក្រេឌីត)/i)||t.match(/(?:credits?|ក្រេឌីត)\s*[:\-]?\s*(\d+(?:\.\d+)?)/i)||t.match(/(?:credits?|ក្រេឌីត)\b[^0-9]{0,24}?(\d+(?:\.\d+)?)/i);
+  if(cm){
+    var v2=Math.abs(parseFloat(cm[1]));
+    if(isFinite(v2)&&v2!==0){if(/song/i.test(t))res.song=v2;else res.media=v2;}
+  }
+  return res;
+}
 function notifAmountLine(n){
-  /* Short pool names ONLY (owner order 2026-11-17): «+50
-     Image.Video» / «−300 Image.Video» / «+24 Song» — no «Credit»
-     word and no package name in the row. */
+  /* Sign + amount + pool on the row (owner order 2026-11-17):
+     «−300 Media» / «+250 Media» / «+24 Song» — the number is
+     ALWAYS shown for a credit in/out notice: from the notice's
+     structured fields first, then recovered from its text
+     (notifTextAmt) — never a bare «កាត់ Credit» / «បន្ថែម Credit»
+     with no amount. No «Credit» word, no package name. */
+  var media=n.media,song=n.song;
+  if((media==null||media===0)&&(song==null||song===0)&&(n.type==='grant'||n.type==='deduct'||n.type==='gift'||n.type==='approved')){
+    var pa=notifTextAmt(n);
+    media=pa.media;song=pa.song;
+  }
   var parts=[];
   var sign=(n.type==='deduct')?'−':'+';
-  if(n.media!=null&&n.media!==0)parts.push(sign+acctFmtBal(Math.abs(n.media))+' Image.Video');
-  if(n.song!=null&&n.song!==0)parts.push(sign+acctFmtBal(Math.abs(n.song))+' Song');
+  if(media!=null&&media!==0)parts.push(sign+acctFmtBal(Math.abs(media))+' Media');
+  if(song!=null&&song!==0)parts.push(sign+acctFmtBal(Math.abs(song))+' Song');
   return parts.join(' · ');
 }
 function notifIcon(n){
@@ -14634,6 +14713,164 @@ window.addEventListener('offline',function(){offlineShow('offline');});
 window.addEventListener('online',function(){offlineCheck();});
 if(!navigator.onLine){offlineShow('offline');}else{offlineCheck();}
 setInterval(function(){offlineCheck();},15000);
+</script>
+<script>
+/* ===== Wake server · ដាស់ server ពេលបើកកម្មវិធី =====
+   The movai-proxy server on Render (Free) sleeps after ~15 min
+   with no traffic, and a cold start takes ~30–50 s. So the
+   moment a user OPENS the app — or taps back INTO it after it
+   sat in the background — this wakes the server at once, BEFORE
+   the user starts working, so it is ready when they do:
+   - Triggers: page load, visibilitychange → visible, window
+     focus. NOTHING runs on a timer in the background: with
+     nobody in the app there is no pinging at all and the server
+     is left to sleep (owner order 2026-11-17).
+   - One wake attempt = repeated lightweight GETs of the public
+     vapid-key endpoint (the same one the offline heartbeat
+     uses) every ~2.5 s until the server answers OK, bounded at
+     90 s; then it stops completely. A server that is already
+     awake answers the first GET at once.
+   - The pill (#wakePill) shows only while a real wake is in
+     progress (it appears if the first answer takes >700 ms on
+     open, >1.2 s on return): spinner + «កំពុងដាស់ server…» +
+     ticking seconds + % (estimated against a ~45 s cold start,
+     capped at 96% until the real answer lands). On success it
+     turns green — «Server រួចរាល់ហើយ · 100%» — for ~2.5 s, then
+     blurs away. On app open a fast (already-awake) answer still
+     flashes the green ready pill briefly so the user sees the
+     server is ready; on return visits a fast answer stays
+     silent. If there is no internet, nothing is shown — the
+     offline popup owns that case. If 90 s pass with no answer,
+     the pill says the server is still starting and goes away;
+     the next open / return tries again. Nothing else is
+     touched: no other function changes. */
+var WAKE_URL='https://movai-proxy.onrender.com/api/public/vapid-key';
+var wakeBusy=false;
+var wakeReadyAt=0;      /* last time the server answered OK */
+var wakeStartedAt=0;
+var wakePillShown=false;
+var wakeTickTimer=null;
+var wakeShowTimer=null;
+var wakeHideTimer=null;
+var wakeOutTimer=null;
+function wakeEls(){return{pill:document.getElementById('wakePill'),spin:document.getElementById('wakeSpin'),check:document.getElementById('wakeCheck'),txt:document.getElementById('wakeText'),meta:document.getElementById('wakeMeta'),fill:document.getElementById('wakeFill')};}
+function wakeFmtSecs(ms){var s=Math.max(0,Math.floor(ms/1000));var m=Math.floor(s/60);var r=s%60;return m+':'+(r<10?'0':'')+r;}
+function wakePct(){var el=Date.now()-wakeStartedAt;var p=Math.round((el/45000)*100);if(p<2)p=2;if(p>96)p=96;return p;}
+function wakeRender(){
+  var e=wakeEls();if(!e.pill)return;
+  e.meta.textContent=wakeFmtSecs(Date.now()-wakeStartedAt)+' · '+wakePct()+'%';
+  e.fill.style.width=wakePct()+'%';
+}
+function wakeShowPill(){
+  var e=wakeEls();if(!e.pill||wakePillShown)return;
+  if(wakeHideTimer){clearTimeout(wakeHideTimer);wakeHideTimer=null;}
+  if(wakeOutTimer){clearTimeout(wakeOutTimer);wakeOutTimer=null;}
+  wakePillShown=true;
+  e.pill.classList.remove('ready');
+  if(e.spin)e.spin.style.display='';
+  if(e.check)e.check.style.display='none';
+  if(e.txt)e.txt.textContent='កំពុងដាស់ server…';
+  wakeRender();
+  e.pill.classList.remove('blur-out');
+  e.pill.style.display='block';
+  e.pill.classList.remove('blur-in');
+  void e.pill.offsetWidth;
+  e.pill.classList.add('blur-in');
+}
+function wakeHidePillSoon(ms){
+  var e=wakeEls();if(!e.pill)return;
+  if(wakeHideTimer)clearTimeout(wakeHideTimer);
+  wakeHideTimer=setTimeout(function(){
+    wakeHideTimer=null;
+    var el=wakeEls();if(!el.pill)return;
+    el.pill.classList.remove('blur-in');
+    el.pill.classList.remove('blur-out');
+    void el.pill.offsetWidth;
+    el.pill.classList.add('blur-out');
+    if(wakeOutTimer)clearTimeout(wakeOutTimer);
+    wakeOutTimer=setTimeout(function(){
+      wakeOutTimer=null;wakePillShown=false;
+      var el2=wakeEls();if(el2.pill){el2.pill.style.display='none';el2.pill.classList.remove('blur-out');el2.pill.classList.remove('ready');}
+    },blurOutMs());
+  },ms);
+}
+function wakeShowReady(){
+  var e=wakeEls();if(!e.pill)return;
+  if(!wakePillShown)wakeShowPill();
+  e.pill.classList.add('ready');
+  if(e.spin)e.spin.style.display='none';
+  if(e.check)e.check.style.display='flex';
+  if(e.txt)e.txt.textContent='Server រួចរាល់ហើយ';
+  if(e.meta)e.meta.textContent=wakeFmtSecs(Date.now()-wakeStartedAt)+' · 100%';
+  if(e.fill)e.fill.style.width='100%';
+  wakeHidePillSoon(2500);
+}
+function wakeFetchOnce(){
+  return new Promise(function(resolve){
+    var ctrl=null,timer=null;
+    var opts={method:'GET',cache:'no-store'};
+    try{
+      if(window.AbortController){
+        ctrl=new AbortController();opts.signal=ctrl.signal;
+        timer=setTimeout(function(){try{ctrl.abort();}catch(e){}},12000);
+      }
+    }catch(e){}
+    fetch(WAKE_URL,opts).then(function(r){
+      if(timer)clearTimeout(timer);
+      resolve(!!(r&&r.ok));
+    }).catch(function(){
+      if(timer)clearTimeout(timer);
+      resolve(false);
+    });
+  });
+}
+function wakeServer(isInitial){
+  if(wakeBusy)return;
+  if(typeof navigator!=='undefined'&&navigator.onLine===false)return;
+  /* Already confirmed awake moments ago — the server stays up
+     ~15 min, so a focus/visibility flicker must not re-ping. */
+  if(wakeReadyAt&&Date.now()-wakeReadyAt<60000)return;
+  wakeBusy=true;
+  wakeStartedAt=Date.now();
+  var deadline=wakeStartedAt+90000;
+  if(wakeShowTimer)clearTimeout(wakeShowTimer);
+  wakeShowTimer=setTimeout(function(){wakeShowTimer=null;if(wakeBusy)wakeShowPill();},isInitial?700:1200);
+  if(wakeTickTimer)clearInterval(wakeTickTimer);
+  wakeTickTimer=setInterval(function(){if(wakePillShown)wakeRender();},250);
+  var finish=function(ok){
+    wakeBusy=false;
+    if(wakeShowTimer){clearTimeout(wakeShowTimer);wakeShowTimer=null;}
+    if(wakeTickTimer){clearInterval(wakeTickTimer);wakeTickTimer=null;}
+    if(ok){
+      wakeReadyAt=Date.now();
+      /* On open, always confirm readiness briefly (even a fast
+         answer); on return, confirm only if the pill showed. */
+      if(isInitial||wakePillShown)wakeShowReady();
+    }else{
+      if(wakePillShown){
+        var e=wakeEls();
+        if(e.txt)e.txt.textContent='Server កំពុងចាប់ផ្ដើម… សូមរង់ចាំបន្តិច';
+        wakeHidePillSoon(4000);
+      }
+    }
+  };
+  var attempt=function(){
+    if(!wakeBusy)return;
+    wakeFetchOnce().then(function(ok){
+      if(!wakeBusy)return;
+      if(ok){finish(true);return;}
+      if(Date.now()>=deadline){finish(false);return;}
+      setTimeout(attempt,2500);
+    });
+  };
+  attempt();
+}
+/* Open the app → wake at once. */
+wakeServer(true);
+/* Tap back into the app → wake again (the server may have gone
+   to sleep while the app sat in the background). */
+document.addEventListener('visibilitychange',function(){if(document.visibilityState==='visible')wakeServer(false);});
+window.addEventListener('focus',function(){wakeServer(false);});
 </script>
 <script>
 /* ================= AI Chat (server AI — no canned replies) =================
