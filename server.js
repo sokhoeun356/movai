@@ -4119,13 +4119,13 @@ function apiRoute(req, res, urlPath) {
   // runs out of credits (or its key is wrong) the server marks it and
   // AUTOMATICALLY moves to the next account that still has credits.
   // Credits renew monthly, so an account marked exhausted is tried again
-  // once a new month starts. If every account fails, song-store falls
-  // back to the local convertAndCacheMp3 path so the site keeps working.
+  // once a new month starts. If every account fails, song-store and the
+  // mp3 endpoint return a clear error — there is NO local fallback
+  // (the local converter was permanently removed, owner order 2026-11-17).
   // The env-var account is READ-ONLY in the Admin (it is set in Render);
   // admin accounts live in cloudinary-accounts.json (GitHub-backed, in
   // the private movai-data repo — same as the other admin data). The
-  // Admin API NEVER returns a full API secret (masked). Placed BEFORE
-  // convertAndCacheMp3 on purpose — song-store (below) calls these. ----
+  // Admin API NEVER returns a full API secret (masked). ----
   const CLOUDINARY_ACCOUNTS_FILE = path.join(DATA_DIR, 'cloudinary-accounts.json');
   function loadCloudinaryAccounts() {
     try { const j = JSON.parse(fs.readFileSync(CLOUDINARY_ACCOUNTS_FILE, 'utf8')); if (Array.isArray(j)) return j.filter((x) => x && typeof x === 'object'); } catch (e) {}
@@ -4293,7 +4293,7 @@ function apiRoute(req, res, urlPath) {
       detail: st ? st.detail : '',
     };
   }
-  // One Cloudinary upload at a time (same serialisation as _mp3Queue).
+  // One Cloudinary upload at a time (serialised through _cloudQueue).
   let _cloudQueue = Promise.resolve();
   // Classify a Cloudinary upload error so the rotation knows what to do:
   // 'gone' = the SOURCE url expired (404/403/410) — no account can fix it.
@@ -4379,107 +4379,12 @@ function apiRoute(req, res, urlPath) {
     _cloudQueue = run.catch(() => {});
     return run;
   }
-  const _mp3Converting = new Map();
-  let _mp3Queue = Promise.resolve();
-  async function convertAndCacheMp3(u) {
-    const cached = mp3CacheGet(u);
-    if (cached) return path.basename(cached);
-    if (_mp3Converting.has(u)) return _mp3Converting.get(u);
-    const run = _mp3Queue.then(async () => {
-      const c2 = mp3CacheGet(u);
-      if (c2) return path.basename(c2);
-      const fname = 'mp3-' + mp3CacheKey(u) + '.mp3';
-      const fp = path.join(DATA_DIR, 'uploads', fname);
-      memLog('mp3-start ' + String(u).slice(0, 60));
-      try {
-        const ctrl = new AbortController();
-        const t = setTimeout(() => ctrl.abort(), 180000);
-        const r = await fetch(u, { signal: ctrl.signal, headers: { 'User-Agent': 'MovAi/1.0' } });
-        clearTimeout(t);
-        /* GONE (Hercules plan Step 6.22): the provider URL has
-           EXPIRED (404/403/410) — the song can never be recovered.
-           Return the marker 'gone' (not null) so the callers can
-           tell the user "This song is no longer available" instead
-           of a generic failure. */
-        if (!r.ok && (r.status === 404 || r.status === 403 || r.status === 410)) return 'gone';
-        if (!r.ok || !r.body) return null;
-        /* STREAMING FIX (2026-11-17, owner order via Hercules):
-           the old code did Buffer.from(await r.arrayBuffer()) — the
-           WHOLE audio file in memory at once (~40 MB WAV + ~50 MB PCM
-           + MP3 chunks), which is what OOM-crashed the 512 MB Render
-           instance ("Converting to MP3..." 40–50 s, then "Server
-           unreachable"). Now the download streams chunk by chunk:
-           - MP3 source: sniffed by magic bytes, then piped STRAIGHT
-             to the cache file — near-zero memory, no conversion.
-           - WAV source: chunks accumulate into ONE buffer (the RIFF
-             parser needs random access), the buffer is freed BEFORE
-             encoding (as before), and lamejs encodes 128 kbps.
-           Conversions still run ONE AT A TIME via _mp3Queue. */
-        const { Readable } = require('stream');
-        const nodeStream = Readable.fromWeb(r.body);
-        fs.mkdirSync(path.join(DATA_DIR, 'uploads'), { recursive: true });
-        let head = Buffer.alloc(0);
-        let kind = null; // 'mp3' | 'wav'
-        let mp3Out = null;
-        let wavChunks = [];
-        let mp3Bytes = 0;
-        for await (const chunk of nodeStream) {
-          const buf = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
-          if (kind === null) {
-            head = Buffer.concat([head, buf]);
-            if (head.length < 4) continue; // need 4 bytes to sniff
-            if (isMp3Bytes(head)) kind = 'mp3';
-            else if (head.toString('ascii', 0, 4) === 'RIFF') kind = 'wav';
-            else { console.error('[mp3] unknown audio format for', String(u).slice(0, 120)); return null; }
-            const first = head; head = null;
-            if (kind === 'mp3') {
-              mp3Out = fs.createWriteStream(fp);
-              mp3Out.on('error', () => {});
-              mp3Bytes += first.length;
-              if (!mp3Out.write(first)) await new Promise((rs) => mp3Out.once('drain', rs));
-            } else {
-              wavChunks.push(first);
-            }
-            continue;
-          }
-          if (kind === 'mp3') {
-            mp3Bytes += buf.length;
-            if (!mp3Out.write(buf)) await new Promise((rs) => mp3Out.once('drain', rs));
-          } else {
-            wavChunks.push(buf);
-          }
-        }
-        if (kind === null) { console.error('[mp3] empty audio for', String(u).slice(0, 120)); return null; }
-        if (kind === 'mp3') {
-          await new Promise((rs, rj) => { mp3Out.end((err) => (err ? rj(err) : rs())); });
-          if (mp3Bytes < 1000) { try { fs.unlinkSync(fp); } catch (e) {} return null; }
-          _mp3Cache[mp3CacheKey(u)] = fname;
-          mp3CacheSave();
-          ghPersistFile(fp);
-          memLog('mp3-end ' + fname);
-          return fname;
-        }
-        // WAV: parse PCM, free the buffer, then encode to MP3 128k.
-        const buf = Buffer.concat(wavChunks); wavChunks = null;
-        const pcm = wavParsePcm(buf);
-        const mp3 = await pcmToMp3(pcm, 128);
-        fs.writeFileSync(fp, mp3);
-        ghPersistFile(fp);
-        _mp3Cache[mp3CacheKey(u)] = fname;
-        mp3CacheSave();
-        memLog('mp3-end ' + fname);
-        return fname;
-      } catch (e) {
-        console.error('[mp3] convert failed for', String(u).slice(0, 120), ':', String((e && e.message) || e).slice(0, 200));
-        memLog('mp3-end-failed ' + fname);
-        try { if (fs.existsSync(fp) && fs.statSync(fp).size < 1000) fs.unlinkSync(fp); } catch (e2) {}
-        return null;
-      }
-    });
-    _mp3Queue = run.catch(() => {});
-    _mp3Converting.set(u, run);
-    try { return await run; } finally { _mp3Converting.delete(u); }
-  }
+  // ---- LOCAL MP3 CONVERSION PERMANENTLY REMOVED (owner order 2026-11-17 ~11:16): ----
+  // The local WAV->MP3 converter (convertAndCacheMp3, ~420 MB RSS) OOM-crashed the
+  // 512 MB Render instance, so it is DELETED — not disabled, not dormant. Render
+  // does NO file work at all: every MP3 download goes through Cloudinary only.
+  // If Cloudinary fails, the mp3 endpoint returns a clear 503 error instead of
+  // ever converting locally. Do NOT re-add a local converter here. ----
   if (req.method === 'GET' && urlPath === '/api/gen/song/mp3') {
     // Handler is NOT async — run the async work in an IIFE (same pattern
     // as /api/gen/video/file).
@@ -4546,13 +4451,11 @@ function apiRoute(req, res, urlPath) {
   // POST /api/public/song-store — PUBLIC. {url}. Stores a song
   // PERMANENTLY right after generation (Hercules checklist point A,
   // owner order 2026-11-17): the AI provider's audio URL is TEMPORARY
-  // and expires, so the server downloads it once (streaming, via the
-  // existing convertAndCacheMp3 — WAV→MP3 128k if needed), caches it as
-  // mp3-<hash>.mp3 in ./data/uploads/, backs it up to GitHub, and
-  // returns our permanent /uploads/ URL. The website then saves THAT
-  // URL (never the provider URL) in History, so Play/Download work
-  // forever. Placed AFTER convertAndCacheMp3 (line ~4045) on purpose —
-  // calling it from here must not hit a TDZ ReferenceError.
+  // and expires, so the server stores it PERMANENTLY in Cloudinary
+  // (Cloudinary fetches + converts to MP3) and returns the Cloudinary
+  // MP3 URL. The website then saves THAT URL (never the provider URL)
+  // in History, so Play/Download work forever. NO local file work:
+  // the local converter was permanently removed (owner order 2026-11-17).
   if (req.method === 'POST' && urlPath === '/api/public/song-store') {
     readJSONBody(req, 64 * 1024).then(async (body) => {
       const url = String((body && body.url) || '').trim();
