@@ -548,22 +548,36 @@ img.hist-media,.d3-preview{cursor:zoom-in}
 .mv-auto-grad .mc-name span{color:var(--accent)}
 .mv-shade{position:absolute;inset:0;background:linear-gradient(rgba(0,0,0,.34),rgba(0,0,0,0) 30%,rgba(0,0,0,0) 52%,rgba(0,0,0,.55));pointer-events:none}
 .mv-title{position:absolute;top:9%;left:7%;right:7%;text-align:center;color:#fff;font-size:1.375rem;font-weight:900;line-height:1.35;text-shadow:0 2px 12px rgba(0,0,0,.65);overflow-wrap:break-word;pointer-events:none}
-.mv-lyrics{position:absolute;left:6%;right:6%;bottom:13%;text-align:center;pointer-events:none}
-.mv-line{font-size:1rem;line-height:1.5;color:rgba(255,255,255,.48);text-shadow:0 1px 8px rgba(0,0,0,.6);transition:color .25s ease,font-size .25s ease;overflow-wrap:break-word}
-.mv-line.on{color:#fff;font-size:1.1875rem;font-weight:900}
-.mv-line.on .mv-line-txt{background:rgba(0,0,0,.38);border-radius:8px;padding:2px 10px;box-decoration-break:clone;-webkit-box-decoration-break:clone}
+.mv-lyrics{position:absolute;left:6%;right:6%;top:50%;transform:translateY(-50%);text-align:center;pointer-events:none;z-index:3}
+.mv-line{font-size:1.0625rem;line-height:1.55;color:rgba(255,255,255,.78);text-shadow:0 1px 8px rgba(0,0,0,.7);transition:color .25s ease,font-size .25s ease;overflow-wrap:break-word}
+.mv-line.on{color:#fff;font-size:1.625rem;font-weight:900;line-height:1.45}
+.mv-line.on + .mv-line{margin-top:12px}
+.mv-line.on .mv-line-txt{background:rgba(0,0,0,.42);border-radius:10px;padding:4px 14px;box-decoration-break:clone;-webkit-box-decoration-break:clone}
 .mv-line .mv-line-tr{display:block;font-size:0.8125rem;font-weight:700;color:var(--accent);margin-top:3px;text-shadow:0 1px 8px rgba(0,0,0,.7)}
 .mv-bigplay{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:72px;height:72px;border-radius:50%;border:1px solid rgba(255,255,255,.55);background:rgba(8,10,6,.48);-webkit-backdrop-filter:blur(4px);backdrop-filter:blur(4px);color:#fff;font-size:1.5rem;display:none;align-items:center;justify-content:center;cursor:pointer;padding:0;z-index:4;font-family:inherit}
 .mv-bigplay.show{display:inline-flex}
-.mv-controls{display:flex;align-items:center;gap:9px;padding:10px 14px calc(12px + env(safe-area-inset-bottom,0px));background:#0b0c0e;border-top:1px solid rgba(255,255,255,.09)}
+.mv-controls{display:flex;align-items:center;gap:9px;flex-wrap:wrap;padding:10px 14px calc(12px + env(safe-area-inset-bottom,0px));background:#0b0c0e;border-top:1px solid rgba(255,255,255,.09)}
 .mv-cbtn{flex:0 0 auto;min-width:44px;height:44px;border-radius:50%;border:1px solid rgba(255,255,255,.22);background:rgba(255,255,255,.07);color:#fff;font-family:inherit;font-size:0.9375rem;font-weight:800;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;padding:0 10px}
 .mv-cbtn:active{opacity:.8}
 .mv-cbtn.wide{border-radius:999px;font-size:0.8125rem;gap:6px}
 .mv-cbtn svg{width:17px;height:17px;display:block}
-.mv-seek{flex:1 1 auto;min-width:0;accent-color:var(--accent);cursor:pointer}
+.mv-seek{flex:1 1 auto;min-width:64px;accent-color:var(--accent);cursor:pointer}
 .mv-time{flex:0 0 auto;font-size:0.75rem;font-weight:700;color:rgba(255,255,255,.85);font-variant-numeric:tabular-nums;white-space:nowrap}
 .mv-note{padding:0 14px 10px;background:#0b0c0e;font-size:0.75rem;color:rgba(255,255,255,.55);line-height:1.5}
 .mv-note:empty{display:none}
+/* Auto background: the MovAi logo / cover sits CENTRED and fitted
+   whole inside the stage (contain — never cropped); a blurred,
+   darkened copy of the same picture fills the rest of the frame. */
+.mv-bg-fitwrap{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;overflow:hidden}
+.mv-bg-fitwrap .mv-bg-blur{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;filter:blur(26px) brightness(.5);transform:scale(1.18)}
+.mv-bg-fitwrap .mv-fit-img{position:relative;max-width:86%;max-height:86%;width:auto;height:auto;object-fit:contain;border-radius:10px;box-shadow:0 10px 34px rgba(0,0,0,.5);display:block}
+/* Lyrics loading progress: spinner + running 0%→100% in the
+   CENTRE of the MV stage until the lines arrive. */
+.mv-progress{position:absolute;inset:0;z-index:5;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;background:rgba(0,0,0,.45);text-align:center;padding:16px;pointer-events:none}
+.mv-spinner{width:46px;height:46px;border-radius:50%;border:4px solid rgba(255,255,255,.25);border-top-color:var(--accent);animation:mvSpin .8s linear infinite}
+@keyframes mvSpin{to{transform:rotate(360deg)}}
+.mv-progress-pct{font-size:2rem;font-weight:900;color:#fff;font-variant-numeric:tabular-nums;line-height:1;text-shadow:0 2px 10px rgba(0,0,0,.6)}
+.mv-progress-txt{font-size:0.875rem;font-weight:700;color:rgba(255,255,255,.88);line-height:1.5;text-shadow:0 1px 6px rgba(0,0,0,.6)}
 @media (prefers-reduced-motion:reduce){.mv-bg .mv-auto-img{animation:none}.mv-line{transition:none}}
 /* ===== Fullscreen media viewer (tap any image / video / 3D preview) ===== */
 .fs-viewer{position:fixed;inset:0;z-index:90;background:rgba(0,0,0,.96);align-items:center;justify-content:center}
@@ -2573,6 +2587,11 @@ main{padding-top:calc(3.75rem + env(safe-area-inset-top,0px))}
       <div class="mv-title" id="mvTitle"></div>
       <div class="mv-lyrics" id="mvLyrics"></div>
       <button type="button" class="mv-bigplay" id="mvBigPlay" aria-label="Play">▶</button>
+      <div class="mv-progress" id="mvProgress" style="display:none">
+        <div class="mv-spinner" aria-hidden="true"></div>
+        <div class="mv-progress-pct" id="mvProgressPct">0%</div>
+        <div class="mv-progress-txt" id="mvProgressTxt"></div>
+      </div>
     </div>
   </div>
   <p class="mv-note" id="mvNote"></p>
@@ -2583,6 +2602,7 @@ main{padding-top:calc(3.75rem + env(safe-area-inset-top,0px))}
     <span class="mv-time" id="mvDur">0:00</span>
     <button type="button" class="mv-cbtn wide" id="mvDlBtn"></button>
     <button type="button" class="mv-cbtn wide" id="mvShareBtn"></button>
+    <button type="button" class="mv-cbtn wide" id="mvExpBtn"></button>
     <button type="button" class="mv-cbtn" id="mvCloseBtn" aria-label="Close">✕</button>
   </div>
 </div>
@@ -3087,7 +3107,9 @@ km:{
  mvLyricsLbl:'អត្ថបទចម្រៀង · Lyrics',mvLyricsHave:'មានអត្ថបទរួច — អក្សរនឹងរត់តាមពេលច្រៀង (karaoke)',mvLyricsNone:'បទនេះមិនទាន់មានអត្ថបទទេ — ឲ្យ AI ស្ដាប់ហើយសរសេរឲ្យ',
  mvAiBtn:'AI ស្ដាប់ + សរសេរអត្ថបទ',mvAiBusy:'AI កំពុងស្ដាប់… {s} វិនាទី',mvAiDone:'AI សរសេរអត្ថបទរួចរាល់ ✓',mvAiFail:'AI ស្ដាប់មិនបានទេ — server អាចមិនទាន់មានមុខងារនេះ ឬអ៊ីនធឺណិតមានបញ្ហា។ សូមព្យាយាមម្ដងទៀត',
  mvTrLabel:'បកប្រែអត្ថបទទៅ (បើចង់)',mvTrNone:'អត់បកប្រែ',mvTrBusy:'កំពុងបកប្រែអត្ថបទ…',mvTrFail:'បកប្រែមិនបាន — បង្ហាញអត្ថបទដើមវិញ',
- mvStart:'ចាប់ផ្ដើម MV',mvNoSong:'រកបទចម្រៀងមិនឃើញទេ'
+ mvStart:'ចាប់ផ្ដើម MV',mvNoSong:'រកបទចម្រៀងមិនឃើញទេ',
+ mvProgListen:'AI កំពុងស្ដាប់ + សរសេរអត្ថបទ…',
+ mvExpBtn:'ទាញយកជា Video',mvExpStop:'បញ្ឈប់',mvExpRec:'កំពុងថត MV… {p}% · {t}',mvExpDone:'ថតរួចរាល់ ✓',mvExpDl:'Download Video',mvExpFail:'Export មិនបានទេ — browser នេះមិនគាំទ្រ ឬសំឡេងបទមិនអាចថតបាន'
 },
 en:{
  docTitle:'MovAi — Create Images & Videos',menuLabel:'Menu',closeLabel:'Close menu',
@@ -3314,7 +3336,9 @@ en:{
  mvLyricsLbl:'Lyrics',mvLyricsHave:'Lyrics found — they will run karaoke-style with the singing',mvLyricsNone:'This song has no lyrics yet — let AI listen and write them',
  mvAiBtn:'AI listen + write lyrics',mvAiBusy:'AI is listening… {s}s',mvAiDone:'AI wrote the lyrics ✓',mvAiFail:'AI could not listen — the server may not have this feature yet, or the connection failed. Please try again',
  mvTrLabel:'Translate lyrics to (optional)',mvTrNone:'No translation',mvTrBusy:'Translating lyrics…',mvTrFail:'Translation failed — showing the original lyrics',
- mvStart:'Start MV',mvNoSong:'Song not found'
+ mvStart:'Start MV',mvNoSong:'Song not found',
+ mvProgListen:'AI is listening + writing lyrics…',
+ mvExpBtn:'Export Video',mvExpStop:'Stop',mvExpRec:'Recording MV… {p}% · {t}',mvExpDone:'Recording done ✓',mvExpDl:'Download Video',mvExpFail:'Export failed — this browser does not support recording, or the song audio cannot be captured'
 }};
 function tx(k){var d=I18N[LANG]||I18N.km;return (k in d)?d[k]:(I18N.km[k]||k);}
 function loc(o){return (o&&typeof o==='object')?(o[LANG]||o.km||''):o;}
@@ -16731,48 +16755,83 @@ function mvNormLines(j){
   }
   return out.length?out:null;
 }
-function mvAiFetch(trLang){
+/* Lyrics progress overlay (centre of the MV stage): a spinner
+   plus a percentage that runs 0%→100% while AI listens / writes.
+   The percentage eases towards ~92% while waiting and completes
+   to 100% the moment the lines arrive. */
+var mvProgTimer=0,mvProgPct=0;
+function mvProgRender(){var p=document.getElementById('mvProgressPct');if(p)p.textContent=Math.round(mvProgPct)+'%';}
+function mvProgStart(label){
+  var ov=document.getElementById('mvProgress');if(!ov)return;
+  var lb=document.getElementById('mvProgressTxt');if(lb)lb.textContent=label||'';
+  ov.style.display='flex';mvProgPct=0;mvProgRender();
+  clearInterval(mvProgTimer);
+  mvProgTimer=setInterval(function(){
+    if(mvProgPct<92){mvProgPct=Math.min(92,mvProgPct+(92-mvProgPct)*0.045+0.4);mvProgRender();}
+  },200);
+}
+function mvProgDone(){
+  clearInterval(mvProgTimer);mvProgPct=100;mvProgRender();
+  setTimeout(function(){var ov=document.getElementById('mvProgress');if(ov)ov.style.display='none';},450);
+}
+function mvProgHide(){clearInterval(mvProgTimer);var ov=document.getElementById('mvProgress');if(ov)ov.style.display='none';}
+function mvAiFetch(trLang,attempt){
+  attempt=attempt||0;
   var song=mvState.song;
-  if(!song||!song.url||mvState.aiBusy)return;
-  if(!/^https:/i.test(song.url)){mvMsgShow(tx('mvAiFail'),'err');return;}
+  if(!song||!song.url)return;
+  if(mvState.aiBusy&&attempt===0)return;
+  if(!/^https:/i.test(song.url)){if(attempt===0)mvMsgShow(tx('mvAiFail'),'err');return;}
   mvState.aiBusy=true;
-  mvLyrRender();
-  var t0=Date.now();
+  if(attempt===0)mvLyrRender();
   var noteEl=document.getElementById('mvNote');
-  var viewOpen=document.getElementById('mvView')&&document.getElementById('mvView').style.display!=='none';
+  var viewEl=document.getElementById('mvView');
+  var viewOpen=!!(viewEl&&viewEl.style.display!=='none');
+  if(viewOpen&&attempt===0)mvProgStart(tx(trLang?'mvTrBusy':'mvProgListen'));
+  var t0=Date.now();
   var timer=setInterval(function(){
+    if(viewOpen)return;
     var s=Math.round((Date.now()-t0)/1000);
-    if(viewOpen&&noteEl)noteEl.textContent=tx(trLang?'mvTrBusy':'mvAiBusy').replace('{s}',s);
-    else mvMsgShow(tx(trLang?'mvTrBusy':'mvAiBusy').replace('{s}',s),'');
+    mvMsgShow(tx(trLang?'mvTrBusy':'mvAiBusy').replace('{s}',String(s)),'');
   },500);
-  function finish(){
-    clearInterval(timer);mvState.aiBusy=false;
-    if(viewOpen&&noteEl)noteEl.textContent='';
-  }
   var body={audioUrl:song.url};
   if(trLang)body.translateTo=trLang;
   var timeout=new Promise(function(_,rej){setTimeout(function(){rej(new Error('timeout'));},120000);});
   Promise.race([fetch(GEN_API+'/mv/lyrics',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}),timeout])
   .then(function(r){if(!r.ok)throw new Error('http '+r.status);return r.json();})
   .then(function(j){
-    finish();
     var lines=mvNormLines(j);
     if(!lines)throw new Error('bad shape');
+    clearInterval(timer);mvState.aiBusy=false;
     var timed=lines.length&&typeof lines[0].start==='number';
     if(trLang){
       mvTrCache[song.url+'|'+trLang]={kind:timed?'timed':'text',lines:lines};
-      mvMsgShow(tx('mvAiDone'),'ok');
+      if(viewOpen&&noteEl)noteEl.textContent='';
     }else{
       mvCache[song.url]={kind:timed?'timed':'text',lines:lines};
-      mvMsgShow(tx('mvAiDone'),'ok');
       mvLyrRender();
     }
+    if(viewOpen)mvProgDone();
+    else mvMsgShow(tx('mvAiDone'),'ok');
     if(mvState.song&&mvState.song.url===song.url)mvApplyLines(lines,timed);
   })
   .catch(function(){
-    finish();
-    if(viewOpen&&noteEl)noteEl.textContent=tx(trLang?'mvTrFail':'mvAiFail');
-    else mvMsgShow(tx(trLang?'mvTrFail':'mvAiFail'),'err');
+    clearInterval(timer);mvState.aiBusy=false;
+    /* One automatic retry before anything is reported. */
+    if(attempt<1){setTimeout(function(){mvAiFetch(trLang,attempt+1);},700);return;}
+    if(viewOpen)mvProgHide();
+    if(trLang){
+      /* Translation failed twice: NEVER leave the screen without
+         lyrics — the ORIGINAL lines (sung language) stay / are
+         fetched and shown big; only a small note at the bottom
+         mentions the translation. */
+      if(viewOpen&&noteEl)noteEl.textContent=tx('mvTrFail');
+      else mvMsgShow(tx('mvTrFail'),'');
+      var have=mvResolveLines(song).kind!=='none';
+      if(!have&&mvState.song&&mvState.song.url===song.url)mvAiFetch('',0);
+    }else{
+      if(viewOpen&&noteEl)noteEl.textContent=tx('mvAiFail');
+      else mvMsgShow(tx('mvAiFail'),'err');
+    }
     mvLyrRender();
   });
 }
@@ -16806,11 +16865,18 @@ function mvStart(){
     var c=mvTrCache[song.url+'|'+trLang];
     mvApplyLines(c.lines,c.kind==='timed');
   }else if(r.kind!=='none'){
+    /* Creation lyrics: on screen at once. A picked translation
+       is fetched on top and swaps in when it lands — if it
+       fails, these original lines simply stay. */
     mvApplyLines(r.lines,r.kind==='timed');
+    if(trLang)mvAiFetch(trLang);
   }else{
+    /* No creation lyrics: ask AI to listen + write them right
+       away — the lines appear the moment they come back. A
+       failed translation falls back to the original lyrics. */
     mvApplyLines(null,false);
+    mvAiFetch(trLang||'');
   }
-  if(trLang&&!mvTrCache[song.url+'|'+trLang])mvAiFetch(trLang);
   /* Audio: one dedicated element for the MV view. */
   if(!mvAudio){
     mvAudio=new Audio();
@@ -16830,6 +16896,7 @@ function mvStart(){
   if(dl)dl.innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v11"/><path d="M7 10l5 5 5-5"/><path d="M4 21h16"/></svg><span>'+escHtml(tx('histDownload'))+'</span>';
   var sh=document.getElementById('mvShareBtn');
   if(sh)sh.innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="6" cy="12" r="2.5"/><circle cx="18" cy="6" r="2.5"/><circle cx="18" cy="18" r="2.5"/><path d="M8.2 10.9l7.6-3.7M8.2 13.1l7.6 3.7"/></svg><span>'+escHtml(tx('histShare'))+'</span>';
+  mvExpBtnLabel(false);
 }
 function mvBuildBg(){
   var bg=document.getElementById('mvBg');if(!bg)return;
@@ -16849,10 +16916,19 @@ function mvBuildBg(){
     return;
   }
   if(song&&song.image&&/^https:/i.test(song.image)){
+    /* The cover / MovAi logo is shown CENTRED and fitted whole
+       (contain — never cropped); a blurred copy fills the frame
+       behind it. */
+    var wrap=document.createElement('div');
+    wrap.className='mv-bg-fitwrap';
+    var blur=document.createElement('img');
+    blur.src=song.image;blur.alt='';blur.className='mv-bg-blur';blur.setAttribute('aria-hidden','true');
+    wrap.appendChild(blur);
     var cv=document.createElement('img');
-    cv.src=song.image;cv.alt='';cv.className='mv-auto-img';
+    cv.src=song.image;cv.alt='';cv.className='mv-fit-img';
     cv.addEventListener('error',function(){bg.innerHTML='';bg.appendChild(mvAutoGrad(song));});
-    bg.appendChild(cv);
+    wrap.appendChild(cv);
+    bg.appendChild(wrap);
     return;
   }
   bg.appendChild(mvAutoGrad(song));
@@ -16898,7 +16974,9 @@ function mvSyncLyrics(force){
   if(!box)return;
   var lines=mvState.lines;
   if(!lines||!lines.length||!mvAudio){if(force||mvState.curLine!==-2){box.innerHTML='';mvState.curLine=-2;}return;}
-  var t=mvAudio.currentTime||0,idx=-1,i;
+  /* Preload: a line appears slightly BEFORE it is sung, so the
+     words are already on screen when the voice reaches them. */
+  var t=(mvAudio.currentTime||0)+0.6,idx=-1,i;
   if(mvState.timed){
     for(i=0;i<lines.length;i++){
       var s=lines[i].start;
@@ -16917,11 +16995,8 @@ function mvSyncLyrics(force){
     nx.className='mv-line';nx.textContent=lines[0].text;
     box.appendChild(nx);return;
   }
-  if(idx>0){
-    var pv=document.createElement('div');
-    pv.className='mv-line';pv.textContent=lines[idx-1].text;
-    box.appendChild(pv);
-  }
+  /* The line being sung: big, in the CENTRE of the screen.
+     The next line sits right below it. Nothing else covers them. */
   var cl=document.createElement('div');
   cl.className='mv-line on';
   var sp=document.createElement('span');
@@ -16940,12 +17015,15 @@ function mvSyncLyrics(force){
   }
 }
 function mvTogglePlay(){
+  if(mvExp.on)return;
   if(!mvAudio)return;
   if(mvAudio.paused){mvPauseOthers();var pr=mvAudio.play();if(pr&&pr.catch)pr.catch(function(){});}
   else mvAudio.pause();
   mvSyncBtns();
 }
 function mvCloseView(){
+  if(mvExp.on)mvExpFinish();
+  mvProgHide();
   if(mvAudio){try{mvAudio.pause();}catch(e){}}
   var view=document.getElementById('mvView');
   if(view){
@@ -16963,6 +17041,238 @@ function mvShare(){
   var song=mvState.song;if(!song)return;
   histShare({type:'song',url:song.url,title:song.title||''},document.getElementById('mvShareBtn'));
 }
+/* ===== Export MV as a video file (owner order 2026-11-17) =====
+   «Export Video» records the MV itself — background, song title,
+   karaoke lyrics in time with the singing, and the song audio —
+   onto a <canvas> captured with MediaRecorder, producing a real
+   video file (MP4 where the browser supports it, otherwise WebM)
+   the user can download and post to Facebook / YouTube. The song
+   plays from the start while recording; progress (percent + time)
+   shows under the stage and the button becomes Stop. The export
+   uses its OWN audio element (crossOrigin anonymous, routed
+   through an AudioContext) so normal MV playback is untouched. */
+var mvExp={on:false,rec:null,ctx:null,audio:null,chunks:[],raf:0,timer:0,url:'',mime:'',cv:null,cx:null,bgVid:null,bgImg:null,cover:null,dur:0};
+function mvExpMime(){
+  if(typeof MediaRecorder==='undefined')return '';
+  var list=['video/mp4;codecs=avc1.42E01E,mp4a.40.2','video/mp4','video/webm;codecs=vp9,opus','video/webm;codecs=vp8,opus','video/webm'];
+  for(var i=0;i<list.length;i++){try{if(MediaRecorder.isTypeSupported(list[i]))return list[i];}catch(e){}}
+  return '';
+}
+function mvExpNote(html){var n=document.getElementById('mvNote');if(n)n.innerHTML=html||'';}
+function mvExpBtnLabel(rec){
+  var b=document.getElementById('mvExpBtn');if(!b)return;
+  if(rec)b.innerHTML='<span>⏹ '+escHtml(tx('mvExpStop'))+'</span>';
+  else b.innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2.5" y="5" width="19" height="14" rx="3"/><path d="M10 9.5l5 2.5-5 2.5z" fill="currentColor" stroke="none"/></svg><span>'+escHtml(tx('mvExpBtn'))+'</span>';
+}
+function mvExportToggle(){
+  if(mvExp.on){mvExpFinish();return;}
+  var song=mvState.song;
+  if(!song||!song.url)return;
+  var mime=mvExpMime();
+  if(!mime){mvExpNote(escHtml(tx('mvExpFail')));return;}
+  try{mvExpStart(song,mime);}catch(e){mvExpCleanup();mvExpBtnLabel(false);mvExpNote(escHtml(tx('mvExpFail')));}
+}
+function mvExpStart(song,mime){
+  var f=mvFmtById(mvState.fmt);
+  var W,H;
+  if(f.w>=f.h){W=1280;H=Math.round(1280*f.h/f.w);}else{H=1280;W=Math.round(1280*f.w/f.h);}
+  W-=W%2;H-=H%2;
+  var cv=document.createElement('canvas');cv.width=W;cv.height=H;
+  mvExp.cv=cv;mvExp.cx=cv.getContext('2d');mvExp.mime=mime;mvExp.chunks=[];mvExp.dur=0;
+  mvExp.bgVid=null;mvExp.bgImg=null;mvExp.cover=null;
+  if(mvState.bgMode==='upload'&&mvState.bgUrl){
+    if(mvState.bgKind==='video'){
+      var vd=document.createElement('video');
+      vd.src=mvState.bgUrl;vd.muted=true;vd.loop=true;vd.playsInline=true;
+      mvExp.bgVid=vd;var pv=vd.play();if(pv&&pv.catch)pv.catch(function(){});
+    }else{
+      var im=new Image();im.src=mvState.bgUrl;mvExp.bgImg=im;
+    }
+  }else if(song.image&&/^https:/i.test(song.image)){
+    var ci=new Image();ci.crossOrigin='anonymous';ci.src=song.image;mvExp.cover=ci;
+  }
+  var AC=window.AudioContext||window.webkitAudioContext;
+  if(!AC)throw new Error('no audio context');
+  if(mvAudio){try{mvAudio.pause();}catch(e){}}
+  mvPauseOthers();
+  var ctx=new AC();
+  mvExp.ctx=ctx;
+  var au=new Audio();
+  au.crossOrigin='anonymous';au.preload='auto';au.src=song.url;
+  mvExp.audio=au;
+  var srcNode=ctx.createMediaElementSource(au);
+  var dest=ctx.createMediaStreamDestination();
+  srcNode.connect(dest);srcNode.connect(ctx.destination);
+  var vs=cv.captureStream(30);
+  var tracks=[];
+  vs.getVideoTracks().forEach(function(t){tracks.push(t);});
+  dest.stream.getAudioTracks().forEach(function(t){tracks.push(t);});
+  var rec=new MediaRecorder(new MediaStream(tracks),{mimeType:mime,videoBitsPerSecond:8000000,audioBitsPerSecond:192000});
+  mvExp.rec=rec;
+  rec.ondataavailable=function(ev){if(ev.data&&ev.data.size)mvExp.chunks.push(ev.data);};
+  rec.onstop=mvExpStopped;
+  au.addEventListener('ended',function(){if(mvExp.on)mvExpFinish();});
+  au.addEventListener('loadedmetadata',function(){mvExp.dur=isFinite(au.duration)?au.duration:0;});
+  mvExp.on=true;
+  mvExpBtnLabel(true);
+  mvExpNote(escHtml(tx('mvExpRec').replace('{p}','0').replace('{t}','0:00 / 0:00')));
+  rec.start(500);
+  if(ctx.state==='suspended'){var rp=ctx.resume();if(rp&&rp.catch)rp.catch(function(){});}
+  var pp=au.play();if(pp&&pp.catch)pp.catch(function(){});
+  mvExpLoop();
+  mvExp.timer=setInterval(mvExpProgress,250);
+}
+function mvExpLoop(){
+  if(!mvExp.on)return;
+  mvExpDraw();
+  mvExp.raf=requestAnimationFrame(mvExpLoop);
+}
+function mvExpCoverDraw(cx,img,W,H){
+  var iw=img.naturalWidth||img.videoWidth||0,ih=img.naturalHeight||img.videoHeight||0;
+  if(!iw||!ih)return false;
+  var sc=Math.max(W/iw,H/ih),dw=iw*sc,dh=ih*sc;
+  try{cx.drawImage(img,(W-dw)/2,(H-dh)/2,dw,dh);return true;}catch(e){return false;}
+}
+function mvExpWrap(cx,text,maxW){
+  var parts=String(text||'').split(/\s+/),lines=[],cur='';
+  function flush(){if(cur){lines.push(cur);cur='';}}
+  for(var i=0;i<parts.length;i++){
+    var w=parts[i];if(!w)continue;
+    while(cx.measureText(w).width>maxW&&w.length>1){
+      flush();
+      var n=w.length-1;
+      while(n>1&&cx.measureText(w.slice(0,n)).width>maxW)n--;
+      lines.push(w.slice(0,n));w=w.slice(n);
+    }
+    if(!cur)cur=w;
+    else if(cx.measureText(cur+' '+w).width<=maxW)cur+=' '+w;
+    else{flush();cur=w;}
+  }
+  flush();
+  return lines.length?lines:[''];
+}
+function mvExpDraw(){
+  var cx=mvExp.cx,cv=mvExp.cv;if(!cx||!cv)return;
+  var W=cv.width,H=cv.height,song=mvState.song||{};
+  var t=mvExp.audio?(mvExp.audio.currentTime||0):0;
+  var dur=mvExp.dur||(mvExp.audio&&isFinite(mvExp.audio.duration)?mvExp.audio.duration:0);
+  cx.fillStyle='#07080a';cx.fillRect(0,0,W,H);
+  var drew=false;
+  if(mvExp.bgVid&&mvExp.bgVid.readyState>=2)drew=mvExpCoverDraw(cx,mvExp.bgVid,W,H);
+  if(!drew&&mvExp.bgImg&&mvExp.bgImg.complete&&mvExp.bgImg.naturalWidth)drew=mvExpCoverDraw(cx,mvExp.bgImg,W,H);
+  if(!drew&&mvExp.cover&&mvExp.cover.complete&&mvExp.cover.naturalWidth){
+    cx.save();
+    try{cx.filter='blur(30px) brightness(.55)';}catch(e){}
+    cx.translate(W/2,H/2);cx.scale(1.18,1.18);cx.translate(-W/2,-H/2);
+    mvExpCoverDraw(cx,mvExp.cover,W,H);
+    cx.restore();
+    var iw=mvExp.cover.naturalWidth,ih=mvExp.cover.naturalHeight;
+    var sc=Math.min(W*0.86/iw,H*0.86/ih),dw=iw*sc,dh=ih*sc;
+    try{cx.drawImage(mvExp.cover,(W-dw)/2,(H-dh)/2,dw,dh);drew=true;}catch(e){drew=false;}
+  }
+  if(!drew){
+    var hh=0,tt0=String(song.title||'MovAi');
+    for(var i=0;i<tt0.length;i++)hh=(hh*31+tt0.charCodeAt(i))%360;
+    var g=cx.createLinearGradient(0,0,W,H);
+    g.addColorStop(0,'hsl('+hh+',52%,26%)');g.addColorStop(.7,'hsl('+((hh+70)%360)+',58%,12%)');g.addColorStop(1,'#07080a');
+    cx.fillStyle=g;cx.fillRect(0,0,W,H);
+    cx.font='900 '+Math.round(W*0.11)+'px system-ui,sans-serif';
+    cx.textBaseline='middle';
+    var wMov=cx.measureText('Mov').width,wAi=cx.measureText('Ai').width,x0=(W-(wMov+wAi))/2;
+    cx.textAlign='left';cx.fillStyle='#fff';cx.fillText('Mov',x0,H*0.30);
+    cx.fillStyle='#a3e635';cx.fillText('Ai',x0+wMov,H*0.30);
+    cx.textAlign='center';
+  }
+  var sg=cx.createLinearGradient(0,0,0,H);
+  sg.addColorStop(0,'rgba(0,0,0,.34)');sg.addColorStop(.3,'rgba(0,0,0,0)');sg.addColorStop(.52,'rgba(0,0,0,0)');sg.addColorStop(1,'rgba(0,0,0,.55)');
+  cx.fillStyle=sg;cx.fillRect(0,0,W,H);
+  cx.fillStyle='#fff';cx.textAlign='center';cx.textBaseline='top';
+  cx.shadowColor='rgba(0,0,0,.65)';cx.shadowBlur=12;
+  cx.font='900 '+Math.round(W*0.052)+'px system-ui,sans-serif';
+  var tl=mvExpWrap(cx,song.title||'MovAi',W*0.86);
+  for(var ti=0;ti<Math.min(2,tl.length);ti++)cx.fillText(tl[ti],W/2,H*0.07+ti*W*0.062);
+  cx.shadowBlur=0;
+  var lines=mvState.lines;
+  if(lines&&lines.length){
+    var lt=t+0.6,idx=-1,j;
+    if(mvState.timed){
+      for(j=0;j<lines.length;j++){var s=lines[j].start;if(typeof s==='number'&&lt>=s)idx=j;else if(typeof s==='number'&&lt<s)break;}
+    }else if(dur>0)idx=Math.min(lines.length-1,Math.floor(lt/dur*lines.length));
+    else idx=0;
+    if(idx<0)idx=0;
+    var cur=lines[idx];
+    var fs=Math.round(W*0.058);
+    cx.font='900 '+fs+'px system-ui,sans-serif';
+    var cl=mvExpWrap(cx,cur.text,W*0.88);
+    var lh=fs*1.4,totalH=cl.length*lh,y0=H*0.52-totalH/2,maxw=0;
+    cl.forEach(function(L){maxw=Math.max(maxw,cx.measureText(L).width);});
+    cx.fillStyle='rgba(0,0,0,.42)';
+    cx.beginPath();
+    if(cx.roundRect)cx.roundRect((W-maxw)/2-18,y0-10,maxw+36,totalH+20,14);else cx.rect((W-maxw)/2-18,y0-10,maxw+36,totalH+20);
+    cx.fill();
+    cx.fillStyle='#fff';cx.shadowColor='rgba(0,0,0,.6)';cx.shadowBlur=8;
+    cl.forEach(function(L,k){cx.fillText(L,W/2,y0+k*lh);});
+    cx.shadowBlur=0;
+    var ny=y0+totalH+16;
+    if(cur.tr){
+      cx.font='700 '+Math.round(W*0.034)+'px system-ui,sans-serif';
+      cx.fillStyle='#a3e635';
+      cx.fillText(cur.tr,W/2,ny);ny+=Math.round(W*0.05);
+    }
+    if(idx<lines.length-1){
+      cx.font='500 '+Math.round(W*0.036)+'px system-ui,sans-serif';
+      cx.fillStyle='rgba(255,255,255,.75)';
+      var nl=mvExpWrap(cx,lines[idx+1].text,W*0.88);
+      for(var m=0;m<Math.min(2,nl.length);m++)cx.fillText(nl[m],W/2,ny+m*W*0.048);
+    }
+  }
+}
+function mvExpProgress(){
+  if(!mvExp.on||!mvExp.audio)return;
+  var d=mvExp.dur||mvExp.audio.duration||0,c=mvExp.audio.currentTime||0;
+  var p=d>0?Math.min(100,Math.round(c/d*100)):0;
+  mvExpNote(escHtml(tx('mvExpRec').replace('{p}',String(p)).replace('{t}',histFmtTime(c)+' / '+histFmtTime(d))));
+}
+function mvExpFinish(){
+  if(!mvExp.on)return;
+  mvExp.on=false;
+  clearInterval(mvExp.timer);
+  if(mvExp.raf)cancelAnimationFrame(mvExp.raf);
+  if(mvExp.audio){try{mvExp.audio.pause();}catch(e){}}
+  if(mvExp.bgVid){try{mvExp.bgVid.pause();}catch(e){}}
+  if(mvExp.rec&&mvExp.rec.state!=='inactive'){try{mvExp.rec.stop();}catch(e){mvExpStopped();}}
+  else mvExpStopped();
+}
+function mvExpStopped(){
+  mvExpBtnLabel(false);
+  var isMp4=mvExp.mime.indexOf('mp4')>=0;
+  var blob=new Blob(mvExp.chunks,{type:isMp4?'video/mp4':'video/webm'});
+  mvExp.chunks=[];
+  if(mvExp.url){try{URL.revokeObjectURL(mvExp.url);}catch(e){}mvExp.url='';}
+  if(!blob.size){mvExpNote(escHtml(tx('mvExpFail')));mvExpCleanup();return;}
+  mvExp.url=URL.createObjectURL(blob);
+  var song=mvState.song||{};
+  var name=String(song.title||'MovAi MV').replace(/[\\/:*?"<>|]+/g,' ').replace(/\s+/g,' ').replace(/^\s+|\s+$/g,'')||'MovAi MV';
+  var mb=(blob.size/1048576).toFixed(1);
+  var n=document.getElementById('mvNote');
+  if(n){
+    n.innerHTML='';
+    var a=document.createElement('a');
+    a.className='mv-cbtn wide';a.style.cssText='text-decoration:none;display:inline-flex';
+    a.href=mvExp.url;a.download=name+' - MovAi MV.'+(isMp4?'mp4':'webm');
+    a.textContent='⬇ '+tx('mvExpDl')+' · '+mb+' MB';
+    n.appendChild(a);
+    var s=document.createElement('span');
+    s.style.cssText='display:block;margin-top:6px';
+    s.textContent=tx('mvExpDone');
+    n.appendChild(s);
+  }
+  mvExpCleanup();
+}
+function mvExpCleanup(){
+  if(mvExp.ctx){try{mvExp.ctx.close();}catch(e){}}
+  mvExp.ctx=null;mvExp.audio=null;mvExp.rec=null;mvExp.cv=null;mvExp.cx=null;mvExp.bgVid=null;mvExp.bgImg=null;mvExp.cover=null;
+}
 (function(){
   var pb=document.getElementById('mvPlayBtn');if(pb)pb.addEventListener('click',mvTogglePlay);
   var big=document.getElementById('mvBigPlay');if(big)big.addEventListener('click',mvTogglePlay);
@@ -16977,6 +17287,7 @@ function mvShare(){
   });
   var dl=document.getElementById('mvDlBtn');if(dl)dl.addEventListener('click',mvDownload);
   var sh=document.getElementById('mvShareBtn');if(sh)sh.addEventListener('click',mvShare);
+  var exb=document.getElementById('mvExpBtn');if(exb)exb.addEventListener('click',mvExportToggle);
   var cl=document.getElementById('mvCloseBtn');if(cl)cl.addEventListener('click',mvCloseView);
   window.addEventListener('resize',function(){
     var v=document.getElementById('mvView');
