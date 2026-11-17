@@ -143,7 +143,7 @@ const GH_DATA_FILES = [
   'public.json', 'package-events.json', 'blocked-models.json',
   'model-logins.json', 'blocked-ips.json', 'blocked-emails.json',
   'updates.json', 'admin-lockouts.json', 'history.json', 'mp3cache.json',
-  'cloudinary-accounts.json',
+  'cloudinary-accounts.json', 'cloudinary-rotation.json',
 ];
 const ghShaCache = {}; // filename -> GitHub blob sha (for PUT updates)
 function ghEnabled() { return !!GH_TOKEN; }
@@ -4115,13 +4115,19 @@ function apiRoute(req, res, urlPath) {
   // Gmails and adds Cloudinary accounts in the Admin (3 fields: Cloud
   // Name, API Key, API Secret, then Save). The MAIN account (bg08mr3i)
   // lives in the Render env var CLOUDINARY_URL and is FIRST in the
-  // rotation; admin accounts follow in the order added. When one account
-  // runs out of credits (or its key is wrong) the server marks it and
-  // AUTOMATICALLY moves to the next account that still has credits.
-  // Credits renew monthly, so an account marked exhausted is tried again
-  // once a new month starts. If every account fails, song-store and the
-  // mp3 endpoint return a clear error — there is NO local fallback
-  // (the local converter was permanently removed, owner order 2026-11-17).
+  // rotation; admin accounts follow in the order added.
+  // ROUND-ROBIN (owner order 2026-11-17): each NEW upload uses the next
+  // enabled account in turn (upload 1 -> account 1, upload 2 -> account
+  // 2, ... cycling) — the accounts SHARE the work instead of draining
+  // one account until it fails. The last-used account is remembered in
+  // cloudinary-rotation.json (GitHub-backed, survives restarts). When
+  // one account runs out of credits (or its key is wrong) the server
+  // marks it and AUTOMATICALLY moves to the next account that still has
+  // credits (failover stays as the safety net). Credits renew monthly,
+  // so an account marked exhausted is tried again once a new month
+  // starts. If every account fails, song-store and the mp3 endpoint
+  // return a clear error — there is NO local fallback (the local
+  // converter was permanently removed, owner order 2026-11-17).
   // The env-var account is READ-ONLY in the Admin (it is set in Render);
   // admin accounts live in cloudinary-accounts.json (GitHub-backed, in
   // the private movai-data repo — same as the other admin data). The
@@ -4178,6 +4184,23 @@ function apiRoute(req, res, urlPath) {
     return list;
   }
   function cloudinaryConfigured() { return cloudinaryCandidates().length > 0; }
+  // ROUND-ROBIN pointer (owner order 2026-11-17): each NEW upload uses the
+  // next enabled account in turn (upload 1 -> account 1, upload 2 ->
+  // account 2, ... cycling), instead of draining one account until it
+  // fails. The pointer is an account id (stable across adds/removes) and
+  // is persisted to GitHub like the other admin data, so it survives
+  // Render restarts. Advanced ONLY on a successful store.
+  const CLOUDINARY_ROTATION_FILE = path.join(DATA_DIR, 'cloudinary-rotation.json');
+  function loadCloudinaryRotation() {
+    try { const j = JSON.parse(fs.readFileSync(CLOUDINARY_ROTATION_FILE, 'utf8'));
+      if (j && typeof j === 'object') return j; } catch (e) {}
+    return { lastAccountId: null };
+  }
+  function saveCloudinaryRotation(obj) {
+    try { fs.mkdirSync(DATA_DIR, { recursive: true }); } catch (e) {}
+    fs.writeFileSync(CLOUDINARY_ROTATION_FILE, JSON.stringify(obj, null, 2));
+    ghPersistFile(CLOUDINARY_ROTATION_FILE); // fire-and-forget, same as saveCloudinaryAccounts()
+  }
   // The Cloudinary SDK is a global singleton: config() mutates it.
   // Uploads run ONE AT A TIME through _cloudQueue, so setting the
   // config inside the queued block (right before the upload and the
@@ -4408,8 +4431,19 @@ function apiRoute(req, res, urlPath) {
   async function cloudinaryStoreSong(u, title) {
     const candidates = cloudinaryCandidates();
     if (!candidates.length) return null;
+    // Round-robin: start from the account AFTER the one that stored the
+    // last upload, so new uploads cycle through all enabled accounts
+    // instead of draining the first one. (Inside _cloudQueue below, so
+    // the read+advance is atomic — no two uploads can interleave it.)
+    const rot = loadCloudinaryRotation();
+    let start = 0;
+    if (rot.lastAccountId) {
+      const li = candidates.findIndex((x) => x.id === rot.lastAccountId);
+      if (li >= 0) start = (li + 1) % candidates.length;
+    }
+    const ordered = candidates.slice(start).concat(candidates.slice(0, start));
     const run = _cloudQueue.then(async () => {
-      for (const a of candidates) {
+      for (const a of ordered) {
         for (let attempt = 1; attempt <= 2; attempt++) {
           try {
             const c = cloudinaryConfigFor(a);
@@ -4422,6 +4456,7 @@ function apiRoute(req, res, urlPath) {
             const mp3Url = cloudinaryMp3UrlFor(a, publicId, title);
             memLog('cloudinary-upload ok ' + publicId + ' via ' + (a.label || a.cloudName));
             cloudinaryClearAccountMarks(a);
+            saveCloudinaryRotation({ lastAccountId: a.id, updatedAt: new Date().toISOString() });
             return { publicId, mp3Url, accountId: a.id, accountLabel: a.label || a.cloudName };
           } catch (e) {
             const msg = String((e && e.message) || e);
@@ -4430,7 +4465,7 @@ function apiRoute(req, res, urlPath) {
             if (kind === 'exists') {
               // Asset already stored under our deterministic public_id.
               const mp3Url = cloudinaryMp3UrlFor(a, cloudinaryPublicIdForUrl(u), title);
-              if (mp3Url) { cloudinaryClearAccountMarks(a); return { publicId: cloudinaryPublicIdForUrl(u), mp3Url, accountId: a.id, accountLabel: a.label || a.cloudName }; }
+              if (mp3Url) { cloudinaryClearAccountMarks(a); saveCloudinaryRotation({ lastAccountId: a.id, updatedAt: new Date().toISOString() }); return { publicId: cloudinaryPublicIdForUrl(u), mp3Url, accountId: a.id, accountLabel: a.label || a.cloudName }; }
             }
             if (kind === 'async') {
               // Background processing: wait for the asset, with the wait
@@ -4446,7 +4481,7 @@ function apiRoute(req, res, urlPath) {
               const ready = await cloudinaryWaitForAsset(c, detId, waitMs);
               if (!ready) { memLog('cloudinary-async timeout ' + detId); return null; }
               const mp3Url = cloudinaryMp3UrlFor(a, detId, title);
-              if (mp3Url) { cloudinaryClearAccountMarks(a); return { publicId: detId, mp3Url, accountId: a.id, accountLabel: a.label || a.cloudName }; }
+              if (mp3Url) { cloudinaryClearAccountMarks(a); saveCloudinaryRotation({ lastAccountId: a.id, updatedAt: new Date().toISOString() }); return { publicId: detId, mp3Url, accountId: a.id, accountLabel: a.label || a.cloudName }; }
             }
             if (kind === 'gone') return 'gone';
             if (kind === 'quota') { cloudinaryMarkAccount(a, 'quota', msg); break; }
