@@ -4049,28 +4049,83 @@ function apiRoute(req, res, urlPath) {
     const run = _mp3Queue.then(async () => {
       const c2 = mp3CacheGet(u);
       if (c2) return path.basename(c2);
+      const fname = 'mp3-' + mp3CacheKey(u) + '.mp3';
+      const fp = path.join(DATA_DIR, 'uploads', fname);
       try {
         const ctrl = new AbortController();
         const t = setTimeout(() => ctrl.abort(), 180000);
         const r = await fetch(u, { signal: ctrl.signal, headers: { 'User-Agent': 'MovAi/1.0' } });
         clearTimeout(t);
-        if (!r.ok) return null;
-        let buf = Buffer.from(await r.arrayBuffer());
-        let mp3;
-        if (isMp3Bytes(buf)) mp3 = buf;
-        else if (buf.toString('ascii', 0, 4) === 'RIFF') {
-          const pcm = wavParsePcm(buf);
-          buf = null; // free the ~50 MB WAV before encoding
-          mp3 = await pcmToMp3(pcm, 128);
-        } else return null;
-        const fname = 'mp3-' + mp3CacheKey(u) + '.mp3';
+        if (!r.ok || !r.body) return null;
+        /* STREAMING FIX (2026-11-17, owner order via Hercules):
+           the old code did Buffer.from(await r.arrayBuffer()) — the
+           WHOLE audio file in memory at once (~40 MB WAV + ~50 MB PCM
+           + MP3 chunks), which is what OOM-crashed the 512 MB Render
+           instance ("Converting to MP3..." 40–50 s, then "Server
+           unreachable"). Now the download streams chunk by chunk:
+           - MP3 source: sniffed by magic bytes, then piped STRAIGHT
+             to the cache file — near-zero memory, no conversion.
+           - WAV source: chunks accumulate into ONE buffer (the RIFF
+             parser needs random access), the buffer is freed BEFORE
+             encoding (as before), and lamejs encodes 128 kbps.
+           Conversions still run ONE AT A TIME via _mp3Queue. */
+        const { Readable } = require('stream');
+        const nodeStream = Readable.fromWeb(r.body);
         fs.mkdirSync(path.join(DATA_DIR, 'uploads'), { recursive: true });
-        fs.writeFileSync(path.join(DATA_DIR, 'uploads', fname), mp3);
-        ghPersistFile(path.join(DATA_DIR, 'uploads', fname));
+        let head = Buffer.alloc(0);
+        let kind = null; // 'mp3' | 'wav'
+        let mp3Out = null;
+        let wavChunks = [];
+        let mp3Bytes = 0;
+        for await (const chunk of nodeStream) {
+          const buf = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+          if (kind === null) {
+            head = Buffer.concat([head, buf]);
+            if (head.length < 4) continue; // need 4 bytes to sniff
+            if (isMp3Bytes(head)) kind = 'mp3';
+            else if (head.toString('ascii', 0, 4) === 'RIFF') kind = 'wav';
+            else { console.error('[mp3] unknown audio format for', String(u).slice(0, 120)); return null; }
+            const first = head; head = null;
+            if (kind === 'mp3') {
+              mp3Out = fs.createWriteStream(fp);
+              mp3Out.on('error', () => {});
+              mp3Bytes += first.length;
+              if (!mp3Out.write(first)) await new Promise((rs) => mp3Out.once('drain', rs));
+            } else {
+              wavChunks.push(first);
+            }
+            continue;
+          }
+          if (kind === 'mp3') {
+            mp3Bytes += buf.length;
+            if (!mp3Out.write(buf)) await new Promise((rs) => mp3Out.once('drain', rs));
+          } else {
+            wavChunks.push(buf);
+          }
+        }
+        if (kind === null) { console.error('[mp3] empty audio for', String(u).slice(0, 120)); return null; }
+        if (kind === 'mp3') {
+          await new Promise((rs, rj) => { mp3Out.end((err) => (err ? rj(err) : rs())); });
+          if (mp3Bytes < 1000) { try { fs.unlinkSync(fp); } catch (e) {} return null; }
+          _mp3Cache[mp3CacheKey(u)] = fname;
+          mp3CacheSave();
+          ghPersistFile(fp);
+          return fname;
+        }
+        // WAV: parse PCM, free the buffer, then encode to MP3 128k.
+        const buf = Buffer.concat(wavChunks); wavChunks = null;
+        const pcm = wavParsePcm(buf);
+        const mp3 = await pcmToMp3(pcm, 128);
+        fs.writeFileSync(fp, mp3);
+        ghPersistFile(fp);
         _mp3Cache[mp3CacheKey(u)] = fname;
         mp3CacheSave();
         return fname;
-      } catch (e) { return null; }
+      } catch (e) {
+        console.error('[mp3] convert failed for', String(u).slice(0, 120), ':', String((e && e.message) || e).slice(0, 200));
+        try { if (fs.existsSync(fp) && fs.statSync(fp).size < 1000) fs.unlinkSync(fp); } catch (e2) {}
+        return null;
+      }
     });
     _mp3Queue = run.catch(() => {});
     _mp3Converting.set(u, run);
@@ -4094,19 +4149,23 @@ function apiRoute(req, res, urlPath) {
       if (!u) return sendJSON(res, 400, { ok: false, error: 'missing u' });
       try {
         // Cached MP3? Serve it instantly (no re-fetch, no re-encode).
+        // STREAMING: pipe the file to the response — never load the
+        // whole MP3 into memory (Hercules fix 2026-11-17).
         const cachedFp = mp3CacheGet(u);
         if (cachedFp) {
-          const mp3 = fs.readFileSync(cachedFp);
-          res.writeHead(200, { 'Content-Type': 'audio/mpeg', 'Content-Disposition': disp, 'Content-Length': mp3.length, 'Cache-Control': 'public, max-age=86400', 'Access-Control-Allow-Origin': '*' });
-          res.end(mp3);
+          const st = fs.statSync(cachedFp);
+          res.writeHead(200, { 'Content-Type': 'audio/mpeg', 'Content-Disposition': disp, 'Content-Length': st.size, 'Cache-Control': 'public, max-age=86400', 'Access-Control-Allow-Origin': '*' });
+          fs.createReadStream(cachedFp).on('error', () => { try { res.end(); } catch (e) {} }).pipe(res);
           return;
         }
         const fname = await convertAndCacheMp3(u);
         if (!fname) return sendJSON(res, 500, { ok: false, error: 'MP3 convert failed' });
-        const mp3 = fs.readFileSync(path.join(DATA_DIR, 'uploads', fname));
-        res.writeHead(200, { 'Content-Type': 'audio/mpeg', 'Content-Disposition': disp, 'Content-Length': mp3.length, 'Cache-Control': 'public, max-age=86400', 'Access-Control-Allow-Origin': '*' });
-        res.end(mp3);
+        const outFp = path.join(DATA_DIR, 'uploads', fname);
+        const st2 = fs.statSync(outFp);
+        res.writeHead(200, { 'Content-Type': 'audio/mpeg', 'Content-Disposition': disp, 'Content-Length': st2.size, 'Cache-Control': 'public, max-age=86400', 'Access-Control-Allow-Origin': '*' });
+        fs.createReadStream(outFp).on('error', () => { try { res.end(); } catch (e) {} }).pipe(res);
       } catch (e) {
+        console.error('[mp3] serve failed:', String((e && e.message) || e).slice(0, 200));
         try { sendJSON(res, 500, { ok: false, error: 'MP3 convert failed: ' + String((e && e.message) || e).slice(0, 200) }); } catch (e2) {}
       }
     })();
