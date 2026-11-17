@@ -72,13 +72,14 @@ async function readJSONBody(req, limitBytes) {
 const DATA_DIR = path.join(ROOT, 'data');
 const USERS_FILE = path.join(DATA_DIR, 'users.json');
 const GRANTS_FILE = path.join(DATA_DIR, 'grants.json');
+const HISTORY_FILE = path.join(DATA_DIR, 'history.json');
 const SETTINGS_FILE = path.join(DATA_DIR, 'settings.json');
 const FREE_MEDIA_CREDITS = 250;
 const FREE_SONG_CREDITS = 24;
 
 /* ---------------- GitHub-backed persistent storage ----------------- */
 // Render free disk is ephemeral — ./data/*.json is wiped on restart, so
-// posts, credits and users vanish. When MOVAI_GITHUB_TOKEN is set, the 17
+// posts, credits and users vanish. When MOVAI_GITHUB_TOKEN is set, the 20
 // JSON data files are ALSO stored in a private GitHub repo (branch main,
 // repo root, same filenames). On startup the server pulls each file from
 // GitHub into the local ./data/ cache (overwriting local); on every local
@@ -102,7 +103,7 @@ const GH_DATA_FILES = [
   'push-subs.json', 'packages.json', 'purchase-requests.json',
   'public.json', 'package-events.json', 'blocked-models.json',
   'model-logins.json', 'blocked-ips.json', 'blocked-emails.json',
-  'updates.json', 'admin-lockouts.json',
+  'updates.json', 'admin-lockouts.json', 'history.json',
 ];
 const ghShaCache = {}; // filename -> GitHub blob sha (for PUT updates)
 function ghEnabled() { return !!GH_TOKEN; }
@@ -364,6 +365,26 @@ function saveUsers(u) {
   try { fs.mkdirSync(DATA_DIR, { recursive: true }); } catch (e) {}
   fs.writeFileSync(USERS_FILE, JSON.stringify(u, null, 2));
   ghPersistFile(USERS_FILE);
+}
+// History: each user's created things (songs/images/videos), keyed by
+// lowercased email: {"<email>": [items...]}. The website's localStorage
+// is only a cache; the server is the truth, so ONE Gmail shows ALL old
+// data on ANY device. Base64 thumbnails are NEVER stored here.
+function loadHistory() {
+  try { const j = JSON.parse(fs.readFileSync(HISTORY_FILE, 'utf8')); if (j && typeof j === 'object' && !Array.isArray(j)) return j; } catch (e) {}
+  return {};
+}
+function saveHistory(h) {
+  try { fs.mkdirSync(DATA_DIR, { recursive: true }); } catch (e) {}
+  fs.writeFileSync(HISTORY_FILE, JSON.stringify(h, null, 2));
+  ghPersistFile(HISTORY_FILE);
+}
+// History merge key: item id first, else its src/url. Items with neither
+// cannot be matched across devices and are skipped on sync.
+function histKey(it) {
+  if (typeof it.id === 'string' && it.id.trim()) return 'id:' + it.id.trim();
+  const u = (typeof it.src === 'string' && it.src.trim()) ? it.src.trim() : (typeof it.url === 'string' ? it.url.trim() : '');
+  return u ? 'url:' + u : '';
 }
 // User IDs: 10 chars, uppercase letters + digits, no confusing chars
 // (0/O and 1/I excluded). Auto-generated once on first sync; once assigned
@@ -3272,6 +3293,53 @@ function apiRoute(req, res, urlPath) {
     try { const j = JSON.parse(fs.readFileSync(GRANTS_FILE, 'utf8')); if (Array.isArray(j)) arr = j; } catch (e) {}
     const mine = arr.filter((g) => g && typeof g.email === 'string' && g.email.toLowerCase() === email).slice(-100).reverse();
     return sendJSON(res, 200, { ok: true, email, history: mine.map((g) => ({ credits: numOr(g.credits, 0), songCredits: numOr(g.songCredits, 0), note: typeof g.note === 'string' ? g.note : '', at: g.at || '' })) });
+  }
+  // GET /api/public/history?email=... — PUBLIC. The user's own created
+  // things (History): songs/images/videos, newest first, max 300.
+  // This is what makes ONE Gmail show ALL old data on ANY device.
+  if (req.method === 'GET' && urlPath === '/api/public/history') {
+    const email = normEmail(new URL(req.url, 'http://localhost').searchParams.get('email') || '');
+    if (!email) return sendJSON(res, 200, { ok: false, error: 'សូមដាក់ Gmail' });
+    const h = loadHistory();
+    const arr = Array.isArray(h[email]) ? h[email] : [];
+    return sendJSON(res, 200, { ok: true, email, items: arr.slice(0, 300) });
+  }
+  // POST /api/public/history — PUBLIC. {email, items:[...]}. Merges the
+  // incoming items with the stored History for that email (by item id,
+  // else by src/url; same key keeps the one with the larger ts), strips
+  // base64 thumbnails, sorts newest first, caps at 300.
+  if (req.method === 'POST' && urlPath === '/api/public/history') {
+    readJSONBody(req, 512 * 1024).then(async (body) => {
+      const email = normEmail(body && body.email);
+      if (!email) return sendJSON(res, 200, { ok: false, error: 'សូមដាក់ Gmail' });
+      if (!body || !Array.isArray(body.items)) return sendJSON(res, 200, { ok: false, error: 'ទិន្នន័យមិនត្រឹមត្រូវទេ' });
+      const h = loadHistory();
+      const byKey = {};
+      const stored = Array.isArray(h[email]) ? h[email] : [];
+      for (const it of stored) {
+        if (!it || typeof it !== 'object') continue;
+        const k = histKey(it);
+        if (k) byKey[k] = it;
+      }
+      for (const it of body.items) {
+        if (!it || typeof it !== 'object') continue;
+        const k = histKey(it);
+        if (!k) continue;
+        const clean = Object.assign({}, it);
+        delete clean.thumb;
+        const prev = byKey[k];
+        if (!prev || numOr(clean.ts, 0) > numOr(prev.ts, 0)) byKey[k] = clean;
+      }
+      const merged = Object.values(byKey).sort((a, b) => numOr(b.ts, 0) - numOr(a.ts, 0)).slice(0, 300);
+      h[email] = merged;
+      saveHistory(h);
+      // Critical write: confirm history.json is on GitHub BEFORE
+      // returning success, so a restart cannot lose History already
+      // reported as saved.
+      await ghFlushFile(HISTORY_FILE);
+      return sendJSON(res, 200, { ok: true, email, items: merged });
+    }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
+    return;
   }
 
   // ---- Auto Update Version New (endpoints) ----
