@@ -4480,32 +4480,25 @@ function apiRoute(req, res, urlPath) {
           fs.createReadStream(cachedFp).on('error', () => { try { res.end(); } catch (e) {} }).pipe(res);
           return;
         }
-        // CLOUDINARY ONLY (owner order 2026-11-17 ~09:32): the local
-        // WAV→MP3 conversion is TURNED OFF — it peaks at ~420 MB RSS
-        // and OOM-crashes the 512 MB Render instance (user hit "Server
-        // unreachable" during a 52s conversion, 09:19). A WAV goes to
-        // Cloudinary only (it fetches + converts); if Cloudinary is not
-        // configured or its upload fails, return a clear error instead
-        // of crashing the server. MP3 sources still use the local
-        // download+cache path below (no encode, low memory).
-        if (!/\.mp3(\?|#|$)/i.test(u)) {
-          if (!cloudinaryConfigured()) return sendJSON(res, 503, { ok: false, error: 'MP3 conversion unavailable — Cloudinary not configured' });
-          const cl = await cloudinaryStoreSong(u);
-          if (cl === 'gone') return sendJSON(res, 410, { ok: false, error: 'gone', message: 'This song is no longer available' });
-          if (cl && cl.mp3Url) {
-            res.writeHead(302, { Location: cl.mp3Url, 'Access-Control-Allow-Origin': '*' });
-            res.end();
-            return;
-          }
-          return sendJSON(res, 503, { ok: false, error: 'MP3 conversion failed — Cloudinary could not store this song' });
+        // CLOUDINARY ONLY — NO SERVER FILE WORK (owner order 2026-11-17
+        // ~09:45): Render does light API work only (generation); the
+        // heavy file work lives entirely in Cloudinary. Every source
+        // URL (MP3 or WAV) goes to Cloudinary (it fetches + stores +
+        // converts) and the browser is redirected to the Cloudinary
+        // MP3. The server never downloads, converts, or caches audio
+        // bytes for a new URL — no disk, no bandwidth, no OOM. If
+        // Cloudinary is not configured or its upload fails, return a
+        // clear error. (The cache check above still serves legacy MP3s
+        // already on disk — plain streaming, no work.)
+        if (!cloudinaryConfigured()) return sendJSON(res, 503, { ok: false, error: 'MP3 download unavailable — Cloudinary not configured' });
+        const cl = await cloudinaryStoreSong(u);
+        if (cl === 'gone') return sendJSON(res, 410, { ok: false, error: 'gone', message: 'This song is no longer available' });
+        if (cl && cl.mp3Url) {
+          res.writeHead(302, { Location: cl.mp3Url, 'Access-Control-Allow-Origin': '*' });
+          res.end();
+          return;
         }
-        const fname = await convertAndCacheMp3(u);
-        if (fname === 'gone') return sendJSON(res, 410, { ok: false, error: 'gone', message: 'This song is no longer available' });
-        if (!fname) return sendJSON(res, 500, { ok: false, error: 'MP3 convert failed' });
-        const outFp = path.join(DATA_DIR, 'uploads', fname);
-        const st2 = fs.statSync(outFp);
-        res.writeHead(200, { 'Content-Type': 'audio/mpeg', 'Content-Disposition': disp, 'Content-Length': st2.size, 'Cache-Control': 'public, max-age=86400', 'Access-Control-Allow-Origin': '*' });
-        fs.createReadStream(outFp).on('error', () => { try { res.end(); } catch (e) {} }).pipe(res);
+        return sendJSON(res, 503, { ok: false, error: 'MP3 download failed — Cloudinary could not store this song' });
       } catch (e) {
         console.error('[mp3] serve failed:', String((e && e.message) || e).slice(0, 200));
         try { sendJSON(res, 500, { ok: false, error: 'MP3 convert failed: ' + String((e && e.message) || e).slice(0, 200) }); } catch (e2) {}
