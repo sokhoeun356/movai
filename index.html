@@ -2224,28 +2224,13 @@ main{padding-top:calc(3.75rem + env(safe-area-inset-top,0px))}
       <div class="pkg-card media hot">
         <span class="pkg-name" data-i18n="pkgYearly">ប្រចាំឆ្នាំ</span>
         <div class="pkg-price" id="pkgPrice-yearly">$15<small data-i18n="pkgPerMonth">/ខែ</small></div>
-        <p style="font-size:0.7rem;color:var(--muted);margin-top:1px" id="pkgBilled-yearly" data-i18n="pkgBilledYear">បង់ $180/ឆ្នាំ</p>
         <div class="pkg-credits" data-i18n="pkgCreditsYear">140,000 Credit</div>
-        <div class="pkg-feats">
-          <div data-i18n="pkgFeatImgModels">រូបភាព · Z-Image Turbo · Qwen Image 2.1 · Flux 2 Klein · Krea 2</div>
-          <div data-i18n="pkgFeatVidModels">វីដេអូ · LTX 2.5 · MiniMax H3</div>
-          <div data-i18n="pkgFeatPremImg">Premium រូបភាព · GPT Image 2 · Nano Banana 2.1 · Nano Banana Pro</div>
-          <div data-i18n="pkgFeatPremVid">Premium វីដេអូ · Kling 3.0 · Kling 4.0 · Veo 3.1 · Seedance 2.5</div>
-          <div data-i18n="pkgDur365">រយៈពេល · 365 ថ្ងៃ (12 ខែ)</div>
-        </div>
         <button type="button" class="btn btn-green" id="pkgBuy-yearly" onclick="pkgBuyAsk('yearly')" data-i18n="pkgBuy">ទិញឥឡូវ</button>
       </div>
       <div class="pkg-card media">
         <span class="pkg-name" data-i18n="pkgMonthly">ប្រចាំខែ</span>
         <div class="pkg-price" id="pkgPrice-monthly">$25<small data-i18n="pkgPerMonth">/ខែ</small></div>
         <div class="pkg-credits" data-i18n="pkgCreditsMonth">11,000 Credit</div>
-        <div class="pkg-feats">
-          <div data-i18n="pkgFeatImgModels">រូបភាព · Z-Image Turbo · Qwen Image 2.1 · Flux 2 Klein · Krea 2</div>
-          <div data-i18n="pkgFeatVidModels">វីដេអូ · LTX 2.5 · MiniMax H3</div>
-          <div data-i18n="pkgFeatPremImg">Premium រូបភាព · GPT Image 2 · Nano Banana 2.1 · Nano Banana Pro</div>
-          <div data-i18n="pkgFeatPremVid">Premium វីដេអូ · Kling 3.0 · Kling 4.0 · Veo 3.1 · Seedance 2.5</div>
-          <div data-i18n="pkgDur30">រយៈពេល · 30 ថ្ងៃ (1 ខែ)</div>
-        </div>
         <button type="button" class="btn btn-green" id="pkgBuy-monthly" onclick="pkgBuyAsk('monthly')" data-i18n="pkgBuy">ទិញឥឡូវ</button>
       </div>
     </div>
@@ -2723,7 +2708,7 @@ km:{
  pkgFeatPremium:'បើក Model Premium ទាំងអស់',
  pkgModelSong:'ម៉ូដែល · Model v6',pkgDur30:'រយៈពេល · 30 ថ្ងៃ (1 ខែ)',pkgDur365:'រយៈពេល · 365 ថ្ងៃ (12 ខែ)',pkgFeatImgModels:'រូបភាព · Z-Image Turbo · Qwen Image 2.1 · Flux 2 Klein · Krea 2',pkgFeatVidModels:'វីដេអូ · LTX 2.5 · MiniMax H3',pkgFeatPremImg:'Premium រូបភាព · GPT Image 2 · Nano Banana 2.1 · Nano Banana Pro',pkgFeatPremVid:'Premium វីដេអូ · Kling 3.0 · Kling 4.0 · Veo 3.1 · Seedance 2.5',
  pkgBuy:'ទិញឥឡូវ',pkgActive:'កំពុងប្រើកញ្ចប់នេះ',pkgTabSong:'Create Music',pkgTabMedia:'Create Video',pkgDragHint:'អូសចុះក្រោមដើម្បីបិទ · Drag down to close',pkgWaitingAdmin:'រង់ចាំ Admin អនុម័ត',pkgReqSent:'បានផ្ញើសំណើរទិញទៅ Admin ហើយ — រង់ចាំ Admin អនុម័ត ទើប Credit ចូលគណនីរបស់អ្នក',pkgReqFail:'ផ្ញើសំណើរមិនបានទេ — Server មិនទាន់ភ្ជាប់ សូមព្យាយាមម្ដងទៀតបន្តិចក្រោយ',pkgReqSending:'កំពុងផ្ញើសំណើរទិញទៅ Admin…',
- pkgYourPlan:'កញ្ចប់របស់អ្នក',pkgActiveUntil:'ប្រើបានដល់ {d}',
+ pkgYourPlan:'កញ្ចប់របស់អ្នក',pkgActiveUntil:'ប្រើបានដល់ {d}',pkgExpires:'ផុតកំណត់',pkgExpiresOn:'ផុតកំណត់ {d}',
  pkgGroupMedia:'សម្រាប់រូបភាព និង វីដេអូ · Image & Video Credit',
  pkgGroupSong:'សម្រាប់បទចម្រៀង · Song Credit',
  songFreeAuto:'ទទួលដោយស្វ័យប្រវត្តិ',
@@ -2944,7 +2929,7 @@ en:{
  pkgFeatPremium:'Unlocks every Premium model',
  pkgModelSong:'Model · Model v6',pkgDur30:'Duration · 30 days (1 month)',pkgDur365:'Duration · 365 days (12 months)',pkgFeatImgModels:'Image · Z-Image Turbo · Qwen Image 2.1 · Flux 2 Klein · Krea 2',pkgFeatVidModels:'Video · LTX 2.5 · MiniMax H3',pkgFeatPremImg:'Premium image · GPT Image 2 · Nano Banana 2.1 · Nano Banana Pro',pkgFeatPremVid:'Premium video · Kling 3.0 · Kling 4.0 · Veo 3.1 · Seedance 2.5',
  pkgBuy:'Buy now',pkgActive:'This is your active package',pkgTabSong:'Create Music',pkgTabMedia:'Create Video',pkgDragHint:'Drag down to close',pkgWaitingAdmin:'Waiting for Admin approval',pkgReqSent:'Your purchase request was sent to the Admin — credits will arrive after the Admin approves it',pkgReqFail:'Could not send the request — the server is not connected yet, please try again in a little while',pkgReqSending:'Sending your purchase request to the Admin…',
- pkgYourPlan:'Your package',pkgActiveUntil:'Active until {d}',
+ pkgYourPlan:'Your package',pkgActiveUntil:'Active until {d}',pkgExpires:'Expires',pkgExpiresOn:'Expires {d}',
  pkgGroupMedia:'For Image & Video · Image & Video Credit',
  pkgGroupSong:'For Songs · Song Credit',
  songFreeAuto:'Automatic',
@@ -4095,6 +4080,27 @@ function pkgGet(){
   return null;
 }
 function pkgIsPremium(){return !!pkgGet();}
+/* Package expiry, shown ONCE and clearly (owner order 2026-11-17):
+   the full day/month/year the plan ends PLUS its clock time when
+   the timestamp carries one — «17/12/2026 · 16:33» — in Phnom Penh
+   time, the same zone as notifFullTimeStr. A 1-month plan shows
+   the date one month on; a 1-year plan shows the date (and year)
+   one year on. Used by the Packages status line, My Profile (its
+   own «ផុតកំណត់» row under each active plan) and the drawer
+   account box; the same plan.until / songPlan.until timestamps
+   already sync to the server (acctAdminPayload), so the Admin
+   user detail reads the identical expiry. */
+function pkgExpiryStr(ts){
+  if(!ts)return '';
+  var d=new Date(ts);if(isNaN(d.getTime()))return '';
+  try{
+    var parts=new Intl.DateTimeFormat('en-GB',{timeZone:'Asia/Phnom_Penh',day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).formatToParts(d),o={};
+    for(var i=0;i<parts.length;i++)o[parts[i].type]=parts[i].value;
+    if(o.day&&o.month&&o.year&&o.hour!=null)return o.day+'/'+o.month+'/'+o.year+' · '+o.hour+':'+o.minute;
+  }catch(e){}
+  var u=new Date(d.getTime()+7*3600000),p=function(x){return (x<10?'0':'')+x;};
+  return p(u.getUTCDate())+'/'+p(u.getUTCMonth()+1)+'/'+u.getUTCFullYear()+' · '+p(u.getUTCHours())+':'+p(u.getUTCMinutes());
+}
 function pkgLockedNotice(msg){
   genMsg(msg||tx('pkgLockedModel'));
   packagesShow();
@@ -4108,9 +4114,8 @@ function pkgRender(){
     var h='';
     if(plan){
       var pl=pkgPlanById(plan.id);
-      h='<span style="color:var(--accent-text);font-weight:800">'+escHtml(tx('pkgYourPlan'))+': '+(pl?escHtml(loc(pl.name)):escHtml(String(plan.id)))+'</span> · '+escHtml(tx('pkgActiveUntil').replace('{d}',new Date(plan.until).toLocaleDateString()));
+      h='<span style="color:var(--accent-text);font-weight:800">'+escHtml(tx('pkgYourPlan'))+': '+(pl?escHtml(loc(pl.name)):escHtml(String(plan.id)))+'</span> · '+escHtml(tx('pkgExpiresOn').replace('{d}',pkgExpiryStr(plan.until)));
     }
-    if(u)h+='<br>'+escHtml(tx('acctMediaCredit'))+': <b style="color:var(--accent-text)">'+(u.credits||0)+' Credit</b><br>'+escHtml(tx('acctSongCredit'))+': <b style="color:#ADDC29">'+(u.songCredits||0)+' Credit</b>';
     st.innerHTML=h;
   }
   PKG_PLANS.forEach(function(pl){
@@ -4416,7 +4421,6 @@ function pkgBuyAsk(id){
   h+='<div style="display:flex;justify-content:space-between;gap:10px;padding:8px 0;border-top:1px solid var(--line)"><span>'+escHtml(tx('pkgSheetPlan'))+'</span><b>'+escHtml(loc(pl.name))+' · MovAi</b></div>';
   h+='<div style="display:flex;justify-content:space-between;gap:10px;padding:8px 0;border-top:1px solid var(--line)"><span>'+escHtml(tx('pkgCreditsLbl'))+'</span><b style="color:var(--accent-text)">'+pkgFmtNum(pl.credits)+' Credit</b></div>';
   h+='<div style="display:flex;justify-content:space-between;gap:10px;padding:8px 0;border-top:1px solid var(--line)"><span>'+escHtml(tx('pkgTotal'))+'</span><b>$'+pkgFmtPrice(pkgCurPrice(pl))+'</b></div>';
-  h+='<p style="font-size:0.8125rem;color:var(--muted);line-height:1.7;margin-top:10px">'+escHtml(pkgNoteLive(pl))+' · '+escHtml(tx('pkgFeatMedia'))+' · '+escHtml(tx('pkgFeatPremium'))+'</p>';
   if(u){
     h+='<div id="pkgPayBox"></div>';
   }else{
@@ -4512,7 +4516,6 @@ function songPkgRender(){
     h+='<span class="pkg-name">'+escHtml(loc(pl.name))+'</span>';
     h+='<div class="pkg-price">'+(pl.free?('$'+pl.price):pkgPriceHtml(pl,'<small>'+escHtml(tx('pkgPerMonth'))+'</small>'))+'</div>';
     h+='<div class="pkg-credits">'+pkgFmtNum(pl.credits)+' Credit</div>';
-    h+='<div class="pkg-feats"><div>'+escHtml(tx('pkgModelSong'))+'</div><div>'+escHtml(tx('pkgDur30'))+'</div></div>';
     if(pl.free){
       h+='<button type="button" class="btn btn-free" disabled>'+escHtml(tx('songFreeAuto'))+'</button>';
     }else{
@@ -4534,7 +4537,6 @@ function songPkgBuyAsk(id){
   h+='<div style="display:flex;justify-content:space-between;gap:10px;padding:8px 0;border-top:1px solid var(--line)"><span>'+escHtml(tx('pkgSheetPlan'))+'</span><b>'+escHtml(loc(pl.name))+' · MovAi</b></div>';
   h+='<div style="display:flex;justify-content:space-between;gap:10px;padding:8px 0;border-top:1px solid var(--line)"><span>'+escHtml(tx('pkgCreditsLbl'))+'</span><b style="color:#ADDC29">'+pkgFmtNum(pl.credits)+' Credit</b></div>';
   h+='<div style="display:flex;justify-content:space-between;gap:10px;padding:8px 0;border-top:1px solid var(--line)"><span>'+escHtml(tx('pkgTotal'))+'</span><b>$'+pkgFmtPrice(pkgCurPrice(pl))+'</b></div>';
-  h+='<p style="font-size:0.8125rem;color:var(--muted);line-height:1.7;margin-top:10px">'+escHtml(pkgNoteLive(pl))+' · '+escHtml(tx('songPkgOnlyNote'))+'</p>';
   if(u){
     h+='<div id="pkgPayBox"></div>';
   }else{
@@ -13557,9 +13559,11 @@ function profileRender(){
   h+=profileInfoRowHtml(tx('profileAccount'),acctNameHtml(u));
   h+=profileInfoRow(tx('profileEmail'),u.email);
   var plan=pkgGet();var pp=plan?pkgPlanById(plan.id):null;
-  h+=profileInfoRow(tx('profilePlan'),plan?((pp?loc(pp.name):String(plan.id))+' · '+tx('pkgActiveUntil').replace('{d}',new Date(plan.until).toLocaleDateString())):tx('profileFree'));
+  h+=profileInfoRow(tx('profilePlan'),plan?(pp?loc(pp.name):String(plan.id)):tx('profileFree'));
+  if(plan)h+=profileInfoRow(tx('pkgExpires'),pkgExpiryStr(plan.until));
   var splan=songPkgGet();var spp=splan?songPkgPlanById(splan.id):null;
-  h+=profileInfoRow(tx('profileSongPlan'),splan?((spp?loc(spp.name):String(splan.id))+' · '+tx('pkgActiveUntil').replace('{d}',new Date(splan.until).toLocaleDateString())):tx('profileFree'));
+  h+=profileInfoRow(tx('profileSongPlan'),splan?(spp?loc(spp.name):String(splan.id)):tx('profileFree'));
+  if(splan)h+=profileInfoRow(tx('pkgExpires'),pkgExpiryStr(splan.until));
   h+=profileInfoRow(tx('mhTitle'),u.mhConnected?tx('mhDone'):tx('mhNotYet'));
   if(u.created)h+=profileInfoRow(tx('profileSince'),new Date(u.created).toLocaleDateString());
   h+='</div>';
@@ -13631,7 +13635,7 @@ function acctRenderUser(u){
   h+='<div id="acctIpSlot">'+profileIpRowHtml(u)+'</div>';
   h+='<div style="margin-top:10px"><span style="font-size:0.75rem;font-weight:700">'+escHtml(tx('profileBalance'))+'</span>'+profileBalRow('song',tx('acctSongCredit'),u.songCredits)+profileBalRow('media',tx('acctMediaCredit'),u.credits)+'</div>';
   var _plan=pkgGet();
-  if(_plan){var _pp=pkgPlanById(_plan.id);h+='<p style="font-size:0.8125rem;margin-top:10px;font-weight:700;color:var(--accent-text);line-height:1.6">'+escHtml(tx('pkgYourPlan'))+': '+escHtml(_pp?loc(_pp.name):String(_plan.id))+' · '+escHtml(tx('pkgActiveUntil').replace('{d}',new Date(_plan.until).toLocaleDateString()))+'</p>';}
+  if(_plan){var _pp=pkgPlanById(_plan.id);h+='<p style="font-size:0.8125rem;margin-top:10px;font-weight:700;color:var(--accent-text);line-height:1.6">'+escHtml(tx('pkgYourPlan'))+': '+escHtml(_pp?loc(_pp.name):String(_plan.id))+' · '+escHtml(tx('pkgExpiresOn').replace('{d}',pkgExpiryStr(_plan.until)))+'</p>';}
   /* No Magic Hour API key place in the ☰ drawer (owner order):
      API keys are admin-only, managed in the separate Admin app.
      The drawer account box shows identity, balances and plan only.
