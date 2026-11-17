@@ -3062,12 +3062,12 @@ main{padding-top:calc(3.75rem + env(safe-area-inset-top,0px))}
     <p id="authUseAnother" style="display:none;font-size:0.8125rem;color:var(--muted);margin-top:14px" data-i18n="authUseAnother">ប្រើគណនីផ្សេង · Use another account</p>
     <div class="auth-field">
       <label for="authEmail" data-i18n="loginGmailLabel">គណនី Google (Gmail)</label>
-      <input class="input" id="authEmail" type="email" autocomplete="email" data-i18n-ph="loginGmailPh" placeholder="yourname@gmail.com" onkeydown="if(event.key==='Enter'){event.preventDefault();var p=document.getElementById('authPass');if(p)p.focus();}">
+      <input class="input" id="authEmail" type="email" autocomplete="email" data-i18n-ph="loginGmailPh" placeholder="yourname@gmail.com" oninput="authNoAcctDismissOnType()" onkeydown="if(event.key==='Enter'){event.preventDefault();var p=document.getElementById('authPass');if(p)p.focus();}">
     </div>
     <div class="auth-field">
       <label for="authPass" data-i18n="authPassLabel">លេខសម្ងាត់ · Password</label>
       <div class="auth-pass-wrap">
-        <input class="input" id="authPass" type="password" autocomplete="current-password" data-i18n-ph="authPassPh" placeholder="បញ្ចូលលេខសម្ងាត់របស់អ្នក" onkeydown="if(event.key==='Enter')authSigninSubmit()">
+        <input class="input" id="authPass" type="password" autocomplete="current-password" data-i18n-ph="authPassPh" placeholder="បញ្ចូលលេខសម្ងាត់របស់អ្នក" oninput="authNoAcctDismissOnType()" onkeydown="if(event.key==='Enter')authSigninSubmit()">
         <button type="button" class="auth-eye" onclick="authToggleEye('authPass',this)" aria-label="Show / hide password"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button>
       </div>
     </div>
@@ -3379,6 +3379,7 @@ km:{
  authSigninBtn:'ចូលប្រើ · Sign-in',authForgot:'ភ្លេចលេខសម្ងាត់?',authOr:'ឬ',
  authSignupGoogle:'ចុះឈ្មោះជាមួយ Google · Sign up with Google',
  authContinueGoogle:'បន្តជាមួយ Google · Continue with Google',
+ authNoAccountMsg:'មិនទាន់មាន Gmail នេះទេ — សូម Continue with Google ជាមុនសិន ទើបអាច Log in បាន',
  authUseAnother:'ប្រើគណនីផ្សេង · Use another account',authSavedTap:'ចុចដើម្បីចូលប្រើ',
  authSavedExpired:'ការចូលដែលបានសេវផុតកំណត់ហើយ — សូមចូលដោយ Gmail និងលេខសម្ងាត់របស់អ្នក',
  authAlready:'អ្នកមានគណនីរួចហើយ។ សូមចូលប្រើដោយ Gmail និងលេខសម្ងាត់របស់អ្នក។',
@@ -3639,6 +3640,7 @@ en:{
  authSigninBtn:'Sign-in',authForgot:'Forgot password?',authOr:'or',
  authSignupGoogle:'Sign up with Google',
  authContinueGoogle:'Continue with Google',
+ authNoAccountMsg:'No account with this Gmail yet — please Continue with Google first, then you can log in',
  authUseAnother:'Use another account',authSavedTap:'Tap to sign in',
  authSavedExpired:'Saved login expired, please sign in with your password.',
  authAlready:'You already have an account. Please sign in with your Gmail and password.',
@@ -13484,20 +13486,57 @@ var authPendingProf=null;
 var authSaveCtx=null;
 var AUTH_EYE_ON='<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>';
 var AUTH_EYE_OFF='<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>';
+/* 8-second auto-dismiss timer for the no-account sign-in message
+   (see authShowNoAccount). Any new form message, a fresh Sign-in
+   tap, or typing in the form clears it, so it can never hide a
+   newer message. */
+var authNoAcctTimer=null;
+function authNoAcctClearTimer(){
+  if(authNoAcctTimer){clearTimeout(authNoAcctTimer);authNoAcctTimer=null;}
+}
 function authFormMsg(t){
   var m=document.getElementById('authFormMsg');
   if(m){m.textContent=t||'';m.style.color='#f87171';}
   /* Any fresh form message clears the «Continue with Google»
-     shortcut — it is only re-shown by the sign-in handler when
-     the server flags noAccount (Gmail has no account yet). */
+     shortcut AND its auto-dismiss timer — the button is only
+     re-shown by the sign-in handler when the server flags
+     noAccount (Gmail has no account yet). */
   authNoAcctBtn(false);
 }
 /* Show/hide the «Continue with Google» button that sits directly
    under the sign-in error. It starts the SAME Google sign-up flow
-   as «Sign up with Google» (authGoogleSignup). */
+   as «Sign up with Google» (authGoogleSignup). Hiding the button
+   also cancels the no-account auto-dismiss timer. */
 function authNoAcctBtn(show){
+  if(!show)authNoAcctClearTimer();
   var b=document.getElementById('authNoAcctBtn');
   if(b)b.style.display=show?'flex':'none';
+}
+/* noAccount sign-in error: show the LOCALIZED message (never the
+   server's bilingual text — the app shows ONE language at a time,
+   the one the user picked), keep the «Continue with Google»
+   button under it, and auto-dismiss both after 8 seconds. */
+function authShowNoAccount(){
+  authFormMsg(tx('authNoAccountMsg'));
+  authNoAcctBtn(true);
+  authNoAcctClearTimer();
+  authNoAcctTimer=setTimeout(function(){
+    authNoAcctTimer=null;
+    var m=document.getElementById('authFormMsg');
+    if(m)m.textContent='';
+    authNoAcctBtn(false);
+  },8000);
+}
+/* Typing in the sign-in form dismisses the no-account message at
+   once — but ONLY while it is on its 8s timer; every other form
+   error is left exactly as it was. Wired via oninput on the
+   email / password fields. */
+function authNoAcctDismissOnType(){
+  if(!authNoAcctTimer)return;
+  authNoAcctClearTimer();
+  var m=document.getElementById('authFormMsg');
+  if(m)m.textContent='';
+  authNoAcctBtn(false);
 }
 function authToggleEye(inputId,btn){
   var inp=document.getElementById(inputId);if(!inp)return;
@@ -13543,7 +13582,14 @@ function authSigninSubmit(){
   authFetchJson('/api/auth/signin','POST',{email:email,password:pw},30000).then(function(data){
     if(btn)btn.disabled=false;
     if(!data){authFormMsg(tx('authErrNet'));return;}
-    if(data.ok!==true){authFormMsg(authErrText(data,'authErrSignin'));if(data.noAccount===true)authNoAcctBtn(true);return;}
+    if(data.ok!==true){
+      /* noAccount: localized one-language message + the Google
+         button + 8s auto-dismiss — never the server's bilingual
+         text. Every other error shows exactly as before. */
+      if(data.noAccount===true){authShowNoAccount();}
+      else{authFormMsg(authErrText(data,'authErrSignin'));}
+      return;
+    }
     var prof=authProfFromUser(data.user,email);
     if(pwEl)pwEl.value='';
     loginSheetClose();
