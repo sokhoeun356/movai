@@ -2300,53 +2300,103 @@ main{padding-top:calc(3.75rem + env(safe-area-inset-top,0px))}
 .song-coverwrap .song-play{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:23px;height:23px;font-size:.55rem;background:rgba(8,10,6,.52);color:#fff;border-color:rgba(255,255,255,.55);-webkit-backdrop-filter:blur(3px);backdrop-filter:blur(3px);z-index:2;box-shadow:0 3px 10px rgba(0,0,0,.35)}
 /* Create results: the centred Play turns translucent like everywhere else */
 .gcc-play{background:rgba(8,10,6,.48);color:#fff;border:1px solid rgba(255,255,255,.55);-webkit-backdrop-filter:blur(4px);backdrop-filter:blur(4px)}
-/* ===== Desktop / laptop layout (owner order 2026-11-17) =====
-   On a phone MovAi keeps the mobile-app form exactly as it is:
-   one centred 720px column, floating header pills and the bottom
-   dock. On a laptop / computer screen (1024px and wider) the SAME
-   page becomes a real computer website instead:
-   · a fixed LEFT SIDEBAR (the dock turned vertical, icon + label
-     rows) — the bottom app dock is gone;
-   · a proper TOP BAR strip across the top — MovAi pill at the
-     left over the sidebar, notifications + account at the right
-     of the content area;
-   · the content uses the wide screen: centred at up to 1240px
-     beside the sidebar, never stretched edge to edge;
-   · the Public feed's big song cards form a two-column grid
-     (no sideways swipe carousel), History media becomes a
-     three-column grid, and the Packages popup opens wide with
-     its cards side by side;
-   · the ☰ drawer becomes a full-height side panel, the AI chat
-     becomes a right-side panel, and the mini player / toasts
-     anchor to the content area instead of the app bottom.
+/* ===== Desktop / laptop DASHBOARD (owner order 2026-11-17, v2) =====
+   On a phone MovAi keeps the mobile-app form exactly as it is.
+   On a computer screen (1024px and wider) the owner rejected the
+   first desktop pass — one huge song card floating in a big empty
+   screen — and ordered a real computer dashboard instead, with
+   EVERYTHING on screen at once and nothing hidden:
+   · LEFT SIDEBAR: the ☰ drawer pinned permanently open (nav,
+     account and every setting — language, day/night, theme,
+     glass, font, API keys — visible at all times, never behind
+     a button), under a full-width TOP BAR (MovAi pill at the
+     left, notifications + account at the right);
+   · MAIN AREA: the Public feed's song cards become SMALL
+     (cover ≈140px) and pack into a dense grid — 4 columns at
+     1024px, 5 at 1440px, 6 at 1680px — filling the width
+     between the sidebar and the right rail;
+   · RIGHT RAIL, always visible: the now-playing player pinned
+     at the top (cover, title, play/pause, seek bar) and the AI
+     chat docked below it (messages + the type-a-message box),
+     never a popup or a drawer;
+   · BOTTOM DOCK: the app dock stays on screen too, as a slim,
+     small, centred iPhone-style pill — icons only, taking
+     almost no space.
    Everything below 1024px is untouched — phone layout, MV view,
    sheets, players and every function work exactly as before. */
 .dock-label{display:none}
 @media(min-width:1024px){
+ /* Top bar strip across the whole screen */
  body::before{content:"";position:fixed;top:0;left:0;right:0;height:78px;background:var(--bg);border-bottom:1px solid var(--line);z-index:25}
- main{max-width:none;width:calc(100% - 248px);margin:0 0 0 248px;padding:104px 40px 64px}
- .nav-row,#page-public,#page-gen,#page-history{max-width:1240px;margin-left:auto;margin-right:auto;width:100%}
  .menuwrap{left:22px;top:15px}
- .topbar-right{right:40px;top:15px}
- #topSearchBar{left:calc(248px + 40px);right:40px;top:90px;max-width:1240px;margin-left:auto;margin-right:auto}
- .nav-row .create-modebar{max-width:780px}
- .panel{padding:28px;border-radius:20px}
- /* Sidebar: the dock, vertical */
- .dock{left:0;right:auto;top:0;bottom:0;width:248px;height:100dvh;flex-direction:column;justify-content:flex-start;align-items:stretch;gap:6px;padding:96px 16px 20px;border-radius:0;border-left:none;border-top:none;border-bottom:none}
- .dock-item{flex:0 0 auto;width:100%;height:52px;justify-content:flex-start;gap:13px;padding:0 16px;border-radius:12px}
- .dock-item svg{width:24px;height:24px;flex:0 0 auto}
+ .topbar-right{right:16px;top:15px}
+ /* Content column between the left sidebar and the right rail */
+ main{max-width:none;width:auto;margin:0 312px 0 248px;padding:100px 20px 120px}
+ .nav-row,#page-public,#page-gen,#page-history{max-width:none;width:auto;margin-left:0;margin-right:0}
+ #topSearchBar{left:268px;right:332px;top:88px;max-width:none;margin:0}
+ .nav-row .create-modebar{max-width:860px}
+ .panel{padding:22px;border-radius:20px}
+ /* LEFT SIDEBAR: the ☰ drawer pinned open — nav, account and
+    every setting stay on screen; its backdrop never shows and
+    its own head (a second MovAi wordmark + close ✕) is hidden,
+    the top-bar pill above it is the sidebar's header */
+ .drawer{display:block;transform:none;top:0;left:0;width:248px;height:100dvh;max-height:none;border-radius:0;border-top:none;border-bottom:none;border-left:none;z-index:24;padding:94px 12px 20px}
+ .drawer-head{display:none}
+ .drawer-backdrop{display:none!important}
+ /* BOTTOM DOCK: slim, small, centred iPhone-style pill */
+ .dock{left:50%;right:auto;bottom:12px;transform:translateX(-50%);width:max-content;max-width:calc(100vw - 24px);height:auto;flex-direction:row;justify-content:center;align-items:center;gap:2px;padding:6px;border-radius:999px}
+ .dock-item{flex:0 0 auto;width:54px;height:48px;justify-content:center;gap:0;padding:0;border-radius:999px}
+ .dock-item svg{width:24px;height:24px}
  .dock-item:hover{background:rgba(255,255,255,.16)}
- .dock-label{display:inline;font-size:0.9375rem;font-weight:800;white-space:nowrap;letter-spacing:.01em}
- .dock-badge{top:50%;right:14px;transform:translateY(-50%)}
- /* ☰ drawer: full-height side panel */
- .drawer{top:0;left:0;width:min(360px,34vw);height:100dvh;max-height:none;border-radius:0 22px 22px 0;padding-top:26px}
- /* Public feed: two-column card grid, no swipe carousel */
- .pub-carousel{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px;overflow:visible;padding:6px 0 12px;scroll-snap-type:none}
+ .dock-label{display:none}
+ /* RIGHT RAIL: the AI chat docked open under the top bar —
+    messages and the message box always on screen */
+ .chat-panel{display:flex;left:auto;right:0;top:78px;bottom:0;width:312px;margin:0;border:none;border-left:1px solid var(--line2);border-radius:0;box-shadow:none;z-index:30;transition:top .25s ease}
+ .chat-panel .chat-close{display:none}
+ .chat-backdrop.open{display:none}
+ .chat-fab{display:none}
+ /* Now-playing player pinned at the TOP of the rail; while it
+    is on screen (JS shows it with display:block) the chat
+    slides down below it — pure CSS, via :has() */
+ .mini-panel{left:auto;right:8px;top:86px;bottom:auto;width:296px;max-width:296px;margin:0;z-index:31;border-radius:16px}
+ .mini-logo{display:none!important}
+ body:has(.mini-panel[style*="display: block"]) .chat-panel{top:264px}
+ /* Public feed: SMALL song cards in a dense grid */
+ .pub-carousel{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;overflow:visible;padding:4px 0 12px;scroll-snap-type:none}
  .pub-slide{flex:none;min-width:0}
  .pub-card{margin-top:14px}
  .pub-slide .pub-card{margin-top:0;height:100%}
- /* Create: form panel centred at a readable width */
- #page-gen .panel{max-width:980px;margin-left:auto;margin-right:auto}
+ /* Compact grid-card internals: small cover, title, artist,
+    play button and views — nothing oversized */
+ .pub-carousel .pub-card.pub-song-card{padding:10px;border-radius:18px}
+ .pub-carousel .pub-avatar{width:24px;height:24px}
+ .pub-carousel .pub-avatar svg{width:14px;height:14px}
+ .pub-carousel .pub-name,.pub-carousel .pub-admin-name{font-size:0.75rem}
+ .pub-carousel .pub-adm-fsub{font-size:0.625rem}
+ .pub-carousel .pub-creator-follow,.pub-carousel .pub-adm-follow{padding:3px 9px;min-height:24px;font-size:0.625rem;border-width:1px}
+ .pub-carousel .pub-rank{min-width:26px;height:20px;padding:0 6px;font-size:0.6875rem}
+ .pub-carousel .pub-toplinks{margin-top:4px;gap:6px}
+ .pub-carousel .pub-songlink{padding:4px 9px;font-size:0.6875rem;gap:5px}
+ .pub-carousel .pub-songlink svg{width:12px;height:12px}
+ .pub-carousel .pub-yt-logo{width:28px;height:28px}
+ .pub-carousel .pub-yt-logo svg{width:17px;height:17px}
+ .pub-carousel .pub-card.pub-song-card .pub-cover-wrap{width:100%;margin:6px 0 0;border-radius:12px}
+ .pub-carousel .pub-card.pub-song-card .pub-song-cover{border-radius:12px}
+ .pub-carousel .pub-cover-play{width:38px;height:38px}
+ .pub-carousel .pub-song-titlerow{gap:6px;margin-top:7px}
+ .pub-carousel .pub-song-title{font-size:0.8125rem}
+ .pub-carousel .pub-song-views{font-size:0.75rem;gap:4px}
+ .pub-carousel .pub-song-views svg{width:14px;height:14px}
+ .pub-carousel .pub-genre-badge{font-size:0.625rem;padding:2px 7px}
+ .pub-carousel .pub-acts-toggle{width:26px;height:26px}
+ .pub-carousel .pub-player{gap:6px;margin-top:5px}
+ .pub-carousel .pub-play-pill{width:32px;height:32px;min-height:32px}
+ .pub-carousel .pub-play-pill svg{width:13px;height:13px}
+ .pub-carousel .pub-prog{height:18px}
+ .pub-carousel .pub-time{font-size:0.6875rem}
+ .pub-carousel .pub-acts .pub-pill,.pub-carousel .pub-acts .pub-act{min-height:26px;padding:3px 8px;font-size:0.6875rem;gap:4px}
+ /* Create: form panel at a readable width, centred in the column */
+ #page-gen .panel{max-width:1080px;margin-left:auto;margin-right:auto}
  .threed-grid{grid-template-columns:1fr 1fr}
  /* History: wider lists, media as a three-column grid */
  .hist-tabs{max-width:780px}
@@ -2360,20 +2410,31 @@ main{padding-top:calc(3.75rem + env(safe-area-inset-top,0px))}
  #page-packages:not(.pop-auto) .pkg-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;overflow:visible;padding:6px 0 10px}
  #page-packages:not(.pop-auto) .pkg-grid>.pkg-card{flex:none;width:auto}
  .pkg-sheet-card{max-width:540px}
- /* AI chat: right-side panel; its robot button rests at the sidebar foot */
- .chat-fab{left:95px;bottom:22px}
- .chat-panel{left:auto;right:24px;top:24px;bottom:24px;margin:0;width:min(480px,calc(100vw - 48px));border:1px solid var(--line2);border-radius:20px}
- /* Mini player + toasts anchor to the content area */
- .mini-logo{right:28px;bottom:28px}
- .mini-panel{left:auto;right:28px;bottom:100px;width:420px;max-width:420px;margin:0}
- .mini-drop{left:calc(50% + 124px)}
- .wake-pill{left:calc(50% + 124px);bottom:28px}
- .net-ready-toast,.dl-fail-toast,.mp3-prog-toast{left:calc(50% + 124px)}
+ /* Toasts + wake pill centre over the content column */
+ .mini-drop{left:calc(50% - 32px)}
+ .wake-pill{left:calc(50% - 32px);bottom:92px}
+ .net-ready-toast,.dl-fail-toast,.mp3-prog-toast{left:calc(50% - 32px)}
 }
-@media(min-width:1600px){
- main{padding-left:56px;padding-right:56px}
- .topbar-right{right:56px}
- #topSearchBar{left:calc(248px + 56px);right:56px}
+/* Narrower desktops (1024–1279px): slimmer sidebar + rail so
+   the 4-column card grid keeps usable card widths */
+@media(min-width:1024px) and (max-width:1279px){
+ .drawer{width:208px}
+ main{margin-left:208px;margin-right:264px;padding-left:16px;padding-right:16px}
+ .chat-panel{width:264px}
+ .mini-panel{width:248px}
+ #topSearchBar{left:228px;right:284px}
+ .mini-drop,.wake-pill,.net-ready-toast,.dl-fail-toast,.mp3-prog-toast{left:calc(50% - 28px)}
+}
+@media(min-width:1440px){
+ .pub-carousel{grid-template-columns:repeat(5,minmax(0,1fr))}
+ main{padding-left:28px;padding-right:28px}
+ #topSearchBar{left:276px;right:340px}
+}
+@media(min-width:1680px){
+ /* Widest screens: six small cards across */
+ .pub-carousel{grid-template-columns:repeat(6,minmax(0,1fr))}
+ main{padding-left:36px;padding-right:36px}
+ #topSearchBar{left:284px;right:348px}
 }
 </style>
 </head>
