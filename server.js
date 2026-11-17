@@ -3067,12 +3067,18 @@ function apiRoute(req, res, urlPath) {
           name: typeof body.name === 'string' ? body.name.trim().slice(0, 100) : '',
           firstName: typeof body.firstName === 'string' ? body.firstName.trim().slice(0, 50) : '',
           lastName: typeof body.lastName === 'string' ? body.lastName.trim().slice(0, 50) : '',
-          // SECURITY: never trust the client's balance. A hacked browser
-          // could send credits:10000 here. Cap new accounts at the free
-          // grant (250 media / 24 song). The Admin/server balance is the
+          // GIFT LOCK (owner order 2026-11-17): a new account ALWAYS
+          // starts at 0/0. The server NEVER trusts the client's
+          // balance — a browser could send credits:250 and mint the
+          // gift without claiming, and a stale/new-device sync could
+          // re-create the account with the gift. The gift (+250 media
+          // / +24 song) is granted ONLY by the CLAIM flow below
+          // (giftClaimed:true + !giftClaimed), once per Gmail,
+          // forever, on any device. The Admin/server balance is the
           // only truth; the Profile number is display-only.
-          credits: Math.min(Math.max(0, numOr(body.credits, FREE_MEDIA_CREDITS)), FREE_MEDIA_CREDITS),
-          songCredits: Math.min(Math.max(0, numOr(body.songCredits, FREE_SONG_CREDITS)), FREE_SONG_CREDITS),
+          credits: 0,
+          songCredits: 0,
+          giftClaimed: false,
           plan: typeof body.plan === 'string' ? body.plan.slice(0, 50) : '',
           songPlan: typeof body.songPlan === 'string' ? body.songPlan.slice(0, 50) : '',
           createdAt: now, updatedAt: now,
@@ -3115,23 +3121,32 @@ function apiRoute(req, res, urlPath) {
         _modelLogins[_model] = (Number(_modelLogins[_model]) || 0) + 1;
         saveModelLogins(_modelLogins);
       }
-      // GIFT (owner order 2026-11-17, bug found 09:20): when the website
-      // sends giftClaimed:true the server must ACTUALLY grant the gift
-      // (+250 media / +24 song), once per user. The old code only sent
-      // a notification and never added the credits, so the server stayed
-      // at 0/0 and the website's sync-back showed a phantom "Admin
-      // deducted credit" for the full gift amount (user Oun Lyna2,
-      // 09:12:18). giftClaimed flag prevents a second grant; Math.max
-      // tops the balance UP to 250/24 instead of adding, so a user
-      // created with the gift already (first sync) is never double-
-      // credited. Logged to grants.json so it shows in credit history.
+      // GIFT — LOCKED once per Gmail, forever (owner order 2026-11-17,
+      // biggest problem): when the website sends giftClaimed:true the
+      // server grants the gift (+250 media / +24 song), once per user.
+      // giftClaimed flag prevents a second grant; Math.max tops the
+      // balance UP to 250/24 instead of adding. New accounts start at
+      // 0/0 (see above) so the gift can only arrive through this
+      // CLAIM flow. The 21:01 exploit: Oun Lyna2 got the gift again
+      // (+50 media / +24 song) by logging in from a new device,
+      // because her earlier admin grant never set giftClaimed — the
+      // flag is now the single lock, and the notification below fires
+      // ONLY when credits are actually granted (never on a refused
+      // re-claim). Logged to grants.json so it shows in credit history.
       if (body && body.giftClaimed === true && !u.giftClaimed) {
         const _gm = Math.max(0, FREE_MEDIA_CREDITS - Math.floor(numOr(u.credits, 0)));
         const _gs = Math.max(0, FREE_SONG_CREDITS - Math.floor(numOr(u.songCredits, 0)));
         if (_gm > 0) u.credits = Math.floor(numOr(u.credits, 0)) + _gm;
         if (_gs > 0) u.songCredits = Math.floor(numOr(u.songCredits, 0)) + _gs;
         u.giftClaimed = true;
-        if (_gm > 0 || _gs > 0) logGrant({ email, credits: _gm, songCredits: _gs, note: 'gift', at: now });
+        // Notify ONLY when credits were actually granted. The old code
+        // notified on every sync with giftClaimed:true, even when the
+        // gift was already locked (no credits given) — the Admin got a
+        // false "Gift claimed" alert for a user who got nothing.
+        if (_gm > 0 || _gs > 0) {
+          logGrant({ email, credits: _gm, songCredits: _gs, note: 'gift', at: now });
+          addNotification('gift-claimed', email, '🎁 កាដូបានទទួល · Gift claimed', (u.name || email) + ' (' + email + ') បានទទួលកាដូ Free 250 Image.Video + 24 Song Credit');
+        }
       }
       u.credits = Math.max(0, Math.floor(numOr(u.credits, 0)));
       u.songCredits = Math.max(0, Math.floor(numOr(u.songCredits, 0)));
@@ -3142,9 +3157,6 @@ function apiRoute(req, res, urlPath) {
       await ghFlushFile(USERS_FILE);
       if (isNewUser) {
         addNotification('login', email, '👤 អ្នកប្រើថ្មី · New user', (u.name || email) + ' (' + email + ') បាន log in លើកដំបូង');
-      }
-      if (body && body.giftClaimed === true) {
-        addNotification('gift-claimed', email, '🎁 កាដូបានទទួល · Gift claimed', (u.name || email) + ' (' + email + ') បានទទួលកាដូ Free 250 Image.Video + 24 Song Credit');
       }
       if (_isNewDevice) {
         addNotification('security', email, '🔐 ឧបករណ៍ថ្មី · New device login', email + ' logged in from a new device: ' + (_model || _dev || 'Unknown') + ' · IP ' + (_cip || '—'));
