@@ -943,10 +943,13 @@ function getEmailTransporter() {
       // smtp.gmail.com:465 (implicit TLS), but 587 is the standard
       // submission port and connects. Explicit timeouts so a dead
       // connection fails fast (15s) instead of hanging the request
-      // for nodemailer's 2-minute default (owner order 2026-11-17).
+      // for nodemailer's 2-minute default. family:4 forces IPv4 —
+      // Render's IPv6 route to Gmail SMTP blackholes (both 465 and
+      // 587 timed out; owner order 2026-11-17).
       emailTransporter = NodemailerLib.createTransport({
         host: 'smtp.gmail.com', port: 587, secure: false, requireTLS: true,
         auth: { user, pass },
+        family: 4,
         connectionTimeout: 15000, greetingTimeout: 15000, socketTimeout: 30000,
       });
       emailTransporterKey = key;
