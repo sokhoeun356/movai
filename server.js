@@ -2882,6 +2882,184 @@ function apiRoute(req, res, urlPath) {
     }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
     return;
   }
+  // ---- MV lyrics (karaoke) — transcription via Groq Whisper ----
+  // POST /api/mv/lyrics {audioUrl, translateTo?} — PUBLIC (no admin key).
+  // Fetches the song audio (in-memory only, never to disk), transcribes it
+  // with Groq Whisper (whisper-large-v3-turbo, verbose_json) and returns
+  // timed lyric lines in the language the song is sung in. NO translation
+  // by default; when translateTo is given, the lines are translated with
+  // Groq chat (gpt-oss-120b) keeping the same timings. Groq Whisper
+  // rejects files over 25 MB, so bigger files are refused up front.
+  const MV_LYRICS_MAX_BYTES = 25 * 1024 * 1024;
+  const MV_LYRICS_FETCH_TIMEOUT_MS = 60000;
+  const MV_LYRICS_WHISPER_TIMEOUT_MS = 120000;
+  function mvLyricsFileName(contentType, audioUrl) {
+    const ct = String(contentType || '').toLowerCase();
+    if (ct.includes('wav') || ct.includes('x-wav')) return 'song.wav';
+    if (ct.includes('ogg')) return 'song.ogg';
+    if (ct.includes('flac')) return 'song.flac';
+    if (ct.includes('m4a') || ct.includes('mp4')) return 'song.m4a';
+    if (ct.includes('webm')) return 'song.webm';
+    const m = String(audioUrl || '').toLowerCase().match(/\.([a-z0-9]{2,5})(?:[?#]|$)/);
+    if (m && ['mp3', 'wav', 'ogg', 'flac', 'm4a', 'webm', 'mp4'].includes(m[1])) return 'song.' + m[1];
+    return 'song.mp3';
+  }
+  function mvLyricsMime(fileName) {
+    if (/\.wav$/i.test(fileName)) return 'audio/wav';
+    if (/\.ogg$/i.test(fileName)) return 'audio/ogg';
+    if (/\.flac$/i.test(fileName)) return 'audio/flac';
+    if (/\.m4a$/i.test(fileName)) return 'audio/mp4';
+    if (/\.webm$/i.test(fileName)) return 'audio/webm';
+    return 'audio/mpeg';
+  }
+  async function mvLyricsFetchAudio(audioUrl) {
+    // Returns {ok:true, buf, contentType} or {ok:false, tooLarge:true} or
+    // {ok:false, error}. Streams with a hard cap so a huge file is never
+    // fully loaded into memory.
+    let r;
+    try {
+      r = await fetch(audioUrl, { signal: AbortSignal.timeout(MV_LYRICS_FETCH_TIMEOUT_MS) });
+    } catch (e) {
+      return { ok: false, error: 'fetch' };
+    }
+    if (!r.ok) return { ok: false, error: 'fetch' };
+    const lenHdr = r.headers && r.headers.get ? r.headers.get('content-length') : null;
+    const len = lenHdr ? parseInt(lenHdr, 10) : NaN;
+    if (!Number.isNaN(len) && len > MV_LYRICS_MAX_BYTES) return { ok: false, tooLarge: true };
+    const ct = (r.headers && r.headers.get ? r.headers.get('content-type') : '') || '';
+    if (!r.body || typeof r.body.getReader !== 'function') {
+      const buf = Buffer.from(await r.arrayBuffer());
+      if (buf.length > MV_LYRICS_MAX_BYTES) return { ok: false, tooLarge: true };
+      return { ok: true, buf, contentType: ct };
+    }
+    const reader = r.body.getReader();
+    const chunks = [];
+    let total = 0;
+    try {
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        total += value.byteLength;
+        if (total > MV_LYRICS_MAX_BYTES) { try { await reader.cancel(); } catch (e) {} return { ok: false, tooLarge: true }; }
+        chunks.push(Buffer.from(value));
+      }
+    } catch (e) {
+      return { ok: false, error: 'fetch' };
+    }
+    return { ok: true, buf: Buffer.concat(chunks), contentType: ct };
+  }
+  async function mvLyricsWhisper(buf, fileName, key) {
+    // Returns {ok:true, language, lyrics}. Throws rotErr on failure so
+    // withProviderKeyRotation can rotate on 429/auth errors; other
+    // failures (e.g. a 400 for bad audio) fail immediately without
+    // burning the other keys.
+    const fd = new FormData();
+    fd.append('file', new Blob([buf], { type: mvLyricsMime(fileName) }), fileName);
+    fd.append('model', 'whisper-large-v3-turbo');
+    fd.append('response_format', 'verbose_json');
+    let r;
+    try {
+      r = await fetch('https://api.groq.com/openai/v1/audio/transcriptions', {
+        method: 'POST',
+        headers: { 'Authorization': 'Bearer ' + key },
+        body: fd,
+        signal: AbortSignal.timeout(MV_LYRICS_WHISPER_TIMEOUT_MS),
+      });
+    } catch (e) {
+      throw rotErr('Whisper: ' + (e && e.message ? String(e.message).slice(0, 120) : 'request failed'), 0);
+    }
+    const j = await r.json().catch(() => null);
+    if (!r.ok) {
+      const em = (j && j.error && typeof j.error.message === 'string' && j.error.message) ? j.error.message : ('Groq HTTP ' + r.status);
+      throw rotErr('Whisper: ' + String(em).slice(0, 200), r.status);
+    }
+    const segs = Array.isArray(j && j.segments) ? j.segments : [];
+    const lyrics = [];
+    for (const s of segs) {
+      const text = s && typeof s.text === 'string' ? s.text.trim() : '';
+      if (!text) continue;
+      const start = typeof s.start === 'number' && isFinite(s.start) ? Math.max(0, Math.round(s.start * 100) / 100) : 0;
+      const end = typeof s.end === 'number' && isFinite(s.end) ? Math.max(start, Math.round(s.end * 100) / 100) : start;
+      lyrics.push({ text, start, end });
+      if (lyrics.length % 50 === 0) await new Promise((res2) => setImmediate(res2));
+    }
+    const language = j && typeof j.language === 'string' ? j.language.trim().toLowerCase() : '';
+    return { ok: true, language, lyrics };
+  }
+  async function mvLyricsTranslate(lyrics, translateTo, key) {
+    // Translate each lyric line to translateTo via Groq chat, keeping the
+    // same line count and timings. Returns {ok:true, lines} or
+    // {ok:false, error, status} (so a 429 can still rotate to the next key).
+    const numbered = lyrics.map((l, i) => (i + 1) + '. ' + l.text).join('\n');
+    const sys = 'You are a lyrics translator. Translate each numbered lyric line to ' + translateTo + '. Reply with ONLY the translated lines, same numbering, one per line, no extra text, no explanations, no markdown, no emojis.';
+    const r = await chatThinkerCallGroq(sys, null, numbered, key);
+    if (!r.ok) return { ok: false, error: r.error || 'translate failed', status: r.status || 0 };
+    const clean = sanitizeChatReply(r.reply || '');
+    const out = [];
+    const lines = clean.split('\n');
+    for (let i = 0; i < lines.length; i++) {
+      const t = lines[i].replace(/^\s*\d+\s*[.)]\s*/, '').trim();
+      if (t) out.push(t);
+      if (i % 50 === 0) await new Promise((res2) => setImmediate(res2));
+    }
+    if (!out.length) return { ok: false, error: 'translate failed', status: 0 };
+    return { ok: true, lines: out };
+  }
+  if (req.method === 'POST' && urlPath === '/api/mv/lyrics') {
+    readJSONBody(req, 64 * 1024).then(async (body) => {
+      logActivity({ at: new Date().toISOString(), mode: 'mv-lyrics' });
+      const audioUrl = body && typeof body.audioUrl === 'string' ? body.audioUrl.trim() : '';
+      const translateTo = body && typeof body.translateTo === 'string' ? body.translateTo.trim().slice(0, 50) : '';
+      let u;
+      try { u = new URL(audioUrl); } catch (e) { u = null; }
+      if (!u || (u.protocol !== 'http:' && u.protocol !== 'https:') || audioUrl.length > 2000) {
+        return sendJSON(res, 200, { ok: false, error: 'សូមដាក់លីងបទចម្រៀងត្រឹមត្រូវ · Please provide a valid song audio URL' });
+      }
+      const fetched = await mvLyricsFetchAudio(audioUrl);
+      if (!fetched.ok) {
+        if (fetched.tooLarge) return sendJSON(res, 200, { ok: false, error: 'ឯកសារបទចម្រៀងធំពេកសម្រាប់បង្កើតអក្សរចម្រៀងអូតូ (លើស 25 MB) — សូមប្រើអត្ថបទដែលបានសរសេរពេលបង្កើតបទវិញ · The song file is too large for auto-lyrics (over 25 MB) — please use the lyrics written when the song was created instead' });
+        return sendJSON(res, 200, { ok: false, error: 'ទាញយកបទចម្រៀងមិនបាន · Could not download the song audio' });
+      }
+      if (!fetched.buf || !fetched.buf.length) {
+        return sendJSON(res, 200, { ok: false, error: 'ទាញយកបទចម្រៀងមិនបាន · Could not download the song audio' });
+      }
+      const fileName = mvLyricsFileName(fetched.contentType, audioUrl);
+      let tr;
+      try {
+        tr = await withProviderKeyRotation('groq', async (k) => {
+          return mvLyricsWhisper(fetched.buf, fileName, k);
+        });
+      } catch (e) {
+        if (e && e.noKey) return sendJSON(res, 200, { ok: false, error: 'Admin មិនទាន់ដាក់ Groq API Key ទេ · Admin has not set a Groq API Key yet' });
+        return sendJSON(res, 200, { ok: false, error: 'ស្ដាប់បទចម្រៀងមិនបាន (Whisper) · Could not transcribe the song (Whisper)' });
+      }
+      if (!tr.lyrics || !tr.lyrics.length) {
+        return sendJSON(res, 200, { ok: false, error: 'រកមិនឃើញអត្ថបទចម្រៀងក្នុងបទនេះទេ · No lyrics were found in this song' });
+      }
+      const language = tr.language || '';
+      if (!translateTo) {
+        return sendJSON(res, 200, { ok: true, language, lyrics: tr.lyrics });
+      }
+      // Translate, keeping timings. On translation failure, fall back to
+      // the original-language lyrics so the MV still has something to show.
+      let translated = null;
+      try {
+        translated = await withProviderKeyRotation('groq', async (k) => {
+          const t = await mvLyricsTranslate(tr.lyrics, translateTo, k);
+          if (!t.ok) throw rotErr(t.error || 'translate failed', t.status || 0);
+          return t.lines;
+        });
+      } catch (e) {
+        translated = null;
+      }
+      if (!translated) {
+        return sendJSON(res, 200, { ok: true, language, lyrics: tr.lyrics, translationFailed: true });
+      }
+      const outLyrics = tr.lyrics.map((l, i) => ({ text: (translated[i] !== undefined ? translated[i] : l.text), start: l.start, end: l.end }));
+      return sendJSON(res, 200, { ok: true, language, translatedTo: translateTo, lyrics: outLyrics });
+    }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
+    return;
+  }
   // ---- MovAi Admin API ----
   // POST /api/admin/sync — {email, name, credits, songCredits, plan, songPlan}
   // Called by the MovAi website (no admin key). Creates the user on first
