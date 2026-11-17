@@ -2056,6 +2056,7 @@ async function withProviderKeyRotation(provider, fn, reqKey, candidatesOverride)
   const start = _keyRotationStart.get(p) || 0;
   const n = candidates.length;
   let lastErr = null;
+  const attempts = [];
   for (let i = 0; i < n; i++) {
     const idx = (start + i) % n;
     const cand = candidates[idx];
@@ -2070,11 +2071,16 @@ async function withProviderKeyRotation(provider, fn, reqKey, candidatesOverride)
       return out;
     } catch (e) {
       lastErr = e;
-      if (!_isRotatableError(e)) throw e;
+      // Diagnostic: record which key (by number only — NEVER the key
+      // value) failed and why, so a multi-key failure can be diagnosed
+      // without reading server logs.
+      attempts.push({ key: idx + 1, http: (e && e.httpStatus) || 0, err: String((e && e.message) || e).slice(0, 160) });
+      if (!_isRotatableError(e)) { lastErr.attempts = attempts; throw lastErr; }
       keyHealthSet(p, idx, 'exhausted', String((e && e.message) || e).slice(0, 120));
       if (i < n - 1) console.log('[keys] ' + p + ' key ' + (idx + 1) + '/' + n + ' failed (' + String((e && e.message) || e).slice(0, 120) + '), trying next key');
     }
   }
+  if (lastErr) lastErr.attempts = attempts;
   throw lastErr;
 }
 
@@ -3560,7 +3566,7 @@ function apiRoute(req, res, urlPath) {
         } catch (e) {
           if (e && e.noKey) return sendJSON(res, 200, { ok: false, error: 'mvsep_no_key', message: { km: 'Admin មិនទាន់ដាក់ MVSEP API Key ទេ', en: 'Admin has not added an MVSEP API key yet' } });
           if (e && e.code === 'mvsep_timeout') return sendJSON(res, 200, { ok: false, error: 'mvsep_timeout', hash: e.hash || '', message: { km: 'MVSEP កំពុងបំបែកបទនេះ — សូមរង់ចាំបន្តិច ហើយចុច Split (AI) ម្តងទៀត', en: 'MVSEP is still separating this song — please wait a bit and tap Split (AI) again' } });
-          if (e && /quota exceeded/i.test(String(e.message || ''))) return sendJSON(res, 200, { ok: false, error: 'mvsep_limit', message: { km: 'MVSEP ដល់កំណត់ 50 បទ/ថ្ងៃ លើ Key ទាំងអស់ហើយ — សូមសាកល្បងម្តងទៀតនៅថ្ងៃស្អែក', en: 'MVSEP daily limit of 50 songs/day reached on all keys — please try again tomorrow' } });
+          if (e && /quota exceeded/i.test(String(e.message || ''))) return sendJSON(res, 200, { ok: false, error: 'mvsep_limit', message: { km: 'MVSEP ដល់កំណត់ 50 បទ/ថ្ងៃ លើ Key ទាំងអស់ហើយ — សូមសាកល្បងម្តងទៀតនៅថ្ងៃស្អែក', en: 'MVSEP daily limit of 50 songs/day reached on all keys — please try again tomorrow' }, debugAttempts: (e && e.attempts) || undefined });
           return sendJSON(res, 200, { ok: false, error: (e && e.message) || 'MVSEP: request failed' });
         }
         // Success: count it against the key that did the work (server-side daily counter for the Admin display).
