@@ -1914,6 +1914,13 @@ function mvsepErrText(j) {
   if (d && typeof d === 'object' && typeof d.message === 'string' && d.message) return d.message;
   return '';
 }
+function mvsepIsSuccess(j) {
+  // MVSEP documents success as boolean true, but the live API has
+  // returned a created job (with hash) while the strict boolean check
+  // failed — so treat true, "true" and 1 as success.
+  if (!j || typeof j !== 'object') return false;
+  return j.success === true || j.success === 'true' || j.success === 1;
+}
 function mvsepIsLimitText(s) {
   return /limit|quota|exceed|daily|too many/i.test(String(s || ''));
 }
@@ -1935,10 +1942,15 @@ async function mvsepCreateSeparation(keyValue, audioUrl) {
   const text = mvsepErrText(j) || ('HTTP ' + r.status);
   if (r.status === 429 || (j && j.success === false && mvsepIsLimitText(text))) throw mvsepQuotaErr(text, r.status);
   if (r.status === 401 || r.status === 403) throw rotErr('MVSEP: invalid API key (HTTP ' + r.status + ')', r.status);
-  if (!r.ok || !j || j.success !== true) throw new Error('MVSEP: ' + text);
-  const hash = (j.data && typeof j.data.hash === 'string' && j.data.hash) || (typeof j.hash === 'string' && j.hash) || '';
-  if (!hash) throw new Error('MVSEP: no separation hash returned');
-  return hash;
+  // The hash is the real proof of success — accept it whenever it is
+  // present, even if the API returns success as a string or omits it.
+  // (The live API returned "Job created successfully" WITH a hash, but
+  // the old strict j.success === true check rejected it, so Split (AI)
+  // failed on the user's phone even though the job was created.)
+  const hash = (j && j.data && typeof j.data.hash === 'string' && j.data.hash) || (j && typeof j.hash === 'string' && j.hash) || '';
+  if (hash) return hash;
+  if (!r.ok || !j || !mvsepIsSuccess(j)) throw new Error('MVSEP: ' + text);
+  throw new Error('MVSEP: no separation hash returned');
 }
 async function mvsepGetSeparation(hash) {
   // GET .../separation/get?hash=<hash> — no api_token needed (the official
@@ -1948,15 +1960,23 @@ async function mvsepGetSeparation(hash) {
   const r = await fetch(MVSEP_GET_URL + '?hash=' + encodeURIComponent(hash), { signal: AbortSignal.timeout(30000) });
   const j = await r.json().catch(() => null);
   if (!j || typeof j !== 'object') throw new Error('MVSEP: bad status response (HTTP ' + r.status + ')');
-  if (j.success !== true) {
+  // Files are the real proof the separation is done — accept them
+  // whenever they are present, even if success comes back as a string
+  // or is omitted (same lenient rule as the create call).
+  const files = j.data && Array.isArray(j.data.files) ? j.data.files : null;
+  if (files) {
+    const stems = mvsepParseStems(files);
+    if (stems.length) return { done: true, stems };
+    return { done: false };
+  }
+  // No files yet: only an explicit failure (success === false) throws;
+  // anything else is still processing (the poll loop times out after
+  // 4 minutes and the Studio resumes via the status endpoint).
+  if (j.success === false) {
     const text = mvsepErrText(j) || ('HTTP ' + r.status);
     throw new Error('MVSEP separation failed: ' + text);
   }
-  const files = j.data && Array.isArray(j.data.files) ? j.data.files : null;
-  if (!files) return { done: false };
-  const stems = mvsepParseStems(files);
-  if (!stems.length) return { done: false };
-  return { done: true, stems };
+  return { done: false };
 }
 async function mvsepSeparateWithKey(keyValue, audioUrl) {
   // Create + poll with ONE key. Only the create step can trigger key
@@ -1989,11 +2009,13 @@ function _isRotatableError(e) {
 // Try a provider's keys in order, starting from the remembered start
 // index. fn(key, endpoint) must return a value on success or THROW on
 // failure. On a credit/rate-limit/auth error the NEXT key is tried; any
-// other error fails immediately without rotating. On success the winning
-// key is pinned as the next start. If every key fails with a
-// credit/rate-limit/auth error, the LAST key's error is thrown. If the
-// provider has no keys (and no request key), a 'no key configured' error
-// (err.noKey = true) is thrown. Key values are never logged.
+// other error fails immediately without rotating. STRICT ROUND-ROBIN
+// (owner order 2026-11-18): on success the pointer advances to the
+// NEXT key, so usage spreads evenly across all keys (1 → 2 → 3 → 1 …).
+// If every key fails with a credit/rate-limit/auth error, the LAST
+// key's error is thrown. If the provider has no keys (and no request
+// key), a 'no key configured' error (err.noKey = true) is thrown. Key
+// values are never logged.
 async function withProviderKeyRotation(provider, fn, reqKey, candidatesOverride) {
   const p = normProvider(provider);
   let candidates;
