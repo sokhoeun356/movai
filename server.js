@@ -1684,6 +1684,66 @@ function keyHealthList() {
   } catch (e) {}
   return out;
 }
+// ---- Groq token usage (live remaining per key) ----
+// Groq has no public quota API, so the server tracks chat tokens itself:
+// every Groq chat completion returns usage.total_tokens, which is
+// recorded per key (by 1-based index) per day. Free tier = 200,000
+// tokens/day per key (the quota the owner already knows from x1One).
+// Whisper (audio transcription) returns no token usage, so it is NOT
+// counted here — this display covers chat/text tokens (AI Chat +
+// translation) only. Persisted to groq-usage.json so it survives
+// restarts; the day rolls over in Phnom Penh time. Key VALUES are never
+// stored or exposed — only the 1-based index + counts.
+const GROQ_USAGE_FILE = path.join(DATA_DIR, 'groq-usage.json');
+const GROQ_DAILY_LIMIT = 200000;
+let _groqUsage = null;
+function groqUsageLoad() {
+  if (_groqUsage && typeof _groqUsage === 'object') return _groqUsage;
+  try { const j = JSON.parse(fs.readFileSync(GROQ_USAGE_FILE, 'utf8')); if (j && typeof j === 'object' && typeof j.date === 'string') { _groqUsage = j; return _groqUsage; } } catch (e) {}
+  _groqUsage = { date: '', keys: {} };
+  return _groqUsage;
+}
+function groqUsageSave() {
+  try { fs.mkdirSync(DATA_DIR, { recursive: true }); fs.writeFileSync(GROQ_USAGE_FILE, JSON.stringify(_groqUsage, null, 2)); ghPersistFile(GROQ_USAGE_FILE); } catch (e) {}
+}
+function groqUsageTodayDate() {
+  return new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Phnom_Penh' });
+}
+function recordGroqTokens(keyValue, totalTokens) {
+  try {
+    const n = Number(totalTokens) || 0;
+    if (n <= 0) return;
+    const today = groqUsageTodayDate();
+    const u = groqUsageLoad();
+    if (u.date !== today) { u.date = today; u.keys = {}; }
+    const list = adminProviderKeyList('groq');
+    let idx = -1;
+    for (let i = 0; i < list.length; i++) { if (list[i].key === keyValue) { idx = i; break; } }
+    if (idx < 0) return; // request-provided key, not an admin-stored one
+    const k = String(idx);
+    const prev = (u.keys[k] && Number(u.keys[k].used)) || 0;
+    u.keys[k] = { used: prev + n };
+    groqUsageSave();
+  } catch (e) {}
+}
+function groqUsageList() {
+  // Returns {date, dailyLimit, keys:[{key, usedToday, remainingToday,
+  // percentRemaining, status}]} — status: green (>50% left), yellow
+  // (<=50% left, still >0), red (0 left / exhausted). Keys are 1-based.
+  const today = groqUsageTodayDate();
+  const u = groqUsageLoad();
+  if (u.date !== today) { u.date = today; u.keys = {}; }
+  const n = adminProviderKeyList('groq').length;
+  const out = [];
+  for (let i = 0; i < n; i++) {
+    const used = (u.keys[String(i)] && Number(u.keys[String(i)].used)) || 0;
+    const remaining = Math.max(0, GROQ_DAILY_LIMIT - used);
+    const pct = Math.round((remaining / GROQ_DAILY_LIMIT) * 100);
+    const status = remaining <= 0 ? 'red' : (pct <= 50 ? 'yellow' : 'green');
+    out.push({ key: i + 1, usedToday: used, remainingToday: remaining, percentRemaining: pct, status });
+  }
+  return { date: today, dailyLimit: GROQ_DAILY_LIMIT, keys: out };
+}
 function _isRotatableError(e) {
   if (!e) return false;
   const st = e && e.httpStatus;
@@ -2927,6 +2987,8 @@ function apiRoute(req, res, urlPath) {
         }
         const content = j && j.choices && j.choices[0] && j.choices[0].message && typeof j.choices[0].message.content === 'string' ? j.choices[0].message.content : '';
         if (!content.trim()) return { ok: false, error: 'Groq: empty reply', status: r.status };
+        // Record chat tokens for the live per-key remaining display.
+        try { const tot = j && j.usage && Number(j.usage.total_tokens); if (tot > 0) recordGroqTokens(key, tot); } catch (e) {}
         return { ok: true, reply: content.trim(), model };
       } catch (e) {
         lastErr = { ok: false, error: 'Groq: ' + (e && e.message ? e.message : 'request failed'), status: 0 };
@@ -3629,6 +3691,17 @@ function apiRoute(req, res, urlPath) {
       }
     })().catch(() => sendJSON(res, 200, { ok: false, error: 'Brevo usage check failed' }));
     return;
+  }
+  // GET /api/admin/groq-usage — admin key required. Live Groq token
+  // usage per key for the Admin → API Keys display: daily limit
+  // (200,000 tokens/day/key), used today, remaining today, percent
+  // remaining, and status (green >50% left, yellow <=50%, red 0 left).
+  // Keys are 1-based indexes only — key values are never returned.
+  if (req.method === 'GET' && urlPath === '/api/admin/groq-usage') {
+    const a = adminKeyOk(req);
+    if (!a.ok) return sendJSON(res, 200, { ok: false, error: a.error });
+    const u = groqUsageList();
+    return sendJSON(res, 200, { ok: true, provider: 'groq', date: u.date, dailyLimit: u.dailyLimit, keys: u.keys });
   }
   // POST /api/admin/grant — {email, credits, songCredits, note?} — admin key required.
   // credits/songCredits are DELTAS (can be negative to deduct, balance never below 0).
