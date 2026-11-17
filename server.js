@@ -143,6 +143,7 @@ const GH_DATA_FILES = [
   'public.json', 'package-events.json', 'blocked-models.json',
   'model-logins.json', 'blocked-ips.json', 'blocked-emails.json',
   'updates.json', 'admin-lockouts.json', 'history.json', 'mp3cache.json',
+  'cloudinary-accounts.json',
 ];
 const ghShaCache = {}; // filename -> GitHub blob sha (for PUT updates)
 function ghEnabled() { return !!GH_TOKEN; }
@@ -4091,66 +4092,241 @@ function apiRoute(req, res, urlPath) {
   // on the 512 MB Render instance peaks at ~420 MB RSS (tested 2026-11-17)
   // and can OOM. Cloudinary fetches the provider URL ITSELF (remote URL
   // upload) and converts WAV->MP3 with a transformation, so Render never
-  // loads the 50 MB file. Keys ONLY in Render Environment Variables
-  // (CLOUDINARY_CLOUD_NAME / CLOUDINARY_API_KEY / CLOUDINARY_API_SECRET),
-  // NEVER in code or GitHub. If keys are missing, song-store falls back
-  // to the local convertAndCacheMp3 path (current behaviour) so the site
-  // keeps working while the owner sets Cloudinary up. Placed BEFORE
+  // loads the 50 MB file.
+  // MULTI-ACCOUNT (owner order 2026-11-17 ~08:47): the owner has 10
+  // Gmails and adds Cloudinary accounts in the Admin (3 fields: Cloud
+  // Name, API Key, API Secret, then Save). The MAIN account (bg08mr3i)
+  // lives in the Render env var CLOUDINARY_URL and is FIRST in the
+  // rotation; admin accounts follow in the order added. When one account
+  // runs out of credits (or its key is wrong) the server marks it and
+  // AUTOMATICALLY moves to the next account that still has credits.
+  // Credits renew monthly, so an account marked exhausted is tried again
+  // once a new month starts. If every account fails, song-store falls
+  // back to the local convertAndCacheMp3 path so the site keeps working.
+  // The env-var account is READ-ONLY in the Admin (it is set in Render);
+  // admin accounts live in cloudinary-accounts.json (GitHub-backed, in
+  // the private movai-data repo — same as the other admin data). The
+  // Admin API NEVER returns a full API secret (masked). Placed BEFORE
   // convertAndCacheMp3 on purpose — song-store (below) calls these. ----
-  let _cloudinary = null;
-  function cloudinaryClient() {
-    if (_cloudinary) return _cloudinary;
+  const CLOUDINARY_ACCOUNTS_FILE = path.join(DATA_DIR, 'cloudinary-accounts.json');
+  function loadCloudinaryAccounts() {
+    try { const j = JSON.parse(fs.readFileSync(CLOUDINARY_ACCOUNTS_FILE, 'utf8')); if (Array.isArray(j)) return j.filter((x) => x && typeof x === 'object'); } catch (e) {}
+    return [];
+  }
+  function saveCloudinaryAccounts(arr) {
+    try { fs.mkdirSync(DATA_DIR, { recursive: true }); } catch (e) {}
+    fs.writeFileSync(CLOUDINARY_ACCOUNTS_FILE, JSON.stringify(arr, null, 2));
+    ghPersistFile(CLOUDINARY_ACCOUNTS_FILE);
+  }
+  function cloudinaryAccountId() {
+    return 'cld-' + require('crypto').randomBytes(6).toString('hex');
+  }
+  // The MAIN account from the Render env vars (CLOUDINARY_CLOUD_NAME /
+  // CLOUDINARY_API_KEY / CLOUDINARY_API_SECRET, or the single
+  // CLOUDINARY_URL). Returns an account-shaped object or null.
+  function cloudinaryEnvAccount() {
     const cn = (process.env.CLOUDINARY_CLOUD_NAME || '').trim();
     const ck = (process.env.CLOUDINARY_API_KEY || '').trim();
     const cs = (process.env.CLOUDINARY_API_SECRET || '').trim();
-    // CLOUDINARY_URL (single var, cloudinary://<key>:<secret>@<cloud>)
-    // is accepted too — the SDK reads it itself. Prefer the three
-    // separate vars when they are all set.
     const curl = (process.env.CLOUDINARY_URL || '').trim();
-    if ((!cn || !ck || !cs) && !curl) return null;
-    try {
-      const c = require('cloudinary').v2;
-      if (cn && ck && cs) c.config({ cloud_name: cn, api_key: ck, api_secret: cs });
-      else c.config();
-      _cloudinary = c;
-      return c;
-    } catch (e) {
-      console.error('[cloudinary] SDK load failed:', String((e && e.message) || e).slice(0, 200));
-      return null;
+    if (cn && ck && cs) return { id: 'env', source: 'env', readonly: true, label: 'Main (Render)', cloudName: cn, apiKey: ck, apiSecret: cs, enabled: true, exhausted: false, exhaustedAt: null, lastError: '', lastErrorAt: null };
+    if (curl) {
+      const m = /^cloudinary:\/\/([^:]+):([^@]+)@([^/]+)/.exec(curl);
+      if (m) return { id: 'env', source: 'env', readonly: true, label: 'Main (Render)', cloudName: m[3], apiKey: m[1], apiSecret: m[2], enabled: true, exhausted: false, exhaustedAt: null, lastError: '', lastErrorAt: null };
     }
+    return null;
   }
-  function cloudinaryConfigured() { return !!cloudinaryClient(); }
-  function cloudinaryMp3Url(publicId) {
-    const c = cloudinaryClient();
+  // Is this account exhausted in the CURRENT month? Credits renew
+  // monthly, so an exhaustion from a previous month no longer counts.
+  function cloudinaryAccountExhaustedNow(a) {
+    if (!a || !a.exhausted || !a.exhaustedAt) return false;
+    const d = new Date(String(a.exhaustedAt));
+    if (Number.isNaN(d.getTime())) return true;
+    const now = new Date();
+    return d.getUTCFullYear() === now.getUTCFullYear() && d.getUTCMonth() === now.getUTCMonth();
+  }
+  // Ordered rotation candidates: env account first, then enabled admin
+  // accounts in the order added. Exhausted-this-month accounts are
+  // skipped (they get a fresh chance next month).
+  function cloudinaryCandidates() {
+    const list = [];
+    const env = cloudinaryEnvAccount();
+    if (env) list.push(env);
+    for (const a of loadCloudinaryAccounts()) {
+      if (!a || a.enabled === false) continue;
+      if (cloudinaryAccountExhaustedNow(a)) continue;
+      list.push(a);
+    }
+    return list;
+  }
+  function cloudinaryConfigured() { return cloudinaryCandidates().length > 0; }
+  // The Cloudinary SDK is a global singleton: config() mutates it.
+  // Uploads run ONE AT A TIME through _cloudQueue, so setting the
+  // config inside the queued block (right before the upload and the
+  // URL build) is safe — no two accounts can interleave.
+  let _cloudinary = null;
+  function cloudinarySdk() {
+    if (_cloudinary) return _cloudinary;
+    try { _cloudinary = require('cloudinary').v2; return _cloudinary; }
+    catch (e) { console.error('[cloudinary] SDK load failed:', String((e && e.message) || e).slice(0, 200)); return null; }
+  }
+  function cloudinaryConfigFor(a) {
+    const c = cloudinarySdk();
+    if (!c) return null;
+    c.config({ cloud_name: a.cloudName, api_key: a.apiKey, api_secret: a.apiSecret });
+    return c;
+  }
+  function cloudinaryMp3UrlFor(a, publicId) {
+    const c = cloudinaryConfigFor(a);
     if (!c) return null;
     return c.url(publicId, { resource_type: 'video', format: 'mp3', audio_codec: 'mp3', bit_rate: '192k', flags: 'attachment' });
   }
+  // Mask an API key/secret for the Admin: first 2 + last 2 chars only.
+  function cloudinaryMask(v) {
+    const s = String(v || '');
+    if (s.length <= 6) return '••••';
+    return s.slice(0, 2) + '••••' + s.slice(-2);
+  }
+  // Raw Cloudinary Admin API call (ping / usage) with Basic Auth.
+  // Uses fetch directly (not the SDK) so the Admin endpoints never
+  // touch the SDK global config that the upload queue relies on.
+  async function cloudinaryApiGet(a, apiPath, timeoutMs) {
+    const url = 'https://api.cloudinary.com/v1_1/' + encodeURIComponent(a.cloudName) + apiPath;
+    const basic = Buffer.from(a.apiKey + ':' + a.apiSecret).toString('base64');
+    const r = await fetch(url, { headers: { 'Authorization': 'Basic ' + basic }, signal: AbortSignal.timeout(timeoutMs || 10000) });
+    const j = await r.json().catch(() => null);
+    if (!r.ok) {
+      const msg = (j && j.error && j.error.message) ? String(j.error.message) : ('HTTP ' + r.status);
+      const err = new Error(msg);
+      err.status = r.status;
+      throw err;
+    }
+    return j;
+  }
+  // Account status for the Admin lights. Returns {status,
+  // creditsRemaining, creditsLimit, detail}. status: 'ok' (green),
+  // 'low' (yellow, credits almost out), 'exhausted' (red, no credits),
+  // 'invalid' (red, wrong key/secret), 'disabled' (grey), 'unknown'
+  // (yellow, could not verify). The blue credit dot is shown when
+  // creditsRemaining > 0.
+  async function cloudinaryAccountStatus(a) {
+    if (!a) return { status: 'unknown', creditsRemaining: null, creditsLimit: null, detail: '' };
+    if (a.source !== 'env' && a.enabled === false) return { status: 'disabled', creditsRemaining: null, creditsLimit: null, detail: 'Disabled' };
+    if (cloudinaryAccountExhaustedNow(a)) return { status: 'exhausted', creditsRemaining: 0, creditsLimit: null, detail: 'Credits used up this month' };
+    try {
+      const u = await cloudinaryApiGet(a, '/usage', 10000);
+      const cr = (u && u.credits) || {};
+      const used = Number(cr.usage !== undefined ? cr.usage : cr.used);
+      const limit = Number(cr.limit);
+      if (Number.isFinite(used) && Number.isFinite(limit) && limit > 0) {
+        const remaining = Math.max(0, limit - used);
+        if (remaining <= 0) return { status: 'exhausted', creditsRemaining: 0, creditsLimit: limit, detail: 'Credits used up' };
+        if (remaining < 5 || remaining / limit < 0.2) return { status: 'low', creditsRemaining: remaining, creditsLimit: limit, detail: 'Credits almost out' };
+        return { status: 'ok', creditsRemaining: remaining, creditsLimit: limit, detail: '' };
+      }
+      return { status: 'ok', creditsRemaining: null, creditsLimit: null, detail: '' };
+    } catch (e) {
+      const msg = String((e && e.message) || e);
+      if ((e && (e.status === 401 || e.status === 403)) || /api_secret mismatch|invalid api key|unauthorized|authentication/i.test(msg)) {
+        return { status: 'invalid', creditsRemaining: null, creditsLimit: null, detail: 'Wrong key or secret' };
+      }
+      return { status: 'unknown', creditsRemaining: null, creditsLimit: null, detail: msg.slice(0, 120) };
+    }
+  }
+  function cloudinaryPublicAccount(a, st) {
+    return {
+      id: a.id, source: a.source || 'admin', readonly: !!a.readonly,
+      label: a.label || a.cloudName, cloudName: a.cloudName,
+      apiKeyMasked: cloudinaryMask(a.apiKey),
+      enabled: a.enabled !== false,
+      exhausted: !!a.exhausted, exhaustedAt: a.exhaustedAt || null,
+      lastError: a.lastError || '', lastErrorAt: a.lastErrorAt || null,
+      createdAt: a.createdAt || null,
+      status: st ? st.status : 'unknown',
+      creditsRemaining: st ? st.creditsRemaining : null,
+      creditsLimit: st ? st.creditsLimit : null,
+      detail: st ? st.detail : '',
+    };
+  }
   // One Cloudinary upload at a time (same serialisation as _mp3Queue).
   let _cloudQueue = Promise.resolve();
-  // Remote-URL upload: Cloudinary downloads the provider URL itself, so
-  // Render never touches the 50 MB WAV. Retries 3x, then returns null
-  // (caller falls back to local conversion). Returns {publicId, mp3Url},
-  // or the marker 'gone' when Cloudinary could not fetch the source
-  // (expired provider URL), or null on failure.
+  // Classify a Cloudinary upload error so the rotation knows what to do:
+  // 'gone' = the SOURCE url expired (404/403/410) — no account can fix it.
+  // 'quota' = this account is out of credits / rate-limited — mark it
+  // exhausted and move to the next account. 'auth' = wrong key/secret —
+  // mark it invalid and move on. 'other' = transient — retry once.
+  function cloudinaryClassifyUploadError(msg) {
+    const m = String(msg || '');
+    if (/api_secret mismatch|invalid api key|unauthorized|invalid signature/i.test(m)) return 'auth';
+    if (/quota|credit|exceed.*plan|rate limit|too many requests/i.test(m)) return 'quota';
+    if (/404|410|not found|gone|forbidden|403/i.test(m)) return 'gone';
+    return 'other';
+  }
+  // Mark an admin account exhausted/invalid in the data file (the env
+  // account is not stored, so it is only logged). Never throws.
+  function cloudinaryMarkAccount(a, kind, msg) {
+    if (!a || a.source === 'env') { console.error('[cloudinary] env account ' + kind + ':', String(msg || '').slice(0, 160)); return; }
+    try {
+      const now = new Date().toISOString();
+      const arr = loadCloudinaryAccounts();
+      const it = arr.find((x) => x && x.id === a.id);
+      if (!it) return;
+      it.lastError = String(msg || kind).slice(0, 200);
+      it.lastErrorAt = now;
+      if (kind === 'quota') { it.exhausted = true; it.exhaustedAt = now; }
+      it.updatedAt = now;
+      saveCloudinaryAccounts(arr);
+    } catch (e) {}
+  }
+  // Clear an admin account's exhausted/invalid marks after a success
+  // (so it is tried first again next time). Never throws.
+  function cloudinaryClearAccountMarks(a) {
+    if (!a || a.source === 'env') return;
+    try {
+      const arr = loadCloudinaryAccounts();
+      const it = arr.find((x) => x && x.id === a.id);
+      if (!it) return;
+      if (it.exhausted || it.lastError) {
+        it.exhausted = false; it.exhaustedAt = null; it.lastError = ''; it.lastErrorAt = null;
+        it.updatedAt = new Date().toISOString();
+        saveCloudinaryAccounts(arr);
+      }
+    } catch (e) {}
+  }
+  // Remote-URL upload with AUTOMATIC ROTATION: tries each candidate
+  // account in order (env account first, then admin accounts). A quota
+  // or auth failure marks that account and moves to the next one, so a
+  // song never dies just because one account ran out. Returns
+  // {publicId, mp3Url, accountId, accountLabel}, or the marker 'gone'
+  // when Cloudinary could not fetch the source (expired provider URL),
+  // or null when every account failed (caller falls back to local).
   async function cloudinaryStoreSong(u) {
-    const c = cloudinaryClient();
-    if (!c) return null;
+    const candidates = cloudinaryCandidates();
+    if (!candidates.length) return null;
     const run = _cloudQueue.then(async () => {
-      for (let attempt = 1; attempt <= 3; attempt++) {
-        try {
-          memLog('cloudinary-upload attempt ' + attempt + ' ' + String(u).slice(0, 60));
-          const res = await c.uploader.upload(u, { resource_type: 'video', folder: 'movai/songs' });
-          const publicId = res && res.public_id;
-          if (!publicId) return null;
-          const mp3Url = cloudinaryMp3Url(publicId);
-          memLog('cloudinary-upload ok ' + publicId);
-          return { publicId, mp3Url };
-        } catch (e) {
-          const msg = String((e && e.message) || e);
-          console.error('[cloudinary] upload attempt ' + attempt + ' failed for', String(u).slice(0, 120), ':', msg.slice(0, 200));
-          if (/404|410|not found|gone|forbidden|403/i.test(msg)) return 'gone';
-          if (attempt === 3) return null;
-          await new Promise((r) => setTimeout(r, 2000 * attempt));
+      for (const a of candidates) {
+        for (let attempt = 1; attempt <= 2; attempt++) {
+          try {
+            const c = cloudinaryConfigFor(a);
+            if (!c) continue;
+            memLog('cloudinary-upload ' + (a.label || a.cloudName) + ' attempt ' + attempt + ' ' + String(u).slice(0, 60));
+            const res = await c.uploader.upload(u, { resource_type: 'video', folder: 'movai/songs' });
+            const publicId = res && res.public_id;
+            if (!publicId) continue;
+            const mp3Url = cloudinaryMp3UrlFor(a, publicId);
+            memLog('cloudinary-upload ok ' + publicId + ' via ' + (a.label || a.cloudName));
+            cloudinaryClearAccountMarks(a);
+            return { publicId, mp3Url, accountId: a.id, accountLabel: a.label || a.cloudName };
+          } catch (e) {
+            const msg = String((e && e.message) || e);
+            const kind = cloudinaryClassifyUploadError(msg);
+            console.error('[cloudinary] upload via ' + (a.label || a.cloudName) + ' attempt ' + attempt + ' failed (' + kind + '):', msg.slice(0, 200));
+            if (kind === 'gone') return 'gone';
+            if (kind === 'quota') { cloudinaryMarkAccount(a, 'quota', msg); break; }
+            if (kind === 'auth') { cloudinaryMarkAccount(a, 'auth', msg); break; }
+            if (attempt === 2) { cloudinaryMarkAccount(a, 'other', msg); break; }
+            await new Promise((r) => setTimeout(r, 2000 * attempt));
+          }
         }
       }
       return null;
@@ -4338,7 +4514,7 @@ function apiRoute(req, res, urlPath) {
           if (cl === 'gone') return sendJSON(res, 200, { ok: false, error: 'gone', url });
           if (cl && cl.mp3Url) {
             memLog('song-store-end');
-            return sendJSON(res, 200, { ok: true, url: cl.mp3Url, provider: 'cloudinary', publicId: cl.publicId });
+            return sendJSON(res, 200, { ok: true, url: cl.mp3Url, provider: 'cloudinary', publicId: cl.publicId, account: cl.accountLabel || '', accountId: cl.accountId || '' });
           }
           console.error('[songstore] cloudinary upload failed for', url.slice(0, 120), '— falling back to local conversion');
         }
@@ -4364,6 +4540,122 @@ function apiRoute(req, res, urlPath) {
         memLog('songstore-end-failed');
         return sendJSON(res, 200, { ok: false, error: 'store failed', url });
       }
+    }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
+    return;
+  }
+  // ---- Cloudinary accounts (Admin) — owner order 2026-11-17 ~08:47.
+  // The owner adds Cloudinary accounts in the Admin (3 fields: Cloud
+  // Name, API Key, API Secret, then Save) and the server rotates
+  // automatically when one runs out. The MAIN account (env var) is
+  // listed FIRST as read-only; admin accounts follow. Each account
+  // carries a status light: ok (green), low (yellow, credits almost
+  // out), exhausted (red, no credits), invalid (red, wrong key/secret),
+  // disabled (grey), unknown (yellow, could not verify). A blue credit
+  // dot is shown when credits remain. Placed AFTER the Cloudinary
+  // helpers on purpose (TDZ) — these endpoints use them. ----
+  // GET /api/admin/cloudinary-accounts — admin key required. Lists the
+  // env account (read-only) + admin accounts, each with its status.
+  if (req.method === 'GET' && urlPath === '/api/admin/cloudinary-accounts') {
+    const a = adminKeyOk(req);
+    if (!a.ok) return sendJSON(res, 200, { ok: false, error: a.error });
+    (async () => {
+      try {
+        const all = [];
+        const env = cloudinaryEnvAccount();
+        if (env) all.push(env);
+        for (const x of loadCloudinaryAccounts()) all.push(x);
+        const list = await Promise.all(all.map(async (x) => {
+          const st = await cloudinaryAccountStatus(x);
+          return cloudinaryPublicAccount(x, st);
+        }));
+        return sendJSON(res, 200, { ok: true, accounts: list });
+      } catch (e) {
+        return sendJSON(res, 200, { ok: false, error: String((e && e.message) || e).slice(0, 200) });
+      }
+    })();
+    return;
+  }
+  // POST /api/admin/cloudinary-accounts — {cloudName, apiKey, apiSecret}
+  // — admin key required. Verifies the pair with a Cloudinary ping
+  // BEFORE saving, so a wrong key/secret is reported immediately.
+  if (req.method === 'POST' && urlPath === '/api/admin/cloudinary-accounts') {
+    const a = adminKeyOk(req);
+    if (!a.ok) return sendJSON(res, 200, { ok: false, error: a.error });
+    readJSONBody(req, 64 * 1024).then(async (body) => {
+      const cloudName = String((body && body.cloudName) || '').trim();
+      const apiKey = String((body && body.apiKey) || '').trim();
+      const apiSecret = String((body && body.apiSecret) || '').trim();
+      if (!cloudName || !apiKey || !apiSecret) return sendJSON(res, 200, { ok: false, error: 'សូមដាក់ Cloud Name, API Key និង API Secret ទាំងបី' });
+      const arr = loadCloudinaryAccounts();
+      const dup = arr.find((x) => x && String(x.cloudName || '').trim().toLowerCase() === cloudName.toLowerCase());
+      const cand = { id: dup ? dup.id : cloudinaryAccountId(), source: 'admin', readonly: false, label: cloudName, cloudName, apiKey, apiSecret, enabled: dup ? dup.enabled !== false : true, exhausted: false, exhaustedAt: null, lastError: '', lastErrorAt: null, createdAt: dup ? (dup.createdAt || new Date().toISOString()) : new Date().toISOString(), updatedAt: new Date().toISOString() };
+      try {
+        await cloudinaryApiGet(cand, '/ping', 15000);
+      } catch (e) {
+        const msg = String((e && e.message) || e);
+        return sendJSON(res, 200, { ok: false, error: 'Cloudinary មិនទទួល key/secret នេះទេ · ' + msg.slice(0, 160) });
+      }
+      if (dup) { const i = arr.findIndex((x) => x && x.id === dup.id); if (i >= 0) arr[i] = cand; }
+      else arr.push(cand);
+      saveCloudinaryAccounts(arr);
+      await ghFlushFile(CLOUDINARY_ACCOUNTS_FILE);
+      const st = await cloudinaryAccountStatus(cand);
+      return sendJSON(res, 200, { ok: true, account: cloudinaryPublicAccount(cand, st), updated: !!dup });
+    }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹমត្រូវទេ', 'Bad request')));
+    return;
+  }
+  // DELETE /api/admin/cloudinary-accounts?id=... — admin key required.
+  // Removes an admin account. The env (Main) account cannot be deleted.
+  if (req.method === 'DELETE' && urlPath === '/api/admin/cloudinary-accounts') {
+    const a = adminKeyOk(req);
+    if (!a.ok) return sendJSON(res, 200, { ok: false, error: a.error });
+    const id = String(new URL(req.url, 'http://localhost').searchParams.get('id') || '').trim();
+    if (!id || id === 'env') return sendJSON(res, 200, { ok: false, error: 'មិនអាចលុបគណនី Main នេះបានទេ' });
+    const arr = loadCloudinaryAccounts();
+    const i = arr.findIndex((x) => x && x.id === id);
+    if (i < 0) return sendJSON(res, 200, { ok: false, error: 'រកគណនីនេះមិនឃើញទេ' });
+    arr.splice(i, 1);
+    saveCloudinaryAccounts(arr);
+    return sendJSON(res, 200, { ok: true, deleted: id });
+  }
+  // POST /api/admin/cloudinary-accounts/toggle — {id, enabled} — admin
+  // key required. Enables or disables an admin account.
+  if (req.method === 'POST' && urlPath === '/api/admin/cloudinary-accounts/toggle') {
+    const a = adminKeyOk(req);
+    if (!a.ok) return sendJSON(res, 200, { ok: false, error: a.error });
+    readJSONBody(req, 64 * 1024).then(async (body) => {
+      const id = String((body && body.id) || '').trim();
+      const enabled = !!(body && body.enabled);
+      if (!id || id === 'env') return sendJSON(res, 200, { ok: false, error: 'មិនអាចបិទគណនី Main នេះបានទេ' });
+      const arr = loadCloudinaryAccounts();
+      const it = arr.find((x) => x && x.id === id);
+      if (!it) return sendJSON(res, 200, { ok: false, error: 'រកគណនីនេះមិនឃើញទេ' });
+      it.enabled = enabled;
+      it.updatedAt = new Date().toISOString();
+      saveCloudinaryAccounts(arr);
+      const st = await cloudinaryAccountStatus(it);
+      return sendJSON(res, 200, { ok: true, account: cloudinaryPublicAccount(it, st) });
+    }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
+    return;
+  }
+  // POST /api/admin/cloudinary-accounts/reset — {id} — admin key
+  // required. Clears an account's exhausted/invalid marks so it is
+  // tried again (credits renew monthly; use this after topping up or
+  // fixing a key).
+  if (req.method === 'POST' && urlPath === '/api/admin/cloudinary-accounts/reset') {
+    const a = adminKeyOk(req);
+    if (!a.ok) return sendJSON(res, 200, { ok: false, error: a.error });
+    readJSONBody(req, 64 * 1024).then(async (body) => {
+      const id = String((body && body.id) || '').trim();
+      if (!id || id === 'env') return sendJSON(res, 200, { ok: false, error: 'គណនី Main មិនមានស្ថានភាពត្រូវសម្អាតទេ' });
+      const arr = loadCloudinaryAccounts();
+      const it = arr.find((x) => x && x.id === id);
+      if (!it) return sendJSON(res, 200, { ok: false, error: 'រកគណនីនេះមិនឃើញទេ' });
+      it.exhausted = false; it.exhaustedAt = null; it.lastError = ''; it.lastErrorAt = null;
+      it.updatedAt = new Date().toISOString();
+      saveCloudinaryAccounts(arr);
+      const st = await cloudinaryAccountStatus(it);
+      return sendJSON(res, 200, { ok: true, account: cloudinaryPublicAccount(it, st) });
     }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
     return;
   }
