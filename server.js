@@ -1948,8 +1948,10 @@ async function mvsepCreateSeparation(keyValue, audioUrl) {
   fd.append('audiofile', new Blob([buf], { type: ct }), fname);
   fd.append('sep_type', String(MVSEP_SEP_TYPE));
   fd.append('add_opt1', String(MVSEP_MODEL_OPT));
+  fd.append('add_opt2', '');
   fd.append('output_format', '0');
-  const r = await fetch(MVSEP_CREATE_URL, { method: 'POST', body: fd, signal: AbortSignal.timeout(120000) });
+  fd.append('is_demo', '0');
+  const r = await fetch(MVSEP_CREATE_URL, { method: 'POST', body: fd, headers: { 'User-Agent': 'MovAi/1.0 (https://movai-1.onrender.com)' }, signal: AbortSignal.timeout(120000) });
   const j = await r.json().catch(() => null);
   const text = mvsepErrText(j) || ('HTTP ' + r.status);
   if (r.status === 429 || (j && j.success === false && mvsepIsLimitText(text))) throw mvsepQuotaErr(text, r.status);
