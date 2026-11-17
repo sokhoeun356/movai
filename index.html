@@ -3072,6 +3072,7 @@ main{padding-top:calc(3.75rem + env(safe-area-inset-top,0px))}
       </div>
     </div>
     <p id="authFormMsg" style="font-size:0.8125rem;margin-top:10px;min-height:16px;line-height:1.6"></p>
+    <button type="button" class="google-btn" id="authNoAcctBtn" style="display:none;margin-top:10px" onclick="authGoogleSignup()"><svg viewBox="0 0 48 48" width="20" height="20" aria-hidden="true" style="flex:0 0 auto"><path fill="#FFC107" d="M43.6 20.1H42V20H24v8h11.3C33.7 32.7 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.9 1.2 8 3l5.7-5.7C34.3 6.1 29.3 4 24 4 13 4 4 13 4 24s9 20 20 20 20-9 20-20c0-1.3-.1-2.6-.4-3.9z"/><path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.9 1.2 8 3l5.7-5.7C34.3 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.1 26.7 36 24 36c-5.2 0-9.6-3.3-11.3-8l-6.5 5C9.5 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.1H42V20H24v8h11.3c-.8 2.3-2.3 4.3-4.1 5.6l6.2 5.2C36.9 39.2 44 34 44 24c0-1.3-.1-2.6-.4-3.9z"/></svg><span data-i18n="authContinueGoogle">បន្តជាមួយ Google · Continue with Google</span></button>
     <button type="button" class="kbtn kbtn-black" id="authSigninBtn" style="margin-top:6px;width:100%" onclick="authSigninSubmit()" data-i18n="authSigninBtn">ចូលប្រើ · Sign-in</button>
     <button type="button" class="auth-forgot" onclick="forgotOpen()" data-i18n="authForgot">ភ្លេចលេខសម្ងាត់?</button>
     <div class="auth-divider" aria-hidden="true"><span data-i18n="authOr">ឬ</span></div>
@@ -3377,6 +3378,7 @@ km:{
  authPassLabel:'លេខសម្ងាត់ · Password',authPassPh:'បញ្ចូលលេខសម្ងាត់របស់អ្នក',
  authSigninBtn:'ចូលប្រើ · Sign-in',authForgot:'ភ្លេចលេខសម្ងាត់?',authOr:'ឬ',
  authSignupGoogle:'ចុះឈ្មោះជាមួយ Google · Sign up with Google',
+ authContinueGoogle:'បន្តជាមួយ Google · Continue with Google',
  authUseAnother:'ប្រើគណនីផ្សេង · Use another account',authSavedTap:'ចុចដើម្បីចូលប្រើ',
  authSavedExpired:'ការចូលដែលបានសេវផុតកំណត់ហើយ — សូមចូលដោយ Gmail និងលេខសម្ងាត់របស់អ្នក',
  authAlready:'អ្នកមានគណនីរួចហើយ។ សូមចូលប្រើដោយ Gmail និងលេខសម្ងាត់របស់អ្នក។',
@@ -3636,6 +3638,7 @@ en:{
  authPassLabel:'Password',authPassPh:'Enter your password',
  authSigninBtn:'Sign-in',authForgot:'Forgot password?',authOr:'or',
  authSignupGoogle:'Sign up with Google',
+ authContinueGoogle:'Continue with Google',
  authUseAnother:'Use another account',authSavedTap:'Tap to sign in',
  authSavedExpired:'Saved login expired, please sign in with your password.',
  authAlready:'You already have an account. Please sign in with your Gmail and password.',
@@ -13484,6 +13487,17 @@ var AUTH_EYE_OFF='<svg viewBox="0 0 24 24" width="20" height="20" fill="none" st
 function authFormMsg(t){
   var m=document.getElementById('authFormMsg');
   if(m){m.textContent=t||'';m.style.color='#f87171';}
+  /* Any fresh form message clears the «Continue with Google»
+     shortcut — it is only re-shown by the sign-in handler when
+     the server flags noAccount (Gmail has no account yet). */
+  authNoAcctBtn(false);
+}
+/* Show/hide the «Continue with Google» button that sits directly
+   under the sign-in error. It starts the SAME Google sign-up flow
+   as «Sign up with Google» (authGoogleSignup). */
+function authNoAcctBtn(show){
+  var b=document.getElementById('authNoAcctBtn');
+  if(b)b.style.display=show?'flex':'none';
 }
 function authToggleEye(inputId,btn){
   var inp=document.getElementById(inputId);if(!inp)return;
@@ -13529,7 +13543,7 @@ function authSigninSubmit(){
   authFetchJson('/api/auth/signin','POST',{email:email,password:pw},30000).then(function(data){
     if(btn)btn.disabled=false;
     if(!data){authFormMsg(tx('authErrNet'));return;}
-    if(data.ok!==true){authFormMsg(authErrText(data,'authErrSignin'));return;}
+    if(data.ok!==true){authFormMsg(authErrText(data,'authErrSignin'));if(data.noAccount===true)authNoAcctBtn(true);return;}
     var prof=authProfFromUser(data.user,email);
     if(pwEl)pwEl.value='';
     loginSheetClose();
