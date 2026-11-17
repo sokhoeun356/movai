@@ -1429,6 +1429,12 @@ html[data-mode="light"] .mv-a{color:var(--accent-text)}
 .style-tag>span{min-width:0;overflow-wrap:break-word}
 .style-tag-x{flex:0 0 auto;width:24px;height:24px;border-radius:50%;border:1px solid var(--line2);background:transparent;color:var(--muted);font-size:0.6875rem;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;padding:0;font-family:inherit;line-height:1}
 .style-tag-x:active{color:#f87171;border-color:rgba(248,113,113,.55)}
+/* Preset style chips above the Style input: only the short preset name
+   is ever shown; tapping toggles the preset tag on/off. The full preset
+   prompt lives in SONG_STYLE_PRESETS (JS) and is expanded only in the
+   style text sent to the provider on Generate. */
+.style-preset-chip{flex:0 0 auto;padding:8px 16px;border-radius:999px;border:1px solid var(--line2);background:transparent;color:var(--muted);font-family:inherit;font-size:0.8125rem;font-weight:800;cursor:pointer;min-height:38px;line-height:1.2}
+.style-preset-chip.on{background:var(--accent-fill);color:#0d1005;border-color:transparent}
 /* The tags box never grows past ~4 rows of chips, however many styles
    are added — the rest scroll up/down inside the box itself. One row =
    chip height (2.125rem) + its top margin (0.5rem); 4 rows + 3 row
@@ -1646,6 +1652,9 @@ html[data-smooth="1"] .brand-frame,html[data-smooth="1"] .acct-chip,html[data-sm
               <textarea class="input" id="songLyrics" rows="5" data-i18n-ph="songLyricsPh" placeholder="សរសេរអត្ថបទចម្រៀង (lyrics) របស់អ្នកនៅទីនេះ..." style="margin-top:6px;border:1px solid var(--line2);background:var(--field);padding:12px 14px;min-height:110px;border-radius:12px"></textarea>
             </div>
             <div>
+              <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px">
+                <button type="button" class="style-preset-chip" data-preset="Sad Trap" onclick="songStyleTogglePreset('Sad Trap')">Sad Trap</button>
+              </div>
               <div style="display:flex;gap:8px">
                 <input type="text" class="input" id="songStyle" data-i18n-ph="songStylePh" placeholder="ឧ. Pop, Rock, សំឡេងខ្មែរបុរាណ..." maxlength="500" style="flex:1;min-width:0;min-height:44px;padding:10px 14px" onkeydown="if(event.key==='Enter'){event.preventDefault();songStyleAdd();}">
                 <button type="button" class="kbtn kbtn-black" style="flex:0 0 auto;min-height:44px;padding:10px 20px" onclick="songStyleAdd()" data-i18n="btnAddStyle">Add</button>
@@ -5443,6 +5452,19 @@ function songProxySongs(root){
    plus whatever text is still sitting in the box. Session-only UI
    state, never stored. */
 var songStyleTagsArr=[];
+/* Preset styles: the UI only ever shows the short preset name (a chip
+   above the Style box, and the same short name as the selected tag).
+   The full prompt stored here replaces the name in the style text sent
+   to the provider on Generate — it is never displayed in the UI. */
+var SONG_STYLE_PRESETS={
+  'Sad Trap':'Emotional Sad Melodic Trap, Deep Heartbreak Ballad, 72 BPM, minor key, haunting soft piano intro, emotional cinematic violin strings, atmospheric pads, deep warm 808 bass, slow trap drums, subtle hi-hats, emotional male vocal with slightly raspy and trembling voice, intimate verses, powerful heartbreaking chorus, vulnerable crying vocal delivery, beautiful melodic hooks, dramatic instrumental drop, piano-only emotional bridge, cinematic outro, melancholic atmosphere, deeply touching, tearjerking, professional studio production, modern emotional trap sound.'
+};
+function songStyleTogglePreset(name){
+  var i=songStyleTagsArr.indexOf(name);
+  if(i>=0)songStyleTagsArr.splice(i,1);
+  else songStyleTagsArr.push(name);
+  songStyleRenderTags();
+}
 function songStyleAdd(){
   var inp=document.getElementById('songStyle');if(!inp)return;
   var parts=(inp.value||'').split(',').map(function(s){return s.trim();}).filter(function(s){return !!s;});
@@ -5462,12 +5484,18 @@ function songStyleRenderTags(){
   box.innerHTML=songStyleTagsArr.map(function(t,i){
     return '<span class="style-tag"><span>'+escHtml(t)+'</span><button type="button" class="style-tag-x" onclick="songStyleRemoveTag('+i+')" aria-label="✕">✕</button></span>';
   }).join('');
+  var chips=document.querySelectorAll('.style-preset-chip');
+  for(var c=0;c<chips.length;c++){
+    var nm=chips[c].getAttribute('data-preset');
+    chips[c].className='style-preset-chip'+(songStyleTagsArr.indexOf(nm)>=0?' on':'');
+  }
 }
 function songStyleFullText(){
   var parts=songStyleTagsArr.slice();
   var inp=document.getElementById('songStyle');
   var rest=inp?((inp.value||'').split(',').map(function(s){return s.trim();}).filter(function(s){return !!s;})):[];
   parts=parts.concat(rest);
+  parts=parts.map(function(p){return SONG_STYLE_PRESETS[p]||p;});
   return parts.join(', ');
 }
 async function genDoSong(p,prompt,keyEntry){
