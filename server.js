@@ -4322,6 +4322,37 @@ function apiRoute(req, res, urlPath) {
     const h = require('crypto').createHash('sha256').update(String(u)).digest('hex').slice(0, 24);
     return 'movai/songs/' + h;
   }
+  // ---- Cloudinary large-file wait LEVELS (owner order 2026-11-17 ~12:19) ----
+  // A big file cannot finish synchronously — Cloudinary processes it in
+  // the background. The server waits for it, with the wait picked
+  // AUTOMATICALLY from the file's weight (its size):
+  //   L1 light   (<=10 MB) : 10s | L2 medium (<=25 MB): 25s
+  //   L3 middle  (<=50 MB) : 50s | L4 heavy   (>50 MB)  : 90s (1.5 min)
+  // If the asset still is not ready after the level's wait, the attempt
+  // CLOSES (returns null -> clear error) and the user tries again; the
+  // next try finds the asset already stored (deterministic public_id).
+  // Size unknown (HEAD failed / no Content-Length) -> L2 medium (25s).
+  function cloudinaryWaitMsForBytes(bytes) {
+    const b = Number(bytes);
+    if (!Number.isFinite(b) || b <= 0) return 25000;
+    if (b <= 10 * 1024 * 1024) return 10000;
+    if (b <= 25 * 1024 * 1024) return 25000;
+    if (b <= 50 * 1024 * 1024) return 50000;
+    return 90000;
+  }
+  // HEAD the source URL for its Content-Length (bytes). Short timeout;
+  // returns null when unknown (server blocks HEAD, no length header...).
+  async function cloudinarySourceBytes(u) {
+    try {
+      const ctl = new AbortController();
+      const t = setTimeout(() => ctl.abort(), 8000);
+      const r = await fetch(String(u), { method: 'HEAD', redirect: 'follow', signal: ctl.signal });
+      clearTimeout(t);
+      const len = r && r.headers && r.headers.get && r.headers.get('content-length');
+      const n = len ? parseInt(len, 10) : NaN;
+      return Number.isFinite(n) && n > 0 ? n : null;
+    } catch (e) { return null; }
+  }
   // Wait until a Cloudinary video asset exists (background processing
   // done) — poll the Admin API, up to `ms` total. Returns true when the
   // asset is visible, false on timeout.
@@ -4402,12 +4433,19 @@ function apiRoute(req, res, urlPath) {
               if (mp3Url) { cloudinaryClearAccountMarks(a); return { publicId: cloudinaryPublicIdForUrl(u), mp3Url, accountId: a.id, accountLabel: a.label || a.cloudName }; }
             }
             if (kind === 'async') {
-              // Background processing: wait for the asset, then hand back
-              // its MP3 URL. Do NOT mark the account (nothing is wrong).
+              // Background processing: wait for the asset, with the wait
+              // picked AUTOMATICALLY from the file's weight (L1 10s /
+              // L2 25s / L3 50s / L4 90s). Do NOT mark the account
+              // (nothing is wrong with it). If the asset still is not
+              // ready after the level's wait, CLOSE this attempt (null)
+              // so the user tries again — the retry finds the asset
+              // already stored under its deterministic public_id.
               const detId = cloudinaryPublicIdForUrl(u);
-              const ready = await cloudinaryWaitForAsset(c, detId, 25000);
+              const waitMs = cloudinaryWaitMsForBytes(await cloudinarySourceBytes(u));
+              memLog('cloudinary-async wait ' + waitMs + 'ms for ' + detId);
+              const ready = await cloudinaryWaitForAsset(c, detId, waitMs);
+              if (!ready) { memLog('cloudinary-async timeout ' + detId); return null; }
               const mp3Url = cloudinaryMp3UrlFor(a, detId, title);
-              if (mp3Url && ready) { cloudinaryClearAccountMarks(a); return { publicId: detId, mp3Url, accountId: a.id, accountLabel: a.label || a.cloudName }; }
               if (mp3Url) { cloudinaryClearAccountMarks(a); return { publicId: detId, mp3Url, accountId: a.id, accountLabel: a.label || a.cloudName }; }
             }
             if (kind === 'gone') return 'gone';
