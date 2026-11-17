@@ -585,7 +585,7 @@ img.hist-media,.d3-preview{cursor:zoom-in}
    it is sung, the line being sung highlighted in step with
    the words inside the video. Screen-only evidence: it is
    never drawn into Export Video. */
-.mv-transcript{background:#0b0c0e;border-top:1px solid rgba(255,255,255,.09);display:flex;flex-direction:column;flex:0 1 auto;max-height:34vh;min-height:0}
+.mv-transcript{background:#0b0c0e;border-top:1px solid rgba(255,255,255,.09);display:flex;flex-direction:column;flex:0 0 auto;max-height:36vh;min-height:0}
 .mv-transcript[hidden]{display:none}
 .mv-tr-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;padding:8px 14px 4px}
 .mv-tr-title{font-size:0.78rem;font-weight:800;color:rgba(255,255,255,.88);line-height:1.5}
@@ -596,8 +596,9 @@ img.hist-media,.d3-preview{cursor:zoom-in}
 .mv-tr-row{display:flex;gap:10px;align-items:flex-start;width:100%;text-align:left;background:transparent;border:0;border-radius:8px;padding:6px 8px;cursor:pointer;color:rgba(255,255,255,.60);font:inherit}
 .mv-tr-time{flex:0 0 auto;min-width:86px;font-size:0.72rem;font-weight:700;font-variant-numeric:tabular-nums;color:rgba(255,255,255,.45);padding-top:3px;white-space:nowrap}
 .mv-tr-text{font-size:0.85rem;line-height:1.55;overflow-wrap:break-word;min-width:0}
-.mv-tr-row.on{background:rgba(255,255,255,.12);color:#fff}
+.mv-tr-row.on{background:rgba(255,211,77,.18);color:#ffd34d;box-shadow:inset 3px 0 0 #ffd34d}
 .mv-tr-row.on .mv-tr-time{color:#ffd34d}
+.mv-tr-row.on .mv-tr-text{color:#ffd34d;font-weight:700}
 /* Auto background: the MovAi logo / cover sits CENTRED and fitted
    whole inside the stage (contain — never cropped); a blurred copy
    of the same picture (NOT darkened — no black shadow behind the
@@ -17232,16 +17233,31 @@ function mvNormLines(j){
        the line start moves to the first REAL word — the line
        must not appear while the singer is only humming in. */
     var fStart=(typeof it.start==='number'&&isFinite(it.start))?it.start:null;
-    if(ws&&ws.length>2){
+    if(ws&&ws.length>=2){
       var trimN=0;
       while(trimN<ws.length-1&&mvVocTok(ws[trimN].t))trimN++;
-      if(trimN>=2){
+      /* Two or more leading hums are trimmed anywhere; at the
+         song's ENTRANCE (the first kept line) even ONE leading
+         «oh» / «អូហូ» is the singer's way in, not a word — it
+         is trimmed too, so the line starts at the first REAL
+         word's mouth-open and can never show during the intro. */
+      if(trimN>=2||(trimN>=1&&out.length===0)){
         var wsN=ws.length;
         ws=ws.slice(trimN);
         if(fStart===null||fStart<ws[0].start)fStart=ws[0].start;
         var tk=text.split(/\s+/).filter(function(x){return x.length;});
         if(tk.length===wsN)text=ws.map(function(w){return w.t;}).join(' ');
       }
+    }
+    if(!ws){
+      /* No word timings: entrance hums merged into the head of
+         the segment TEXT («អូហូ ហេតុអ្វី…» / «Oh, why not…»)
+         are stripped from the text itself under the same rule,
+         so the hum is never part of the shown line. */
+      var tk3=text.split(/[\s\u200B]+/).filter(function(x){return x.length;});
+      var tn3=0;
+      while(tn3<tk3.length-1&&mvVocTok(tk3[tn3]))tn3++;
+      if(tn3>=2||(tn3>=1&&out.length===0&&tk3.length>1))text=tk3.slice(tn3).join(' ');
     }
     out.push({text:text,
       start:fStart,
@@ -17428,6 +17444,13 @@ function mvAiFetch(trLang,attempt){
       else mvMsgShow(tx('mvTrFail'),'');
       var have=mvResolveLines(song).kind!=='none';
       if(!have&&mvState.song&&mvState.song.url===song.url)mvAiFetch('',0);
+      else if(have&&viewOpen&&mvState.song&&mvState.song.url===song.url){
+        /* Timed listen failed: fall back to translating the
+           song's own text lines directly (untimed, as before)
+           so a picked language still becomes the lyric. */
+        var rr=mvResolveLines(song);
+        if(rr.kind==='text')mvTranslateApply(song,trLang,rr.lines,false);
+      }
     }else if(srvErr){
       if(viewOpen&&noteEl)noteEl.textContent=srvErr;
       else mvMsgShow(srvErr,'err');
@@ -17482,24 +17505,30 @@ function mvStart(){
      (its timed lines replace the plain ones when they land);
      otherwise the song's own lines run at once. */
   var r=mvResolveLines(song);
-  if(trLang&&mvTrCache[song.url+'|'+trLang]){
-    var c=mvTrCache[song.url+'|'+trLang];
-    mvApplyLines(c.lines,c.kind==='timed');
-  }else if(r.kind!=='none'){
-    /* Creation lyrics: on screen at once. A picked translation
-       translates THESE lines directly into the picked
-       language (mvTranslateApply) and swaps in when it lands —
-       whichever language was picked, the lyrics become that
-       language, even when the song is sung in another one. If
-       it fails, these original lines simply stay. */
-    mvApplyLines(r.lines,r.kind==='timed');
-    if(trLang)mvTranslateApply(song,trLang,r.lines,r.kind==='timed');
+  var cTr=trLang?mvTrCache[song.url+'|'+trLang]:null;
+  if(cTr&&cTr.kind==='timed'){
+    mvApplyLines(cTr.lines,true);
+  }else if(!trLang&&r.kind==='timed'){
+    mvApplyLines(r.lines,true);
   }else{
-    /* No creation lyrics: ask AI to listen + write them right
-       away — the lines appear the moment they come back. A
-       failed translation falls back to the original lyrics. */
-    mvApplyLines(null,false);
+    /* No TIMED lines for this play yet (owner fix 2026-11-17,
+       latest): creation text alone is only a placeholder — it
+       carries no sung seconds, so the old flow spread it over
+       the song, put line 1 on screen at 0:00 over the wordless
+       «oh-oh» intro, and kept the transcript under the video
+       hidden (it needs real start–end seconds). Now the AI
+       listen runs FIRST (its progress shows on the stage) and
+       its timed lines replace the placeholder the moment they
+       land; a picked translation goes through the same fetch,
+       so the translated lines arrive timed too. Until the
+       timed lines land, mvSyncLyrics keeps the lyric zone
+       EMPTY — no words at all before the first real sung
+       word. If the listen fails, the placeholder lines stay
+       and behave as before. */
     mvAiFetch(trLang||'');
+    if(cTr)mvApplyLines(cTr.lines,cTr.kind==='timed');
+    else if(r.kind!=='none')mvApplyLines(r.lines,r.kind==='timed');
+    else mvApplyLines(null,false);
   }
   /* Audio: one dedicated element for the MV view. */
   if(!mvAudio){
@@ -18054,6 +18083,13 @@ function mvPrepLines(lines){
     var e=(typeof L.end==='number'&&isFinite(L.end))?L.end:null;
     if(L.words&&L.words.length){
       var ws=L.words,w0=ws[0].start,wN=ws[ws.length-1].end;
+      /* First line only: if its word list still opens with an
+         entrance hum («oh» / «អូហូ»), the line's start is the
+         first REAL word — never the hum (owner rule: no lyric
+         shows while the singer is only humming in). */
+      if(i===0&&ws.length>=2&&mvVocTok(ws[0].t)){
+        for(var vi=1;vi<ws.length;vi++){if(!mvVocTok(ws[vi].t)){w0=ws[vi].start;break;}}
+      }
       if(s===null||Math.abs(w0-s)<=6)s=w0;
       if(e===null||wN>e)e=wN;
     }
@@ -18386,6 +18422,12 @@ function mvSyncLyrics(force){
         }
       }
     }
+  }else if(mvState.aiBusy){
+    /* Placeholder (untimed) lines while the AI listen for the
+       REAL sung seconds is still running: show NOTHING — the
+       words appear only when the timed lines land, so line 1
+       can never sit on screen over the wordless intro. */
+    idx=-1;
   }else{
     var d=isFinite(mvAudio.duration)?mvAudio.duration:0;
     if(d>0)idx=Math.min(lines.length-1,Math.floor(t/d*lines.length));
@@ -18616,6 +18658,14 @@ function mvAlignLines(lines,data){
       o=mvAlignNearest(ons,L._s,Math.max(prevS+0.05,L._s-0.5),hi);
     }
     if(o!==null&&o>prevS)L._s=o;
+    /* The AI's stamps are not exact (owner note 2026-11-17,
+       latest): a snap may land on the entrance hum's phrase —
+       a sound, not a word. The WORD timings are the ground
+       truth for where real singing starts, so a line's start
+       may never sit earlier than its first word's mouth-open.
+       This is the general rule for every song, not a per-song
+       patch: no line shows before its first real word. */
+    if(L.words&&L.words.length&&typeof L.words[0].start==='number'&&L._s<L.words[0].start-0.05)L._s=L.words[0].start;
     prevS=L._s;
   }
   /* 2) Ends: a line never runs far past the next line's
