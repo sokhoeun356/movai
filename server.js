@@ -79,7 +79,7 @@ const FREE_SONG_CREDITS = 24;
 
 /* ---------------- GitHub-backed persistent storage ----------------- */
 // Render free disk is ephemeral — ./data/*.json is wiped on restart, so
-// posts, credits and users vanish. When MOVAI_GITHUB_TOKEN is set, the 20
+// posts, credits and users vanish. When MOVAI_GITHUB_TOKEN is set, the 21
 // JSON data files are ALSO stored in a private GitHub repo (branch main,
 // repo root, same filenames). On startup the server pulls each file from
 // GitHub into the local ./data/ cache (overwriting local); on every local
@@ -103,7 +103,7 @@ const GH_DATA_FILES = [
   'push-subs.json', 'packages.json', 'purchase-requests.json',
   'public.json', 'package-events.json', 'blocked-models.json',
   'model-logins.json', 'blocked-ips.json', 'blocked-emails.json',
-  'updates.json', 'admin-lockouts.json', 'history.json',
+  'updates.json', 'admin-lockouts.json', 'history.json', 'mp3cache.json',
 ];
 const ghShaCache = {}; // filename -> GitHub blob sha (for PUT updates)
 function ghEnabled() { return !!GH_TOKEN; }
@@ -4169,6 +4169,50 @@ function apiRoute(req, res, urlPath) {
         try { sendJSON(res, 500, { ok: false, error: 'MP3 convert failed: ' + String((e && e.message) || e).slice(0, 200) }); } catch (e2) {}
       }
     })();
+    return;
+  }
+  // POST /api/public/song-store — PUBLIC. {url}. Stores a song
+  // PERMANENTLY right after generation (Hercules checklist point A,
+  // owner order 2026-11-17): the AI provider's audio URL is TEMPORARY
+  // and expires, so the server downloads it once (streaming, via the
+  // existing convertAndCacheMp3 — WAV→MP3 128k if needed), caches it as
+  // mp3-<hash>.mp3 in ./data/uploads/, backs it up to GitHub, and
+  // returns our permanent /uploads/ URL. The website then saves THAT
+  // URL (never the provider URL) in History, so Play/Download work
+  // forever. Placed AFTER convertAndCacheMp3 (line ~4045) on purpose —
+  // calling it from here must not hit a TDZ ReferenceError.
+  if (req.method === 'POST' && urlPath === '/api/public/song-store') {
+    readJSONBody(req, 64 * 1024).then(async (body) => {
+      const url = String((body && body.url) || '').trim();
+      const proto = req.headers && req.headers['x-forwarded-proto'] === 'http' ? 'http' : 'https';
+      const host = (req.headers && req.headers.host) || 'movai-proxy.onrender.com';
+      const ownBase = proto + '://' + host;
+      try {
+        if (!url) return sendJSON(res, 200, { ok: false, error: 'missing url' });
+        // Already one of OUR permanent uploads URLs? Nothing to do.
+        if (url.indexOf('/uploads/') >= 0 && (url.indexOf(ownBase + '/uploads/') === 0 || url.indexOf('movai-proxy.onrender.com/uploads/') >= 0)) {
+          return sendJSON(res, 200, { ok: true, url });
+        }
+        const fname = await convertAndCacheMp3(url);
+        if (!fname) return sendJSON(res, 200, { ok: false, error: 'store failed', url });
+        // Back the cached MP3 up to GitHub so it survives a Render
+        // restart. (convertAndCacheMp3's ghPersistFile is a no-op for
+        // mp3 files — it only handles GH_DATA_FILES — so this explicit
+        // ghPutUpload is the real backup.) A GitHub failure does NOT
+        // fail the request: the local file works now, and /uploads/
+        // falls back to GitHub when present.
+        try {
+          const b64 = fs.readFileSync(path.join(DATA_DIR, 'uploads', fname)).toString('base64');
+          await ghPutUpload(fname, b64);
+        } catch (e) {
+          console.error('[songstore] github backup failed for', fname, ':', String((e && e.message) || e).slice(0, 200));
+        }
+        return sendJSON(res, 200, { ok: true, url: ownBase + '/uploads/' + fname });
+      } catch (e) {
+        console.error('[songstore] failed for', url.slice(0, 120), ':', String((e && e.message) || e).slice(0, 200));
+        return sendJSON(res, 200, { ok: false, error: 'store failed', url });
+      }
+    }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
     return;
   }
   // GET /api/gen/song/mp3-warm — REMOVED (owner order 2026-11-16 ~22:00):

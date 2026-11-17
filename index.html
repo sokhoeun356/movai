@@ -4971,7 +4971,17 @@ async function dlSaveSongMp3(src,title,fallback){
         if(attempt<3) await new Promise(function(r){setTimeout(r,5000);});
       }
     }
-    if(!rp){ mp3FailReal(lastErr||directErr); return; }
+    if(!rp){
+      mp3FailReal(lastErr||directErr);
+      /* Hercules checklist C8 — last-resort fallback: the direct
+         fetch AND the server conversion both failed, so open the
+         source audio in a new tab where the user can still save it.
+         This only fires when the in-website download has already
+         failed completely (never on the normal path). Note: a popup
+         blocker may stop it — the error above is still shown. */
+      try{ if(/^https:/i.test(src))window.open(src,'_blank'); }catch(e){}
+      return;
+    }
     if(!rp.ok){
       /* Server failed — surface its REAL reason (JSON error or
          plain text) and save NOTHING (never the big WAV). */
@@ -5630,7 +5640,19 @@ function genShowSongs(items,streaming,restored){
   if(!streaming&&!restored){
     songs.forEach(function(s){
       var su=/^https:/i.test(s.url)?s.url:((/^data:audio\//i.test(s.url)&&s.url.length<1200000)?s.url:null);
-      if(su)histAddTo({type:'song',url:su,title:s.title||sTitle,prompt:sPrompt,provider:sProv,image:(s.image&&/^https:/i.test(s.image))?s.image:undefined},saveKey);
+      if(su){
+        var it={type:'song',url:su,title:s.title||sTitle,prompt:sPrompt,provider:sProv,image:(s.image&&/^https:/i.test(s.image))?s.image:undefined};
+        histAddTo(it,saveKey);
+        /* Permanent storage (Hercules checklist A, owner order
+           2026-11-17): the provider audio URL is TEMPORARY and
+           expires. In the background, ask the server to store this
+           song permanently (/uploads/, GitHub-backed) and swap the
+           History entry to the permanent URL once it is ready. The
+           song shows and plays immediately on the provider URL; the
+           swap only makes it permanent. If the store fails, the
+           provider URL stays — nothing is lost. */
+        try{histStorePermanent(it,saveKey);}catch(e){}
+      }
     });
     /* The Create results themselves are kept too (owner rule
        2026-11-16): the songs stay in the creation place,
@@ -6004,6 +6026,33 @@ function histSyncPushFor(key){
         }).catch(function(){});
     });
   },2000);
+}
+/* Permanent song storage (Hercules checklist A, owner order
+   2026-11-17): swap a History song's temporary provider URL for
+   the server's permanent /uploads/ URL. Runs in the background
+   after the song is saved — the song is already visible and
+   playable on the provider URL, and this only makes it permanent
+   (the provider URL expires; ours never does). Skips URLs that
+   are already permanent, and data: URLs (already self-contained).
+   On any failure the provider URL simply stays — nothing breaks. */
+function histStorePermanent(item,saveKey){
+  if(!item||!item.id||!/^https:/i.test(item.url||''))return;
+  if(/movai-proxy\.onrender\.com\/uploads\//i.test(item.url))return;
+  fetch(GEN_API+'/public/song-store',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({url:item.url})})
+    .then(function(r){return r.json();})
+    .then(function(j){
+      if(!j||!j.ok||!j.url||j.url===item.url)return;
+      var arr=histGetFrom(saveKey||histKey());
+      var changed=false;
+      for(var i=0;i<arr.length;i++){
+        if(arr[i]&&arr[i].id===item.id){arr[i].url=j.url;changed=true;break;}
+      }
+      if(!changed)return;
+      histSyncApplying=true;
+      try{histSaveTo(saveKey||histKey(),arr);}catch(e){}
+      histSyncApplying=false;
+      try{histRender();}catch(e){}
+    }).catch(function(){});
 }
 function histAdd(item){
   histAddTo(item,histKey());
