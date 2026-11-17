@@ -2378,7 +2378,7 @@ main{padding-top:calc(3.75rem + env(safe-area-inset-top,0px))}
  .topbar-right{right:16px;top:15px}
  /* Content column between the left sidebar and the right rail */
  main{max-width:none;width:auto;margin:0 312px 0 248px;padding:100px 20px 120px}
- .nav-row,#page-public,#page-gen,#page-history{max-width:none;width:auto;margin-left:0;margin-right:0}
+ .nav-row,#page-public,#page-gen,#page-history,#page-studio{max-width:none;width:auto;margin-left:0;margin-right:0}
  #topSearchBar{left:268px;right:332px;top:88px;max-width:none;margin:0}
  .nav-row .create-modebar{max-width:860px}
  .panel{padding:22px;border-radius:20px}
@@ -2493,6 +2493,46 @@ main{padding-top:calc(3.75rem + env(safe-area-inset-top,0px))}
  main{padding-left:36px;padding-right:36px}
  #topSearchBar{left:284px;right:348px}
 }
+/* ===== MOVAI Studio (owner order 2026-11-17) =====
+   A fully client-side audio editor section: load a song,
+   split Vocals / Instruments (center-channel), a per-track
+   waveform timeline, a mixer (volume / mute / solo), trim,
+   and a WAV mix-down export. No server, no keys. */
+#sec-studio{scroll-margin-top:16px}
+.st-title{font-size:1.125rem;font-weight:800}
+.st-songinfo{font-size:0.8125rem;color:var(--muted);margin-top:4px;overflow-wrap:break-word}
+.st-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;align-items:stretch}
+.st-row .kbtn{flex:1 1 auto}
+.st-url{flex:1 1 200px;width:auto}
+.st-msg{font-size:0.8125rem;margin-top:10px;line-height:1.5;color:var(--text2)}
+.st-msg.err{color:#f87171}
+.st-note{font-size:0.75rem;color:var(--muted);margin-top:10px;line-height:1.55}
+.st-prog{display:none;margin-top:12px}
+.st-prog.on{display:block}
+.st-prog-bar{height:10px;border-radius:999px;background:var(--field);border:1px solid var(--line2);overflow:hidden}
+.st-prog-fill{height:100%;width:0%;background:var(--accent-fill);transition:width .2s ease}
+.st-prog-txt{font-size:0.8125rem;color:var(--text2);margin-top:6px;font-variant-numeric:tabular-nums}
+.st-transport{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:16px;padding-top:14px;border-top:1px solid var(--line)}
+.st-play{width:56px;height:56px;border-radius:50%;border:none;background:var(--accent-fill);color:#0d1005;font-size:1.25rem;cursor:pointer;flex:0 0 auto;display:flex;align-items:center;justify-content:center;font-family:inherit}
+.st-time{font-size:0.9375rem;font-weight:700;font-variant-numeric:tabular-nums}
+.st-loop.on{background:rgba(var(--accent-rgb),.18);border-color:var(--accent);color:var(--accent-text)}
+.st-master{display:flex;align-items:center;gap:8px;flex:1 1 150px;font-size:0.8125rem;color:var(--muted)}
+.st-track{background:var(--card2);border:1px solid var(--line);border-radius:14px;padding:12px;margin-top:12px}
+.st-track-head{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.st-track-name{font-weight:800;font-size:0.9375rem;overflow-wrap:break-word;min-width:0}
+.st-track-del{flex:0 0 auto;width:40px;height:40px;border-radius:10px;background:transparent;border:1px solid var(--line2);color:#f87171;font-size:0.9375rem;cursor:pointer;font-family:inherit}
+.st-wave{position:relative;margin-top:10px;background:var(--field);border:1px solid var(--line);border-radius:10px;overflow:hidden;cursor:pointer}
+.st-wave canvas{display:block;width:100%;height:64px}
+.st-playhead{position:absolute;top:0;bottom:0;width:2px;background:#fff;left:0;pointer-events:none;box-shadow:0 0 6px rgba(0,0,0,.65)}
+.st-ctrls{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:10px}
+.st-vol{flex:1 1 120px}
+.st-ms{min-width:48px;min-height:42px;padding:6px 12px}
+.st-ms.on-mute{background:#7f1d1d;border-color:#f87171;color:#fecaca}
+.st-ms.on-solo{background:rgba(var(--accent-rgb),.2);border-color:var(--accent);color:var(--accent-text)}
+.st-trim{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-top:10px;font-size:0.8125rem;color:var(--muted)}
+.st-trim input{width:78px;padding:8px;border-radius:8px;border:1px solid var(--line2);background:var(--field);color:var(--text);font-family:inherit;font-size:0.875rem;min-height:42px}
+input[type=range].st-range{accent-color:var(--accent);min-height:32px;cursor:pointer}
+@media(min-width:1024px){#page-studio .panel{max-width:1080px;margin-left:auto;margin-right:auto}}
 </style>
 </head>
 <body>
@@ -2504,6 +2544,7 @@ main{padding-top:calc(3.75rem + env(safe-area-inset-top,0px))}
     <button onclick="menuGo('sec-create','song')"><span data-i18n="navModeSong">បង្កើតបទចម្រៀង</span></button>
     <button onclick="menuGo('sec-create','video')"><span data-i18n="navModeVI">វីដេអូ+រូបភាព</span></button>
     <button onclick="menuGo('sec-create','3d')"><span data-i18n="navMode3d">រូបភាព 3D</span></button>
+    <button onclick="menuGo('sec-studio')"><span data-i18n="navStudio">ស្ទូឌីយោ</span> <small>Studio</small></button>
     <button onclick="menuGo('sec-history')"><span data-i18n="navHistory">ប្រវត្តិ</span> <small>History</small></button>
     <button onclick="menuGo('sec-playlist')"><span data-i18n="plTitle">Playlist · បញ្ជីចម្រៀង</span> <small>Playlist</small></button>
     <button onclick="menuGo('sec-packages')"><span data-i18n="navPackages">កញ្ចប់សេវាកម្ម</span> <small data-i18n="navPackagesSub">Packages</small></button>
@@ -2879,6 +2920,39 @@ main{padding-top:calc(3.75rem + env(safe-area-inset-top,0px))}
     <div class="hist-pane" data-hpane="story" style="display:none">
       <h3 class="hist-sec-head"><span data-i18n="histSecStory">ប្រវត្តិ Story</span><span class="hist-sec-count" id="histCount-story"></span></h3>
       <div class="hist-scroll hist-scroll-list"><div id="histList-story"></div></div>
+    </div>
+  </div>
+</section>
+<section id="page-studio" style="display:none" aria-label="Studio">
+  <div class="panel" id="sec-studio">
+    <h2 class="st-title">ស្ទូឌីយោ · Studio</h2>
+    <p class="st-songinfo" id="stSongInfo">មិនទាន់មានបទ · No song loaded</p>
+    <div class="st-row">
+      <button type="button" class="kbtn kbtn-black" onclick="document.getElementById('stFile').click()">បើក File · Open file</button>
+      <button type="button" class="kbtn kbtn-white" id="stSplitBtn" onclick="stSplit()" disabled>បំបែក Track · Split</button>
+      <button type="button" class="kbtn kbtn-white" onclick="document.getElementById('stStemFile').click()">បន្ថែម Track · Add track</button>
+    </div>
+    <div class="st-row">
+      <input class="input st-url" id="stUrl" type="url" placeholder="Link បទចម្រៀង (MP3) · Song URL" aria-label="Song URL">
+      <button type="button" class="kbtn kbtn-white" onclick="stLoadUrl()">បើក Link · Load</button>
+    </div>
+    <input type="file" id="stFile" accept="audio/*" style="display:none" onchange="stLoadFile(this)">
+    <input type="file" id="stStemFile" accept="audio/*" multiple style="display:none" onchange="stAddStems(this)">
+    <p class="st-note">បំបែក Vocal / Instrumental (center-channel) — បំបែក 4 Track ពេញ (Vocal/Drums/Bass/Other) ត្រូវការសេវាបំបែកសំឡេងដាច់ដោយឡែក · Vocal / Instrumental split (center-channel) — a full 4-stem split (Vocal/Drums/Bass/Other) needs a dedicated separation service.</p>
+    <p class="st-msg" id="stMsg" style="display:none"></p>
+    <div class="st-prog" id="stProg">
+      <div class="st-prog-bar"><div class="st-prog-fill" id="stProgFill"></div></div>
+      <div class="st-prog-txt" id="stProgTxt"></div>
+    </div>
+    <div class="st-transport">
+      <button type="button" class="st-play" id="stPlayBtn" onclick="stTogglePlay()" aria-label="Play / Pause">▶</button>
+      <span class="st-time"><span id="stCur">0:00</span> / <span id="stTot">0:00</span></span>
+      <button type="button" class="kbtn kbtn-white st-loop" id="stLoopBtn" onclick="stToggleLoop()" aria-pressed="false">វិលជុំ · Loop</button>
+      <label class="st-master">Master <input type="range" class="st-range" id="stMasterVol" min="0" max="100" value="90" oninput="stSetMaster(this.value)"></label>
+    </div>
+    <div id="stTracks"></div>
+    <div class="st-row">
+      <button type="button" class="btn btn-green" style="flex:1" onclick="stExport()">Export Mix · ទាញយក WAV</button>
     </div>
   </div>
 </section>
@@ -3438,7 +3512,7 @@ km:{
  profileTitle:'ប្រូហ្វាល់របស់ខ្ញុំ',profileBalance:'សមតុល្យ Credit',profileAccount:'គណនី',profileEmail:'Gmail',
  profilePlan:'កញ្ចប់សេវាកម្ម',profileFree:'ឥតគិតថ្លៃ (Free)',profileSince:'សមាជិកតាំងពី',profileLabel:'ប្រូហ្វាល់',
  profileUserId:'លេខសម្គាល់ (ID)',profileCopy:'ចម្លង',profileCopied:'បានចម្លង ✓',acctFirstName:'នាម · First name',acctLastName:'គោត្តនាម · Last name',
- pubTabPublic:'សាធារណៈ',pubTabCreate:'បង្កើត',navModeSong:'បង្កើតបទចម្រៀង',navModeVI:'វីដេអូ+រូបភាព',navMode3d:'រូបភាព 3D',pubTitle:'Public · សាធារណៈ',pubRefresh:'ផ្ទុកថ្មី',pubLoading:'កំពុងផ្ទុក Public...',
+ pubTabPublic:'សាធារណៈ',pubTabCreate:'បង្កើត',navModeSong:'បង្កើតបទចម្រៀង',navModeVI:'វីដេអូ+រូបភាព',navMode3d:'រូបភាព 3D',navStudio:'ស្ទូឌីយោ',studioOpen:'Studio',pubTitle:'Public · សាធារណៈ',pubRefresh:'ផ្ទុកថ្មី',pubLoading:'កំពុងផ្ទុក Public...',
  pubRankNote:'រាំង (Ranking) រាប់តាមចំនួនអ្នកមើល (View) — អ្នកណា View ច្រើនជាងគេ គឺលេខ 1',
  pubEmpty:'មិនទាន់មានអ្វីផុសនៅ Public នៅឡើយទេ — ចូលទៅ បង្កើត ហើយចុច «ផុសទៅ Public» ដើម្បីផុសដំបូងគេ!',
  pubError:'ផ្ទុក Public feed មិនបាន — server អាចកំពុងដេក សូមចុចព្យាយាមម្ដងទៀត',pubRetry:'ព្យាយាមម្ដងទៀត',
@@ -3699,7 +3773,7 @@ en:{
  profileTitle:'My Profile',profileBalance:'Credit balance',profileAccount:'Account',profileEmail:'Gmail',
  profilePlan:'Package',profileFree:'Free',profileSince:'Member since',profileLabel:'Profile',
  profileUserId:'User ID',profileCopy:'Copy',profileCopied:'Copied ✓',acctFirstName:'First name · នាម',acctLastName:'Last name · គោត្តនាម',
- pubTabPublic:'Public',pubTabCreate:'Create',navModeSong:'Create Song',navModeVI:'Video+Image',navMode3d:'3D Image',pubTitle:'Public',pubRefresh:'Refresh',pubLoading:'Loading Public...',
+ pubTabPublic:'Public',pubTabCreate:'Create',navModeSong:'Create Song',navModeVI:'Video+Image',navMode3d:'3D Image',navStudio:'Studio',studioOpen:'Studio',pubTitle:'Public',pubRefresh:'Refresh',pubLoading:'Loading Public...',
  pubRankNote:'Ranking is by views — whoever has the most views is #1',
  pubEmpty:'Nothing has been posted to Public yet — go to Create, make something, and tap "Post to Public" to be the first!',
  pubError:'Could not load the Public feed — the server may be asleep. Please try again',pubRetry:'Try again',
@@ -7409,6 +7483,26 @@ var SONG_SVG_SHARE='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" s
 var SONG_SVG_POST='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3c2.7 2.6 4 5.6 4 9s-1.3 6.4-4 9c-2.7-2.6-4-5.6-4-9s1.3-6.4 4-9z"/></svg>';
 var SONG_SVG_DEL='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16"/><path d="M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/><path d="M6.5 7l.9 12.1A1 1 0 0 0 8.4 20h7.2a1 1 0 0 0 1-.9L17.5 7"/><path d="M10 11v5M14 11v5"/></svg>';
 var SONG_SVG_MV='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2.5" y="5" width="19" height="14" rx="3"/><path d="M10 9.5l5 2.5-5 2.5z" fill="currentColor" stroke="none"/></svg>';
+/* MOVAI Studio (owner order 2026-11-17): the «Studio» action
+   sits beside MV on the owner's OWN song cards only (creation
+   results, History, Playlist, and own posts in Public — the
+   same rule as MV + Download). Tapping it loads the song into
+   the Studio section (studioOpenSong, defined with the Studio
+   engine at the end of this script) and switches to it. */
+var SONG_SVG_STUDIO='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 10v4M8 7v10M12 4v16M16 8v8M20 10v4"/></svg>';
+function studioIcoBtn(url,title){
+  var b=songIcoBtn(tx('studioOpen'),SONG_SVG_STUDIO);
+  b.addEventListener('click',function(){studioOpenSong(url,title||'');});
+  return b;
+}
+function studioPillBtn(url,title){
+  var b=document.createElement('button');
+  b.type='button';b.className='pub-pill';
+  b.innerHTML=SONG_SVG_STUDIO+'<span>'+escHtml(tx('studioOpen'))+'</span>';
+  b.setAttribute('aria-label',tx('studioOpen'));
+  b.addEventListener('click',function(){studioOpenSong(url,title||'');});
+  return b;
+}
 function songIcoBtn(label,svg,red){
   var b=document.createElement('button');
   b.type='button';b.className='song-ico-btn';
@@ -7671,6 +7765,7 @@ function genSongCard(song,n,it,title,prov,prompt,streaming){
   var mvb=songIcoBtn(tx('mvBtn'),SONG_SVG_MV);
   mvb.addEventListener('click',function(){mvOpen({url:u,title:title||'',lyrics:prompt||'',image:(song&&song.image)||''});});
   acts.appendChild(mvb);
+  acts.appendChild(studioIcoBtn(u,title||''));
   var sh=songIcoBtn(tx('histShare'),SONG_SVG_SHARE);
   sh.addEventListener('click',function(){histShare(it||{type:'song',url:u,title:title,prompt:prompt},sh);});
   acts.appendChild(sh);
@@ -8401,6 +8496,7 @@ function histSongCard(it){
     var mvb=songIcoBtn(tx('mvBtn'),SONG_SVG_MV);
     mvb.addEventListener('click',function(){mvOpen({url:it.url,title:it.title||'',lyrics:it.prompt||'',image:it.image||''});});
     rowEl.appendChild(mvb);
+    rowEl.appendChild(studioIcoBtn(it.url,it.title||''));
     var sh=songIcoBtn(tx('histShare'),SONG_SVG_SHARE);
     sh.addEventListener('click',function(){histShare(it,sh);});
     rowEl.appendChild(sh);
@@ -9296,6 +9392,10 @@ function menuGo(id,mode){
   if(mode)genSetMode(mode);
   if(id==='sec-packages'){packagesShow();return;}
   packagesHide();
+  /* Studio is its own top-level view (owner order 2026-11-17):
+     it replaces Public / Create instead of scrolling inside
+     the Create view like the other drawer items. */
+  if(id==='sec-studio'){appSetView('studio');window.scrollTo(0,0);return;}
   appSetView('create');
   /* The Playlist now lives inside the History panel as a tab:
      open that tab, then scroll to the panel itself. */
@@ -9799,7 +9899,7 @@ function pubSetFilter(f){
   },{passive:true});
 })();
 function appSetView(v){
-  var nv=(v==='create')?'create':'public';
+  var nv=(v==='create')?'create':(v==='studio'?'studio':'public');
   var changed=(APP_VIEW!==nv);
   APP_VIEW=nv;
   /* The top header is always visible in both views (owner order
@@ -9807,17 +9907,26 @@ function appSetView(v){
      marker so no hiding rule can apply. */
   try{document.body.classList.remove('view-create');}catch(e){}
   var onPub=(nv==='public');
+  var onCreate=(nv==='create');
   var pub=document.getElementById('page-public');
   var gen=document.getElementById('page-gen');
   var his=document.getElementById('page-history');
+  var stu=document.getElementById('page-studio');
   if(pub)pub.style.display=onPub?'':'none';
-  if(gen)gen.style.display=onPub?'none':'';
-  if(his)his.style.display=onPub?'none':'';
+  if(gen)gen.style.display=onCreate?'':'none';
+  if(his)his.style.display=onCreate?'':'none';
+  if(stu)stu.style.display=(nv==='studio')?'':'none';
   var tp=document.getElementById('viewTabPublic'),tc=document.getElementById('viewTabCreate');
   if(tp){tp.className='view-tab'+(onPub?' on':'');tp.setAttribute('aria-selected',onPub?'true':'false');}
-  if(tc){tc.className='view-tab'+(!onPub?' on':'');tc.setAttribute('aria-selected',!onPub?'true':'false');}
+  if(tc){tc.className='view-tab'+(onCreate?' on':'');tc.setAttribute('aria-selected',onCreate?'true':'false');}
   if(onPub){pubLoadFeed(false);try{pubFollowLoad();}catch(e){}try{pubAutoStart();}catch(e){}}
-  else{try{pubAutoStop();}catch(e){}try{histRender();}catch(e){}try{plRender();}catch(e){}try{lastSongsRestore();}catch(e){}}
+  else{try{pubAutoStop();}catch(e){}}
+  if(onCreate){try{histRender();}catch(e){}try{plRender();}catch(e){}try{lastSongsRestore();}catch(e){}}
+  /* Studio view hooks: redraw the waveforms once the section
+     is visible (canvas widths are 0 while it is hidden), and
+     stop Studio playback when the user leaves the section. */
+  if(nv==='studio'){try{stDrawAllWaves();}catch(e){}}
+  else{try{if(typeof ST!=='undefined'&&ST.playing)stPause(false);}catch(e){}}
   if(changed)window.scrollTo(0,0);
   try{dockSync();}catch(e){}
   /* The mode bar's active tab follows the view just entered:
@@ -10667,6 +10776,7 @@ function plRowEl(en){
   var mvb=songIcoBtn(tx('mvBtn'),SONG_SVG_MV);
   mvb.addEventListener('click',function(){mvOpen({url:en.url,title:en.title||'',lyrics:'',image:en.image||''});});
   rowEl.appendChild(mvb);
+  rowEl.appendChild(studioIcoBtn(en.url,en.title||''));
   var rm=songIcoBtn(tx('plRemove'),SONG_SVG_DEL,true);
   rm.addEventListener('click',function(){plRemove(en.url);});
   rowEl.appendChild(rm);
@@ -11130,6 +11240,7 @@ function pubSongRowEl(it){
   rmv.setAttribute('aria-label',tx('mvBtn'));
   rmv.addEventListener('click',function(){mvOpen({url:it.url,title:it.title||'',lyrics:it.lyrics||it.prompt||'',image:it.image||''});});
   if(pubIsOwn(it))acts.appendChild(rmv);
+  if(pubIsOwn(it))acts.appendChild(studioPillBtn(it.url,it.title||''));
   acts.appendChild(plPillBtn({url:it.url,title:it.title||'',image:it.image||'',name:pubDisplayName(it)}));
   /* The action row is NOT inside the title column any more
      (owner order 2026-11-17): it is appended to the row itself
@@ -11491,6 +11602,7 @@ function pubCardEl(it){
     amv.setAttribute('aria-label',tx('mvBtn'));
     amv.addEventListener('click',function(){mvOpen({url:it.url,title:it.title||'',lyrics:it.lyrics||it.prompt||'',image:it.image||''});});
     if(pubIsOwn(it))arow.appendChild(amv);
+    if(pubIsOwn(it))arow.appendChild(studioPillBtn(it.url,it.title||''));
     arow.appendChild(plPillBtn({url:it.url,title:it.title||'',image:it.image||'',name:pubDisplayName(it)}));
     /* Hidden by default (owner order 2026-11-17): the action row
        sits inside a collapsible wrap — the card stays clean and
@@ -20363,6 +20475,535 @@ function topSearchApply(){
     host.style.display=show?'':'none';
   }
 }
+/* ================= MOVAI Studio (owner order 2026-11-17) =================
+   A fully client-side audio editor in its own top-level view
+   (#page-studio):
+   · Load — upload an MP3/WAV file, paste an audio URL (a MovAi
+     Cloudinary link works), or tap «Studio» on an own song card
+     (studioOpenSong).
+   · Split — Vocals / Instruments by the Web Audio
+     center-channel technique, rendered with OfflineAudioContext
+     (vocals sit in the centre of a stereo mix: (L+R)/2 keeps
+     them, (L−R)/2 removes them). Extra stems can be added as
+     tracks from files.
+   · Timeline — one waveform row per track on a shared time
+     scale, a playhead on every row, tap a waveform to seek,
+     Play / Pause, current / total time, Loop.
+   · Mixer — per-track GainNode volume, Mute, Solo, Master gain.
+   · Edit — per-track Trim (start / end seconds).
+   · Export — OfflineAudioContext mix-down (volume, mute, solo,
+     trim and master respected), encoded to WAV and downloaded
+     as «<song name> - MOVAI Studio.wav», with live progress
+     (% + elapsed seconds).
+   No server, no login, no API keys, no provider calls. */
+var ST={ctx:null,master:null,tracks:[],mainBuffer:null,songName:'',playing:false,loop:false,pos:0,startAt:0,startPos:0,raf:0,nextId:1,masterVol:0.9,busy:false,progPct:0,progLabel:'',progT0:0,progTimer:null};
+function stCtx(){
+  if(!ST.ctx){
+    var AC=window.AudioContext||window.webkitAudioContext;
+    ST.ctx=new AC();
+    ST.master=ST.ctx.createGain();
+    ST.master.gain.value=ST.masterVol;
+    ST.master.connect(ST.ctx.destination);
+  }
+  if(ST.ctx.state==='suspended'){var p=ST.ctx.resume();if(p&&p.catch)p.catch(function(){});}
+  return ST.ctx;
+}
+function stMsg(txt,err){
+  var m=document.getElementById('stMsg');if(!m)return;
+  if(!txt){m.style.display='none';m.textContent='';m.className='st-msg';return;}
+  m.style.display='';m.textContent=txt;m.className='st-msg'+(err?' err':'');
+}
+function stFmt(s){s=Math.max(0,Math.floor(s||0));var m=Math.floor(s/60),r=s%60;return m+':'+(r<10?'0':'')+r;}
+function stTotal(){
+  var t=0,i;
+  for(i=0;i<ST.tracks.length;i++)if(ST.tracks[i].trimEnd>t)t=ST.tracks[i].trimEnd;
+  return t;
+}
+function stAnySolo(){for(var i=0;i<ST.tracks.length;i++)if(ST.tracks[i].solo)return true;return false;}
+function stAudible(tr){if(tr.mute)return false;if(stAnySolo()&&!tr.solo)return false;return true;}
+/* ---- Progress (split + export): % + elapsed seconds ---- */
+function stProgBegin(label){
+  ST.progLabel=label;ST.progPct=0;ST.progT0=Date.now();
+  var p=document.getElementById('stProg');if(p)p.classList.add('on');
+  stProgPaint();
+  if(ST.progTimer)clearInterval(ST.progTimer);
+  ST.progTimer=setInterval(stProgPaint,250);
+}
+function stProgPaint(){
+  var f=document.getElementById('stProgFill'),t=document.getElementById('stProgTxt');
+  if(f)f.style.width=ST.progPct+'%';
+  if(t)t.textContent=ST.progLabel+' · '+Math.round(ST.progPct)+'% · '+stFmt((Date.now()-ST.progT0)/1000);
+}
+function stProgSet(pct){ST.progPct=Math.max(0,Math.min(100,pct));stProgPaint();}
+function stProgEnd(){
+  if(ST.progTimer){clearInterval(ST.progTimer);ST.progTimer=null;}
+  var p=document.getElementById('stProg');if(p)p.classList.remove('on');
+}
+/* ---- Tracks ---- */
+function stAddTrack(name,buffer,fromSong){
+  var ctx=stCtx();
+  var tr={id:ST.nextId++,name:name,buffer:buffer,vol:1,mute:false,solo:false,trimStart:0,trimEnd:buffer.duration,gain:ctx.createGain(),src:null,peaks:null,fromSong:!!fromSong,els:{}};
+  tr.gain.gain.value=1;
+  tr.gain.connect(ST.master);
+  ST.tracks.push(tr);
+  return tr;
+}
+function stRemoveTrack(tr){
+  var wasPlaying=ST.playing;if(wasPlaying)stPause(false);
+  if(tr.src){try{tr.src.stop();}catch(e){}tr.src=null;}
+  try{tr.gain.disconnect();}catch(e){}
+  ST.tracks=ST.tracks.filter(function(x){return x!==tr;});
+  if(ST.pos>stTotal())ST.pos=0;
+  stRenderAllTracks();
+  if(wasPlaying&&ST.tracks.length)stPlay();
+}
+function stRenderAllTracks(){
+  var box=document.getElementById('stTracks');if(!box)return;
+  box.innerHTML='';
+  for(var i=0;i<ST.tracks.length;i++)box.appendChild(stTrackEl(ST.tracks[i]));
+  stDrawAllWaves();
+  stPaintTime();
+}
+function stTrackEl(tr){
+  var wrap=document.createElement('div');wrap.className='st-track';
+  var head=document.createElement('div');head.className='st-track-head';
+  var nm=document.createElement('span');nm.className='st-track-name';nm.textContent=tr.name;
+  head.appendChild(nm);
+  var del=document.createElement('button');del.type='button';del.className='st-track-del';del.textContent='✕';
+  del.setAttribute('aria-label','Remove track · លុប Track');
+  del.addEventListener('click',function(){stRemoveTrack(tr);});
+  head.appendChild(del);
+  wrap.appendChild(head);
+  var wave=document.createElement('div');wave.className='st-wave';
+  var cv=document.createElement('canvas');wave.appendChild(cv);
+  var ph=document.createElement('div');ph.className='st-playhead';wave.appendChild(ph);
+  wave.addEventListener('click',function(ev){
+    var r=wave.getBoundingClientRect();if(r.width<=0)return;
+    stSeek(stTotal()*((ev.clientX-r.left)/r.width));
+  });
+  wrap.appendChild(wave);
+  tr.els.canvas=cv;tr.els.head=ph;
+  var ctrls=document.createElement('div');ctrls.className='st-ctrls';
+  var vol=document.createElement('input');vol.type='range';vol.className='st-range st-vol';vol.min='0';vol.max='100';vol.value=Math.round(tr.vol*100);
+  vol.setAttribute('aria-label','Volume');
+  vol.addEventListener('input',function(){tr.vol=(parseInt(vol.value,10)||0)/100;stApplyGains();});
+  ctrls.appendChild(vol);
+  var mb=document.createElement('button');mb.type='button';mb.className='kbtn kbtn-white st-ms'+(tr.mute?' on-mute':'');mb.textContent='Mute';
+  mb.setAttribute('aria-pressed',tr.mute?'true':'false');
+  mb.addEventListener('click',function(){tr.mute=!tr.mute;mb.className='kbtn kbtn-white st-ms'+(tr.mute?' on-mute':'');mb.setAttribute('aria-pressed',tr.mute?'true':'false');stApplyGains();});
+  ctrls.appendChild(mb);
+  var sb=document.createElement('button');sb.type='button';sb.className='kbtn kbtn-white st-ms'+(tr.solo?' on-solo':'');sb.textContent='Solo';
+  sb.setAttribute('aria-pressed',tr.solo?'true':'false');
+  sb.addEventListener('click',function(){tr.solo=!tr.solo;sb.className='kbtn kbtn-white st-ms'+(tr.solo?' on-solo':'');sb.setAttribute('aria-pressed',tr.solo?'true':'false');stApplyGains();});
+  ctrls.appendChild(sb);
+  wrap.appendChild(ctrls);
+  var trim=document.createElement('div');trim.className='st-trim';
+  trim.appendChild(document.createTextNode('Trim · កាត់'));
+  var ts=document.createElement('input');ts.type='number';ts.min='0';ts.step='0.1';ts.value=tr.trimStart.toFixed(1);ts.setAttribute('aria-label','Trim start (seconds)');
+  var te=document.createElement('input');te.type='number';te.min='0';te.step='0.1';te.value=tr.trimEnd.toFixed(1);te.setAttribute('aria-label','Trim end (seconds)');
+  ts.addEventListener('change',function(){stApplyTrim(tr,ts,te);});
+  te.addEventListener('change',function(){stApplyTrim(tr,ts,te);});
+  trim.appendChild(ts);
+  trim.appendChild(document.createTextNode('–'));
+  trim.appendChild(te);
+  trim.appendChild(document.createTextNode('s'));
+  wrap.appendChild(trim);
+  return wrap;
+}
+function stApplyTrim(tr,tsEl,teEl){
+  var s=parseFloat(tsEl.value),e=parseFloat(teEl.value);
+  if(isNaN(s))s=0;if(isNaN(e))e=tr.buffer.duration;
+  s=Math.max(0,Math.min(s,tr.buffer.duration-0.1));
+  e=Math.max(s+0.1,Math.min(e,tr.buffer.duration));
+  tr.trimStart=s;tr.trimEnd=e;
+  tsEl.value=s.toFixed(1);teEl.value=e.toFixed(1);
+  stDrawAllWaves();
+  if(ST.playing){stStopSources();stStartSources();}
+  stPaintTime();
+}
+/* ---- Waveforms (all tracks share the total time scale, so
+   the playhead lines up on every row) ---- */
+function stPeaks(buffer,n){
+  var ch0=buffer.getChannelData(0);
+  var ch1=buffer.numberOfChannels>1?buffer.getChannelData(1):ch0;
+  var peaks=new Float32Array(n);
+  var block=Math.max(1,Math.floor(buffer.length/n));
+  var step=Math.max(1,Math.floor(block/48));
+  for(var i=0;i<n;i++){
+    var s=i*block,en=Math.min(buffer.length,s+block),mx=0;
+    for(var j=s;j<en;j+=step){var v=(Math.abs(ch0[j])+Math.abs(ch1[j]))*0.5;if(v>mx)mx=v;}
+    peaks[i]=Math.min(1,mx);
+  }
+  return peaks;
+}
+function stDrawAllWaves(){
+  for(var i=0;i<ST.tracks.length;i++)stDrawWave(ST.tracks[i]);
+  stPaintPlayhead();
+}
+function stDrawWave(tr){
+  var cv=tr.els&&tr.els.canvas;if(!cv)return;
+  var dpr=window.devicePixelRatio||1;
+  var w=cv.clientWidth||300,h=64;
+  if(w<=0)w=300;
+  cv.width=Math.round(w*dpr);cv.height=Math.round(h*dpr);
+  var g=cv.getContext('2d');if(!g)return;
+  g.setTransform(dpr,0,0,dpr,0,0);
+  g.clearRect(0,0,w,h);
+  var tot=stTotal();if(tot<=0)tot=tr.buffer.duration;
+  var waveW=w*(tr.buffer.duration/tot);
+  var n=Math.max(24,Math.floor(waveW/2));
+  if(!tr.peaks||tr.peaks.length!==n)tr.peaks=stPeaks(tr.buffer,n);
+  var accent='#addc29';
+  try{var cs=getComputedStyle(document.documentElement).getPropertyValue('--accent');if(cs&&cs.trim())accent=cs.trim();}catch(e){}
+  var x0=tr.trimStart/tr.buffer.duration*waveW,x1=tr.trimEnd/tr.buffer.duration*waveW;
+  var bw=waveW/n;
+  for(var i=0;i<n;i++){
+    var x=i*bw,cx=x+bw*0.5;
+    var inside=cx>=x0&&cx<=x1;
+    g.globalAlpha=inside?0.9:0.28;
+    g.fillStyle=inside?accent:'#9a9ea6';
+    var ph2=Math.max(1,tr.peaks[i]*(h-8));
+    g.fillRect(x,(h-ph2)/2,Math.max(1,bw-0.5),ph2);
+  }
+  g.globalAlpha=1;
+}
+/* ---- Transport ---- */
+function stPaintPlayBtn(){
+  var b=document.getElementById('stPlayBtn');if(b)b.textContent=ST.playing?'❚❚':'▶';
+}
+function stPaintTime(){
+  var c=document.getElementById('stCur'),t=document.getElementById('stTot');
+  if(c)c.textContent=stFmt(ST.pos);
+  if(t)t.textContent=stFmt(stTotal());
+  stPaintPlayhead();
+}
+function stPaintPlayhead(){
+  var tot=stTotal(),pct=tot>0?Math.max(0,Math.min(100,ST.pos/tot*100)):0;
+  for(var i=0;i<ST.tracks.length;i++){var ph=ST.tracks[i].els&&ST.tracks[i].els.head;if(ph)ph.style.left=pct+'%';}
+}
+function stApplyGains(){
+  for(var i=0;i<ST.tracks.length;i++){var tr=ST.tracks[i];tr.gain.gain.value=stAudible(tr)?tr.vol:0;}
+}
+function stStopSources(){
+  for(var i=0;i<ST.tracks.length;i++){var tr=ST.tracks[i];if(tr.src){try{tr.src.onended=null;tr.src.stop();}catch(e){}tr.src=null;}}
+}
+function stStartSources(){
+  var ctx=ST.ctx,now=ctx.currentTime+0.06,pos=ST.pos;
+  for(var i=0;i<ST.tracks.length;i++){
+    var tr=ST.tracks[i];
+    var src=ctx.createBufferSource();src.buffer=tr.buffer;src.connect(tr.gain);
+    tr.src=src;
+    if(pos<tr.trimEnd){
+      if(pos<=tr.trimStart)src.start(now+(tr.trimStart-pos),tr.trimStart,tr.trimEnd-tr.trimStart);
+      else src.start(now,pos,tr.trimEnd-pos);
+    }
+  }
+  ST.startAt=now;ST.startPos=pos;
+}
+function stPlay(){
+  if(!ST.tracks.length){stMsg('មិនទាន់មាន Track · No tracks yet — load a song first',true);return;}
+  stCtx();stApplyGains();
+  if(ST.pos>=stTotal())ST.pos=0;
+  stStopSources();stStartSources();
+  ST.playing=true;stPaintPlayBtn();
+  if(ST.raf)cancelAnimationFrame(ST.raf);
+  var tick=function(){
+    if(!ST.playing)return;
+    ST.pos=ST.startPos+(ST.ctx.currentTime-ST.startAt);
+    var tot=stTotal();
+    if(ST.pos>=tot){
+      if(ST.loop&&tot>0){ST.pos=0;stStopSources();stStartSources();}
+      else{stPause(true);return;}
+    }
+    stPaintTime();
+    ST.raf=requestAnimationFrame(tick);
+  };
+  ST.raf=requestAnimationFrame(tick);
+}
+function stPause(ended){
+  if(ST.playing&&ST.ctx)ST.pos=ST.startPos+(ST.ctx.currentTime-ST.startAt);
+  ST.playing=false;
+  stStopSources();
+  if(ST.raf)cancelAnimationFrame(ST.raf);
+  if(ended)ST.pos=0;
+  var tot=stTotal();if(ST.pos>tot)ST.pos=tot;
+  stPaintPlayBtn();stPaintTime();
+}
+function stTogglePlay(){if(ST.playing)stPause(false);else stPlay();}
+function stSeek(t){
+  var tot=stTotal();
+  ST.pos=Math.max(0,Math.min(tot,t||0));
+  if(ST.playing){stStopSources();stStartSources();}
+  stPaintTime();
+}
+function stToggleLoop(){
+  ST.loop=!ST.loop;
+  var b=document.getElementById('stLoopBtn');
+  if(b){b.classList.toggle('on',ST.loop);b.setAttribute('aria-pressed',ST.loop?'true':'false');}
+}
+function stSetMaster(v){
+  ST.masterVol=(parseInt(v,10)||0)/100;
+  if(ST.master)ST.master.gain.value=ST.masterVol;
+}
+/* ---- Loading ---- */
+function stFileBuffer(f){
+  if(f.arrayBuffer)return f.arrayBuffer();
+  return new Promise(function(res,rej){
+    var r=new FileReader();
+    r.onload=function(){res(r.result);};
+    r.onerror=function(){rej(new Error('read'));};
+    r.readAsArrayBuffer(f);
+  });
+}
+function stDecode(ab){
+  return stCtx().decodeAudioData(ab);
+}
+function stSetSong(name,buffer){
+  stPause(false);
+  for(var i=0;i<ST.tracks.length;i++){try{ST.tracks[i].gain.disconnect();}catch(e){}}
+  ST.tracks=[];
+  ST.mainBuffer=buffer;
+  ST.songName=name||'Song';
+  ST.pos=0;
+  stAddTrack(ST.songName,buffer,true);
+  var info=document.getElementById('stSongInfo');
+  if(info)info.textContent=ST.songName+' · '+stFmt(buffer.duration);
+  var sb=document.getElementById('stSplitBtn');if(sb)sb.disabled=false;
+  stRenderAllTracks();
+  stMsg('');
+}
+function stLoadFile(inp){
+  var f=inp.files&&inp.files[0];inp.value='';
+  if(!f)return;
+  stMsg('កំពុងបើក · Loading…');
+  stFileBuffer(f).then(function(ab){return stDecode(ab);}).then(function(buffer){
+    stSetSong(f.name.replace(/\.[^.]+$/,''),buffer);
+  }).catch(function(){stMsg('បើក File មិនបាន · Could not open that file',true);});
+}
+function stLoadFromUrl(url,nameHint){
+  stMsg('កំពុងផ្ទុក · Loading…');
+  return fetch(url).then(function(r){
+    if(!r.ok)throw new Error('http '+r.status);
+    return r.arrayBuffer();
+  }).then(function(ab){return stDecode(ab);}).then(function(buffer){
+    var name=nameHint||'';
+    if(!name){
+      try{var seg=url.split('?')[0].split('#')[0].split('/').pop();if(seg)name=decodeURIComponent(seg).replace(/\.[^.]+$/,'');}catch(e){}
+    }
+    stSetSong(name||'Song',buffer);
+  }).catch(function(){
+    stMsg('បើក Link មិនបាន — Link នេះអាចប្លុក Cross-origin · Could not load that link (it may block cross-origin audio) — please upload the file instead.',true);
+  });
+}
+function stLoadUrl(){
+  var inp=document.getElementById('stUrl');
+  var url=inp?(inp.value||'').trim():'';
+  if(!url){stMsg('សូមដាក់ Link ជាមុន · Paste a song link first',true);return;}
+  stLoadFromUrl(url,'');
+}
+/* «Studio» on an own song card: switch to the Studio view and
+   load that song's audio URL into it. */
+function studioOpenSong(url,title){
+  if(!url)return;
+  appSetView('studio');
+  window.scrollTo(0,0);
+  var inp=document.getElementById('stUrl');if(inp)inp.value=url;
+  stLoadFromUrl(url,title||'');
+}
+function stAddStems(inp){
+  var files=[];if(inp.files)for(var i=0;i<inp.files.length;i++)files.push(inp.files[i]);
+  inp.value='';
+  if(!files.length)return;
+  stMsg('កំពុងបន្ថែម · Adding…');
+  var chain=Promise.resolve(),failed=0;
+  files.forEach(function(f){
+    chain=chain.then(function(){
+      return stFileBuffer(f).then(function(ab){return stDecode(ab);}).then(function(buffer){
+        stAddTrack(f.name.replace(/\.[^.]+$/,''),buffer,false);
+      }).catch(function(){failed++;});
+    });
+  });
+  chain.then(function(){
+    stRenderAllTracks();
+    if(failed)stMsg('File ខ្លះបើកមិនបាន · Some files could not be opened',true);
+    else stMsg('');
+  });
+}
+/* ---- Stem split: center-channel via OfflineAudioContext ----
+   Vocals (centre) = (L+R)/2 on both channels.
+   Instruments (sides) = (L−R)/2 and (R−L)/2.
+   Renders run one at a time so the progress bar is real
+   (OfflineAudioContext.suspend checkpoints). If offline
+   rendering is unavailable, the same math runs directly on
+   the decoded samples (stSplitMath). */
+function stSplitGraph(buffer,kind){
+  var sr=buffer.sampleRate,len=buffer.length;
+  var off=new OfflineAudioContext(2,len,sr);
+  var src=off.createBufferSource();src.buffer=buffer;
+  var merger=off.createChannelMerger(2);
+  merger.connect(off.destination);
+  function gn(v){var n=off.createGain();n.gain.value=v;return n;}
+  if(buffer.numberOfChannels<2){
+    /* Mono has no sides: Vocals = the signal on both channels,
+       Instruments renders silent. */
+    if(kind==='voc'){src.connect(merger,0,0);src.connect(merger,0,1);}
+  }else{
+    var split=off.createChannelSplitter(2);
+    src.connect(split);
+    if(kind==='voc'){
+      var gl=gn(0.5),gr=gn(0.5);
+      split.connect(gl,0);split.connect(gr,1);
+      gl.connect(merger,0,0);gl.connect(merger,0,1);
+      gr.connect(merger,0,0);gr.connect(merger,0,1);
+    }else{
+      var la=gn(0.5),ra=gn(-0.5),rb=gn(0.5),lb=gn(-0.5);
+      split.connect(la,0);split.connect(ra,1);
+      split.connect(rb,1);split.connect(lb,0);
+      la.connect(merger,0,0);ra.connect(merger,0,0);
+      rb.connect(merger,0,1);lb.connect(merger,0,1);
+    }
+  }
+  return {off:off,src:src};
+}
+function stSplitRenderOne(buffer,kind,from,to){
+  return new Promise(function(resolve,reject){
+    var built=stSplitGraph(buffer,kind);
+    var off=built.off,dur=buffer.duration;
+    for(var k=1;k<10;k++){
+      (function(kk){
+        off.suspend(dur*kk/10).then(function(){
+          stProgSet(from+(to-from)*kk/10);
+          off.resume();
+        }).catch(function(){});
+      })(k);
+    }
+    built.src.start();
+    off.startRendering().then(resolve,reject);
+  });
+}
+function stSplitMath(buffer){
+  var n=buffer.length,sr=buffer.sampleRate,ctx=stCtx();
+  var L=buffer.getChannelData(0);
+  var R=buffer.numberOfChannels>1?buffer.getChannelData(1):L;
+  var voc=ctx.createBuffer(2,n,sr),inst=ctx.createBuffer(2,n,sr);
+  var v0=voc.getChannelData(0),v1=voc.getChannelData(1),i0=inst.getChannelData(0),i1=inst.getChannelData(1);
+  for(var i=0;i<n;i++){
+    var c=(L[i]+R[i])*0.5,d=(L[i]-R[i])*0.5;
+    v0[i]=c;v1[i]=c;i0[i]=d;i1[i]=-d;
+  }
+  return {vocals:voc,inst:inst};
+}
+async function stSplit(){
+  if(ST.busy)return;
+  if(!ST.mainBuffer){stMsg('សូមបើកបទជាមុន · Load a song first',true);return;}
+  ST.busy=true;
+  stPause(false);
+  stProgBegin('កំពុងបំបែក · Splitting');
+  try{
+    var vocBuf,instBuf;
+    try{
+      vocBuf=await stSplitRenderOne(ST.mainBuffer,'voc',0,50);
+      instBuf=await stSplitRenderOne(ST.mainBuffer,'inst',50,100);
+    }catch(e){
+      var m=stSplitMath(ST.mainBuffer);vocBuf=m.vocals;instBuf=m.inst;
+    }
+    stProgSet(100);
+    var kept=[];
+    for(var i=0;i<ST.tracks.length;i++){
+      if(ST.tracks[i].fromSong){try{ST.tracks[i].gain.disconnect();}catch(e){}}
+      else kept.push(ST.tracks[i]);
+    }
+    ST.tracks=kept;
+    var voc=stAddTrack('សំឡេងច្រៀង · Vocals',vocBuf,true);
+    var inst=stAddTrack('ភ្លេង · Instruments',instBuf,true);
+    ST.tracks=[voc,inst].concat(kept);
+    ST.pos=0;
+    stRenderAllTracks();
+    stMsg('បំបែករួច · Split done ✓');
+  }catch(e){
+    stMsg('បំបែកមិនបាន · Split failed',true);
+  }
+  stProgEnd();
+  ST.busy=false;
+}
+/* ---- Export: mix-down to WAV ---- */
+function stRenderMix(){
+  return new Promise(function(resolve,reject){
+    var tot=stTotal();
+    if(tot<=0){reject(new Error('empty'));return;}
+    var sr=44100;
+    var off=new OfflineAudioContext(2,Math.ceil(tot*sr),sr);
+    var master=off.createGain();master.gain.value=ST.masterVol;master.connect(off.destination);
+    var any=false;
+    for(var i=0;i<ST.tracks.length;i++){
+      var tr=ST.tracks[i];
+      if(!stAudible(tr))continue;
+      any=true;
+      var src=off.createBufferSource();src.buffer=tr.buffer;
+      var g=off.createGain();g.gain.value=tr.vol;
+      src.connect(g);g.connect(master);
+      src.start(tr.trimStart,tr.trimStart,Math.max(0.01,tr.trimEnd-tr.trimStart));
+    }
+    if(!any){reject(new Error('silent'));return;}
+    for(var k=1;k<10;k++){
+      (function(kk){
+        off.suspend(tot*kk/10).then(function(){stProgSet(kk*10);off.resume();}).catch(function(){});
+      })(k);
+    }
+    off.startRendering().then(resolve,reject);
+  });
+}
+function stWavBlob(buffer){
+  var nCh=2,len=buffer.length,sr=buffer.sampleRate;
+  var bytes=44+len*nCh*2;
+  var ab=new ArrayBuffer(bytes),v=new DataView(ab);
+  function ws(o,s){for(var i=0;i<s.length;i++)v.setUint8(o+i,s.charCodeAt(i));}
+  ws(0,'RIFF');v.setUint32(4,bytes-8,true);ws(8,'WAVE');ws(12,'fmt ');
+  v.setUint32(16,16,true);v.setUint16(20,1,true);v.setUint16(22,nCh,true);
+  v.setUint32(24,sr,true);v.setUint32(28,sr*nCh*2,true);v.setUint16(32,nCh*2,true);v.setUint16(34,16,true);
+  ws(36,'data');v.setUint32(40,len*nCh*2,true);
+  var L=buffer.getChannelData(0);
+  var R=buffer.numberOfChannels>1?buffer.getChannelData(1):L;
+  var o=44;
+  for(var i=0;i<len;i++){
+    var a=Math.max(-1,Math.min(1,L[i]));v.setInt16(o,a<0?a*0x8000:a*0x7FFF,true);o+=2;
+    var b=Math.max(-1,Math.min(1,R[i]));v.setInt16(o,b<0?b*0x8000:b*0x7FFF,true);o+=2;
+  }
+  return new Blob([ab],{type:'audio/wav'});
+}
+async function stExport(){
+  if(ST.busy)return;
+  if(!ST.tracks.length){stMsg('មិនទាន់មាន Track · No tracks to export — load a song first',true);return;}
+  var anyAud=false,i;
+  for(i=0;i<ST.tracks.length;i++)if(stAudible(ST.tracks[i]))anyAud=true;
+  if(!anyAud){stMsg('Track ទាំងអស់ត្រូវបិទសំឡេង · All tracks are muted or soloed off',true);return;}
+  ST.busy=true;
+  stPause(false);
+  stProgBegin('កំពុង Export · Exporting');
+  try{
+    var buf=await stRenderMix();
+    stProgSet(100);
+    var blob=stWavBlob(buf);
+    var a=document.createElement('a');
+    a.href=URL.createObjectURL(blob);
+    a.download=(ST.songName||'Song')+' - MOVAI Studio.wav';
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(function(){try{URL.revokeObjectURL(a.href);a.remove();}catch(e){}},4000);
+    stMsg('Export រួច · Export done ✓');
+  }catch(e){
+    stMsg('Export មិនបាន · Export failed',true);
+  }
+  stProgEnd();
+  ST.busy=false;
+}
+/* Redraw waveforms when the window size changes (canvas widths
+   follow the layout). */
+var stResizeT=null;
+window.addEventListener('resize',function(){
+  if(stResizeT)clearTimeout(stResizeT);
+  stResizeT=setTimeout(function(){if(ST.tracks.length)stDrawAllWaves();},200);
+});
 </script>
 </body>
 </html>
