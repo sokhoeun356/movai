@@ -12,6 +12,45 @@ try { WebSocketLib = require('ws'); } catch (e) { WebSocketLib = null; }
 let NodemailerLib = null;
 try { NodemailerLib = require('nodemailer'); } catch (e) { NodemailerLib = null; }
 
+/* ------- server stability (Hercules plan Step 7, 2026-11-17) --------------
+   Render Free (512 MB) restarts the whole service when the process dies,
+   so a single uncaught error can take the site down. These handlers make
+   failures VISIBLE in the logs instead of silent, and let Render restart
+   cleanly. Neither handler may throw itself (all logging is try/catch). */
+process.on('unhandledRejection', (reason) => {
+  try {
+    const msg = reason && reason.stack ? String(reason.stack) : String(reason);
+    console.error('[unhandledRejection]', msg.slice(0, 500));
+  } catch (e) { try { console.error('[unhandledRejection] (log failed)'); } catch (e2) {} }
+  // Do NOT exit: an unhandled rejection is not necessarily fatal — the
+  // request that caused it already failed, and the process can keep
+  // serving. Exiting on every rejected promise would restart the
+  // service far more often than needed.
+});
+process.on('uncaughtException', (err) => {
+  try {
+    const msg = err && err.stack ? String(err.stack) : String(err);
+    console.error('[uncaughtException]', msg.slice(0, 500));
+  } catch (e) { try { console.error('[uncaughtException] (log failed)'); } catch (e2) {} }
+  // An uncaught exception means the process is in an UNKNOWN state
+  // (some invariant may be broken). Continuing could corrupt data or
+  // serve wrong results, so exit and let Render restart the service
+  // cleanly from a known-good state.
+  process.exit(1);
+});
+
+/* Memory logging for heavy jobs (Hercules plan Step 7, 2026-11-17):
+   one concise line per heavy-job start/end so Render logs show whether
+   a job (MP3 convert / song store) is what ate the 512 MB. RSS = whole
+   process, heapUsed = JS heap. Never logs a full URL (truncated by
+   the caller). */
+function memLog(tag) {
+  try {
+    const m = process.memoryUsage();
+    console.log('[mem] ' + tag + ' rss=' + (m.rss / 1048576).toFixed(1) + 'MB heapUsed=' + (m.heapUsed / 1048576).toFixed(1) + 'MB');
+  } catch (e) {}
+}
+
 const ROOT = __dirname;
 const PORT = process.env.PORT || 3000;
 
@@ -3881,6 +3920,13 @@ function apiRoute(req, res, urlPath) {
     if (!pub) return sendJSON(res, 200, { ok: false, error: 'Web Push មិនទាន់បើកទេ' });
     return sendJSON(res, 200, { ok: true, publicKey: pub });
   }
+  // GET /api/health — PUBLIC. Liveness probe (Hercules plan Step 7,
+  // 2026-11-17): returns 200 in milliseconds, does NO heavy work and
+  // touches NO database/GitHub. Used to wake the server after Render
+  // sleep and to check it is alive.
+  if (req.method === 'GET' && urlPath === '/api/health') {
+    return sendJSON(res, 200, { ok: true, ts: Date.now() });
+  }
   // POST /api/public/push-subscribe — PUBLIC. {email, subscription, role?}
   // subscription = browser PushSubscription JSON {endpoint, keys:{p256dh,
   // auth}}. Stored/overwritten by endpoint+email. role 'admin' marks an
@@ -4051,11 +4097,18 @@ function apiRoute(req, res, urlPath) {
       if (c2) return path.basename(c2);
       const fname = 'mp3-' + mp3CacheKey(u) + '.mp3';
       const fp = path.join(DATA_DIR, 'uploads', fname);
+      memLog('mp3-start ' + String(u).slice(0, 60));
       try {
         const ctrl = new AbortController();
         const t = setTimeout(() => ctrl.abort(), 180000);
         const r = await fetch(u, { signal: ctrl.signal, headers: { 'User-Agent': 'MovAi/1.0' } });
         clearTimeout(t);
+        /* GONE (Hercules plan Step 6.22): the provider URL has
+           EXPIRED (404/403/410) — the song can never be recovered.
+           Return the marker 'gone' (not null) so the callers can
+           tell the user "This song is no longer available" instead
+           of a generic failure. */
+        if (!r.ok && (r.status === 404 || r.status === 403 || r.status === 410)) return 'gone';
         if (!r.ok || !r.body) return null;
         /* STREAMING FIX (2026-11-17, owner order via Hercules):
            the old code did Buffer.from(await r.arrayBuffer()) — the
@@ -4110,6 +4163,7 @@ function apiRoute(req, res, urlPath) {
           _mp3Cache[mp3CacheKey(u)] = fname;
           mp3CacheSave();
           ghPersistFile(fp);
+          memLog('mp3-end ' + fname);
           return fname;
         }
         // WAV: parse PCM, free the buffer, then encode to MP3 128k.
@@ -4120,9 +4174,11 @@ function apiRoute(req, res, urlPath) {
         ghPersistFile(fp);
         _mp3Cache[mp3CacheKey(u)] = fname;
         mp3CacheSave();
+        memLog('mp3-end ' + fname);
         return fname;
       } catch (e) {
         console.error('[mp3] convert failed for', String(u).slice(0, 120), ':', String((e && e.message) || e).slice(0, 200));
+        memLog('mp3-end-failed ' + fname);
         try { if (fs.existsSync(fp) && fs.statSync(fp).size < 1000) fs.unlinkSync(fp); } catch (e2) {}
         return null;
       }
@@ -4159,6 +4215,7 @@ function apiRoute(req, res, urlPath) {
           return;
         }
         const fname = await convertAndCacheMp3(u);
+        if (fname === 'gone') return sendJSON(res, 410, { ok: false, error: 'gone', message: 'This song is no longer available' });
         if (!fname) return sendJSON(res, 500, { ok: false, error: 'MP3 convert failed' });
         const outFp = path.join(DATA_DIR, 'uploads', fname);
         const st2 = fs.statSync(outFp);
@@ -4193,7 +4250,9 @@ function apiRoute(req, res, urlPath) {
         if (url.indexOf('/uploads/') >= 0 && (url.indexOf(ownBase + '/uploads/') === 0 || url.indexOf('movai-proxy.onrender.com/uploads/') >= 0)) {
           return sendJSON(res, 200, { ok: true, url });
         }
+        memLog('songstore-start');
         const fname = await convertAndCacheMp3(url);
+        if (fname === 'gone') return sendJSON(res, 200, { ok: false, error: 'gone', url });
         if (!fname) return sendJSON(res, 200, { ok: false, error: 'store failed', url });
         // Back the cached MP3 up to GitHub so it survives a Render
         // restart. (convertAndCacheMp3's ghPersistFile is a no-op for
@@ -4207,9 +4266,11 @@ function apiRoute(req, res, urlPath) {
         } catch (e) {
           console.error('[songstore] github backup failed for', fname, ':', String((e && e.message) || e).slice(0, 200));
         }
+        memLog('song-store-end');
         return sendJSON(res, 200, { ok: true, url: ownBase + '/uploads/' + fname });
       } catch (e) {
         console.error('[songstore] failed for', url.slice(0, 120), ':', String((e && e.message) || e).slice(0, 200));
+        memLog('songstore-end-failed');
         return sendJSON(res, 200, { ok: false, error: 'store failed', url });
       }
     }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));

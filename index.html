@@ -2194,6 +2194,8 @@ km:{
  dlFailed:'ទាញយកមិនបានទេ — សូមព្យាយាមម្ដងទៀត',
  mp3Converting:'កំពុងបម្លែងទៅជា MP3…',
  mp3FailNet:'ទាញយកបទមិនបានទេ — បញ្ហាបណ្ដាញ ឬ server មិនឆ្លើយ សូមព្យាយាមម្ដងទៀត',
+ mp3FailGone:'បទចម្រៀងនេះលែងមានទៀតហើយ · សូមបង្កើតបទថ្មី',
+ mp3InAppHint:'សូមបើកក្នុង Chrome ដើម្បីដោនឡូត · Open in Chrome to download',
  mp3FailServer:'បម្លែងទៅជា MP3 មិនបានទេ — server បរាជ័យ សូមព្យាយាមម្ដងទៀត',
  mp3FailOffline:'ទូរស័ព្ទអត់មានអ៊ីនធឺណិត · សូមពិនិត្យ WiFi/4G សិន',
  mp3FailSlow:'បណ្ដាញយឺតពេក · Download មិនទាន់ទេ — សូមព្យាយាមម្ដងទៀតពេលបណ្ដាញល្អ',
@@ -2422,6 +2424,8 @@ en:{
  dlFailed:'Download failed — please try again',
  mp3Converting:'Converting to MP3…',
  mp3FailNet:'Could not fetch the song — network problem or the server did not answer, please try again',
+ mp3FailGone:'This song is no longer available · Please create a new song',
+ mp3InAppHint:'Open in Chrome to download · សូមបើកក្នុង Chrome ដើម្បីដោនឡូត',
  mp3FailServer:'Could not convert to MP3 — the server failed, please try again',
  mp3FailOffline:'No internet on your phone — please check WiFi/4G first',
  mp3FailSlow:'Network too slow — the download timed out, please try again when the connection is better',
@@ -4764,7 +4768,7 @@ function dlNameFor(raw,url,type,fallback){
 function dlBlobSave(blob,fname){
   var u=URL.createObjectURL(blob);
   var a=document.createElement('a');a.href=u;a.download=fname;document.body.appendChild(a);a.click();a.remove();
-  setTimeout(function(){try{URL.revokeObjectURL(u);}catch(e){}},4000);
+  setTimeout(function(){try{URL.revokeObjectURL(u);}catch(e){}},5000);
 }
 var dlFailTimer=null;
 function dlFailShow(){
@@ -4904,6 +4908,14 @@ async function mp3ReadBody(rp){
 async function dlSaveSongMp3(src,title,fallback){
   if(!src||mp3Busy)return;
   mp3Busy=true;
+  /* In-app browser hint (Hercules plan Step 4.17): Telegram /
+     Facebook in-app browsers often cannot save a file. Tell the
+     user to open MovAi in Chrome — but still try the download,
+     because it sometimes works there too. */
+  try{
+    var _ua=String((navigator&&navigator.userAgent)||'');
+    if(/Telegram|FBAN|FBAV|Instagram/i.test(_ua))mp3FailShow('mp3InAppHint');
+  }catch(e){}
   var fname=dlCleanName(title,fallback||'movai-song')+'.mp3';
   mp3ProgStart();
   /* REAL-ERROR REPORTING (owner order 2026-11-17): when a download
@@ -4915,6 +4927,10 @@ async function dlSaveSongMp3(src,title,fallback){
     mp3ProgDone();
     if(mp3IsOffline()){ mp3FailShow('mp3FailOffline'); return; }
     var em=String(errMsg||'');
+    /* The source audio is gone (provider URL expired, 404/403) —
+       show "This song is no longer available" instead of a generic
+       network error (Hercules plan Step 6.22 / Step 8.29). */
+    if(/gone|no longer available|410|expired/i.test(em)){ mp3FailShow('mp3FailGone'); return; }
     if(/abort|timeout/i.test(em)){ mp3FailShow('mp3FailSlow'); return; }
     mp3FailText(tx('mp3FailNet')+(em?' — '+em:''));
   }
@@ -5014,7 +5030,7 @@ async function genDownload(){
   if(it.blob){
     var u=URL.createObjectURL(it.blob);
     var a=document.createElement('a');a.href=u;a.download=fname;document.body.appendChild(a);a.click();a.remove();
-    setTimeout(function(){try{URL.revokeObjectURL(u);}catch(e){}},4000);
+    setTimeout(function(){try{URL.revokeObjectURL(u);}catch(e){}},5000);
     return;
   }
   await dlSave(it.src,fname);
@@ -6035,17 +6051,78 @@ function histSyncPushFor(key){
    (the provider URL expires; ours never does). Skips URLs that
    are already permanent, and data: URLs (already self-contained).
    On any failure the provider URL simply stays — nothing breaks. */
+var histRecoverDone=false;
+/* ONE-TIME RECOVERY (Hercules plan Step 6.20): when History is
+   first rendered in a session, re-store every OLD song that still
+   carries a temporary provider URL, so it becomes permanent too.
+   Runs once per session, in the background, one song at a time
+   (the server serialises the conversions). Songs whose provider
+   URL has already expired are marked gone (see histStorePermanent)
+   and History shows "no longer available" for them. */
+function histRecoverOld(){
+  if(histRecoverDone)return;
+  histRecoverDone=true;
+  try{
+    var key=histKey();
+    var arr=histGetFrom(key);
+    var i=0;
+    (function next(){
+      if(i>=arr.length)return;
+      var it=arr[i++];
+      if(!it||it.type!=='song'||!it.id||it.gone)return next();
+      if(!/^https:/i.test(it.url||''))return next();
+      if(/movai-proxy\.onrender\.com\/uploads\//i.test(it.url))return next();
+      /* Store this one, then move to the next only after it
+         finishes — one at a time, so the server never holds many
+         big downloads at once. */
+      fetch(GEN_API+'/public/song-store',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({url:it.url})})
+        .then(function(r){return r.json();})
+        .then(function(j){
+          var a2=histGetFrom(key);
+          for(var k=0;k<a2.length;k++){
+            if(a2[k]&&a2[k].id===it.id){
+              if(j&&j.ok&&j.url&&j.url!==it.url){a2[k].url=j.url;a2[k].perm=true;a2[k].gone=false;}
+              else if(j&&j.error==='gone'){a2[k].gone=true;}
+              break;
+            }
+          }
+          histSyncApplying=true;
+          try{histSaveTo(key,a2);}catch(e){}
+          histSyncApplying=false;
+          try{histRender();}catch(e){}
+        }).catch(function(){})
+        .finally(function(){next();});
+    })();
+  }catch(e){}
+}
 function histStorePermanent(item,saveKey){
   if(!item||!item.id||!/^https:/i.test(item.url||''))return;
   if(/movai-proxy\.onrender\.com\/uploads\//i.test(item.url))return;
   fetch(GEN_API+'/public/song-store',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({url:item.url})})
     .then(function(r){return r.json();})
     .then(function(j){
-      if(!j||!j.ok||!j.url||j.url===item.url)return;
+      if(!j||!j.ok||!j.url||j.url===item.url){
+        /* Store failed. If the provider URL is GONE (expired 404/
+           403), mark the song so History shows "This song is no
+           longer available" instead of a broken Download button
+           (Hercules plan Step 6.22). Any other failure just leaves
+           the provider URL in place — the download may still work. */
+        if(j&&j.error==='gone'){
+          var arr2=histGetFrom(saveKey||histKey());
+          for(var k=0;k<arr2.length;k++){
+            if(arr2[k]&&arr2[k].id===item.id){arr2[k].gone=true;break;}
+          }
+          histSyncApplying=true;
+          try{histSaveTo(saveKey||histKey(),arr2);}catch(e){}
+          histSyncApplying=false;
+          try{histRender();}catch(e){}
+        }
+        return;
+      }
       var arr=histGetFrom(saveKey||histKey());
       var changed=false;
       for(var i=0;i<arr.length;i++){
-        if(arr[i]&&arr[i].id===item.id){arr[i].url=j.url;changed=true;break;}
+        if(arr[i]&&arr[i].id===item.id){arr[i].url=j.url;arr[i].perm=true;arr[i].gone=false;changed=true;break;}
       }
       if(!changed)return;
       histSyncApplying=true;
@@ -6137,6 +6214,7 @@ function histHeartSvg(liked){
   return '<svg width="15" height="15" viewBox="0 0 24 24" fill="'+(liked?'#ff2e88':'none')+'" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.6l-1-1a5.5 5.5 0 1 0-7.8 7.8l1 1L12 21.2l7.8-7.8 1-1a5.5 5.5 0 0 0 0-7.8z"/></svg>';
 }
 function histRender(){
+  try{histRecoverOld();}catch(e){}
   var all=histGet();
   var cnt=document.getElementById('histCount');
   if(cnt)cnt.textContent=all.length?tx('histCountFmt').replace('{n}',all.length):'';
@@ -6403,7 +6481,7 @@ function histSongCard(it){
   sub.textContent=(ownerName?(ownerName+' · '):'')+histFmtDate(it.ts)+' · ';
   sub.appendChild(time);
   meta.appendChild(sub);
-  if(it.url){
+  if(it.url&&!it.gone){
     var play=document.createElement('button');
     play.type='button';play.className='song-play hist-play';
     play.textContent='▶';play.setAttribute('aria-label',tx('histPlay'));
