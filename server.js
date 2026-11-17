@@ -1925,7 +1925,12 @@ function mvsepIsSuccess(j) {
   return j.success === true || j.success === 'true' || j.success === 1;
 }
 function mvsepIsLimitText(s) {
-  return /limit|quota|exceed|daily|too many/i.test(String(s || ''));
+  // A "limit" error means THIS key is temporarily unusable, so the
+  // rotation tries the next key. That includes the per-account queue
+  // block ("You already have unprocessed file in queue") — the key's
+  // single concurrent-job slot is occupied by a stuck job, so another
+  // key with a free queue must be tried instead.
+  return /limit|quota|exceed|daily|too many|unprocessed file in queue/i.test(String(s || ''));
 }
 function mvsepQuotaErr(detail, httpStatus) {
   // Message MUST contain "quota" so _isRotatableError treats it as a
