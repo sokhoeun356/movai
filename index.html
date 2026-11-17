@@ -1030,9 +1030,10 @@ html[data-mode="light"] .btn-free{color:#63910c}
    Song posts lead with a square cover, the title under it, a
    compact row of small Like / Dislike / Share buttons, then a
    custom player: an accent progress bar with a knob and
-   current / total time. There is NO play button on the cover
-   (owner order 2026-11-17) — the PLAY pill in the player row
-   is the visible control, and tapping the cover itself
+   current / total time. A translucent Play button sits at the
+   CENTRE of the cover (owner order 2026-11-17, superseding the
+   earlier no-button rule) alongside the PLAY pill in the player
+   row — both drive the same audio — and tapping the cover itself
    toggles play/pause; the cover stays completely
    still while the song plays — flat static shine only (the
    dancing rhythm bars were removed, owner correction
@@ -1976,10 +1977,10 @@ html[data-smooth="1"] .brand-frame,html[data-smooth="1"] .acct-chip,html[data-sm
 .pub-song-card .pub-mode-btn{border-color:rgba(255,255,255,.45);color:#fff;background:rgba(255,255,255,.08)}
 .pub-song-card .pub-mode-btn.on{background:#fff;color:#166534;border-color:#fff}
 /* Square cover, larger like SONAR, with the highlight beam
-   sweeping across it. No centre play button on the cover
-   (owner order 2026-11-17): the PLAY pill in the player row
-   is the visible control, and tapping the cover itself
-   still toggles play/pause. */
+   sweeping across it. A translucent Play button sits at the
+   cover's centre (owner order 2026-11-17 — see the «Song cover
+   on EVERY card» block at the end of this stylesheet), and
+   tapping the cover itself still toggles play/pause. */
 .pub-card.pub-song-card .pub-cover-wrap{width:min(74%,300px);border-radius:18px;overflow:hidden;box-shadow:0 10px 26px rgba(20,45,10,.22)}
 .pub-card.pub-song-card .pub-song-cover{border-radius:18px;box-shadow:0 0 0 1px rgba(255,255,255,.25)}
 .pub-card.pub-song-card .pub-song-cover-none{background:rgba(255,255,255,.14);border-color:rgba(255,255,255,.35);color:#fff}
@@ -2016,6 +2017,40 @@ html[data-smooth="1"] .brand-frame,html[data-smooth="1"] .acct-chip,html[data-sm
 .brand-frame .brand-name{font-size:1.0625rem}
 .brand-frame .menu-btn{width:34px;height:34px;padding:0 8px;gap:4px}
 main{padding-top:calc(3.75rem + env(safe-area-inset-top,0px))}
+/* ===== Song cover on EVERY card + Play at the CENTRE of the cover,
+   translucent (owner order 2026-11-17) =====
+   Every song surface — the big feed card, the compact numbered feed
+   rows under the carousel (#2, #3, #4 …), the Create results and the
+   History / Playlist rows — ALWAYS shows a cover: the poster's own
+   uploaded cover when there is one, otherwise the provider (Suno)
+   cover that came with the song, otherwise the MovAi logo tile
+   (.movai-cover-tile). The Play control sits at the CENTRE of the
+   cover — never in a corner — and is TRANSLUCENT (see-through dark
+   with a blur) before and during playback. Playback functions are
+   unchanged: each centred button drives the same audio element as
+   the control it joins. */
+.cover-play{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);border-radius:50%;border:1px solid rgba(255,255,255,.55);background:rgba(8,10,6,.48);-webkit-backdrop-filter:blur(4px);backdrop-filter:blur(4px);color:#fff;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;padding:0;z-index:3;box-shadow:0 6px 18px rgba(0,0,0,.35);-webkit-tap-highlight-color:transparent;font-family:inherit}
+.cover-play:active{filter:brightness(1.3)}
+.cover-play svg{width:46%;height:46%;display:block}
+.pub-cover-play{width:56px;height:56px}
+/* MovAi logo tile — shown when a song carries no cover image at all */
+.movai-cover-tile{flex-direction:column;gap:3px;background:linear-gradient(135deg,#2a3d13,#0e2a38);color:#fff}
+.movai-cover-tile .mc-note{width:30%;height:auto;display:block}
+.movai-cover-tile .mc-name{font-weight:900;letter-spacing:-.01em;line-height:1;color:#fff;font-size:1.05rem;white-space:nowrap}
+.movai-cover-tile .mc-name span{color:var(--accent)}
+.pub-card.pub-song-card .pub-song-cover-none.movai-cover-tile{background:linear-gradient(135deg,#2a3d13,#0e2a38);border-color:rgba(255,255,255,.35);color:#fff}
+/* Compact feed row: square cover thumb, Play centred on it */
+.pub-row-coverwrap{position:relative;flex:0 0 auto;width:64px;height:64px;border-radius:10px;overflow:hidden;background:#000;cursor:pointer;-webkit-tap-highlight-color:transparent}
+.pub-row-coverwrap img,.pub-row-coverwrap .pub-song-cover{width:100%!important;height:100%;margin:0;border-radius:10px;aspect-ratio:auto!important;max-width:none!important}
+.pub-row-coverwrap .movai-cover-tile .mc-name{font-size:.6rem}
+.pub-row-coverwrap .movai-cover-tile .mc-note{width:36%}
+.pub-row-coverwrap .pub-row-play{width:30px;height:30px;background:rgba(8,10,6,.48);color:#fff;border:1px solid rgba(255,255,255,.55)}
+/* History / Playlist rows: Play centred on the small cover */
+.song-coverwrap{position:relative;flex:0 0 auto;width:40px;height:40px;border-radius:6px;overflow:hidden}
+.song-coverwrap .song-cover{width:100%;height:100%;border-radius:6px}
+.song-coverwrap .song-play{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:23px;height:23px;font-size:.55rem;background:rgba(8,10,6,.52);color:#fff;border-color:rgba(255,255,255,.55);-webkit-backdrop-filter:blur(3px);backdrop-filter:blur(3px);z-index:2;box-shadow:0 3px 10px rgba(0,0,0,.35)}
+/* Create results: the centred Play turns translucent like everywhere else */
+.gcc-play{background:rgba(8,10,6,.48);color:#fff;border:1px solid rgba(255,255,255,.55);-webkit-backdrop-filter:blur(4px);backdrop-filter:blur(4px)}
 </style>
 </head>
 <body>
@@ -7586,7 +7621,16 @@ function histSongCard(it){
   }else{
     coverEl=songSolidCover(1,false);
   }
-  rowEl.appendChild(coverEl);
+  /* Cover wrap (owner order 2026-11-17): the Play button sits
+     at the CENTRE of the cover, translucent — the same cover +
+     centred-Play treatment as the feed and the Create results.
+     The cover itself is unchanged: the song's own image (an
+     uploaded cover or the provider/Suno cover) when there is
+     one, otherwise the MovAi logo tile (songSolidCover). */
+  var coverWrapH=document.createElement('div');
+  coverWrapH.className='song-coverwrap';
+  coverWrapH.appendChild(coverEl);
+  rowEl.appendChild(coverWrapH);
   var meta=document.createElement('div');
   meta.className='song-meta';
   var tt=document.createElement('div');
@@ -7606,7 +7650,7 @@ function histSongCard(it){
     play.type='button';play.className='song-play hist-play';
     play.textContent='▶';play.setAttribute('aria-label',tx('histPlay'));
     play.addEventListener('click',function(){histPlayToggle(it);});
-    rowEl.appendChild(play);
+    coverWrapH.appendChild(play);
     rowEl.appendChild(meta);
     var dur=document.createElement('span');
     dur.className='song-dur hist-dur';
@@ -9427,15 +9471,25 @@ function pubPlaySvg(){
 function pubPauseSvg(){
   return '<svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="6" y="4.5" width="4" height="15" rx="1.2"/><rect x="14" y="4.5" width="4" height="15" rx="1.2"/></svg>';
 }
-/* Square cover placeholder for a song post that carries no cover
-   image (or whose cover failed to load): a music note on a plain
-   panel, in the same frame the real cover would take — including
-   the Admin-chosen 1x1 / 4x6 aspect when the post carries one. */
+/* Square cover for a song post that carries no cover image (or
+   whose cover failed to load): the MovAi logo tile, in the same
+   frame the real cover would take — including the Admin-chosen
+   1x1 / 4x6 aspect when the post carries one. A post WITH an
+   image always shows that image: the poster's uploaded cover
+   when they uploaded one, otherwise the provider (Suno) cover
+   that came with the song. */
 function pubSongCoverFallback(it){
+  /* MovAi logo tile (owner order 2026-11-17): a song post that
+     carries NO cover image at all — neither a cover the poster
+     uploaded nor the provider (Suno) cover that came with the
+     song — still shows a cover: the MovAi logo (note + two-tone
+     wordmark) on a dark lime-to-blue tile, in the same frame the
+     real cover would take, including the Admin-chosen 1x1 / 4x6
+     aspect when the post carries one. */
   var d=document.createElement('div');
-  d.className='pub-song-cover pub-song-cover-none';
+  d.className='pub-song-cover pub-song-cover-none movai-cover-tile';
   d.setAttribute('aria-hidden','true');
-  d.innerHTML='<svg width="54" height="54" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>';
+  d.innerHTML='<svg class="mc-note" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg><span class="mc-name">Mov<span>Ai</span></span>';
   if(it&&it.aspect)d.style.cssText=pubAspectCss(it.aspect);
   return d;
 }
@@ -9845,12 +9899,19 @@ function plRowEl(en){
   card.setAttribute('data-pl-url',en.url);
   var rowEl=document.createElement('div');
   rowEl.className='song-row';
-  rowEl.appendChild(songCoverEl({image:en.image},1));
+  /* Cover wrap (owner order 2026-11-17): Play centred on the
+     cover, translucent — same as the feed, Create and History.
+     The cover is the song's own image when there is one,
+     otherwise the MovAi logo tile (songCoverEl). */
+  var coverWrapP=document.createElement('div');
+  coverWrapP.className='song-coverwrap';
+  coverWrapP.appendChild(songCoverEl({image:en.image},1));
+  rowEl.appendChild(coverWrapP);
   var play=document.createElement('button');
   play.type='button';play.className='song-play pl-play';
   play.textContent='▶';play.setAttribute('aria-label',tx('histPlay'));
   play.addEventListener('click',function(){plPlay(en);});
-  rowEl.appendChild(play);
+  coverWrapP.appendChild(play);
   var meta=document.createElement('div');
   meta.className='song-meta';
   var tt=document.createElement('div');
@@ -10238,9 +10299,31 @@ function pubSongRowEl(it){
   rk.textContent='#'+(it._dispRank||it._pos||'');
   row.appendChild(rk);
   var pb=document.createElement('button');
-  pb.type='button';pb.className='pub-row-play';
+  pb.type='button';pb.className='pub-row-play cover-play';
   pb.setAttribute('aria-label','Play');
   pb.innerHTML=pubPlaySvg();
+  /* Cover thumb (owner order 2026-11-17): EVERY compact row
+     shows the song's cover — the poster's uploaded cover when
+     there is one, otherwise the provider (Suno) cover that
+     came with the song, otherwise the MovAi logo tile — with
+     the Play button at the CENTRE of the cover, translucent.
+     (These rows used to show no cover at all: an empty box
+     beside the title.) The button is the row's same Play
+     control, moved onto the cover; tapping the rest of the
+     thumb toggles play/pause too. */
+  var cwrap=document.createElement('div');
+  cwrap.className='pub-row-coverwrap';
+  if(it.image&&/^https:/i.test(it.image)){
+    var rcv=document.createElement('img');
+    rcv.src=it.image;rcv.alt=it.title||'';rcv.className='pub-song-cover';rcv.loading='lazy';
+    rcv.addEventListener('error',function(){var fb=pubSongCoverFallback(it);fb.style.cssText='';rcv.replaceWith(fb);});
+    cwrap.appendChild(rcv);
+  }else{
+    var rfb=pubSongCoverFallback(it);rfb.style.cssText='';
+    cwrap.appendChild(rfb);
+  }
+  cwrap.appendChild(pb);
+  row.appendChild(cwrap);
   var main=document.createElement('div');
   main.className='pub-row-main';
   var tt=document.createElement('p');
@@ -10292,7 +10375,11 @@ function pubSongRowEl(it){
     if(au.paused){var pr=au.play();if(pr&&pr.catch)pr.catch(function(){});}
     else au.pause();
   });
-  row.appendChild(pb);
+  cwrap.addEventListener('click',function(ev){
+    if(ev.target&&ev.target.closest&&ev.target.closest('button'))return;
+    if(au.paused){var pr3=au.play();if(pr3&&pr3.catch)pr3.catch(function(){});}
+    else au.pause();
+  });
   row.appendChild(main);
   row.appendChild(au);
   return row;
@@ -10478,13 +10565,14 @@ function pubCardEl(it){
        the card instead (owner layout). There is NO meta/details
        text under a song card (owner rule). */
     var songExtra=document.createDocumentFragment();
-    /* Cover wrap (owner rule): NO play button sits on the
-       cover (owner order 2026-11-17) — the PLAY pill in the
-       player row below is the visible control. The cover
-       itself — logo or photo — stays completely still while
-       the song plays: flat static shine only, no bars, no
-       movement (owner correction 2026-11-17). Tapping the
-       cover itself toggles play/pause. */
+    /* Cover wrap (owner rule): a translucent Play button sits
+       at the CENTRE of the cover (owner order 2026-11-17,
+       superseding the earlier no-button rule), and the PLAY
+       pill in the player row below stays as a second control
+       for the same audio. The cover itself — logo or photo —
+       stays completely still while the song plays: flat static
+       shine only, no bars, no movement (owner correction
+       2026-11-17). Tapping the cover itself toggles play/pause. */
     var coverWrap=document.createElement('div');
     coverWrap.className='pub-cover-wrap';
     if(it.image&&/^https:/i.test(it.image)){
@@ -10496,6 +10584,17 @@ function pubCardEl(it){
     }else{
       coverWrap.appendChild(pubSongCoverFallback(it));
     }
+    /* Centred translucent Play ON the cover (owner order
+       2026-11-17): the button sits at the cover's CENTRE —
+       never in a corner — see-through before playing, and it
+       drives the SAME audio element as the player-row pill
+       below (pubUiSync keeps both icons in step). Tapping the
+       rest of the cover keeps toggling play/pause as before. */
+    var coverPlay=document.createElement('button');
+    coverPlay.type='button';coverPlay.className='cover-play pub-cover-play';
+    coverPlay.setAttribute('aria-label','Play');
+    coverPlay.innerHTML=pubPlaySvg();
+    coverWrap.appendChild(coverPlay);
     /* Top links row (owner layout, annotated mock): this row sits
        at the very TOP of the song card, directly under the author /
        #rank row — where the removed «Song» pill used to be. It holds
@@ -10704,6 +10803,8 @@ function pubCardEl(it){
       pcur.textContent=histFmtTime(au.currentTime||0);
       ppill.innerHTML=(au.paused?pubPlaySvg():pubPauseSvg());
       ppill.setAttribute('aria-label',au.paused?'Play':'Pause');
+      coverPlay.innerHTML=(au.paused?pubPlaySvg():pubPauseSvg());
+      coverPlay.setAttribute('aria-label',au.paused?'Play':'Pause');
       /* While playing, the cover wrap carries the «playing»
          class — it only switches the cover's static shine to
          its slightly stronger still state; nothing moves. */
@@ -10736,10 +10837,16 @@ function pubCardEl(it){
       }
       else au.pause();
     });
+    coverPlay.addEventListener('click',function(){
+      if(au.paused){
+        var prc=au.play();if(prc&&prc.catch)prc.catch(function(){});
+      }
+      else au.pause();
+    });
     coverWrap.addEventListener('click',function(ev){
       if(ev.target&&ev.target.closest&&ev.target.closest('button'))return;
-      /* No button on the cover: a tap toggles play/pause
-         directly, exactly as before. */
+      /* Tapping the cover itself (outside the centred Play
+         button) toggles play/pause directly, exactly as before. */
       if(au.paused){var pr2=au.play();if(pr2&&pr2.catch)pr2.catch(function(){});}
       else au.pause();
     });
