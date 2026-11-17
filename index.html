@@ -2598,6 +2598,20 @@ input[type=range].st-range{accent-color:var(--accent);min-height:32px;cursor:poi
 .st-pick-dur{flex:0 0 auto;font-size:0.8125rem;color:var(--muted);font-variant-numeric:tabular-nums}
 .st-pick-status{flex:0 0 auto;font-size:0.8125rem;font-weight:800;color:var(--accent-text);font-variant-numeric:tabular-nums;white-space:nowrap}
 .st-pick-empty{font-size:0.8125rem;color:var(--muted);margin-top:8px;line-height:1.55}
+/* ===== AI Studio simplify (owner order 2026-11-18) =====
+   The Studio header is ONE label («AI Studio») plus a small
+   round «+» that opens the file picker — no button rows, no
+   URL field, no explanatory text. The song list is the whole
+   empty state; once a song is loaded the DAW takes the top of
+   the panel and a small ✕ in its top bar unloads back to the
+   list. A failed AI split shows its exact error on the song
+   row itself, with one «Try again» action under it. */
+.st-head{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.st-add-btn{flex:0 0 auto;width:40px;height:40px;border-radius:50%;border:1px solid var(--line2);background:var(--field);color:var(--text);font-size:1.375rem;line-height:1;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;padding:0}
+.st-daw-close{flex:0 0 auto;width:38px;height:38px;border-radius:9px;border:1px solid var(--line2);background:var(--field);color:var(--text);font-size:0.9375rem;line-height:1;cursor:pointer;font-family:inherit;padding:0}
+.st-pick-err{display:none;margin-top:6px;padding:10px 12px;border:1px solid rgba(248,113,113,.45);border-radius:12px;background:rgba(127,29,29,.16);font-size:0.8125rem;line-height:1.55;color:#fecaca;overflow-wrap:break-word}
+.st-pick-err.on{display:block}
+.st-pick-retry{margin-top:8px;min-height:38px;padding:7px 14px;border-radius:9px;border:1px solid var(--line2);background:var(--field);color:var(--text);font-size:0.8125rem;font-weight:700;cursor:pointer;font-family:inherit}
 @media(min-width:1024px){#page-studio .panel{max-width:1360px;margin-left:auto;margin-right:auto}}
 </style>
 </head>
@@ -2610,7 +2624,7 @@ input[type=range].st-range{accent-color:var(--accent);min-height:32px;cursor:poi
     <button onclick="menuGo('sec-create','song')"><span data-i18n="navModeSong">បង្កើតបទចម្រៀង</span></button>
     <button onclick="menuGo('sec-create','video')"><span data-i18n="navModeVI">វីដេអូ+រូបភាព</span></button>
     <button onclick="menuGo('sec-create','3d')"><span data-i18n="navMode3d">រូបភាព 3D</span></button>
-    <button onclick="menuGo('sec-studio')"><span data-i18n="navStudio">ស្ទូឌីយោ</span> <small>Studio<span id="stNavPrep" class="st-nav-prep" style="display:none"></span></small></button>
+    <button onclick="menuGo('sec-studio')"><span>AI Studio</span><span id="stNavPrep" class="st-nav-prep" style="display:none"></span></button>
     <button onclick="menuGo('sec-history')"><span data-i18n="navHistory">ប្រវត្តិ</span> <small>History</small></button>
     <button onclick="menuGo('sec-playlist')"><span data-i18n="plTitle">Playlist · បញ្ជីចម្រៀង</span> <small>Playlist</small></button>
     <button onclick="menuGo('sec-packages')"><span data-i18n="navPackages">កញ្ចប់សេវាកម្ម</span> <small data-i18n="navPackagesSub">Packages</small></button>
@@ -2989,38 +3003,22 @@ input[type=range].st-range{accent-color:var(--accent);min-height:32px;cursor:poi
     </div>
   </div>
 </section>
-<section id="page-studio" style="display:none" aria-label="Studio">
+<section id="page-studio" style="display:none" aria-label="AI Studio">
   <div class="panel" id="sec-studio">
-    <h2 class="st-title">ស្ទូឌីយោ · Studio</h2>
-    <p class="st-songinfo" id="stSongInfo">មិនទាន់មានបទ · No song loaded</p>
-    <div class="st-row">
-      <button type="button" class="kbtn kbtn-black" onclick="document.getElementById('stFile').click()">បើក File · Open file</button>
-      <button type="button" class="kbtn kbtn-white" id="stSplitBtn" onclick="stSplit()" disabled>បំបែក Track · Split</button>
-      <button type="button" class="kbtn kbtn-white" id="stSplitAIBtn" onclick="stSplitAI()" disabled>Split (AI) · បំបែក AI</button>
-      <button type="button" class="kbtn kbtn-white" onclick="document.getElementById('stStemFile').click()">បន្ថែម Track · Add track</button>
-      <button type="button" class="kbtn kbtn-white" id="stClearBtn" onclick="stClearProject()">សម្អាត · Clear</button>
-    </div>
-    <div class="st-row">
-      <input class="input st-url" id="stUrl" type="url" placeholder="Link បទចម្រៀង (MP3) · Song URL" aria-label="Song URL">
-      <button type="button" class="kbtn kbtn-white" onclick="stLoadUrl()">បើក Link · Load</button>
+    <div class="st-head">
+      <h2 class="st-title">AI Studio</h2>
+      <button type="button" class="st-add-btn" onclick="document.getElementById('stFile').click()" aria-label="បើក File · Open file">+</button>
     </div>
     <input type="file" id="stFile" accept="audio/*" style="display:none" onchange="stLoadFile(this)">
-    <input type="file" id="stStemFile" accept="audio/*" multiple style="display:none" onchange="stAddStems(this)">
-    <p class="st-note">បំបែក Vocal / Instrumental (center-channel) — បំបែក 4 Track ពេញ (Vocal/Drums/Bass/Other) ត្រូវការសេវាបំបែកសំឡេងដាច់ដោយឡែក · Vocal / Instrumental split (center-channel) — a full 4-stem split (Vocal/Drums/Bass/Other) needs a dedicated separation service. ប៊ូតុង «Split (AI)» បំបែក 4 Track តាម AI (MVSEP) — ត្រូវការ Link បទចម្រៀង · The «Split (AI)» button splits 4 stems with AI (MVSEP) — needs a song link.</p>
     <p class="st-msg" id="stMsg" style="display:none"></p>
     <p class="st-msg" id="stAutoNote" style="display:none"></p>
     <div class="st-prog" id="stProg">
       <div class="st-prog-bar"><div class="st-prog-fill" id="stProgFill"></div></div>
       <div class="st-prog-txt" id="stProgTxt"></div>
     </div>
-    <div class="st-pick" id="stPick">
-      <div class="st-pick-head">បទរបស់ខ្ញុំ · My Songs</div>
-      <div id="stPickList"></div>
-      <p class="st-pick-empty" id="stPickEmpty" style="display:none">មិនទាន់មានបទ — បង្កើតបទចម្រៀងជាមុនសិន · No songs yet — create a song first</p>
-    </div>
-    <div id="stEmptyState" class="st-empty">Studio ទទេ · Studio is empty<span>បង្កើតបទចម្រៀងថ្មី — វានឹងចូល Studio ហើយបំបែកជាស្រាចដោយស្វ័យប្រវត្តិ · ឬបើក MP3/WAV ខាងលើ<br>Create a song and it lands here already split — or open an MP3/WAV above.</span></div>
-        <div id="stDaw" style="display:none">
+    <div id="stDaw" style="display:none">
       <div class="st-daw-top">
+        <button type="button" class="st-daw-close" onclick="stClearProject()" aria-label="ត្រឡប់ទៅបញ្ជីបទ · Back to song list">✕</button>
         <div class="st-daw-titles">
           <div class="st-daw-title" id="stDawTitle">Song</div>
           <div class="st-daw-sub" id="stDawSub"></div>
@@ -3043,6 +3041,11 @@ input[type=range].st-range{accent-color:var(--accent);min-height:32px;cursor:poi
     </div>
     <div class="st-row" id="stExportRow">
       <button type="button" class="btn btn-green" style="flex:1" onclick="stExport()">Export Mix · ទាញយក WAV</button>
+    </div>
+    <div class="st-pick" id="stPick">
+      <div class="st-pick-head">បទរបស់ខ្ញុំ · My Songs</div>
+      <div id="stPickList"></div>
+      <p class="st-pick-empty" id="stPickEmpty" style="display:none">មិនទាន់មានបទ — បង្កើតបទចម្រៀងជាមុនសិន · No songs yet — create a song first</p>
     </div>
   </div>
 </section>
@@ -21084,8 +21087,11 @@ function studioOpenSong(url,title){
   if(!url)return;
   appSetView('studio');
   window.scrollTo(0,0);
-  var inp=document.getElementById('stUrl');if(inp)inp.value=url;
-  stLoadFromUrl(url,title||'');
+  /* Same one-tap path as the AI Studio song list: load the song
+     and split it with AI right away (stLoadSplitAI). There is
+     no song row here, so progress / errors use the Studio
+     progress bar and message line. */
+  stLoadSplitAI({id:'',url:url,title:title||''},null);
 }
 function stAddStems(inp){
   var files=[];if(inp.files)for(var i=0;i<inp.files.length;i++)files.push(inp.files[i]);
@@ -21161,6 +21167,7 @@ function stClearProject(){
   stMsg('');
   stRenderAllTracks();
   stSyncEmptyUI();
+  try{stPickRender();}catch(e){}
 }
 /* Install an already-split song as the Studio's current project
    (Vocals + Instruments tracks over the song's own buffer) —
@@ -21342,29 +21349,32 @@ async function stAutoPrepareOne(job){
     stAutoNavDone();
   }
 }
-/* ================= Studio SONG PICKER (owner order 2026-11-18) =================
-   «បទរបស់ខ្ញុំ · My Songs» inside the Studio lists the owner's
-   songs from History — the SAME History data the app already
-   keeps (histGet: old AND new songs, most recent first, since
-   History itself is stored newest-first). Tapping a row loads
-   THAT ONE song into the Studio: fetch + decode its audio URL
-   (stFetchDecode), run the existing center-channel split
-   (stSplitRenderOne, stSplitMath fallback) and install it as
-   the Studio's current project via stSetSplitProject — exactly
-   the auto-split result — with the same live «Preparing
-   Studio… X%» progress (the Studio progress bar plus a % on
-   the tapped row). Picking a song stops the current playback
-   and replaces the current project (one project at a time);
-   bumping ST.autoToken also discards any background auto-split
-   still in flight, exactly like a manual load does. Failure
-   handling mirrors the auto-split / manual URL load: a URL
-   that blocks cross-origin decoding first retries once with
-   the song's permanent stored URL (stAutoWaitStoredUrl), then
-   shows the Studio's existing cross-origin message and leaves
-   the current project untouched; a split that fails after a
-   good decode loads the song as ONE single track with the
-   same note the auto-split uses. Nothing here auto-splits the
-   whole History — only the tapped song, one at a time. */
+/* ================= AI Studio SONG PICKER (owner order 2026-11-18) =================
+   «បទរបស់ខ្ញុំ · My Songs» is the AI Studio's empty state: it
+   lists the owner's songs from History — the SAME History data
+   the app already keeps (histGet: old AND new songs, most
+   recent first, since History itself is stored newest-first).
+   ONE tap on a row loads THAT song AND splits it with AI at
+   once: fetch + decode its audio URL (stFetchDecode), install
+   it as the Studio's current project (stSetSong, so the DAW
+   shows immediately), then run the SAME Split (AI) the old
+   button ran (stSplitAI — MVSEP via the server), which
+   replaces the single track with the AI stems. Progress shows
+   on the tapped row plus the Studio progress bar (the Split
+   (AI) bar: label + ticking seconds, never a fake %). If the
+   AI split fails, the EXACT error stSplitAI reported moves
+   onto that song's row (stPickErrors) with a single «Try
+   again» action that re-runs Split (AI) only — the song stays
+   loaded. A URL that blocks cross-origin decoding first
+   retries once with the song's permanent stored URL
+   (stAutoWaitStoredUrl), then shows the Studio's existing
+   cross-origin message on the row (its Try again re-runs the
+   whole load + split). Picking a song stops the current
+   playback and replaces the current project (one project at a
+   time); bumping ST.autoToken also discards any background
+   auto-split still in flight, exactly like a manual load
+   does. Nothing here splits the whole History — only the
+   tapped song, one at a time. */
 function stPickSongs(){
   var out=[];
   try{
@@ -21376,6 +21386,10 @@ function stPickSongs(){
   }catch(e){}
   return out;
 }
+/* Failed load / split messages, keyed by song (History id or
+   URL), painted onto the song's own row by stPickPaintError —
+   kept in a map so they survive stPickRender re-renders. */
+var stPickErrors={};
 function stPickRender(){
   var list=document.getElementById('stPickList');if(!list)return;
   var empty=document.getElementById('stPickEmpty');
@@ -21384,6 +21398,8 @@ function stPickRender(){
   if(empty)empty.style.display=songs.length?'none':'';
   songs.forEach(function(it){
     var key=it.id||it.url;
+    var wrap=document.createElement('div');
+    wrap.className='st-pick-item';
     var row=document.createElement('button');
     row.type='button';
     row.className='st-pick-row'+((ST.projectKey&&ST.projectKey===key)?' on':'');
@@ -21412,19 +21428,59 @@ function stPickRender(){
     row.appendChild(st);
     row._stPickStatus=st;
     row.addEventListener('click',function(){stPickLoad(it,row);});
-    list.appendChild(row);
+    wrap.appendChild(row);
+    var errBox=document.createElement('div');
+    errBox.className='st-pick-err';
+    wrap.appendChild(errBox);
+    row._stPickErrBox=errBox;
+    list.appendChild(wrap);
+    stPickPaintError(row,it);
   });
+}
+/* Paint (or clear) a row's error box from stPickErrors: the
+   exact failure text plus ONE «Try again» action. */
+function stPickPaintError(row,it){
+  var box=row?row._stPickErrBox:null;if(!box)return;
+  var key=it?(it.id||it.url):'';
+  var er=key?stPickErrors[key]:null;
+  box.innerHTML='';
+  if(!er){box.className='st-pick-err';return;}
+  box.className='st-pick-err on';
+  var t=document.createElement('div');
+  t.textContent=er.text;
+  box.appendChild(t);
+  var b=document.createElement('button');
+  b.type='button';
+  b.className='st-pick-retry';
+  b.textContent='Try again · បំបែកម្ដងទៀត';
+  b.addEventListener('click',function(){stPickRetry(it,row);});
+  box.appendChild(b);
 }
 var stPickBusy=false;
 async function stPickLoad(it,row){
+  if(!it||!it.url)return;
+  await stLoadSplitAI(it,row);
+}
+/* ONE tap = load + Split (AI): fetch + decode the song,
+   install it as the Studio's current project (the DAW shows
+   it right away), then run stSplitAI — the exact function the
+   old «Split (AI)» button called — which replaces the single
+   track with the AI stems. Shared by the song-list rows
+   (row = the tapped row) and by «Studio» on a song card
+   (row = null: progress / errors use the Studio progress bar
+   and message line instead). */
+async function stLoadSplitAI(it,row){
   if(!it||!it.url||stPickBusy)return;
+  var key=it.id||it.url;
+  stPickBusy=true;
   try{stPause(false);}catch(e){}
   ST.autoToken++;
   var token=ST.autoToken;
-  var key=it.id||it.url;
-  stPickBusy=true;
   var statusEl=row?row._stPickStatus:null;
   var paint=function(pct){if(statusEl&&document.contains(statusEl))statusEl.textContent='⏳ '+Math.round(pct)+'%';};
+  var paintTxt=function(t){if(statusEl&&document.contains(statusEl))statusEl.textContent=t;};
+  delete stPickErrors[key];
+  if(row)stPickPaintError(row,it);
   var usedProg=false;
   try{
     if(!ST.busy){stProgBegin('កំពុងរៀបចំ Studio · Preparing Studio');usedProg=true;}
@@ -21437,46 +21493,96 @@ async function stPickLoad(it,row){
       if(nu)buffer=await stFetchDecode(nu);
       else throw e1;
     }
-    paint(15);
-    var vocBuf=null,instBuf=null,splitOk=true;
-    ST.progSink=function(p){paint(15+p*0.85);};
-    try{
-      vocBuf=await stSplitRenderOne(buffer,'voc',0,50);
-      instBuf=await stSplitRenderOne(buffer,'inst',50,100);
-    }catch(e2){
-      try{var m=stSplitMath(buffer);vocBuf=m.vocals;instBuf=m.inst;}
-      catch(e3){splitOk=false;}
-    }
-    ST.progSink=null;
     if(token!==ST.autoToken){
       /* The owner loaded or cleared the Studio by hand while
          this prepared — their action wins; discard the result
          and leave the current project exactly as it is. */
       return;
     }
-    ST.songUrl=it.url;/* picked song came from this URL — Split (AI) can use it */
-    if(splitOk&&vocBuf&&instBuf){
-      stSetSplitProject(it.title||'Song',buffer,vocBuf,instBuf,key);
-    }else{
-      stSetSong(it.title||'Song',buffer);
-      ST.projectKey=key;
-      ST.autoNote='Split failed — song loaded as one track · បំបែកមិនបាន — បទត្រូវបានផ្ទុកជា Track តែមួយ';
-      stSyncEmptyUI();
+    paint(15);
+    ST.songUrl=it.url;/* picked song came from this URL — Split (AI) sends it to MVSEP */
+    stSetSong(it.title||'Song',buffer);
+    ST.projectKey=key;
+    try{stSyncEmptyUI();}catch(e){}
+    paintTxt('⏳ កំពុងបំបែក AI · Splitting with AI…');
+    var aiPromise=stSplitAI();
+    var tokenAI=ST.autoToken;/* stSplitAI bumped the token in its synchronous prologue — compare against THIS value below */
+    await aiPromise;
+    if(String(ST.projectKey||'').indexOf('ai-')===0){
+      /* AI stems installed as the current project. (A partial-
+         stem warning, if any, stays in the Studio message
+         line above the DAW.) */
+      try{stPickRender();}catch(e){}
+      return;
     }
-    if(usedProg)stProgSet(100);
-    paint(100);
-    try{stPickRender();}catch(e){}
+    if(tokenAI!==ST.autoToken||!ST.mainBuffer||ST.songUrl!==it.url){
+      /* The owner cleared or replaced the song while the
+         split ran — stSplitAI already stayed silent; do the
+         same here. */
+      return;
+    }
+    /* Split failed: stSplitAI put the EXACT error in the
+       Studio message line — move it onto this song's row,
+       with a «Try again» that re-runs Split (AI) only. */
+    var mEl=document.getElementById('stMsg');
+    var errTxt=mEl?(mEl.textContent||''):'';
+    if(row){
+      stMsg('');
+      stPickErrors[key]={text:errTxt||'បំបែក AI មិនបាន · AI split failed',mode:'ai'};
+      try{stPickRender();}catch(e){}
+    }
+    /* No row (opened from a song card): the exact error stays
+       in the Studio message line, where stSplitAI put it. */
   }catch(e){
-    ST.progSink=null;
     if(token===ST.autoToken){
       /* Cross-origin / load failure: the Studio's existing
-         message; the current project is NOT cleared. */
-      stMsg('បើក Link មិនបាន — Link នេះអាចប្លុក Cross-origin · Could not load that link (it may block cross-origin audio) — please upload the file instead.',true);
+         message; the current project is NOT cleared. With a
+         row, the message shows on the row instead (its Try
+         again re-runs the load + split). */
+      var msg='បើក Link មិនបាន — Link នេះអាចប្លុក Cross-origin · Could not load that link (it may block cross-origin audio) — please upload the file instead.';
+      if(row){
+        stPickErrors[key]={text:msg,mode:'load'};
+        try{stPickRender();}catch(e){}
+      }else{
+        stMsg(msg,true);
+      }
     }
   }finally{
     if(usedProg&&!ST.busy)stProgEnd();
-    if(statusEl)statusEl.textContent='';
+    if(statusEl&&document.contains(statusEl))statusEl.textContent='';
     stPickBusy=false;
+  }
+}
+/* «Try again · បំបែកម្ដងទៀត» on a song row. A failed AI split
+   leaves the song loaded, so this re-runs Split (AI) ONLY
+   (stSplitAI — no reload, no other split). A failed load
+   re-runs the whole one-tap load + split. */
+async function stPickRetry(it,row){
+  if(!it||!it.url||stPickBusy)return;
+  var key=it.id||it.url;
+  var er=stPickErrors[key];
+  if(!er){return;}
+  if(er.mode==='ai'&&ST.mainBuffer&&ST.songUrl===it.url){
+    delete stPickErrors[key];
+    try{stPickRender();}catch(e){}
+    stPickBusy=true;
+    try{
+      await stSplitAI();
+    }finally{
+      stPickBusy=false;
+    }
+    if(String(ST.projectKey||'').indexOf('ai-')===0){
+      try{stPickRender();}catch(e){}
+      return;
+    }
+    if(!ST.mainBuffer||ST.songUrl!==it.url)return;/* owner cleared / replaced it meanwhile */
+    var mEl=document.getElementById('stMsg');
+    var errTxt=mEl?(mEl.textContent||''):'';
+    stMsg('');
+    stPickErrors[key]={text:errTxt||'បំបែក AI មិនបាន · AI split failed',mode:'ai'};
+    try{stPickRender();}catch(e){}
+  }else{
+    stPickLoad(it,row);
   }
 }
 /* ---- Stem split: center-channel via OfflineAudioContext ----
