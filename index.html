@@ -2540,6 +2540,19 @@ input[type=range].st-range{accent-color:var(--accent);min-height:32px;cursor:poi
 .st-nav-prep{display:inline-block;margin-left:6px;padding:2px 8px;border-radius:999px;background:rgba(var(--accent-rgb),.18);color:var(--accent-text);font-size:0.6875rem;font-weight:800;white-space:nowrap;vertical-align:1px}
 .st-empty{margin-top:16px;border:1.5px dashed var(--line2);border-radius:14px;padding:26px 16px;text-align:center;font-size:0.9375rem;font-weight:700;color:var(--text2);line-height:1.65}
 .st-empty span{display:block;margin-top:4px;font-size:0.8125rem;font-weight:400;color:var(--muted)}
+/* ===== Studio song picker (owner order 2026-11-18) =====
+   «My Songs» lists the owner's History songs (old AND new,
+   most recent first) inside the Studio. It is always visible —
+   in the empty state and while a project is loaded — and one
+   tap fetches, decodes and splits that song into the Studio. */
+.st-pick{margin-top:16px}
+.st-pick-head{font-size:0.9375rem;font-weight:800}
+.st-pick-row{display:flex;align-items:center;gap:10px;width:100%;text-align:left;background:var(--card2);border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin-top:8px;cursor:pointer;font-family:inherit;color:var(--text);min-height:48px}
+.st-pick-row.on{border-color:var(--accent);background:rgba(var(--accent-rgb),.12)}
+.st-pick-title{flex:1 1 auto;min-width:0;font-weight:700;font-size:0.875rem;line-height:1.45;overflow-wrap:break-word}
+.st-pick-dur{flex:0 0 auto;font-size:0.8125rem;color:var(--muted);font-variant-numeric:tabular-nums}
+.st-pick-status{flex:0 0 auto;font-size:0.8125rem;font-weight:800;color:var(--accent-text);font-variant-numeric:tabular-nums;white-space:nowrap}
+.st-pick-empty{font-size:0.8125rem;color:var(--muted);margin-top:8px;line-height:1.55}
 @media(min-width:1024px){#page-studio .panel{max-width:1080px;margin-left:auto;margin-right:auto}}
 </style>
 </head>
@@ -2953,6 +2966,11 @@ input[type=range].st-range{accent-color:var(--accent);min-height:32px;cursor:poi
     <div class="st-prog" id="stProg">
       <div class="st-prog-bar"><div class="st-prog-fill" id="stProgFill"></div></div>
       <div class="st-prog-txt" id="stProgTxt"></div>
+    </div>
+    <div class="st-pick" id="stPick">
+      <div class="st-pick-head">បទរបស់ខ្ញុំ · My Songs</div>
+      <div id="stPickList"></div>
+      <p class="st-pick-empty" id="stPickEmpty" style="display:none">មិនទាន់មានបទ — បង្កើតបទចម្រៀងជាមុនសិន · No songs yet — create a song first</p>
     </div>
     <div id="stEmptyState" class="st-empty">Studio ទទេ · Studio is empty<span>បង្កើតបទចម្រៀងថ្មី — វានឹងចូល Studio ហើយបំបែកជាស្រាចដោយស្វ័យប្រវត្តិ · ឬបើក MP3/WAV ខាងលើ<br>Create a song and it lands here already split — or open an MP3/WAV above.</span></div>
     <div class="st-transport" id="stTransport">
@@ -9954,7 +9972,7 @@ function appSetView(v){
   /* Studio view hooks: redraw the waveforms once the section
      is visible (canvas widths are 0 while it is hidden), and
      stop Studio playback when the user leaves the section. */
-  if(nv==='studio'){try{stDrawAllWaves();}catch(e){}try{stSyncEmptyUI();}catch(e){}}
+  if(nv==='studio'){try{stDrawAllWaves();}catch(e){}try{stSyncEmptyUI();}catch(e){}try{stPickRender();}catch(e){}}
   else{try{if(typeof ST!=='undefined'&&ST.playing)stPause(false);}catch(e){}}
   if(changed)window.scrollTo(0,0);
   try{dockSync();}catch(e){}
@@ -21094,6 +21112,142 @@ async function stAutoPrepareOne(job){
     stAutoNavDone();
   }
 }
+/* ================= Studio SONG PICKER (owner order 2026-11-18) =================
+   «បទរបស់ខ្ញុំ · My Songs» inside the Studio lists the owner's
+   songs from History — the SAME History data the app already
+   keeps (histGet: old AND new songs, most recent first, since
+   History itself is stored newest-first). Tapping a row loads
+   THAT ONE song into the Studio: fetch + decode its audio URL
+   (stFetchDecode), run the existing center-channel split
+   (stSplitRenderOne, stSplitMath fallback) and install it as
+   the Studio's current project via stSetSplitProject — exactly
+   the auto-split result — with the same live «Preparing
+   Studio… X%» progress (the Studio progress bar plus a % on
+   the tapped row). Picking a song stops the current playback
+   and replaces the current project (one project at a time);
+   bumping ST.autoToken also discards any background auto-split
+   still in flight, exactly like a manual load does. Failure
+   handling mirrors the auto-split / manual URL load: a URL
+   that blocks cross-origin decoding first retries once with
+   the song's permanent stored URL (stAutoWaitStoredUrl), then
+   shows the Studio's existing cross-origin message and leaves
+   the current project untouched; a split that fails after a
+   good decode loads the song as ONE single track with the
+   same note the auto-split uses. Nothing here auto-splits the
+   whole History — only the tapped song, one at a time. */
+function stPickSongs(){
+  var out=[];
+  try{
+    var a=histGet();
+    for(var i=0;i<a.length;i++){
+      var it=a[i];
+      if(it&&it.type==='song'&&it.url)out.push(it);
+    }
+  }catch(e){}
+  return out;
+}
+function stPickRender(){
+  var list=document.getElementById('stPickList');if(!list)return;
+  var empty=document.getElementById('stPickEmpty');
+  var songs=stPickSongs();
+  list.innerHTML='';
+  if(empty)empty.style.display=songs.length?'none':'';
+  songs.forEach(function(it){
+    var key=it.id||it.url;
+    var row=document.createElement('button');
+    row.type='button';
+    row.className='st-pick-row'+((ST.projectKey&&ST.projectKey===key)?' on':'');
+    row.setAttribute('aria-label',(it.title||'MovAi'));
+    var tt=document.createElement('span');
+    tt.className='st-pick-title';
+    tt.textContent=it.title||'MovAi';
+    row.appendChild(tt);
+    var dur=document.createElement('span');
+    dur.className='st-pick-dur';
+    dur.textContent='';
+    row.appendChild(dur);
+    /* Duration is not stored on History items — read it from
+       the file's metadata once, lightly, exactly like the
+       History song cards do. */
+    try{
+      var mAu=new Audio();
+      mAu.preload='metadata';mAu.src=it.url;
+      mAu.addEventListener('loadedmetadata',function(){
+        if(isFinite(mAu.duration)&&mAu.duration>0)dur.textContent=stFmt(mAu.duration);
+        try{mAu.removeAttribute('src');mAu.load();}catch(e){}
+      });
+    }catch(e){}
+    var st=document.createElement('span');
+    st.className='st-pick-status';
+    row.appendChild(st);
+    row._stPickStatus=st;
+    row.addEventListener('click',function(){stPickLoad(it,row);});
+    list.appendChild(row);
+  });
+}
+var stPickBusy=false;
+async function stPickLoad(it,row){
+  if(!it||!it.url||stPickBusy)return;
+  try{stPause(false);}catch(e){}
+  ST.autoToken++;
+  var token=ST.autoToken;
+  var key=it.id||it.url;
+  stPickBusy=true;
+  var statusEl=row?row._stPickStatus:null;
+  var paint=function(pct){if(statusEl&&document.contains(statusEl))statusEl.textContent='⏳ '+Math.round(pct)+'%';};
+  var usedProg=false;
+  try{
+    if(!ST.busy){stProgBegin('កំពុងរៀបចំ Studio · Preparing Studio');usedProg=true;}
+    paint(2);
+    var buffer=null;
+    try{
+      buffer=await stFetchDecode(it.url);
+    }catch(e1){
+      var nu=await stAutoWaitStoredUrl({id:it.id||'',url:it.url,saveKey:histKey()});
+      if(nu)buffer=await stFetchDecode(nu);
+      else throw e1;
+    }
+    paint(15);
+    var vocBuf=null,instBuf=null,splitOk=true;
+    ST.progSink=function(p){paint(15+p*0.85);};
+    try{
+      vocBuf=await stSplitRenderOne(buffer,'voc',0,50);
+      instBuf=await stSplitRenderOne(buffer,'inst',50,100);
+    }catch(e2){
+      try{var m=stSplitMath(buffer);vocBuf=m.vocals;instBuf=m.inst;}
+      catch(e3){splitOk=false;}
+    }
+    ST.progSink=null;
+    if(token!==ST.autoToken){
+      /* The owner loaded or cleared the Studio by hand while
+         this prepared — their action wins; discard the result
+         and leave the current project exactly as it is. */
+      return;
+    }
+    if(splitOk&&vocBuf&&instBuf){
+      stSetSplitProject(it.title||'Song',buffer,vocBuf,instBuf,key);
+    }else{
+      stSetSong(it.title||'Song',buffer);
+      ST.projectKey=key;
+      ST.autoNote='Split failed — song loaded as one track · បំបែកមិនបាន — បទត្រូវបានផ្ទុកជា Track តែមួយ';
+      stSyncEmptyUI();
+    }
+    if(usedProg)stProgSet(100);
+    paint(100);
+    try{stPickRender();}catch(e){}
+  }catch(e){
+    ST.progSink=null;
+    if(token===ST.autoToken){
+      /* Cross-origin / load failure: the Studio's existing
+         message; the current project is NOT cleared. */
+      stMsg('បើក Link មិនបាន — Link នេះអាចប្លុក Cross-origin · Could not load that link (it may block cross-origin audio) — please upload the file instead.',true);
+    }
+  }finally{
+    if(usedProg&&!ST.busy)stProgEnd();
+    if(statusEl)statusEl.textContent='';
+    stPickBusy=false;
+  }
+}
 /* ---- Stem split: center-channel via OfflineAudioContext ----
    Vocals (centre) = (L+R)/2 on both channels.
    Instruments (sides) = (L−R)/2 and (R−L)/2.
@@ -21267,6 +21421,7 @@ async function stExport(){
    a project appears only from a manual load, «Open in Studio»,
    or the background auto-split of a newly generated song. */
 try{stSyncEmptyUI();}catch(e){}
+try{stPickRender();}catch(e){}
 /* Redraw waveforms when the window size changes (canvas widths
    follow the layout). */
 var stResizeT=null;
