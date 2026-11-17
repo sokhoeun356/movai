@@ -1520,6 +1520,20 @@ html[data-mode="light"] .btn-free{color:#63910c}
 #verifySheet{-webkit-backdrop-filter:blur(16px) saturate(130%);backdrop-filter:blur(16px) saturate(130%)}
 #verifySheet .verify-code-input{text-align:center;font-size:1.5rem;font-weight:800;letter-spacing:.4em;text-indent:.4em}
 #verifySheet .verify-count{font-variant-numeric:tabular-nums}
+/* Forgot-password sheet (code-based reset): same full-background
+   blur + branding as the other auth sheets; the 6-digit code
+   input matches the verify sheet's centred, widely spaced look,
+   and the countdown uses tabular numbers like the verify sheet. */
+#forgotSheet{-webkit-backdrop-filter:blur(16px) saturate(130%);backdrop-filter:blur(16px) saturate(130%)}
+#forgotSheet .login-brand{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px;padding-bottom:12px;border-bottom:1px solid var(--line)}
+#forgotSheet .login-brand-name{font-size:1.75rem;font-weight:900;letter-spacing:-.02em;line-height:1;color:var(--text);white-space:nowrap}
+#forgotSheet .login-brand-name span{color:var(--accent-text)}
+#forgotSheet .login-brand-credit{text-align:right;line-height:1.3;min-width:0}
+#forgotSheet .login-brand-credit b{display:block;font-size:0.75rem;font-weight:800;letter-spacing:.04em;color:var(--text);white-space:nowrap}
+#forgotSheet .login-brand-credit i{display:block;font-style:normal;font-size:0.6875rem;font-weight:600;color:var(--muted);white-space:nowrap}
+#forgotSheet .forgot-code-input{text-align:center;font-size:1.5rem;font-weight:800;letter-spacing:.4em;text-indent:.4em}
+#forgotSheet .forgot-count{font-variant-numeric:tabular-nums}
+.forgot-google-alt{margin-top:14px;padding:14px;border:1px solid var(--line2);border-radius:14px;background:var(--card2);text-align:left}
 /* Google sign-in loading spinner — shown in the login sheet while
    Google is opening, INSTEAD of any «Opening Google…» text (owner
    rule: a spinning indicator only, no waiting words). */
@@ -3059,7 +3073,7 @@ main{padding-top:calc(3.75rem + env(safe-area-inset-top,0px))}
     </div>
     <p id="authFormMsg" style="font-size:0.8125rem;margin-top:10px;min-height:16px;line-height:1.6"></p>
     <button type="button" class="kbtn kbtn-black" id="authSigninBtn" style="margin-top:6px;width:100%" onclick="authSigninSubmit()" data-i18n="authSigninBtn">ចូលប្រើ · Sign-in</button>
-    <button type="button" class="auth-forgot" onclick="authForgotStart()" data-i18n="authForgot">ភ្លេចលេខសម្ងាត់?</button>
+    <button type="button" class="auth-forgot" onclick="forgotOpen()" data-i18n="authForgot">ភ្លេចលេខសម្ងាត់?</button>
     <div class="auth-divider" aria-hidden="true"><span data-i18n="authOr">ឬ</span></div>
     <button type="button" class="google-btn" id="loginGoogleBtn" onclick="authGoogleSignup()"><svg viewBox="0 0 48 48" width="20" height="20" aria-hidden="true" style="flex:0 0 auto"><path fill="#FFC107" d="M43.6 20.1H42V20H24v8h11.3C33.7 32.7 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.9 1.2 8 3l5.7-5.7C34.3 6.1 29.3 4 24 4 13 4 4 13 4 24s9 20 20 20 20-9 20-20c0-1.3-.1-2.6-.4-3.9z"/><path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.9 1.2 8 3l5.7-5.7C34.3 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.1 26.7 36 24 36c-5.2 0-9.6-3.3-11.3-8l-6.5 5C9.5 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.1H42V20H24v8h11.3c-.8 2.3-2.3 4.3-4.1 5.6l6.2 5.2C36.9 39.2 44 34 44 24c0-1.3-.1-2.6-.4-3.9z"/></svg><span data-i18n="authSignupGoogle">ចុះឈ្មោះជាមួយ Google · Sign up with Google</span></button>
     <div id="loginGsiSlot" style="display:none;margin-top:14px;justify-content:center"></div>
@@ -3099,6 +3113,54 @@ main{padding-top:calc(3.75rem + env(safe-area-inset-top,0px))}
     <p id="pwdMsg" style="font-size:0.8125rem;margin-top:10px;min-height:16px;line-height:1.6"></p>
     <button type="button" class="kbtn kbtn-black" id="pwdCreateBtn" style="margin-top:6px;width:100%" onclick="pwdCreateSubmit()" data-i18n="pwdCreateBtn">បង្កើតគណនី · Create Account</button>
     <button type="button" class="kbtn kbtn-white" style="margin-top:10px;width:100%" onclick="pwdSheetCancel()" data-i18n="pkgCancel">បោះបង់</button>
+  </div>
+</div>
+<div id="forgotSheet" class="pkg-sheet" style="display:none" role="dialog" aria-modal="true" onclick="if(event.target===this)forgotClose()">
+  <div class="pkg-sheet-card">
+    <div class="login-brand" aria-hidden="true"><span class="login-brand-name">Mov<span>Ai</span></span><span class="login-brand-credit"><b>YEM SOKHOEUN</b><i>Create by Owner</i></span></div>
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:10px">
+      <h3 style="font-size:1.0625rem;font-weight:800" data-i18n="forgotTitle">ភ្លេចលេខសម្ងាត់</h3>
+      <button type="button" class="drawer-close" style="background:var(--card2);color:var(--text);border-color:var(--line2)" onclick="forgotClose()" aria-label="Close">✕</button>
+    </div>
+    <div id="forgotStep1">
+      <p style="font-size:0.875rem;color:var(--muted);line-height:1.7;margin-top:10px" data-i18n="forgotNote">បញ្ចូល Gmail របស់អ្នក — យើងនឹងផ្ញើលេខកូដ 6 ខ្ទង់ទៅ Gmail នោះ ដើម្បីឲ្យអ្នកកំណត់លេខសម្ងាត់ថ្មី។ លេខកូដផុតកំណត់ក្នុង 60 វិនាទី។</p>
+      <div class="auth-field">
+        <label for="forgotEmail" data-i18n="loginGmailLabel">គណនី Google (Gmail)</label>
+        <input class="input" id="forgotEmail" type="email" autocomplete="email" placeholder="yourname@gmail.com" onkeydown="if(event.key==='Enter')forgotSendCode()">
+      </div>
+      <p id="forgotMsg1" style="font-size:0.8125rem;margin-top:10px;min-height:16px;line-height:1.6"></p>
+      <button type="button" class="kbtn kbtn-black" id="forgotSendBtn" style="margin-top:6px;width:100%" onclick="forgotSendCode()" data-i18n="forgotSendBtn">ផ្ញើលេខកូដ · Send code</button>
+      <div id="forgotGoogleAlt" class="forgot-google-alt" style="display:none">
+        <p style="font-size:0.875rem;line-height:1.7" data-i18n="forgotGoogleAltNote">Email មិនទាន់ដំឡើងនៅលើ Server ទេ — តែអ្នកអាចកំណត់លេខសម្ងាត់ថ្មីដោយ Google បាន (មិនត្រូវការ email)៖</p>
+        <button type="button" class="google-btn" style="margin-top:10px;width:100%" onclick="forgotUseGoogle()"><svg viewBox="0 0 48 48" width="20" height="20" aria-hidden="true" style="flex:0 0 auto"><path fill="#FFC107" d="M43.6 20.1H42V20H24v8h11.3C33.7 32.7 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.9 1.2 8 3l5.7-5.7C34.3 6.1 29.3 4 24 4 13 4 4 13 4 24s9 20 20 20 20-9 20-20c0-1.3-.1-2.6-.4-3.9z"/><path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.9 1.2 8 3l5.7-5.7C34.3 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.1 26.7 36 24 36c-5.2 0-9.6-3.3-11.3-8l-6.5 5C9.5 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.1H42V20H24v8h11.3c-.8 2.3-2.3 4.3-4.1 5.6l6.2 5.2C36.9 39.2 44 34 44 24c0-1.3-.1-2.6-.4-3.9z"/></svg><span data-i18n="forgotUseGoogle">ប្រើ Google ជំនួសវិញ · Use Google instead</span></button>
+      </div>
+      <button type="button" class="auth-forgot" onclick="forgotUseGoogle()" data-i18n="forgotUseGoogle">ប្រើ Google ជំនួសវិញ · Use Google instead</button>
+      <button type="button" class="kbtn kbtn-white" style="margin-top:10px;width:100%" onclick="forgotClose()" data-i18n="verifyBack">ត្រឡប់ទៅ Log in</button>
+    </div>
+    <div id="forgotStep2" style="display:none">
+      <p style="font-size:0.875rem;color:var(--muted);line-height:1.7;margin-top:10px" data-i18n="forgotStep2Note">យើងបានផ្ញើលេខកូដ 6 ខ្ទង់ទៅ Gmail ខាងក្រោម។ សូមបញ្ចូលលេខកូដ រួចដាក់លេខសម្ងាត់ថ្មី។</p>
+      <p id="forgotEmailShow" style="font-size:0.9375rem;font-weight:800;margin-top:8px;overflow-wrap:break-word"></p>
+      <p id="forgotCount" class="forgot-count" style="font-size:0.8125rem;color:var(--muted);margin-top:4px;min-height:16px"></p>
+      <input class="input forgot-code-input" id="forgotCodeInput" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="6" style="margin-top:12px" data-i18n-ph="verifyCodePh" placeholder="លេខកូដ 6 ខ្ទង់" oninput="this.value=this.value.replace(/\D/g,'').slice(0,6)" onkeydown="if(event.key==='Enter'){event.preventDefault();var p=document.getElementById('forgotNewPass');if(p)p.focus();}">
+      <div class="auth-field">
+        <label for="forgotNewPass" data-i18n="forgotNewPassLabel">លេខសម្ងាត់ថ្មី · New password</label>
+        <div class="auth-pass-wrap">
+          <input class="input" id="forgotNewPass" type="password" autocomplete="new-password" data-i18n-ph="authPassPh" placeholder="បញ្ចូលលេខសម្ងាត់របស់អ្នក" onkeydown="if(event.key==='Enter'){event.preventDefault();var c=document.getElementById('forgotConfirmPass');if(c)c.focus();}">
+          <button type="button" class="auth-eye" onclick="authToggleEye('forgotNewPass',this)" aria-label="Show / hide password"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button>
+        </div>
+      </div>
+      <div class="auth-field">
+        <label for="forgotConfirmPass" data-i18n="pwdConfirmLabel">បញ្ជាក់លេខសម្ងាត់</label>
+        <div class="auth-pass-wrap">
+          <input class="input" id="forgotConfirmPass" type="password" autocomplete="new-password" data-i18n-ph="pwdConfirmPh" placeholder="បញ្ចូលលេខសម្ងាត់ម្ដងទៀត" onkeydown="if(event.key==='Enter')forgotResetSubmit()">
+          <button type="button" class="auth-eye" onclick="authToggleEye('forgotConfirmPass',this)" aria-label="Show / hide password"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button>
+        </div>
+      </div>
+      <p id="forgotMsg2" style="font-size:0.8125rem;margin-top:10px;min-height:16px;line-height:1.6"></p>
+      <button type="button" class="kbtn kbtn-black" id="forgotResetBtn" style="margin-top:6px;width:100%" onclick="forgotResetSubmit()" data-i18n="forgotResetBtn">កំណត់លេខសម្ងាត់ថ្មី · Reset password</button>
+      <button type="button" class="kbtn kbtn-white" id="forgotResendBtn" style="display:none;margin-top:10px;width:100%" onclick="forgotResendCode()" data-i18n="verifyResend">ផ្ញើលេខកូដម្ដងទៀត · Resend</button>
+      <button type="button" class="kbtn kbtn-white" style="margin-top:10px;width:100%" onclick="forgotClose()" data-i18n="verifyBack">ត្រឡប់ទៅ Log in</button>
+    </div>
   </div>
 </div>
 <div id="savePwdSheet" class="pkg-sheet" style="display:none" role="dialog" aria-modal="true">
@@ -3327,6 +3389,18 @@ km:{
  pwdErrMismatch:'លេខសម្ងាត់ទាំងពីរមិនដូចគ្នាទេ — សូមបញ្ចូលឲ្យដូចគ្នា',
  pwdErrShort:'លេខសម្ងាត់ត្រូវមានយ៉ាងតិច 6 តួអក្សរ',
  pwdErrFail:'បង្កើតគណនីមិនបានទេ — សូមព្យាយាមម្ដងទៀត',
+ forgotTitle:'ភ្លេចលេខសម្ងាត់',
+ forgotNote:'បញ្ចូល Gmail របស់អ្នក — យើងនឹងផ្ញើលេខកូដ 6 ខ្ទង់ទៅ Gmail នោះ ដើម្បីឲ្យអ្នកកំណត់លេខសម្ងាត់ថ្មី។ លេខកូដផុតកំណត់ក្នុង 60 វិនាទី។',
+ forgotSendBtn:'ផ្ញើលេខកូដ · Send code',
+ forgotSending:'កំពុងផ្ញើលេខកូដទៅ Gmail…',forgotSent:'បានផ្ញើលេខកូដទៅ Gmail របស់អ្នកហើយ ✓',
+ forgotErrSend:'ផ្ញើលេខកូដមិនបានទេ — សូមព្យាយាមម្ដងទៀត',
+ forgotGoogleAltNote:'Email មិនទាន់ដំឡើងនៅលើ Server ទេ — តែអ្នកអាចកំណត់លេខសម្ងាត់ថ្មីដោយ Google បាន (មិនត្រូវការ email)៖',
+ forgotUseGoogle:'ប្រើ Google ជំនួសវិញ · Use Google instead',
+ forgotStep2Note:'យើងបានផ្ញើលេខកូដ 6 ខ្ទង់ទៅ Gmail ខាងក្រោម។ សូមបញ្ចូលលេខកូដ រួចដាក់លេខសម្ងាត់ថ្មី។',
+ forgotNewPassLabel:'លេខសម្ងាត់ថ្មី · New password',
+ forgotResetBtn:'កំណត់លេខសម្ងាត់ថ្មី · Reset password',
+ forgotResetting:'កំពុងកំណត់លេខសម្ងាត់ថ្មី…',
+ forgotErrReset:'កំណត់លេខសម្ងាត់ថ្មីមិនបានទេ — សូមព្យាយាមម្ដងទៀត',
  savePwdTitle:'ចង់សេវ password អត់?',
  savePwdNote:'បើសេវ — លើកក្រោយគ្រាន់តែចុចលើគណនីរបស់អ្នកនៅលើអេក្រង់ Log in វានឹងចូលដោយស្វ័យប្រវត្តិ មិនបាច់វាយលេខសម្ងាត់ទេ។',
  savePwdYes:'សេវ · Save',savePwdNo:'អត់សេវ · Not now',
@@ -3574,6 +3648,18 @@ en:{
  pwdErrMismatch:'The two passwords do not match — please enter the same password twice',
  pwdErrShort:'Password must be at least 6 characters',
  pwdErrFail:'Could not create the account — please try again',
+ forgotTitle:'Forgot password',
+ forgotNote:'Enter your Gmail — we will send a 6-digit code to it so you can set a new password. The code expires in 60 seconds.',
+ forgotSendBtn:'Send code · ផ្ញើលេខកូដ',
+ forgotSending:'Sending the code to your Gmail…',forgotSent:'Code sent to your Gmail ✓',
+ forgotErrSend:'Could not send the code — please try again',
+ forgotGoogleAltNote:'Email is not set up on the server yet — but you can still reset your password with Google (no email needed):',
+ forgotUseGoogle:'Use Google instead · ប្រើ Google ជំនួសវិញ',
+ forgotStep2Note:'We sent a 6-digit code to the Gmail below. Enter the code, then set your new password.',
+ forgotNewPassLabel:'New password',
+ forgotResetBtn:'Reset password · កំណត់លេខសម្ងាត់ថ្មី',
+ forgotResetting:'Resetting your password…',
+ forgotErrReset:'Could not reset the password — please try again',
  savePwdTitle:'Save password?',
  savePwdNote:'If you save it, next time just tap your account on the Log in screen and you will be signed in automatically — no password typing.',
  savePwdYes:'Save',savePwdNo:'Not now',
@@ -13602,6 +13688,149 @@ function authSavedRemove(){
   if(sv){try{authFetchJson('/api/auth/forget','POST',{email:sv.email,rememberToken:sv.rememberToken},15000);}catch(e){}}
   try{localStorage.removeItem('movai_saved_account');}catch(e){}
   authSavedRender();
+}
+/* ===== Code-based forgot password (owner flow, 2026-11-17) =====
+   «Forgot password?» opens the forgot sheet FIRST (the old
+   Google-proved reset stays untouched behind «Use Google
+   instead»):
+   1. Gmail + «Send code» → POST /api/auth/request-reset {email}
+      mails a 6-digit code that lives for 60 SECONDS only. A
+      server refusal is shown in the sheet as-is; when the
+      refusal is the «email not set up» one (authNotConfigured),
+      the prominent Google alternative block appears as well —
+      the Google reset needs no email at all.
+   2. Code (digits only, max 6) + new password + confirm +
+      «Reset password» → POST /api/auth/reset-password {email,
+      code, password, passwordConfirm}. A live 60-second
+      countdown ticks on the sheet («Code expires in 0:47»);
+      at zero the «Resend code» button appears — tapping it
+      calls request-reset again and restarts the countdown.
+   On success the user is logged in EXACTLY like a password
+   sign-in: savePwdPrompt (the «Save password?» prompt) →
+   gisFinishLogin — same session store, same sync, same
+   credits / gift handling. */
+var forgotEmail='';
+var forgotTimerInt=null;
+function forgotMsg(n,t,ok){
+  var m=document.getElementById('forgotMsg'+n);
+  if(m){m.textContent=t||'';m.style.color=ok?'var(--accent-text)':'#f87171';}
+}
+function forgotOpen(){
+  loginSheetClose();
+  forgotStopCountdown();
+  forgotEmail='';
+  var em=document.getElementById('authEmail');
+  var fe=document.getElementById('forgotEmail');
+  if(fe)fe.value=em?String(em.value||'').trim():'';
+  var s1=document.getElementById('forgotStep1');if(s1)s1.style.display='';
+  var s2=document.getElementById('forgotStep2');if(s2)s2.style.display='none';
+  var ga=document.getElementById('forgotGoogleAlt');if(ga)ga.style.display='none';
+  forgotMsg(1,'',true);forgotMsg(2,'',true);
+  var s=document.getElementById('forgotSheet');if(s)sheetShowAnim(s);
+  setTimeout(function(){var i=document.getElementById('forgotEmail');if(i){try{i.focus();}catch(e){}}},380);
+}
+function forgotClose(){
+  forgotStopCountdown();
+  var s=document.getElementById('forgotSheet');if(s)sheetHideAnim(s);
+  loginSheetOpen();
+}
+/* «Use Google instead» — the existing Google-based forgot flow,
+   unchanged: back to the log in sheet, then authForgotStart
+   (loginSheetOpen cleared the intent, so it is set after). */
+function forgotUseGoogle(){
+  forgotStopCountdown();
+  var s=document.getElementById('forgotSheet');if(s)sheetHideAnim(s);
+  loginSheetOpen();
+  authForgotStart();
+}
+function forgotSendCode(){
+  var fe=document.getElementById('forgotEmail');
+  var email=fe?String(fe.value||'').trim().toLowerCase():'';
+  if(!email||email.indexOf('@')<0){forgotMsg(1,tx('loginErrEmail'),false);return;}
+  var ga=document.getElementById('forgotGoogleAlt');if(ga)ga.style.display='none';
+  forgotMsg(1,tx('forgotSending'),true);
+  var btn=document.getElementById('forgotSendBtn');if(btn)btn.disabled=true;
+  authFetchJson('/api/auth/request-reset','POST',{email:email},30000).then(function(data){
+    if(btn)btn.disabled=false;
+    if(!data){forgotMsg(1,tx('authErrNet'),false);return;}
+    if(data.ok!==true){
+      forgotMsg(1,authErrText(data,'forgotErrSend'),false);
+      if(authNotConfigured(data)){var g=document.getElementById('forgotGoogleAlt');if(g)g.style.display='block';}
+      return;
+    }
+    forgotEmail=email;
+    forgotShowStep2();
+  });
+}
+function forgotShowStep2(){
+  var s1=document.getElementById('forgotStep1');if(s1)s1.style.display='none';
+  var s2=document.getElementById('forgotStep2');if(s2)s2.style.display='';
+  var e=document.getElementById('forgotEmailShow');if(e)e.textContent=forgotEmail;
+  var ci=document.getElementById('forgotCodeInput');if(ci)ci.value='';
+  var a=document.getElementById('forgotNewPass');if(a)a.value='';
+  var b=document.getElementById('forgotConfirmPass');if(b)b.value='';
+  forgotMsg(2,tx('forgotSent'),true);
+  forgotStartCountdown();
+  setTimeout(function(){var i=document.getElementById('forgotCodeInput');if(i){try{i.focus();}catch(e){}}},380);
+}
+/* The code's 60-second life, ticking live on the sheet. At zero
+   the countdown line says the code expired and the «Resend
+   code» button appears. */
+function forgotStartCountdown(){
+  forgotStopCountdown();
+  var left=60;
+  var cd=document.getElementById('forgotCount');
+  var rb=document.getElementById('forgotResendBtn');
+  if(rb)rb.style.display='none';
+  var tick=function(){
+    if(left<=0){
+      forgotStopCountdown();
+      if(cd)cd.textContent=tx('verifyExpired');
+      if(rb)rb.style.display='';
+      return;
+    }
+    if(cd){var m=Math.floor(left/60),s=left%60;cd.textContent=tx('verifyExpiresFmt').replace('{t}',m+':'+(s<10?'0':'')+s);}
+    left--;
+  };
+  tick();
+  forgotTimerInt=setInterval(tick,1000);
+}
+function forgotStopCountdown(){
+  if(forgotTimerInt){clearInterval(forgotTimerInt);forgotTimerInt=null;}
+}
+function forgotResendCode(){
+  if(!forgotEmail)return;
+  var rb=document.getElementById('forgotResendBtn');if(rb)rb.disabled=true;
+  forgotMsg(2,tx('forgotSending'),true);
+  authFetchJson('/api/auth/request-reset','POST',{email:forgotEmail},30000).then(function(data){
+    if(rb)rb.disabled=false;
+    if(!data){forgotMsg(2,tx('authErrNet'),false);return;}
+    if(data.ok!==true){forgotMsg(2,authErrText(data,'forgotErrSend'),false);return;}
+    forgotMsg(2,tx('forgotSent'),true);
+    forgotStartCountdown();
+  });
+}
+function forgotResetSubmit(){
+  var ci=document.getElementById('forgotCodeInput');
+  var code=ci?String(ci.value||'').replace(/\D/g,''):'';
+  if(code.length!==6){forgotMsg(2,tx('verifyErrCode'),false);return;}
+  var a=document.getElementById('forgotNewPass');
+  var b=document.getElementById('forgotConfirmPass');
+  var pw=a?String(a.value||''):'';
+  var cf=b?String(b.value||''):'';
+  if(pw.length<6){forgotMsg(2,tx('pwdErrShort'),false);return;}
+  if(pw!==cf){forgotMsg(2,tx('pwdErrMismatch'),false);return;}
+  forgotMsg(2,tx('forgotResetting'),true);
+  var btn=document.getElementById('forgotResetBtn');if(btn)btn.disabled=true;
+  authFetchJson('/api/auth/reset-password','POST',{email:forgotEmail,code:code,password:pw,passwordConfirm:cf},30000).then(function(data){
+    if(btn)btn.disabled=false;
+    if(!data){forgotMsg(2,tx('authErrNet'),false);return;}
+    if(data.ok!==true){forgotMsg(2,authErrText(data,'forgotErrReset'),false);return;}
+    forgotStopCountdown();
+    if(a)a.value='';if(b)b.value='';if(ci)ci.value='';
+    var s=document.getElementById('forgotSheet');if(s)sheetHideAnim(s);
+    savePwdPrompt(forgotEmail,pw,authProfFromUser(data.user,forgotEmail));
+  });
 }
 /* ===== Log in email verification · verify រាល់ពេល Log in =====
    gisOnCredential no longer signs in directly: it hands the
