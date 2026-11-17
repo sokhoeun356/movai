@@ -1645,6 +1645,24 @@ html[data-smooth="1"] .dock{background-color:rgba(var(--glass-tint),.96)}
 html[data-mode="light"] .chat-pkg-card.song .chat-pkg-credits{color:#63910c}
 html[data-mode="light"] .chat-pkg-card.media .chat-pkg-credits{color:#8f27c9}
 .chat-pkg-buy{margin-top:9px;width:100%;padding:10px 16px;font-size:0.875rem;min-height:40px;border-radius:12px}
+/* ===== Contact block (owner order 2026-11-17) =====
+   The owner's contact rows, shown in My Profile (under the red
+   log-out button) and as a card in AI Chat when a user asks for
+   contact / phone / Gmail. Every row is a real link: phones open
+   the dialer (tel:), Gmails open the mail app (mailto:) with the
+   FULL address — only the DISPLAYED Gmail text is masked (first
+   two + last two letters of the name, middle hidden, @gmail.com
+   in full). Phone 1 and the Gmails are banana-leaf green; phone 2
+   is red. */
+.contact-block{display:flex;flex-direction:column;gap:8px}
+.contact-row{display:block;padding:10px 12px;border:1px solid var(--line2);border-radius:10px;background:var(--card2);font-size:0.9375rem;font-weight:800;line-height:1.4;text-decoration:none;overflow-wrap:break-word}
+.contact-row:active{filter:brightness(1.15)}
+.contact-leaf{color:#8be63e}
+.contact-red{color:#f87171}
+html[data-mode="light"] .contact-leaf{color:#4c9407}
+html[data-mode="light"] .contact-red{color:#dc2626}
+.chat-contact-card{margin-top:8px}
+.chat-txt a{color:var(--accent-text);font-weight:700;text-decoration:underline;text-underline-offset:2px}
 .chat-bubble.err{align-self:flex-start;background:rgba(248,113,113,.09);border:1px solid rgba(248,113,113,.5);color:#f87171;border-radius:17px 17px 17px 5px;font-size:0.875rem}
 html[data-mode="light"] .chat-bubble.err{color:#b91c1c;background:rgba(220,38,38,.06);border-color:rgba(220,38,38,.4)}
 .chat-typing{align-self:flex-start;display:none;align-items:center;gap:8px;background:var(--card2);border:1px solid var(--line);border-radius:17px 17px 17px 5px;padding:10px 13px;font-size:0.8125rem;color:var(--muted);font-weight:700}
@@ -13773,6 +13791,37 @@ function profileInfoRow(label,val){
 function profileInfoRowHtml(label,valHtml){
   return '<div style="display:flex;justify-content:space-between;gap:12px;padding:6px 0;border-bottom:1px solid var(--line)"><span style="font-size:0.75rem;color:var(--muted);flex:0 0 auto">'+escHtml(label)+'</span><b style="font-size:0.75rem;text-align:right;overflow-wrap:break-word;min-width:0">'+valHtml+'</b></div>';
 }
+/* ===== Owner contact block (owner order 2026-11-17) =====
+   ONE source for the contact rows used in My Profile and in the
+   AI Chat contact card. Phones link tel: (tap = call), Gmails
+   link mailto: with the FULL address; only the shown Gmail text
+   is masked — first two and last two letters of the name stay,
+   the middle is hidden, «@gmail.com» shows in full, and all
+   three Gmails are masked the same way. */
+var CONTACT_PHONES=[
+  {shown:'+855 81914728',href:'tel:+85581914728',cls:'contact-leaf'},
+  {shown:'+855 60397433',href:'tel:+85560397433',cls:'contact-red'}
+];
+var CONTACT_EMAILS=['sokhoeun7788@gmail.com','sokhoeun356@gmail.com','yemsokhoeun98@gmail.com'];
+function contactMaskEmail(email){
+  var at=String(email).indexOf('@');if(at<0)return String(email);
+  var local=String(email).slice(0,at),dom=String(email).slice(at);
+  if(local.length<=4)return local+dom;
+  return local.slice(0,2)+'••••'+local.slice(-2)+dom;
+}
+function contactBlockHtml(){
+  var h='<div class="contact-block">';
+  for(var i=0;i<CONTACT_PHONES.length;i++){
+    var p=CONTACT_PHONES[i];
+    h+='<a class="contact-row '+p.cls+'" href="'+p.href+'">🤙 '+escHtml(p.shown)+'</a>';
+  }
+  for(var j=0;j<CONTACT_EMAILS.length;j++){
+    var em=CONTACT_EMAILS[j];
+    h+='<a class="contact-row contact-leaf" href="mailto:'+escHtml(em)+'">'+escHtml(contactMaskEmail(em))+'</a>';
+  }
+  h+='</div>';
+  return h;
+}
 function profileRender(){
   try{planExpireSweep();}catch(e){}
   var u=acctCurrent();var body=document.getElementById('profileBody');if(!u||!body)return;
@@ -13821,6 +13870,10 @@ function profileRender(){
   h+='</div>';
   h+='<button type="button" class="prof-pkg-open" onclick="profileGoPackages()"><span>'+escHtml(tx('navPackages'))+'</span><span class="ppo-sub">'+escHtml(tx('navPackagesSub'))+'</span><span class="ppo-arrow" aria-hidden="true">›</span></button>';
   h+='<button type="button" class="kbtn" style="margin-top:14px;width:100%;background:rgba(248,113,113,.10);color:#f87171;border:1px solid rgba(248,113,113,.45)" onclick="acctLogout()">'+escHtml(tx('acctLogout'))+'</button>';
+  /* Contact block (owner order 2026-11-17): directly under the
+     red button — tappable phone rows (tel:) and masked Gmail
+     rows (mailto: to the full address). */
+  h+='<div style="margin-top:14px">'+contactBlockHtml()+'</div>';
   body.innerHTML=h;
 }
 /* Packages are NOT listed inside the profile sheet (owner rule):
@@ -15158,6 +15211,48 @@ function aiChatPkgCard(pkgId){
   card.appendChild(buy);
   return card;
 }
+/* ===== Contact card in AI Chat (owner order 2026-11-17) =====
+   When the user asks for contact / a phone number / a Gmail, the
+   chat shows the whole contact card at once — the same rows as
+   My Profile (contactBlockHtml): phones tap-to-call (tel:),
+   Gmails tap-to-mail (mailto:, full address behind the masked
+   text). The ask is recognised locally so the card always shows,
+   exactly as specified, whatever the server AI would answer. */
+var AI_CHAT_CONTACT_INTRO='នេះជាព័ត៌មានទំនាក់ទំនងរបស់ MovAi — ចុចលើលេខទូរសព្ទដើម្បីខល ឬចុចលើ Gmail ដើម្បីផ្ញើអ៊ីមែល៖';
+function aiChatIsContactAsk(text){
+  var t=String(text||'').toLowerCase();
+  if(/ទំនាក់ទំនង|ទាក់ទង|លេខទូរសព្ទ|លេខទូរស័ព្ទ|អ៊ីមែល/.test(t))return true;
+  if(/contact|phone|gmail|e-?mail/.test(t))return true;
+  return false;
+}
+function aiChatContactCard(){
+  var d=document.createElement('div');
+  d.className='chat-contact-card';
+  d.innerHTML=contactBlockHtml();
+  return d;
+}
+/* Phone numbers and Gmails that appear in an AI answer are
+   tappable too (owner order 2026-11-17): emails become mailto:
+   links, Cambodian numbers (+855 … or 0xx …) become tel: links.
+   The tap is stopped so it never toggles a collapsible bubble. */
+function aiChatLinkify(el){
+  var text=el.textContent;if(!text)return;
+  var re=/([A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,})|(\+855[\s-]?\d{2}[\s-]?\d{3}[\s-]?\d{3,4})|(0\d{2}[\s-]?\d{3}[\s-]?\d{3,4})/g;
+  if(!re.test(text))return;
+  re.lastIndex=0;
+  var frag=document.createDocumentFragment();var last=0,m;
+  while((m=re.exec(text))){
+    if(m.index>last)frag.appendChild(document.createTextNode(text.slice(last,m.index)));
+    var a=document.createElement('a');
+    if(m[1]){a.href='mailto:'+m[1];a.textContent=m[1];}
+    else{var num=(m[2]||m[3]);a.href='tel:'+num.replace(/[\s-]/g,'');a.textContent=num;}
+    a.addEventListener('click',function(ev){if(ev)ev.stopPropagation();});
+    frag.appendChild(a);
+    last=m.index+m[0].length;
+  }
+  if(last<text.length)frag.appendChild(document.createTextNode(text.slice(last)));
+  el.textContent='';el.appendChild(frag);
+}
 function aiChatAddBubble(role,text,isErr,opts){
   var m=document.getElementById('chatMsgs');if(!m)return null;
   var empty=document.getElementById('chatEmpty');if(empty)empty.style.display='none';
@@ -15166,6 +15261,7 @@ function aiChatAddBubble(role,text,isErr,opts){
   var body=document.createElement('div');
   body.className='chat-txt';
   body.textContent=String(text==null?'':text);
+  if(role==='ai'&&!isErr)aiChatLinkify(body);
   b.appendChild(body);
   /* Every AI answer gets the robot avatar on its left (owner order
      2026-11-16) — the same robot mark as the chat header, wrapped in
@@ -15190,6 +15286,11 @@ function aiChatAddBubble(role,text,isErr,opts){
       if(opts.pkg){
         var pc=aiChatPkgCard(opts.pkg);
         if(pc)col.appendChild(pc);
+      }
+      /* Contact ask: the full contact card sits directly under
+         the answer, same tappable rows as My Profile. */
+      if(opts.contact){
+        col.appendChild(aiChatContactCard());
       }
       /* Proof-of-AI line: model + elapsed time from the server
          response, in small text under the answer. */
@@ -15340,6 +15441,17 @@ async function aiChatSend(){
   inp.value='';
   aiChatAddBubble('user',text,false);
   aiChatHistory.push({role:'user',content:text});
+  /* Contact ask (owner order 2026-11-17): answer at once with
+     the intro line + the full tappable contact card — no server
+     round-trip, so the numbers / Gmails always show exactly as
+     specified. */
+  if(aiChatIsContactAsk(text)){
+    aiChatAddBubble('ai',AI_CHAT_CONTACT_INTRO,false,{contact:true});
+    aiChatHistory.push({role:'assistant',content:AI_CHAT_CONTACT_INTRO});
+    try{inp.focus();}catch(e){}
+    aiChatScroll();
+    return;
+  }
   aiChatBusy=true;
   var btn=document.getElementById('chatSendBtn');if(btn)btn.disabled=true;
   aiChatSetTyping(true);
