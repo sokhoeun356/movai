@@ -595,6 +595,37 @@ img.hist-media,.d3-preview{cursor:zoom-in}
 .mv-progress-pct{font-size:2rem;font-weight:900;color:#fff;font-variant-numeric:tabular-nums;line-height:1;text-shadow:0 2px 10px rgba(0,0,0,.6)}
 .mv-progress-txt{font-size:0.875rem;font-weight:700;color:rgba(255,255,255,.88);line-height:1.5;text-shadow:0 1px 6px rgba(0,0,0,.6)}
 @media (prefers-reduced-motion:reduce){.mv-line{transition:none}}
+/* ===== MV readability + motion pass (owner order 2026-11-17,
+   evening — supersedes the size / outline values above) =====
+   1) The outline is now a full 3px ring in --mv-oc around every
+   letter (title, lyrics, centre name) — much stronger than the
+   2px ring above — so the text beats ANY background.
+   2) The text ADAPTS to the background actually shown (owner
+   order 2026-11-17): mvAdaptText samples the cover / uploaded
+   image brightness per song; on a BRIGHT background the stage
+   gets .mv-on-light and the letters flip to dark text with a
+   white ring, on a dark background they stay white with the
+   black ring. The auto-gradient backgrounds are deep by
+   design, so they keep the white treatment.
+   3) The title GLIDES left ↔ right (mvTitleSlide) across the
+   free space mvFitTitle measures into --mv-slide.
+   4) The centre note / name / cover PULSE with the music's
+   beat via --mv-beat (see mvBeatStep — MV view only).
+   5) Title and lyrics are BIGGER than before. Still NO black
+   shade / plate anywhere — the ring is part of the letters. */
+.mv-stage{--mv-oc:rgba(4,4,4,.97);--mv-oln:-3px 0 0 var(--mv-oc),3px 0 0 var(--mv-oc),0 -3px 0 var(--mv-oc),0 3px 0 var(--mv-oc),-3px -3px 0 var(--mv-oc),3px -3px 0 var(--mv-oc),-3px 3px 0 var(--mv-oc),3px 3px 0 var(--mv-oc),-2px -3px 0 var(--mv-oc),2px -3px 0 var(--mv-oc),-2px 3px 0 var(--mv-oc),2px 3px 0 var(--mv-oc),-3px -2px 0 var(--mv-oc),3px -2px 0 var(--mv-oc),-3px 2px 0 var(--mv-oc),3px 2px 0 var(--mv-oc),-1px -3px 0 var(--mv-oc),1px -3px 0 var(--mv-oc),-1px 3px 0 var(--mv-oc),1px 3px 0 var(--mv-oc),-3px -1px 0 var(--mv-oc),3px -1px 0 var(--mv-oc),-3px 1px 0 var(--mv-oc),3px 1px 0 var(--mv-oc),0 3px 14px rgba(0,0,0,.45);--mv-tc:#fff;--mv-tc-dim:rgba(255,255,255,.92);--mv-stroke:rgba(4,4,4,.95);--mv-beat:1}
+.mv-stage.mv-on-light{--mv-oc:rgba(255,255,255,.97);--mv-tc:#101206;--mv-tc-dim:rgba(16,18,6,.9);--mv-stroke:rgba(255,255,255,.95)}
+.mv-title-txt{font-size:1.625rem;color:var(--mv-tc);-webkit-text-stroke:1.6px var(--mv-stroke);animation:mvTitleSlide var(--mv-slide-dur,7s) ease-in-out infinite alternate;will-change:transform}
+@keyframes mvTitleSlide{from{transform:translateX(calc(-1*var(--mv-slide,0px)))}to{transform:translateX(var(--mv-slide,0px))}}
+.mv-line{font-size:1.25rem;color:var(--mv-tc-dim);-webkit-text-stroke:1.1px var(--mv-stroke)}
+.mv-line.on{font-size:1.25rem;color:var(--mv-tc);-webkit-text-stroke:1.1px var(--mv-stroke)}
+.mv-line .mv-line-tr{font-size:1.02rem;color:var(--mv-tc);-webkit-text-stroke:1px var(--mv-stroke)}
+.mv-auto-grad .mc-name{color:var(--mv-tc);-webkit-text-stroke:1.4px var(--mv-stroke);transform:scale(var(--mv-beat,1))}
+.mv-auto-grad .mc-note{width:17%;max-width:84px;transform:scale(var(--mv-beat,1))}
+.mv-bg-fitwrap .mv-fit-img{transform:scale(var(--mv-beat,1))}
+.mv-bg>img,.mv-bg>video{transform:scale(var(--mv-beat,1))}
+.mv-lyrics{top:59%}
+@media (prefers-reduced-motion:reduce){.mv-title-txt{animation:none}}
 /* ===== Fullscreen media viewer (tap any image / video / 3D preview) ===== */
 .fs-viewer{position:fixed;inset:0;z-index:90;background:rgba(0,0,0,.96);align-items:center;justify-content:center}
 .fs-body{width:100%;height:100%;display:flex;align-items:center;justify-content:center;padding:10px}
@@ -10501,6 +10532,21 @@ function pubMiniStopAll(){
    song, the title on one line, the view count, and the same
    Like / Dislike / Share as the big card — all in the normal
    vertical page scroll. */
+/* ===== MV + Download: OWN songs only (owner rule 2026-11-17) =====
+   A Public post belongs to its poster — their copyright. MV and
+   Download are offered ONLY when the post's owner email is the
+   signed-in account's own email; for anyone else's song the
+   Public row / card shows neither button. (The user's own songs
+   keep MV + Download everywhere else they appear: creation
+   results, History and their Playlist are untouched.) */
+function pubIsOwn(it){
+  if(!it)return false;
+  var em=String(it.email||'').trim().toLowerCase();
+  if(!em)return false;
+  var cur=null;try{cur=acctCurrent();}catch(e){}
+  if(!cur||!cur.email)return false;
+  return em===String(cur.email).trim().toLowerCase();
+}
 function pubSongRowEl(it){
   if(it&&it.url)mp3Warm(it.url);
   var row=document.createElement('div');
@@ -10581,13 +10627,13 @@ function pubSongRowEl(it){
   rdl.innerHTML=pubDlSvg()+'<span data-pub-downloads="'+escHtml(it.id)+'">'+acctFmtBal(it.downloads)+'</span>';
   rdl.setAttribute('aria-label',tx('histDownload'));
   rdl.addEventListener('click',function(){pubDownloadPost(it,rdl);});
-  acts.appendChild(rdl);
+  if(pubIsOwn(it))acts.appendChild(rdl);
   var rmv=document.createElement('button');
   rmv.type='button';rmv.className='pub-pill';
   rmv.innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2.5" y="5" width="19" height="14" rx="3"/><path d="M10 9.5l5 2.5-5 2.5z" fill="currentColor" stroke="none"/></svg><span>'+escHtml(tx('mvBtn'))+'</span>';
   rmv.setAttribute('aria-label',tx('mvBtn'));
   rmv.addEventListener('click',function(){mvOpen({url:it.url,title:it.title||'',lyrics:it.lyrics||it.prompt||'',image:it.image||''});});
-  acts.appendChild(rmv);
+  if(pubIsOwn(it))acts.appendChild(rmv);
   acts.appendChild(plPillBtn({url:it.url,title:it.title||'',image:it.image||'',name:pubDisplayName(it)}));
   /* The action row is NOT inside the title column any more
      (owner order 2026-11-17): it is appended to the row itself
@@ -10942,13 +10988,13 @@ function pubCardEl(it){
     adl.innerHTML=pubDlSvg()+'<span>'+escHtml(tx('histDownload'))+'</span><span data-pub-downloads="'+escHtml(it.id)+'">'+acctFmtBal(it.downloads)+'</span>';
     adl.setAttribute('aria-label',tx('histDownload'));
     adl.addEventListener('click',function(){pubDownloadPost(it,adl);});
-    arow.appendChild(adl);
+    if(pubIsOwn(it))arow.appendChild(adl);
     var amv=document.createElement('button');
     amv.type='button';amv.className='pub-pill';
     amv.innerHTML='<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2.5" y="5" width="19" height="14" rx="3"/><path d="M10 9.5l5 2.5-5 2.5z" fill="currentColor" stroke="none"/></svg><span>'+escHtml(tx('mvBtn'))+'</span>';
     amv.setAttribute('aria-label',tx('mvBtn'));
     amv.addEventListener('click',function(){mvOpen({url:it.url,title:it.title||'',lyrics:it.lyrics||it.prompt||'',image:it.image||''});});
-    arow.appendChild(amv);
+    if(pubIsOwn(it))arow.appendChild(amv);
     arow.appendChild(plPillBtn({url:it.url,title:it.title||'',image:it.image||'',name:pubDisplayName(it)}));
     /* Hidden by default (owner order 2026-11-17): the action row
        sits inside a collapsible wrap — the card stays clean and
@@ -17037,6 +17083,7 @@ function mvStart(){
   view.style.display='flex';
   document.body.style.overflow='hidden';
   mvBuildBg();
+  mvAdaptText();
   var stageEl=document.getElementById('mvStage');
   if(stageEl)stageEl.style.setProperty('--mv-acc',mvSongStyle(song).acc);
   var tt=document.getElementById('mvTitle');
@@ -17069,15 +17116,16 @@ function mvStart(){
     mvAudio.addEventListener('timeupdate',mvSync);
     mvAudio.addEventListener('loadedmetadata',mvSync);
     mvAudio.addEventListener('durationchange',mvSync);
-    mvAudio.addEventListener('play',function(){mvSyncBtns();mvRafKick();});
-    mvAudio.addEventListener('pause',mvSyncBtns);
-    mvAudio.addEventListener('ended',mvSyncBtns);
+    mvAudio.addEventListener('play',function(){mvSyncBtns();mvRafKick();mvBeatSyncToMain(false);});
+    mvAudio.addEventListener('pause',function(){mvSyncBtns();mvBeatSyncToMain(false);});
+    mvAudio.addEventListener('ended',function(){mvSyncBtns();mvBeatSyncToMain(false);});
   }
   if(mvAudio.getAttribute('src')!==song.url){mvAudio.src=song.url;mvAudio.currentTime=0;}
   mvPauseOthers();
   mvFitStage();mvFitTitle();mvSync();mvSyncBtns();
   var pr=mvAudio.play();if(pr&&pr.catch)pr.catch(function(){mvSyncBtns();});
   mvRafKick();
+  mvBeatEnsure();mvBeatSyncToMain(true);
   var dl=document.getElementById('mvDlBtn');
   if(dl)dl.innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v11"/><path d="M7 10l5 5 5-5"/><path d="M4 21h16"/></svg><span>'+escHtml(tx('histDownload'))+'</span>';
   var sh=document.getElementById('mvShareBtn');
@@ -17144,20 +17192,134 @@ function mvFitStage(){
   stage.style.width=Math.floor(w)+'px';
   stage.style.height=Math.floor(h)+'px';
 }
-/* Title auto-fit (owner order 2026-11-17): the MV title stays
-   MODERATE — it shrinks automatically until it fits on ONE line
-   inside the stage, so a long title never wraps down over the
-   centred lyrics. Only if it still cannot fit at the floor size
-   does it wrap (the lyrics sit lower, clear of it). */
+/* Title auto-fit (owner order 2026-11-17, evening update): the
+   MV title is a bit BIGGER than before and still shrinks
+   automatically until it fits on ONE line inside the stage, so
+   a long title never wraps down over the centred lyrics. Only
+   if it still cannot fit at the floor size does it wrap (the
+   lyrics sit lower, clear of it). The free space left on the
+   line becomes the title's glide distance (--mv-slide): the
+   title slides left ↔ right across it, back and forth — a
+   title that fills the whole line has nowhere to glide and
+   stays centred. */
 function mvFitTitle(){
   var stage=document.getElementById('mvStage'),tt=document.getElementById('mvTitle');
   if(!stage||!tt)return;
   var sp=tt.querySelector('.mv-title-txt');if(!sp)return;
   var maxW=stage.clientWidth*0.88;if(maxW<=0)return;
-  var size=Math.max(14,Math.min(22,stage.clientWidth*0.055));
+  var size=Math.max(16,Math.min(30,stage.clientWidth*0.075));
   sp.style.whiteSpace='nowrap';sp.style.fontSize=size+'px';
-  while(size>12&&sp.scrollWidth>maxW){size-=1;sp.style.fontSize=size+'px';}
-  if(sp.scrollWidth>maxW)sp.style.whiteSpace='normal';
+  while(size>13&&sp.scrollWidth>maxW){size-=1;sp.style.fontSize=size+'px';}
+  if(sp.scrollWidth>maxW){
+    sp.style.whiteSpace='normal';
+    sp.style.setProperty('--mv-slide','0px');
+  }else{
+    var slide=Math.max(0,(maxW-sp.scrollWidth)/2-2);
+    if(slide<8)slide=0;
+    sp.style.setProperty('--mv-slide',slide+'px');
+    sp.style.setProperty('--mv-slide-dur',Math.min(11,Math.max(3.5,slide/13)).toFixed(1)+'s');
+  }
+}
+/* ===== Adaptive MV text (owner order 2026-11-17) =====
+   The text follows the background of THIS song: the cover /
+   uploaded image actually shown is sampled once (tiny canvas,
+   average brightness). A BRIGHT background flips the stage to
+   .mv-on-light — dark letters with a white ring; a dark one
+   keeps white letters with the black ring — so the title and
+   lyrics never lose to the background, whichever song plays.
+   The auto-gradient backgrounds are deep by design and keep
+   the white treatment; if sampling is blocked (CORS) the
+   strong ring alone still carries readability. The measured
+   brightness is kept on mvState.bgLum so Export Video paints
+   its text the same way. */
+function mvAdaptText(){
+  var stage=document.getElementById('mvStage');if(!stage)return;
+  stage.classList.remove('mv-on-light');
+  mvState.bgLum=null;
+  var src='';
+  if(mvState.bgMode==='upload'&&mvState.bgUrl&&mvState.bgKind==='image')src=mvState.bgUrl;
+  else if(mvState.bgMode!=='upload'&&mvState.song&&mvState.song.image)src=mvState.song.image;
+  if(!src)return;
+  var img=new Image();
+  try{img.crossOrigin='anonymous';}catch(e){}
+  img.onload=function(){
+    try{
+      var cv=document.createElement('canvas');cv.width=24;cv.height=24;
+      var cx=cv.getContext('2d');cx.drawImage(img,0,0,24,24);
+      var d=cx.getImageData(0,0,24,24).data,sum=0,n=0,i;
+      for(i=0;i<d.length;i+=4){sum+=0.2126*d[i]+0.7152*d[i+1]+0.0722*d[i+2];n++;}
+      var lum=n?(sum/n/255):0;
+      mvState.bgLum=lum;
+      var st2=document.getElementById('mvStage');
+      if(st2&&document.getElementById('mvView').style.display!=='none')st2.classList.toggle('mv-on-light',lum>0.58);
+    }catch(e){}
+  };
+  img.src=src;
+}
+/* ===== Beat pulse — MV view ONLY (owner order 2026-11-17) =====
+   The centre note / name / cover bounce WITH the music: a
+   hidden twin audio element (same song URL, routed ONLY to an
+   AnalyserNode — never to the speakers, so the real MV audio
+   is untouched) measures the low-end energy every frame. A
+   strong beat kicks --mv-beat up at once and it eases back
+   down, so fast drumming bounces fast, a slow groove bounces
+   slowly, and a quiet passage (no beat) stays calm at 1. If
+   the analyser cannot run (no Web Audio / CORS), the pulse
+   simply stays off and playback is unaffected. This lives
+   ONLY inside the MV — the Public cards keep their plain
+   playback exactly as the owner ordered earlier. */
+var mvBeat={ctx:null,au:null,an:null,data:null,level:1,base:0};
+function mvBeatEnsure(){
+  if(mvBeat.ctx||!mvAudio)return;
+  try{
+    var AC=window.AudioContext||window.webkitAudioContext;
+    if(!AC)return;
+    var au=new Audio();
+    try{au.crossOrigin='anonymous';}catch(e){}
+    au.preload='auto';
+    var ctx=new AC();
+    var srcNode=ctx.createMediaElementSource(au);
+    var an=ctx.createAnalyser();
+    an.fftSize=256;an.smoothingTimeConstant=0.5;
+    srcNode.connect(an);
+    mvBeat.ctx=ctx;mvBeat.au=au;mvBeat.an=an;
+    mvBeat.data=new Uint8Array(an.frequencyBinCount);
+  }catch(e){mvBeat.ctx=null;mvBeat.au=null;mvBeat.an=null;}
+}
+function mvBeatSyncToMain(force){
+  var au=mvBeat.au;if(!au||!mvAudio)return;
+  var url=mvAudio.getAttribute('src')||'';
+  if(au.getAttribute('src')!==url){try{au.src=url;}catch(e){}}
+  if(mvAudio.paused||mvAudio.ended){try{au.pause();}catch(e){}return;}
+  try{
+    var drift=Math.abs((au.currentTime||0)-(mvAudio.currentTime||0));
+    if(force||drift>0.45||au.paused)au.currentTime=mvAudio.currentTime||0;
+  }catch(e){}
+  if(mvBeat.ctx&&mvBeat.ctx.state==='suspended'){var r=mvBeat.ctx.resume();if(r&&r.catch)r.catch(function(){});}
+  var p=au.play();if(p&&p.catch)p.catch(function(){});
+}
+function mvBeatStep(){
+  var stage=document.getElementById('mvStage');if(!stage)return;
+  var target=1;
+  if(mvBeat.an&&mvAudio&&!mvAudio.paused&&!mvAudio.ended){
+    if(window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches){
+      stage.style.setProperty('--mv-beat','1');return;
+    }
+    try{
+      if(mvBeat.au&&Math.abs((mvBeat.au.currentTime||0)-(mvAudio.currentTime||0))>0.6)mvBeatSyncToMain(false);
+      mvBeat.an.getByteFrequencyData(mvBeat.data);
+      var n=Math.max(2,Math.floor(mvBeat.data.length*0.12)),sum=0,i;
+      for(i=0;i<n;i++)sum+=mvBeat.data[i];
+      var e=sum/n/255;
+      mvBeat.base=mvBeat.base*0.97+e*0.03;
+      var ex=Math.max(0,e-Math.max(0.12,mvBeat.base*0.92));
+      target=1+Math.min(0.22,ex*1.1+Math.max(0,e-0.6)*0.18);
+    }catch(e){target=1;}
+  }
+  if(target>mvBeat.level)mvBeat.level=target;
+  else mvBeat.level+=(target-mvBeat.level)*0.32;
+  if(mvBeat.level<1)mvBeat.level=1;
+  stage.style.setProperty('--mv-beat',mvBeat.level.toFixed(3));
 }
 function mvSync(){
   if(!mvAudio)return;
@@ -17183,6 +17345,7 @@ var mvRaf=0;
 function mvRafLoop(){
   mvRaf=0;
   mvSyncLyrics(false);
+  mvBeatStep();
   if(mvAudio&&!mvAudio.paused&&!mvAudio.ended)mvRaf=requestAnimationFrame(mvRafLoop);
 }
 function mvRafKick(){if(!mvRaf)mvRaf=requestAnimationFrame(mvRafLoop);}
@@ -17249,6 +17412,10 @@ function mvTogglePlay(){
 function mvCloseView(){
   if(mvExp.on)mvExpFinish();
   if(mvRaf){cancelAnimationFrame(mvRaf);mvRaf=0;}
+  mvBeat.level=1;mvBeat.base=0;
+  if(mvBeat.au){try{mvBeat.au.pause();}catch(e){}}
+  var bst=document.getElementById('mvStage');
+  if(bst){bst.style.setProperty('--mv-beat','1');bst.classList.remove('mv-on-light');}
   mvProgHide();
   if(mvAudio){try{mvAudio.pause();}catch(e){}}
   var view=document.getElementById('mvView');
@@ -17381,6 +17548,12 @@ function mvExpDraw(){
   var cx=mvExp.cx,cv=mvExp.cv;if(!cx||!cv)return;
   var W=cv.width,H=cv.height,song=mvState.song||{};
   var sty=mvSongStyle(song);
+  /* Text adapts to the background like the on-screen MV
+     (mvAdaptText measured this song's bg brightness): bright
+     background → dark letters + white outline; dark → white
+     letters + black outline. */
+  var expOnLight=(typeof mvState.bgLum==='number'&&mvState.bgLum>0.58&&((mvState.bgMode==='upload'&&mvState.bgKind==='image')||(mvState.bgMode!=='upload'&&!!song.image)));
+  var TC=expOnLight?'#101206':'#fff',OC=expOnLight?'rgba(255,255,255,.95)':'rgba(8,8,8,.92)',TCD=expOnLight?'rgba(16,18,6,.88)':'rgba(255,255,255,.88)';
   var t=mvExp.audio?(mvExp.audio.currentTime||0):0;
   var dur=mvExp.dur||(mvExp.audio&&isFinite(mvExp.audio.duration)?mvExp.audio.duration:0);
   cx.fillStyle='#07080a';cx.fillRect(0,0,W,H);
@@ -17406,9 +17579,9 @@ function mvExpDraw(){
     var wMov=cx.measureText('Mov').width,wAi=cx.measureText('Ai').width,x0=(W-(wMov+wAi))/2;
     /* Dark outline under the fill so the name beats any
        background brightness (owner order 2026-11-17). */
-    cx.lineJoin='round';cx.strokeStyle='rgba(8,8,8,.92)';cx.lineWidth=Math.max(2,Math.round(W*0.11*0.14));
+    cx.lineJoin='round';cx.strokeStyle=OC;cx.lineWidth=Math.max(2,Math.round(W*0.11*0.14));
     cx.textAlign='left';cx.strokeText('Mov',x0,H*0.30);cx.strokeText('Ai',x0+wMov,H*0.30);
-    cx.fillStyle='#fff';cx.fillText('Mov',x0,H*0.30);
+    cx.fillStyle=TC;cx.fillText('Mov',x0,H*0.30);
     cx.fillStyle=sty.acc;cx.fillText('Ai',x0+wMov,H*0.30);
     cx.textAlign='center';
   }
@@ -17425,17 +17598,17 @@ function mvExpDraw(){
      wraps down over the lyrics), accent underline, outlined. */
   cx.textAlign='center';cx.textBaseline='top';
   var tTitle=String(song.title||'MovAi');
-  var tSize=Math.round(W*0.052);
+  var tSize=Math.round(W*0.06);
   cx.font='900 '+tSize+'px system-ui,sans-serif';
-  while(tSize>Math.round(W*0.026)&&cx.measureText(tTitle).width>W*0.88){tSize-=2;cx.font='900 '+tSize+'px system-ui,sans-serif';}
+  while(tSize>Math.round(W*0.03)&&cx.measureText(tTitle).width>W*0.88){tSize-=2;cx.font='900 '+tSize+'px system-ui,sans-serif';}
   var tl,tLines,tLh,tTw;
   if(cx.measureText(tTitle).width<=W*0.88){tl=[tTitle];tLines=1;tTw=cx.measureText(tTitle).width;}
   else{tl=mvExpWrap(cx,tTitle,W*0.86);tLines=Math.min(2,tl.length);tTw=0;for(var tm=0;tm<tLines;tm++)tTw=Math.max(tTw,cx.measureText(tl[tm]).width);}
   tLh=tSize*1.3;
   var tPlateY=H*0.05,tPlateH=tLines*tLh;
-  cx.lineJoin='round';cx.strokeStyle='rgba(8,8,8,.92)';cx.lineWidth=Math.max(2,Math.round(tSize*0.16));
+  cx.lineJoin='round';cx.strokeStyle=OC;cx.lineWidth=Math.max(2,Math.round(tSize*0.16));
   for(var ti=0;ti<tLines;ti++)cx.strokeText(tl[ti],W/2,tPlateY+ti*tLh);
-  cx.fillStyle='#fff';
+  cx.fillStyle=TC;
   cx.shadowColor='rgba(0,0,0,.5)';cx.shadowBlur=8;cx.shadowOffsetY=2;
   for(var ti2=0;ti2<tLines;ti2++)cx.fillText(tl[ti2],W/2,tPlateY+ti2*tLh);
   cx.shadowBlur=0;cx.shadowOffsetY=0;
@@ -17454,14 +17627,14 @@ function mvExpDraw(){
        current and next lines alike — only weight / brightness
        differ — and every line is outlined (strokeText under
        the fill) so it stays clear on any background. */
-    var fs=Math.round(W*0.042);
+    var fs=Math.round(W*0.05);
     var olw=Math.max(2,Math.round(fs*0.16));
-    cx.lineJoin='round';cx.strokeStyle='rgba(8,8,8,.92)';cx.lineWidth=olw;
+    cx.lineJoin='round';cx.strokeStyle=OC;cx.lineWidth=olw;
     cx.font='800 '+fs+'px system-ui,sans-serif';
     var cl=mvExpWrap(cx,cur.text,W*0.88);
     var lh=fs*1.4,totalH=cl.length*lh,y0=H*0.56-totalH/2;
     cl.forEach(function(L,k){cx.strokeText(L,W/2,y0+k*lh);});
-    cx.fillStyle='#fff';cx.shadowColor='rgba(0,0,0,.5)';cx.shadowBlur=8;cx.shadowOffsetY=2;
+    cx.fillStyle=TC;cx.shadowColor='rgba(0,0,0,.5)';cx.shadowBlur=8;cx.shadowOffsetY=2;
     cl.forEach(function(L,k){cx.fillText(L,W/2,y0+k*lh);});
     cx.shadowBlur=0;cx.shadowOffsetY=0;
     var ny=y0+totalH+16;
@@ -17469,7 +17642,7 @@ function mvExpDraw(){
       cx.font='700 '+Math.round(fs*0.85)+'px system-ui,sans-serif';
       cx.lineWidth=Math.max(2,Math.round(fs*0.85*0.16));
       cx.strokeText(cur.tr,W/2,ny);
-      cx.fillStyle='#fff';cx.shadowColor='rgba(0,0,0,.5)';cx.shadowBlur=6;
+      cx.fillStyle=TC;cx.shadowColor='rgba(0,0,0,.5)';cx.shadowBlur=6;
       cx.fillText(cur.tr,W/2,ny);ny+=Math.round(fs*1.5);
       cx.shadowBlur=0;
     }
@@ -17480,7 +17653,7 @@ function mvExpDraw(){
       cx.lineWidth=olw;
       var nl=mvExpWrap(cx,lines[idx+1].text,W*0.88);
       for(var m=0;m<Math.min(2,nl.length);m++)cx.strokeText(nl[m],W/2,ny+m*lh);
-      cx.fillStyle='rgba(255,255,255,.88)';cx.shadowColor='rgba(0,0,0,.5)';cx.shadowBlur=6;
+      cx.fillStyle=TCD;cx.shadowColor='rgba(0,0,0,.5)';cx.shadowBlur=6;
       for(var m2=0;m2<Math.min(2,nl.length);m2++)cx.fillText(nl[m2],W/2,ny+m2*lh);
       cx.shadowBlur=0;
     }
@@ -17543,6 +17716,7 @@ function mvExpCleanup(){
     var d=isFinite(mvAudio.duration)?mvAudio.duration:0;
     if(d>0){try{mvAudio.currentTime=d*(parseInt(sk.value,10)||0)/1000;}catch(e){}}
     mvSyncLyrics(true);
+    mvBeatSyncToMain(true);
   });
   var dl=document.getElementById('mvDlBtn');if(dl)dl.addEventListener('click',mvDownload);
   var sh=document.getElementById('mvShareBtn');if(sh)sh.addEventListener('click',mvShare);
