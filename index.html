@@ -2039,12 +2039,30 @@ main{padding-top:calc(3.75rem + env(safe-area-inset-top,0px))}
 .movai-cover-tile .mc-name{font-weight:900;letter-spacing:-.01em;line-height:1;color:#fff;font-size:1.05rem;white-space:nowrap}
 .movai-cover-tile .mc-name span{color:var(--accent)}
 .pub-card.pub-song-card .pub-song-cover-none.movai-cover-tile{background:linear-gradient(135deg,#2a3d13,#0e2a38);border-color:rgba(255,255,255,.35);color:#fff}
-/* Compact feed row: square cover thumb, Play centred on it */
-.pub-row-coverwrap{position:relative;flex:0 0 auto;width:64px;height:64px;border-radius:10px;overflow:hidden;background:#000;cursor:pointer;-webkit-tap-highlight-color:transparent}
-.pub-row-coverwrap img,.pub-row-coverwrap .pub-song-cover{width:100%!important;height:100%;margin:0;border-radius:10px;aspect-ratio:auto!important;max-width:none!important}
-.pub-row-coverwrap .movai-cover-tile .mc-name{font-size:.6rem}
-.pub-row-coverwrap .movai-cover-tile .mc-note{width:36%}
-.pub-row-coverwrap .pub-row-play{width:30px;height:30px;background:rgba(8,10,6,.48);color:#fff;border:1px solid rgba(255,255,255,.55)}
+/* Compact feed row: square cover thumb, Play centred on it.
+   The cover box is LARGE and the cover FILLS it edge to edge
+   (owner order 2026-11-17): the row used to carry a small 64px
+   thumb at the top of a much taller row, leaving a big empty
+   dark box under / around the MovAi logo tile. The cover now
+   spans the full height of the row's top area, and the logo
+   tile's note + wordmark scale up with the box so the logo
+   itself reads big inside it. */
+.pub-row-coverwrap{position:relative;flex:0 0 auto;width:108px;height:108px;border-radius:12px;overflow:hidden;background:#000;cursor:pointer;-webkit-tap-highlight-color:transparent}
+.pub-row-coverwrap img,.pub-row-coverwrap .pub-song-cover{width:100%!important;height:100%!important;margin:0;border-radius:12px;aspect-ratio:auto!important;max-width:none!important;object-fit:cover}
+.pub-row-coverwrap .movai-cover-tile{width:100%!important;height:100%!important}
+.pub-row-coverwrap .movai-cover-tile .mc-name{font-size:.95rem}
+.pub-row-coverwrap .movai-cover-tile .mc-note{width:42%}
+.pub-row-coverwrap .pub-row-play{width:38px;height:38px;background:rgba(8,10,6,.48);color:#fff;border:1px solid rgba(255,255,255,.55)}
+/* Feed row layout (owner order 2026-11-17): the Like / Dislike /
+   Share / Download / Save buttons DROP OUT of the title column
+   into ONE full-width row of their own UNDER the title / views
+   area, stretching across the whole card; the top area beside
+   the cover keeps the title, the views and the song's duration
+   (m:ss, e.g. 5:00) shown as a small pill. */
+.pub-songrow{flex-wrap:wrap}
+.pub-row-acts{flex:1 1 100%;flex-wrap:nowrap;gap:5px;margin-top:9px}
+.pub-row-acts .pub-pill,.pub-row-acts .pub-act{flex:1 1 0;min-width:0;justify-content:center;padding:4px 4px}
+.pub-row-dur{display:inline-flex;align-items:center;margin-left:7px;padding:1px 8px;border-radius:999px;border:1px solid var(--line2);color:var(--text2);font-size:0.6875rem;font-weight:800;font-variant-numeric:tabular-nums;white-space:nowrap}
 /* History / Playlist rows: Play centred on the small cover */
 .song-coverwrap{position:relative;flex:0 0 auto;width:40px;height:40px;border-radius:6px;overflow:hidden}
 .song-coverwrap .song-cover{width:100%;height:100%;border-radius:6px}
@@ -10333,6 +10351,15 @@ function pubSongRowEl(it){
   meta.className='pub-row-meta';
   meta.innerHTML=pubEyeSvg()+'<span data-pub-views="'+escHtml(it.id)+'">'+fmtCount(it.views)+'</span>';
   main.appendChild(meta);
+  /* Duration in the top area (owner order 2026-11-17): the space
+     beside the title / views carries the song's length (m:ss,
+     e.g. 5:00) — from the post's stored duration when known,
+     otherwise filled in from the row audio's own metadata the
+     moment it loads (see the loadedmetadata hook below). */
+  var dur=document.createElement('span');
+  dur.className='pub-row-dur';
+  dur.textContent=(it.duration&&it.duration>0)?histFmtTime(it.duration):'0:00';
+  meta.appendChild(dur);
   var acts=document.createElement('div');
   acts.className='pub-row-acts';
   var lk=document.createElement('button');
@@ -10362,7 +10389,10 @@ function pubSongRowEl(it){
   rdl.addEventListener('click',function(){pubDownloadPost(it,rdl);});
   acts.appendChild(rdl);
   acts.appendChild(plPillBtn({url:it.url,title:it.title||'',image:it.image||'',name:pubDisplayName(it)}));
-  main.appendChild(acts);
+  /* The action row is NOT inside the title column any more
+     (owner order 2026-11-17): it is appended to the row itself
+     below, so it stretches as ONE full-width row under the
+     cover + title / views / duration area. */
   var au=document.createElement('audio');
   au.src=it.url;au.preload='metadata';au.style.display='none';
   var sync=function(){
@@ -10371,6 +10401,9 @@ function pubSongRowEl(it){
     row.classList.toggle('np-glow',!au.paused);
   };
   pubWireFeedAudio(au,it,sync);
+  au.addEventListener('loadedmetadata',function(){
+    if(isFinite(au.duration)&&au.duration>0)dur.textContent=histFmtTime(au.duration);
+  });
   pb.addEventListener('click',function(){
     if(au.paused){var pr=au.play();if(pr&&pr.catch)pr.catch(function(){});}
     else au.pause();
@@ -10381,6 +10414,7 @@ function pubSongRowEl(it){
     else au.pause();
   });
   row.appendChild(main);
+  row.appendChild(acts);
   row.appendChild(au);
   return row;
 }
