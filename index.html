@@ -1082,7 +1082,14 @@ html[data-mode="light"] .btn-free{color:#63910c}
    opening goes blur → sharp, closing sharp → blur. */
 .pub-avatar{width:32px;height:32px;border-radius:50%;flex:0 0 auto;overflow:hidden;display:inline-flex;align-items:center;justify-content:center;border:1.5px solid var(--line2);background:var(--card);color:#fff}
 .pub-avatar img{width:100%;height:100%;object-fit:cover;display:block}
-.pub-avatar-init{font-size:0.8125rem;font-weight:900;text-shadow:0 1px 2px rgba(0,0,0,.4)}
+/* ONE real profile photo everywhere (owner order 2026-11-17):
+   a creator avatar NEVER falls back to an initial letter — when
+   no real photo is known yet it shows this neutral person
+   silhouette instead, and the account's real Google / custom
+   photo replaces it the moment it is known. */
+.pub-avatar svg{width:19px;height:19px;display:block;color:#9aa0aa}
+.pub-song-card .pub-avatar svg{color:rgba(255,255,255,.92)}
+.avatar-orb svg{width:25px;height:25px;display:block;color:#fff;filter:drop-shadow(0 1px 3px rgba(0,0,0,.5))}
 .pub-creator-follow{flex:0 0 auto;display:inline-flex;align-items:center;padding:6px 13px;border-radius:999px;border:1.5px solid var(--accent);background:transparent;color:var(--accent-text);font-family:inherit;font-size:0.75rem;font-weight:800;cursor:pointer;min-height:32px;white-space:nowrap;-webkit-tap-highlight-color:transparent}
 .pub-creator-follow:active{opacity:.8}
 .pub-creator-follow.following{background:var(--accent-fill);color:#0d1005;border-color:transparent}
@@ -1987,7 +1994,7 @@ main{padding-top:calc(3.75rem + env(safe-area-inset-top,0px))}
 </div>
 <div class="topbar-right">
   <button type="button" class="notif-bell" id="notifBell" onclick="notifBellClick()" aria-label="ដំណឹង · Notifications"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg><span class="notif-badge" id="notifBadge" style="display:none">0</span></button>
-  <button type="button" class="avatar-btn" id="acctAvatar" style="display:none" onclick="profileOpen()" aria-label="Profile"><span class="avatar-orb" id="acctAvatarOrb">?</span></button>
+  <button type="button" class="avatar-btn" id="acctAvatar" style="display:none" onclick="profileOpen()" aria-label="Profile"><span class="avatar-orb" id="acctAvatarOrb"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="8.2" r="4.1"/><path d="M3.6 21.4c.8-4.2 4.2-6.5 8.4-6.5s7.6 2.3 8.4 6.5"/></svg></span></button>
   <button type="button" class="acct-chip" id="acctChip" onclick="loginSheetOpen()">ចូលគណនី</button>
 </div>
 <!-- Top navigation row (owner order 2026-11-17): ONLY the mode
@@ -8740,14 +8747,119 @@ function pubFollowToggle(){
 }
 /* ===== Feed song card — creator avatar + Follow (owner order
    2026-11-17) =====
-   Every song card leads with its creator: avatar (the creator's
-   own profile photo when the post carries one, otherwise their
-   initial on a colour derived from their name), their name, and
-   a Follow button. The Admin's cards keep the server-backed
+   Every song card leads with its creator: avatar, their name,
+   and a Follow button. The Admin's cards keep the server-backed
    pubFollow above; other creators use this per-creator toggle,
    which follows the same rules — signed-out viewers are asked
    to log in first, and every card of the same creator refreshes
    together. */
+/* ===== ONE real profile photo everywhere (owner order
+   2026-11-17) =====
+   The avatar beside a song in the feed is the post OWNER's real
+   profile photo — the very same photo the header (top-right)
+   and the Profile sheet show for that account (their Google
+   profile photo, or the custom photo they picked, which takes
+   precedence exactly as acctPicture defines). It is NEVER an
+   initial letter (no «T» for «Taxr B2»): the letter fallback is
+   removed entirely. Resolution order for a feed post:
+   1. the photo the post itself carries (posts made from this
+      app now send the poster's acctPicture as `avatar` — see
+      pubDoPostSend / postFlowSubmit — so the server stores it
+      and every device sees the same photo);
+   2. a photo known locally for that account on this device —
+      the signed-in account itself (matched by Gmail, or by
+      display name when the post carries no Gmail), the Admin's
+      own account for Admin posts, or any account in the local
+      account store matched by Gmail / name (every Gmail used on
+      this device shows its own real photo);
+   3. only when NO real photo is known anywhere: a neutral
+      person silhouette — still never a letter. */
+var PUB_PERSON_SVG='<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="8.2" r="4.1"/><path d="M3.6 21.4c.8-4.2 4.2-6.5 8.4-6.5s7.6 2.3 8.4 6.5"/></svg>';
+function pubAvatarUsable(u){
+  return typeof u==='string'&&/^(https?:\/\/|data:image\/|\/\/)/i.test(u.trim());
+}
+function pubAvatarClean(u){
+  return String(u||'').trim().replace(/^\/\//,'https://');
+}
+function pubLocalPictureFor(it){
+  if(!it)return '';
+  var email=String(it.email||'').trim().toLowerCase();
+  var dn='';try{dn=pubDisplayName(it);}catch(e){}
+  dn=String(dn||it.name||'').trim().toLowerCase();
+  function picOf(rec){
+    if(!rec)return '';
+    try{return acctPicture(rec)||'';}catch(e){return rec.customPicture||rec.picture||'';}
+  }
+  var us={};try{us=acctUsersGet();}catch(e){}
+  if(email&&us[email]){var p0=picOf(us[email]);if(p0)return p0;}
+  var cur=null;try{cur=acctCurrent();}catch(e){}
+  if(cur){
+    var cp=picOf(cur);
+    if(cp){
+      if(email&&cur.email&&email===String(cur.email).trim().toLowerCase())return cp;
+      if(!email&&dn&&cur.name&&dn===String(cur.name).trim().toLowerCase())return cp;
+      try{if(pubIsAdmin(it)&&pubIsAdmin({email:cur.email||'',name:cur.name||''}))return cp;}catch(e){}
+    }
+  }
+  if(dn){
+    for(var k in us){
+      if(!Object.prototype.hasOwnProperty.call(us,k))continue;
+      var rec=us[k];
+      if(rec&&rec.name&&String(rec.name).trim().toLowerCase()===dn){var px=picOf(rec);if(px)return px;}
+    }
+  }
+  return '';
+}
+function pubResolveAvatar(it){
+  if(!it)return '';
+  var direct=[it.avatar,it.picture,it.photo,it.profilePic];
+  for(var i=0;i<direct.length;i++){
+    if(pubAvatarUsable(direct[i]))return pubAvatarClean(direct[i]);
+  }
+  var local='';try{local=pubLocalPictureFor(it);}catch(e){}
+  if(pubAvatarUsable(local))return pubAvatarClean(local);
+  return '';
+}
+function pubAvatarPaint(av,src){
+  if(!av)return;
+  av.innerHTML='';
+  av.style.background='';
+  if(src){
+    var im=document.createElement('img');
+    im.src=src;im.alt='';im.loading='lazy';im.referrerPolicy='no-referrer';
+    im.addEventListener('error',function(){
+      /* A photo URL that fails to load must not leave a broken
+         image — or ever a letter: show the silhouette. */
+      if(im.parentNode===av)av.innerHTML=PUB_PERSON_SVG;
+    });
+    av.appendChild(im);
+  }else{
+    av.innerHTML=PUB_PERSON_SVG;
+  }
+}
+/* When the signed-in account's real photo becomes known (log in,
+   or picking / removing a custom photo — both re-render the top
+   bar), refresh the feed avatars already on screen in place, so
+   the photo beside the user's own songs matches the header and
+   the Profile at once, with no feed reload. */
+function pubAvatarsRefresh(){
+  var els=document.querySelectorAll('[data-pub-avatar-for]');
+  if(!els.length||!pubItems.length)return;
+  var byId={};
+  for(var i=0;i<pubItems.length;i++)byId[pubItems[i].id]=pubItems[i];
+  for(var j=0;j<els.length;j++){
+    var el=els[j];
+    var it=byId[el.getAttribute('data-pub-avatar-for')];
+    if(!it)continue;
+    var src=pubResolveAvatar(it);
+    var img=el.querySelector('img');
+    if(src){
+      if(!img||img.getAttribute('src')!==src)pubAvatarPaint(el,src);
+    }else if(img){
+      pubAvatarPaint(el,'');
+    }
+  }
+}
 var pubCreatorFollows={};
 function pubCreatorKey(it){
   return String((it&&it.email)||(it&&it.name)||'').trim().toLowerCase();
@@ -8756,19 +8868,8 @@ function pubCreatorAvatarEl(it){
   var av=document.createElement('span');
   av.className='pub-avatar';
   av.setAttribute('aria-hidden','true');
-  var dn=pubDisplayName(it)||'?';
-  function useInitial(){
-    av.classList.add('pub-avatar-init');
-    av.textContent=dn.charAt(0).toUpperCase();
-    var h=0;for(var i=0;i<dn.length;i++)h=(h*31+dn.charCodeAt(i))%360;
-    av.style.background='linear-gradient(145deg,hsl('+h+',62%,44%),hsl('+((h+45)%360)+',62%,30%))';
-  }
-  if(it.avatar&&/^https:/i.test(it.avatar)){
-    var im=document.createElement('img');
-    im.src=it.avatar;im.alt='';im.loading='lazy';
-    im.addEventListener('error',function(){im.remove();useInitial();});
-    av.appendChild(im);
-  }else useInitial();
+  if(it&&it.id)av.setAttribute('data-pub-avatar-for',String(it.id));
+  pubAvatarPaint(av,pubResolveAvatar(it));
   return av;
 }
 function pubCreatorFollowRender(){
@@ -8892,7 +8993,7 @@ function pubNormItem(x){
   return {
     id:String(x.id||x.postId||x._id||url),
     name:String(x.name||x.author||x.userName||x.owner||''),
-    avatar:String(x.avatar||x.avatarUrl||x.photo||x.picture||x.profilePic||''),
+    avatar:String(x.avatar||x.avatarUrl||x.avatar_url||x.photo||x.picture||x.profilePic||x.profilePicture||x.photoUrl||x.pictureUrl||x.authorAvatar||x.ownerAvatar||x.userAvatar||x.googlePicture||''),
     email:String(x.email||x.userEmail||x.authorEmail||x.ownerEmail||''),
     premium:!!(x.premium||x.hasPlan||x.plan),
     title:String(x.title||''),
@@ -9042,6 +9143,10 @@ function pubLockMerge(fresh){
          copy, so an un-like still counts down as it should. */
       if(old.views>f.views)f.views=old.views;
       if((old.downloads||0)>(f.downloads||0))f.downloads=old.downloads;
+      /* The creator's real profile photo never drops out of the
+         feed: when the server's fresh copy carries no avatar but
+         the locked copy has one, the locked photo stays. */
+      if(!f.avatar&&old.avatar)f.avatar=old.avatar;
       return;
     }
     /* The server now returns this post under its real id (same
@@ -11186,12 +11291,20 @@ function pubDoPostSend(vis,coverUrl){
   if(!u){pubSheetClose();loginSheetOpen();return;}
   var msg=document.getElementById('pubSheetMsg');
   if(msg){msg.textContent=tx('pubPosting');msg.style.color='var(--muted)';}
+  /* The poster's REAL profile photo rides with the post (owner
+     order 2026-11-17): the same acctPicture the header and the
+     Profile show (Google photo, or the picked custom photo), so
+     the server stores it on the post and the feed can show that
+     one photo beside the song on every device — never a letter. */
+  var myPic='';try{myPic=acctPicture(u)||'';}catch(e){myPic=u.picture||'';}
   var payload={
     email:u.email,
     userId:acctValidUserId(u.id)?u.id:'',
     name:u.name||'',
     firstName:u.firstName||'',
     lastName:u.lastName||'',
+    avatar:myPic,
+    picture:myPic,
     title:item.title||'',
     type:item.type,
     url:item.url,
@@ -11227,8 +11340,9 @@ function pubDoPostSend(vis,coverUrl){
           var nit=null;
           try{nit=pubNormItem((data&&(data.post||data.item))||data);}catch(e){}
           if(!nit||nit.url!==payload.url){
-            nit={id:String((data&&(data.id||data.postId))||('lock'+Date.now().toString(36))),name:payload.name||'',email:payload.email||'',premium:false,title:payload.title||'',type:payload.type,url:payload.url,aspect:payload.aspect||'',image:payload.image||'',likes:0,dislikes:0,views:0,downloads:0,rank:null,tier:null,liked:false,disliked:false,duration:null,model:'',provider:payload.provider||'',genre:payload.genre||'',youtube:'',youtubeChannel:'',ts:Date.now()};
+            nit={id:String((data&&(data.id||data.postId))||('lock'+Date.now().toString(36))),name:payload.name||'',email:payload.email||'',avatar:payload.avatar||'',premium:false,title:payload.title||'',type:payload.type,url:payload.url,aspect:payload.aspect||'',image:payload.image||'',likes:0,dislikes:0,views:0,downloads:0,rank:null,tier:null,liked:false,disliked:false,duration:null,model:'',provider:payload.provider||'',genre:payload.genre||'',youtube:'',youtubeChannel:'',ts:Date.now()};
           }
+          if(!nit.avatar&&payload.avatar)nit.avatar=payload.avatar;
           if(nit.type==='song'&&payload.genre&&!nit.genre)nit.genre=payload.genre;
           if(nit.type==='song'&&payload.image&&!nit.image)nit.image=payload.image;
           if(payload.aspect&&!nit.aspect)nit.aspect=payload.aspect;
@@ -11535,7 +11649,10 @@ async function postFlowSubmit(){
       image=postFlow.coverUrl||'';
     }
     postFlowBusyStart(tx('postPosting'));
-    var payload={email:u.email,userId:acctValidUserId(u.id)?u.id:'',name:u.name||'',firstName:u.firstName||'',lastName:u.lastName||'',title:title,type:'song',url:url,image:image,visibility:'public'};
+    /* Same one-photo rule: the poster's real profile photo (the
+       header / Profile photo) rides with the post as `avatar`. */
+    var myPic2='';try{myPic2=acctPicture(u)||'';}catch(e){myPic2=u.picture||'';}
+    var payload={email:u.email,userId:acctValidUserId(u.id)?u.id:'',name:u.name||'',firstName:u.firstName||'',lastName:u.lastName||'',avatar:myPic2,picture:myPic2,title:title,type:'song',url:url,image:image,visibility:'public'};
     if(postFlow.kind==='song')payload.genre=postFlow.genre;
     else payload.kind=postFlow.kind;
     if(postFlow.histItem&&postFlow.histItem.provider)payload.provider=postFlow.histItem.provider;
@@ -11550,8 +11667,9 @@ async function postFlowSubmit(){
       var nit2=null;
       try{nit2=pubNormItem((pj&&(pj.post||pj.item))||pj);}catch(e){}
       if(!nit2||nit2.url!==url){
-        nit2={id:String((pj&&(pj.id||pj.postId))||('lock'+Date.now().toString(36))),name:u.name||'',email:u.email||'',premium:false,title:title,type:'song',url:url,aspect:'',image:image||'',likes:0,dislikes:0,views:0,downloads:0,rank:null,tier:null,liked:false,disliked:false,duration:null,model:'',provider:payload.provider||'',genre:(postFlow.kind==='song'?postFlow.genre:''),youtube:'',youtubeChannel:'',ts:Date.now()};
+        nit2={id:String((pj&&(pj.id||pj.postId))||('lock'+Date.now().toString(36))),name:u.name||'',email:u.email||'',avatar:myPic2||'',premium:false,title:title,type:'song',url:url,aspect:'',image:image||'',likes:0,dislikes:0,views:0,downloads:0,rank:null,tier:null,liked:false,disliked:false,duration:null,model:'',provider:payload.provider||'',genre:(postFlow.kind==='song'?postFlow.genre:''),youtube:'',youtubeChannel:'',ts:Date.now()};
       }
+      if(nit2&&!nit2.avatar&&myPic2)nit2.avatar=myPic2;
       if(postFlow.kind==='song'&&postFlow.genre&&!nit2.genre)nit2.genre=postFlow.genre;
       pubLockAdd(nit2);
     }catch(e){}
@@ -13594,18 +13712,23 @@ function acctSaveName(){
      & video packages — and the 250-credit free sign-up grant lands
      here too; the lime song packages top up songCredits instead.)
    The top-right corner is ONE horizontal row: the notification
-   bell on the LEFT, and the Log in button (guest) or a glossy 3D
-   avatar orb (signed in, the user's initial) on the RIGHT.
+   bell on the LEFT, and the Log in button (guest) or the glossy
+   3D avatar orb (signed in) on the RIGHT. The orb shows the
+   account's REAL profile photo — the same acctPicture the
+   Profile sheet and the feed avatars use (owner order
+   2026-11-17: ONE photo everywhere, never an initial letter;
+   an account with no photo at all shows the neutral person
+   silhouette, not a letter).
    Tapping the avatar opens the profile sheet (account, Gmail,
    both balances, package, Magic Hour status, member since, and a
    Log out button at the bottom); the bell opens the notifications
    sheet (or the log-in sheet for guests). */
 function acctFmtBal(n){return pkgFmtNum(Math.max(0,parseInt(n,10)||0));}
-function acctInitial(u){
-  var s=(u&&u.name?String(u.name):'')||(u&&u.email?String(u.email):'')||'?';
-  s=s.trim();var ch='?';
-  try{ch=Array.from(s)[0]||'?';}catch(e){ch=s.charAt(0)||'?';}
-  return ch.toUpperCase();
+/* The no-photo avatar face: the shared person silhouette (the
+   same PUB_PERSON_SVG the feed avatars use) — never a letter. */
+function acctAvatarFaceHtml(){
+  try{if(typeof PUB_PERSON_SVG==='string'&&PUB_PERSON_SVG)return PUB_PERSON_SVG;}catch(e){}
+  return '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="8.2" r="4.1"/><path d="M3.6 21.4c.8-4.2 4.2-6.5 8.4-6.5s7.6 2.3 8.4 6.5"/></svg>';
 }
 function acctRenderTopbar(u){
   try{document.body.classList.toggle('signed-in',!!u);}catch(e){}
@@ -13618,8 +13741,12 @@ function acctRenderTopbar(u){
     if(orb){
       var pic=acctPicture(u);
       if(pic)orb.innerHTML='<img src="'+escHtml(pic)+'" alt="" referrerpolicy="no-referrer" style="width:100%;height:100%;border-radius:50%;object-fit:cover;display:block">';
-      else orb.textContent=acctInitial(u);
+      else orb.innerHTML=acctAvatarFaceHtml();
     }
+    /* The header photo and the feed photos are ONE photo: when
+       this account's picture lands or changes, the avatars
+       beside its songs in the feed update in place too. */
+    try{pubAvatarsRefresh();}catch(e){}
     var ps=document.getElementById('profileSheet');
     if(ps&&ps.style.display!=='none')profileRender();
   }else{
@@ -13652,13 +13779,13 @@ function profileRender(){
   var h='';
   var pic=acctPicture(u);
   h+='<div style="display:flex;align-items:center;gap:10px">';
-  h+='<span class="prof-pic-wrap"><span class="avatar-orb avatar-lg">'+(pic?'<img src="'+escHtml(pic)+'" alt="" referrerpolicy="no-referrer" style="width:100%;height:100%;border-radius:50%;object-fit:cover;display:block">':escHtml(acctInitial(u)))+'</span><button type="button" class="prof-pic-cam" onclick="profPicPick()" aria-label="'+escHtml(tx(pic?'profPicChange':'profPicUpload'))+'"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg></button></span>';
+  h+='<span class="prof-pic-wrap"><span class="avatar-orb avatar-lg">'+(pic?'<img src="'+escHtml(pic)+'" alt="" referrerpolicy="no-referrer" style="width:100%;height:100%;border-radius:50%;object-fit:cover;display:block">':acctAvatarFaceHtml())+'</span><button type="button" class="prof-pic-cam" onclick="profPicPick()" aria-label="'+escHtml(tx(pic?'profPicChange':'profPicUpload'))+'"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg></button></span>';
   h+='<div style="min-width:0"><div style="font-size:1rem;font-weight:900;overflow-wrap:break-word">'+acctNameHtml(u)+'</div>';
   h+='<div style="font-size:0.75rem;color:var(--muted);overflow-wrap:break-word;margin-top:1px">'+escHtml(u.email)+'</div></div></div>';
   /* Profile picture: the Google photo arrives automatically; with
      no Google photo the user picks one from their phone here. A
      self-picked photo can be changed any time, and removed to go
-     back to the Google photo / initial. The long explanatory
+     back to the Google photo. The long explanatory
      paragraph is GONE (owner order 2026-11-17) — only the small
      «Change profile photo» button stays. */
   h+='<div class="prof-pic-btns"><button type="button" class="kbtn kbtn-white" onclick="profPicPick()">'+escHtml(tx(pic?'profPicChange':'profPicUpload'))+'</button>';
