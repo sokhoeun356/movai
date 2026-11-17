@@ -957,11 +957,50 @@ function getEmailTransporter() {
     return emailTransporter;
   } catch (e) { return null; }
 }
+// Brevo HTTPS email API (replaces Gmail SMTP, which is blocked from
+// Render — all SMTP ports time out). Brevo sends over HTTPS (port
+// 443), so it works from Render. Free tier: 300 emails/day. The API
+// key lives in settings.email.brevoApiKey (set in Admin → Settings →
+// Email). Sender must be a Brevo-verified sender (sokhoeun356).
+async function sendViaBrevo(toEmail, fromEmail, subject, html, text) {
+  const s = loadSettings();
+  const em = (s && s.email && typeof s.email === 'object') ? s.email : {};
+  const apiKey = typeof em.brevoApiKey === 'string' ? em.brevoApiKey.trim() : '';
+  if (!apiKey) return { ok: false, error: 'Brevo API key not configured' };
+  const from = (typeof fromEmail === 'string' && fromEmail.trim()) ? fromEmail.trim() : 'sokhoeun356@gmail.com';
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => { try { ctrl.abort(); } catch (e) {} }, 20000);
+  try {
+    const r = await fetch('https://api.brevo.com/v3/smtp/email', {
+      method: 'POST',
+      headers: { 'api-key': apiKey, 'Content-Type': 'application/json', 'Accept': 'application/json' },
+      body: JSON.stringify({
+        sender: { name: 'MovAi', email: from },
+        to: [{ email: toEmail }],
+        subject,
+        htmlContent: html,
+        textContent: text,
+      }),
+      signal: ctrl.signal,
+    });
+    clearTimeout(timer);
+    if (!r.ok) {
+      const t = await r.text().catch(() => '');
+      return { ok: false, error: 'Brevo error ' + r.status + ': ' + String(t).slice(0, 200) };
+    }
+    return { ok: true };
+  } catch (e) {
+    clearTimeout(timer);
+    return { ok: false, error: 'Brevo send failed — ' + (e && e.message ? String(e.message).slice(0, 200) : 'error') };
+  }
+}
 function verifyEmailConfigured() {
   try {
     const s = loadSettings();
     const em = (s && s.email && typeof s.email === 'object') ? s.email : {};
-    return !!(typeof em.user === 'string' && em.user.trim() && typeof em.appPassword === 'string' && em.appPassword.trim() && NodemailerLib);
+    const brevoOk = typeof em.brevoApiKey === 'string' && em.brevoApiKey.trim().length > 0;
+    const gmailOk = !!(typeof em.user === 'string' && em.user.trim() && typeof em.appPassword === 'string' && em.appPassword.trim() && NodemailerLib);
+    return brevoOk || gmailOk;
   } catch (e) { return false; }
 }
 function buildVerifyEmailHtml(code, link) {
@@ -1015,21 +1054,35 @@ async function sendVerificationEmail(email) {
     return { ok: false, error: 'ផ្ញើច្រើនពេក — សូមរង់ចាំ 1 ម៉ោង' };
   }
   if (!sc || now - sc.windowStart >= 3600 * 1000) verifySendCount.set(em, { count: 0, windowStart: now });
-  const transporter = getEmailTransporter();
-  if (!transporter) return { ok: false, error: 'Admin មិនទាន់ដាក់ Email (Gmail App Password) ទេ' };
   const code = String(Math.floor(100000 + Math.random() * 900000));
   const token = crypto.randomBytes(24).toString('hex');
   const link = VERIFY_SITE_URL + '/?verify=' + token;
   verifyStore.set(em, { code, token, expiresAt: now + VERIFY_CODE_TTL_MS, attempts: 0 });
   const s = loadSettings();
   const fromUser = (s && s.email && typeof s.email.user === 'string' && s.email.user.trim()) ? s.email.user.trim() : 'sokhoeun7788@gmail.com';
+  const subject = 'MovAi — លេខកូដផ្ទៀងផ្ទាត់ ' + code;
+  const html = buildVerifyEmailHtml(code, link);
+  const text = buildVerifyEmailText(code, link);
+  // Brevo HTTPS API first (Gmail SMTP is blocked from Render).
+  const brevo = await sendViaBrevo(em, fromUser, subject, html, text);
+  if (brevo.ok) {
+    const sc2 = verifySendCount.get(em);
+    if (sc2) sc2.count += 1;
+    return { ok: true, sent: true, via: 'brevo' };
+  }
+  // Brevo not configured or failed — fall back to Gmail SMTP.
+  const transporter = getEmailTransporter();
+  if (!transporter) {
+    verifyStore.delete(em);
+    return { ok: false, error: brevo.error && brevo.error !== 'Brevo API key not configured' ? brevo.error : 'Admin មិនទាន់ដាក់ Email (Gmail App Password) ទេ' };
+  }
   try {
     await transporter.sendMail({
       from: '"MovAi" <' + fromUser + '>',
       to: em,
-      subject: 'MovAi — លេខកូដផ្ទៀងផ្ទាត់ ' + code,
-      text: buildVerifyEmailText(code, link),
-      html: buildVerifyEmailHtml(code, link),
+      subject,
+      text,
+      html,
     });
   } catch (e) {
     verifyStore.delete(em);
@@ -1037,7 +1090,7 @@ async function sendVerificationEmail(email) {
   }
   const sc2 = verifySendCount.get(em);
   if (sc2) sc2.count += 1;
-  return { ok: true, sent: true };
+  return { ok: true, sent: true, via: 'smtp' };
 }
 function verifyCodeCheck(email, code) {
   const em = String(email || '').trim().toLowerCase();
