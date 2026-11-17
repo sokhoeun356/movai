@@ -917,7 +917,7 @@ function sendTelegramAdmin(text, parseMode) {
 // Sending uses Gmail SMTP (nodemailer) with the admin's Gmail + App
 // Password from settings.email (set in the Admin app → Email Settings).
 // The App Password is NEVER returned by any endpoint and NEVER logged.
-const VERIFY_CODE_TTL_MS = 10 * 60 * 1000; // a code/link lives 10 minutes
+const VERIFY_CODE_TTL_MS = 60 * 1000; // a code/link lives 60 seconds (owner order 2026-11-17 — resend after expiry)
 const VERIFY_MAX_ATTEMPTS = 5; // wrong-code guesses per code before it dies
 const VERIFY_SEND_MAX_PER_HOUR = 5; // emails per address per hour (anti-spam)
 const VERIFY_SITE_URL = 'https://movai-1.onrender.com';
@@ -967,7 +967,7 @@ function buildVerifyEmailHtml(code, link) {
     + '</div>'
     + '<div style="background:#17181c;border:1px solid #26272c;border-radius:16px;padding:22px 18px;text-align:center;">'
     + '<div style="font-size:17px;font-weight:700;margin-bottom:6px;">លេខកូដផ្ទៀងផ្ទាត់ · Your verification code</div>'
-    + '<div style="font-size:13px;color:#9ca3af;margin-bottom:16px;">បញ្ចូលលេខកូដនេះក្នុង MovAi ដើម្បីចូលប្រើ — Enter this code in MovAi to log in. វាមានសុពលភាព 10 នាទី · Valid for 10 minutes.</div>'
+    + '<div style="font-size:13px;color:#9ca3af;margin-bottom:16px;">បញ្ចូលលេខកូដនេះក្នុង MovAi ដើម្បីចូលប្រើ — Enter this code in MovAi to log in. វាមានសុពលភាព 60 វិនាទី · Valid for 60 seconds.</div>'
     + '<div style="font-size:38px;font-weight:900;letter-spacing:10px;color:#ADDC29;background:#0A0B0D;border:1px dashed #ADDC29;border-radius:12px;padding:12px 8px;margin-bottom:16px;">' + esc(code) + '</div>'
     + '<div style="font-size:13px;color:#9ca3af;margin-bottom:10px;">ឬចុច Link ខាងក្រោមដើម្បីចូលប្រើភ្លាម · Or tap the button below to log in instantly:</div>'
     + '<a href="' + esc(link) + '" style="display:inline-block;background:#ADDC29;color:#0A0B0D;font-weight:800;font-size:15px;text-decoration:none;padding:12px 28px;border-radius:999px;">ចូលប្រើ MovAi · Log in to MovAi</a>'
@@ -986,7 +986,7 @@ function buildVerifyEmailText(code, link) {
   return [
     'MovAi \u2014 \u179b\u17c1\u1781\u1780\u17bc\u178a\u1795\u17d2\u1784\u1795\u17d2\u178f\u17d2\u178f \u00b7 Your verification code',
     '',
-    '\u179b\u17c1\u1781\u1780\u17bc\u178a\u1795\u17d2\u1784\u1795\u17d2\u178f\u17d2\u178f\u179a\u1794\u179f\u17d2\u1793 (\u1798\u17b6\u1793\u179f\u17bb\u1796\u179b\u1797\u17b6\u1796 10 \u1793\u17b6\u178f\u17b8): ' + code,
+    '\u179b\u17c1\u1781\u1780\u17bc\u178a\u1795\u17d2\u1784\u1795\u17d2\u178f\u17d2\u178f\u179a\u1794\u179f\u17d2\u1793 (\u1798\u17b6\u1793\u179f\u17bb\u1796\u179b\u1797\u17b6\u1796 60 \u179c\u17b7\u1793\u17b6\u178f\u17b8): ' + code,
     '',
     '\u17ac\u17be\u1785\u17bb\u1785 Link \u1793\u17b9\u17c1\u17c7\u178a\u17be\u1798\u1794\u17be\u1794\u1785\u17d2\u179b\u1785\u17d2\u1794\u179a\u17d2\u1793: ' + link,
     '',
@@ -3439,6 +3439,61 @@ function apiRoute(req, res, urlPath) {
     }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
     return;
   }
+  // POST /api/auth/request-reset — {email} — PUBLIC. Forgot password:
+  // sends the 6-digit verification code to the Gmail (same code system
+  // as email verification — code lives 60 seconds, max 5 sends/hour).
+  // The user must exist; otherwise the error says so (no code is sent
+  // to a Gmail with no MovAi account). REQUIRES the Admin to have set
+  // up email (Gmail App Password in settings) — otherwise the error
+  // says email is not configured yet.
+  if (req.method === 'POST' && urlPath === '/api/auth/request-reset') {
+    readJSONBody(req, 64 * 1024).then(async (body) => {
+      const email = normEmail(body && body.email);
+      if (!email) return sendJSON(res, 200, { ok: false, error: 'សូមដាក់ Gmail ត្រឹមត្រូវ' });
+      const users = loadUsers();
+      if (!users[email]) return sendJSON(res, 200, { ok: false, error: 'រក Gmail នេះមិនឃើញទេ — សូម Sign-up ជាមុនសិន · No account with this Gmail, please sign up first' });
+      if (!verifyEmailConfigured()) return sendJSON(res, 200, { ok: false, error: 'Admin មិនទាន់ដាក់ Email (Gmail App Password) ទេ — សូមប្រាប់ Admin · Email is not set up yet, please tell the Admin' });
+      const sent = await sendVerificationEmail(email);
+      if (!sent.ok) return sendJSON(res, 200, { ok: false, error: sent.error || 'ផ្ញើលេខកូដមិនបានទេ · Could not send the code' });
+      return sendJSON(res, 200, { ok: true, sent: true });
+    }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
+    return;
+  }
+  // POST /api/auth/reset-password — {email, code, password,
+  // passwordConfirm} — PUBLIC. Forgot password step 2: the 6-digit
+  // code (from request-reset) proves the Gmail belongs to the caller,
+  // then the new password is set (6–64 chars, must match). All saved
+  // (remember-me) logins are revoked and the sign-in lock is cleared.
+  // Returns {ok:true, user} so the website can log them in at once.
+  if (req.method === 'POST' && urlPath === '/api/auth/reset-password') {
+    readJSONBody(req, 64 * 1024).then(async (body) => {
+      const email = normEmail(body && body.email);
+      const code = body && typeof body.code === 'string' ? body.code : '';
+      const password = body && typeof body.password === 'string' ? body.password : '';
+      const passwordConfirm = body && typeof body.passwordConfirm === 'string' ? body.passwordConfirm : '';
+      if (!email) return sendJSON(res, 200, { ok: false, error: 'សូមដាក់ Gmail ត្រឹមត្រូវ' });
+      if (password.length < 6 || password.length > 64) return sendJSON(res, 200, { ok: false, error: 'Password ត្រូវមាន 6–64 តួអក្សរ · Password must be 6–64 characters' });
+      if (password !== passwordConfirm) return sendJSON(res, 200, { ok: false, error: 'Password ទាំងពីរមិនដូចគ្នាទេ · Passwords do not match' });
+      const v = verifyCodeCheck(email, code);
+      if (!v.ok) return sendJSON(res, 200, { ok: false, error: v.error });
+      const users = loadUsers();
+      const u = users[email];
+      if (!u) return sendJSON(res, 200, { ok: false, error: 'រក Gmail នេះមិនឃើញទេ · No account with this Gmail' });
+      const hp = await hashPassword(password);
+      u.passwordSalt = hp.salt;
+      u.passwordHash = hp.hash;
+      revokeAllRememberTokens(u);
+      signinClear(email);
+      const now = new Date().toISOString();
+      logActivity({ at: now, mode: 'reset-password', email });
+      u.updatedAt = now;
+      saveUsers(users);
+      await ghFlushFile(USERS_FILE);
+      addNotification('security', email, '🔑 Password ត្រូវបានប្តូរ · Password changed', (u.name || email) + ' (' + email + ') បានប្តូរ Password តាមរយៈលេខកូដ 6 ខ្ទង់');
+      return sendJSON(res, 200, { ok: true, user: pubUser(u) });
+    }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
+    return;
+  }
   // GET /api/admin/users — admin key required. Newest first.
   if (req.method === 'GET' && urlPath === '/api/admin/users') {
     const a = adminKeyOk(req);
@@ -3488,6 +3543,49 @@ function apiRoute(req, res, urlPath) {
       } else {
         addNotification('grant', email, '➕ បន្ថែម Credit · Credits granted', 'Admin បានបន្ថែម ' + deltaText + ' ឲ្យ ' + email + ' · ID: ' + (u.id || '—') + (grantNote ? ' — ' + grantNote : ''));
       }
+      return sendJSON(res, 200, { ok: true, user: pubUser(u) });
+    }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
+    return;
+  }
+  // POST /api/admin/reset-password — {email, newPassword?} — admin key
+  // required. Admin password management (owner order 2026-11-17): the
+  // Admin can reset any user's password. With newPassword (6–64 chars)
+  // it sets that password for the user (Admin tells the user the new
+  // password). WITHOUT newPassword it CLEARS the password — the user
+  // must set a new one via Forgot password (6-digit code) or Google.
+  // NOTE: the Admin can NEVER view a user's plain password — passwords
+  // are stored only as scrypt hashes, which cannot be reversed. The
+  // Admin sees hasPassword (in pubUser) and can reset; that is the
+  // secure equivalent. All saved (remember-me) logins are revoked and
+  // the sign-in lock is cleared.
+  if (req.method === 'POST' && urlPath === '/api/admin/reset-password') {
+    const a = adminKeyOk(req);
+    if (!a.ok) return sendJSON(res, 200, { ok: false, error: a.error });
+    readJSONBody(req, 64 * 1024).then(async (body) => {
+      const email = normEmail(body && body.email);
+      const newPassword = body && typeof body.newPassword === 'string' ? body.newPassword : '';
+      if (!email) return sendJSON(res, 200, { ok: false, error: 'សូមដាក់ Gmail ត្រឹមត្រូវ' });
+      const users = loadUsers();
+      const u = users[email];
+      if (!u) return sendJSON(res, 200, { ok: false, error: 'រកអ្នកប្រើនេះមិនឃើញទេ' });
+      const now = new Date().toISOString();
+      if (newPassword) {
+        if (newPassword.length < 6 || newPassword.length > 64) return sendJSON(res, 200, { ok: false, error: 'Password ត្រូវមាន 6–64 តួអក្សរ · Password must be 6–64 characters' });
+        const hp = await hashPassword(newPassword);
+        u.passwordSalt = hp.salt;
+        u.passwordHash = hp.hash;
+        addNotification('security', email, '🔑 Admin បានប្តូរ Password · Admin reset password', 'Admin បានប្តូរ Password ឲ្យ ' + email + ' (Password ថ្មី — សូមប្រាប់អ្នកប្រើ)');
+      } else {
+        u.passwordHash = null;
+        u.passwordSalt = null;
+        addNotification('security', email, '🔑 Admin បានលុប Password · Admin cleared password', 'Admin បានលុប Password របស់ ' + email + ' — អ្នកប្រើត្រូវបង្កើត Password ថ្មី (Forgot password ឬ Google)');
+      }
+      revokeAllRememberTokens(u);
+      signinClear(email);
+      logActivity({ at: now, mode: 'admin-reset-password', email });
+      u.updatedAt = now;
+      saveUsers(users);
+      await ghFlushFile(USERS_FILE);
       return sendJSON(res, 200, { ok: true, user: pubUser(u) });
     }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
     return;
