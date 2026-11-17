@@ -4103,10 +4103,15 @@ function apiRoute(req, res, urlPath) {
     const cn = (process.env.CLOUDINARY_CLOUD_NAME || '').trim();
     const ck = (process.env.CLOUDINARY_API_KEY || '').trim();
     const cs = (process.env.CLOUDINARY_API_SECRET || '').trim();
-    if (!cn || !ck || !cs) return null;
+    // CLOUDINARY_URL (single var, cloudinary://<key>:<secret>@<cloud>)
+    // is accepted too — the SDK reads it itself. Prefer the three
+    // separate vars when they are all set.
+    const curl = (process.env.CLOUDINARY_URL || '').trim();
+    if ((!cn || !ck || !cs) && !curl) return null;
     try {
       const c = require('cloudinary').v2;
-      c.config({ cloud_name: cn, api_key: ck, api_secret: cs });
+      if (cn && ck && cs) c.config({ cloud_name: cn, api_key: ck, api_secret: cs });
+      else c.config();
       _cloudinary = c;
       return c;
     } catch (e) {
