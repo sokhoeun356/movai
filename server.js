@@ -4194,10 +4194,37 @@ function apiRoute(req, res, urlPath) {
     c.config({ cloud_name: a.cloudName, api_key: a.apiKey, api_secret: a.apiSecret });
     return c;
   }
-  function cloudinaryMp3UrlFor(a, publicId) {
+  // Build the download URL for a stored Cloudinary song. `title` is the
+  // song's display name (optional) — when given, it becomes the download
+  // filename via fl_attachment:<title> so the saved file is named after
+  // the song (e.g. "WHY IS LIFE SO HARD ON ME.mp3") instead of the
+  // provider's generic name ("output.mp3"). The title is sanitised to
+  // URL-safe characters (spaces kept, Khmer kept as percent-encoded
+  // UTF-8, slashes/quotes stripped) so the URL stays valid.
+  function cloudinaryMp3UrlFor(a, publicId, title) {
     const c = cloudinaryConfigFor(a);
     if (!c) return null;
+    const t = String(title || '').trim().replace(/[\\/:*?"<>|]/g, '').replace(/\s+/g, ' ').slice(0, 120);
+    if (t) {
+      // fl_attachment:<name> sets the Content-Disposition filename.
+      // Use the SDK's attachment flag with a custom filename: build the
+      // URL then append the encoded name to the fl_attachment flag.
+      const base = c.url(publicId, { resource_type: 'video', format: 'mp3', audio_codec: 'mp3', bit_rate: '192k', flags: 'attachment' });
+      if (!base) return null;
+      return base.replace('fl_attachment', 'fl_attachment:' + encodeURIComponent(t));
+    }
     return c.url(publicId, { resource_type: 'video', format: 'mp3', audio_codec: 'mp3', bit_rate: '192k', flags: 'attachment' });
+  }
+  // Rewrite an EXISTING Cloudinary MP3 URL so its download filename is
+  // the song title (fl_attachment:<title>). Used for songs stored
+  // BEFORE the title fix — their stored URL has fl_attachment without
+  // a name (downloads as "output.mp3"). Returns the original URL when
+  // it is not a Cloudinary URL or has no title to apply.
+  function cloudinaryUrlWithTitle(url, title) {
+    const u = String(url || '');
+    const t = String(title || '').trim().replace(/[\\/:*?"<>|]/g, '').replace(/\s+/g, ' ').slice(0, 120);
+    if (!t || u.indexOf('res.cloudinary.com/') < 0 || u.indexOf('fl_attachment') < 0) return u;
+    return u.replace(/fl_attachment(?::[^/]*)?/, 'fl_attachment:' + encodeURIComponent(t));
   }
   // Mask an API key/secret for the Admin: first 2 + last 2 chars only.
   function cloudinaryMask(v) {
@@ -4318,7 +4345,7 @@ function apiRoute(req, res, urlPath) {
   // {publicId, mp3Url, accountId, accountLabel}, or the marker 'gone'
   // when Cloudinary could not fetch the source (expired provider URL),
   // or null when every account failed (caller falls back to local).
-  async function cloudinaryStoreSong(u) {
+  async function cloudinaryStoreSong(u, title) {
     const candidates = cloudinaryCandidates();
     if (!candidates.length) return null;
     const run = _cloudQueue.then(async () => {
@@ -4331,7 +4358,7 @@ function apiRoute(req, res, urlPath) {
             const res = await c.uploader.upload(u, { resource_type: 'video', folder: 'movai/songs' });
             const publicId = res && res.public_id;
             if (!publicId) continue;
-            const mp3Url = cloudinaryMp3UrlFor(a, publicId);
+            const mp3Url = cloudinaryMp3UrlFor(a, publicId, title);
             memLog('cloudinary-upload ok ' + publicId + ' via ' + (a.label || a.cloudName));
             cloudinaryClearAccountMarks(a);
             return { publicId, mp3Url, accountId: a.id, accountLabel: a.label || a.cloudName };
@@ -4490,8 +4517,18 @@ function apiRoute(req, res, urlPath) {
         // Cloudinary is not configured or its upload fails, return a
         // clear error. (The cache check above still serves legacy MP3s
         // already on disk — plain streaming, no work.)
+        // Already a Cloudinary URL? Just rewrite its download filename
+        // to the song title (no re-upload, no server file work) and
+        // redirect to it. This fixes songs stored BEFORE the title
+        // fix — their stored URL has fl_attachment without a name
+        // (downloads as "output.mp3").
+        if (u.indexOf('res.cloudinary.com/') >= 0 && u.indexOf('fl_attachment') >= 0) {
+          res.writeHead(302, { Location: cloudinaryUrlWithTitle(u, name.replace(/\.mp3$/i, '')), 'Access-Control-Allow-Origin': '*' });
+          res.end();
+          return;
+        }
         if (!cloudinaryConfigured()) return sendJSON(res, 503, { ok: false, error: 'MP3 download unavailable — Cloudinary not configured' });
-        const cl = await cloudinaryStoreSong(u);
+        const cl = await cloudinaryStoreSong(u, name.replace(/\.mp3$/i, ''));
         if (cl === 'gone') return sendJSON(res, 410, { ok: false, error: 'gone', message: 'This song is no longer available' });
         if (cl && cl.mp3Url) {
           res.writeHead(302, { Location: cl.mp3Url, 'Access-Control-Allow-Origin': '*' });
@@ -4519,6 +4556,7 @@ function apiRoute(req, res, urlPath) {
   if (req.method === 'POST' && urlPath === '/api/public/song-store') {
     readJSONBody(req, 64 * 1024).then(async (body) => {
       const url = String((body && body.url) || '').trim();
+      const title = String((body && (body.title || body.name)) || '').trim();
       const proto = req.headers && req.headers['x-forwarded-proto'] === 'http' ? 'http' : 'https';
       const host = (req.headers && req.headers.host) || 'movai-proxy.onrender.com';
       const ownBase = proto + '://' + host;
@@ -4528,9 +4566,11 @@ function apiRoute(req, res, urlPath) {
         if (url.indexOf('/uploads/') >= 0 && (url.indexOf(ownBase + '/uploads/') === 0 || url.indexOf('movai-proxy.onrender.com/uploads/') >= 0)) {
           return sendJSON(res, 200, { ok: true, url });
         }
-        // Already a Cloudinary MP3 URL? Nothing to do.
+        // Already a Cloudinary MP3 URL? Rewrite its download filename
+        // to the song title (no re-upload) so it saves with the song's
+        // name instead of the provider's generic "output.mp3".
         if (url.indexOf('res.cloudinary.com/') >= 0) {
-          return sendJSON(res, 200, { ok: true, url, provider: 'cloudinary' });
+          return sendJSON(res, 200, { ok: true, url: cloudinaryUrlWithTitle(url, title), provider: 'cloudinary' });
         }
         memLog('songstore-start');
         // CLOUDINARY ONLY (owner order 2026-11-17 ~09:32): the local
@@ -4541,7 +4581,7 @@ function apiRoute(req, res, urlPath) {
         // clear error instead of crashing the server. The website keeps
         // the provider URL in that case (temporary) and retries later.
         if (!cloudinaryConfigured()) return sendJSON(res, 200, { ok: false, error: 'cloudinary not configured', url });
-        const cl = await cloudinaryStoreSong(url);
+        const cl = await cloudinaryStoreSong(url, title);
         if (cl === 'gone') return sendJSON(res, 200, { ok: false, error: 'gone', url });
         if (cl && cl.mp3Url) {
           memLog('song-store-end');
