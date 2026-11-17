@@ -143,7 +143,7 @@ const GH_DATA_FILES = [
   'public.json', 'package-events.json', 'blocked-models.json',
   'model-logins.json', 'blocked-ips.json', 'blocked-emails.json',
   'updates.json', 'admin-lockouts.json', 'history.json', 'mp3cache.json',
-  'cloudinary-accounts.json', 'cloudinary-rotation.json',
+  'cloudinary-accounts.json', 'cloudinary-rotation.json', 'admin-key.json',
 ];
 const ghShaCache = {}; // filename -> GitHub blob sha (for PUT updates)
 function ghEnabled() { return !!GH_TOKEN; }
@@ -355,8 +355,32 @@ function recordFailedAdminAttempt(req, ip) {
     return 0;
   } catch (e) { return 0; }
 }
+// ---- File-backed Admin Key (owner order 2026-11-17) ----
+// The Admin Key lives in ./data/admin-key.json (GitHub-backed, survives
+// restarts) so the admin can reveal / reset it after a Google sign-in.
+// The env MOVAI_ADMIN_KEY stays as an emergency fallback and as the
+// seed: when the file has no key yet, the env value is copied into it
+// (the value is never logged).
+const ADMIN_KEY_FILE = path.join(DATA_DIR, 'admin-key.json');
+function loadAdminKeyFile() {
+  try { const j = JSON.parse(fs.readFileSync(ADMIN_KEY_FILE, 'utf8')); if (j && typeof j.key === 'string' && j.key) return j.key; } catch (e) {}
+  return '';
+}
+function saveAdminKeyFile(key) {
+  try { fs.mkdirSync(DATA_DIR, { recursive: true }); } catch (e) {}
+  fs.writeFileSync(ADMIN_KEY_FILE, JSON.stringify({ key, updatedAt: new Date().toISOString() }, null, 2));
+  ghPersistFile(ADMIN_KEY_FILE);
+}
+function currentAdminKey() {
+  let k = loadAdminKeyFile();
+  if (!k) {
+    const env = process.env.MOVAI_ADMIN_KEY || '';
+    if (env) { k = env; try { saveAdminKeyFile(env); } catch (e) {} }
+  }
+  return k;
+}
 function adminKeyOk(req) {
-  const k = process.env.MOVAI_ADMIN_KEY;
+  const k = currentAdminKey();
   if (!k) return { ok: false, error: 'Admin key not configured on server' };
   const h = String(req.headers['authorization'] || '');
   const m = /^Bearer\s+(.+)$/.exec(h);
@@ -1039,7 +1063,42 @@ function verifyTokenCheck(token) {
 // A subscription: {email, endpoint, keys:{p256dh, auth}, role, createdAt,
 // updatedAt}. role 'admin' marks an admin device (the Admin app subscribes
 // with {email:<admin gmail>, role:'admin'}).
-const ADMIN_EMAILS = ['sokhoeun7788@gmail.com', 'yemsokhoeun98@gmail.com', 'sokhoeun350@gmail.com'];
+const ADMIN_EMAILS = ['sokhoeun7788@gmail.com', 'yemsokhoeun98@gmail.com', 'sokhoeun356@gmail.com'];
+// ---- Admin-key Google session (Admin website Google sign-in) ----
+// After Google sign-in the Admin app proves its Gmail with a Google ID
+// token; the server verifies it and issues a short-lived (15 min)
+// session token tied to that admin Gmail. The session is in-memory
+// only (a restart simply asks the admin to sign in again). It is used
+// ONLY to reveal / reset the Admin Key — it never replaces the Admin
+// Key itself, and key-entry attempts keep the graduated lockout.
+const MOVAI_GOOGLE_CLIENT_ID = '809358546010-dspkik0o4ahg7km15dspro5cj3qjk384.apps.googleusercontent.com';
+const ADMIN_KEY_SESSION_MS = 15 * 60 * 1000;
+const _adminKeySessions = new Map(); // token -> {email, name, picture, expiresAt}
+const _adminKeyRate = new Map(); // email + ':' + action -> {count, windowStart}
+function issueAdminKeySession(email, name, picture) {
+  const token = crypto.randomBytes(32).toString('hex');
+  _adminKeySessions.set(token, { email, name: name || '', picture: picture || '', expiresAt: Date.now() + ADMIN_KEY_SESSION_MS });
+  return token;
+}
+function adminKeySessionFromReq(req) {
+  const h = String(req.headers['authorization'] || '');
+  const m = /^Bearer\s+(.+)$/.exec(h);
+  if (!m) return null;
+  const s = _adminKeySessions.get(m[1]);
+  if (!s) return null;
+  if (s.expiresAt <= Date.now()) { _adminKeySessions.delete(m[1]); return null; }
+  if (!ADMIN_EMAILS.includes(s.email)) return null;
+  return s;
+}
+function adminKeyRateOk(email, action) {
+  const key = email + ':' + action;
+  const now = Date.now();
+  const rec = _adminKeyRate.get(key);
+  if (!rec || now - rec.windowStart >= 60 * 60 * 1000) { _adminKeyRate.set(key, { count: 1, windowStart: now }); return true; }
+  if (rec.count >= 5) return false;
+  rec.count += 1;
+  return true;
+}
 const VAPID_FILE = path.join(DATA_DIR, 'vapid.json');
 const VAPID_SUBJECT = 'mailto:sokhoeun356@gmail.com';
 const PUSH_SUBS_FILE = path.join(DATA_DIR, 'push-subs.json');
@@ -3238,6 +3297,68 @@ function apiRoute(req, res, urlPath) {
     const list = rec && Array.isArray(rec.keys) ? rec.keys : [];
     return sendJSON(res, 200, { ok: true, provider, keys: list.map((e) => ({ key: e.key || '', endpoint: e.endpoint || '', addedAt: e.addedAt || '' })) });
   }
+  // ---- Admin Key: Google sign-in session + reveal + reset ----
+  // POST /api/admin/key/verify-google — PUBLIC. {idToken} (Google ID
+  // token from the Admin website's Google sign-in). The server verifies
+  // the token with Google (tokeninfo: aud, iss, exp, email_verified),
+  // checks the Gmail is one of the three admin Gmails, and issues a
+  // 15-minute session token tied to that Gmail. The error never says
+  // whether the token or the Gmail was the problem.
+  if (req.method === 'POST' && urlPath === '/api/admin/key/verify-google') {
+    readJSONBody(req, 64 * 1024).then(async (body) => {
+      const idToken = body && typeof body.idToken === 'string' ? body.idToken.trim() : '';
+      if (!idToken) return sendJSON(res, 200, { ok: false, error: 'Google sign-in មិនត្រឹមត្រូវទេ · Google sign-in failed' });
+      let info = null;
+      try {
+        const r = await fetch('https://oauth2.googleapis.com/tokeninfo?id_token=' + encodeURIComponent(idToken), { signal: AbortSignal.timeout(10000) });
+        if (r.ok) info = await r.json().catch(() => null);
+      } catch (e) {}
+      const bad = () => sendJSON(res, 200, { ok: false, error: 'Google sign-in មិនត្រឹមត្រូវទេ · Google sign-in failed' });
+      if (!info || typeof info !== 'object') return bad();
+      if (info.aud !== MOVAI_GOOGLE_CLIENT_ID) return bad();
+      if (info.iss !== 'accounts.google.com' && info.iss !== 'https://accounts.google.com') return bad();
+      if (info.email_verified !== 'true' && info.email_verified !== true) return bad();
+      const expMs = Number(info.exp) * 1000;
+      if (!Number.isFinite(expMs) || expMs <= Date.now()) return bad();
+      const email = normEmail(info.email);
+      if (!email || !ADMIN_EMAILS.includes(email)) return bad();
+      const session = issueAdminKeySession(email, typeof info.name === 'string' ? info.name : '', typeof info.picture === 'string' ? info.picture : '');
+      return sendJSON(res, 200, { ok: true, session, email, name: typeof info.name === 'string' ? info.name : '', picture: typeof info.picture === 'string' ? info.picture : '' });
+    }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
+    return;
+  }
+  // GET /api/admin/key/reveal — requires header Authorization: Bearer
+  // <session> (valid, unexpired, admin Gmail). Returns the current
+  // Admin Key so the Admin app can show (eye) and copy it. Max 5
+  // reveals per Gmail per hour.
+  if (req.method === 'GET' && urlPath === '/api/admin/key/reveal') {
+    const s = adminKeySessionFromReq(req);
+    if (!s) return sendJSON(res, 200, { ok: false, error: 'Session ផុតកំណត់ហើយ សូមចូល Google ម្តងទៀត · Session expired, please sign in with Google again' });
+    if (!adminKeyRateOk(s.email, 'reveal')) return sendJSON(res, 200, { ok: false, error: 'មើល key ច្រើនដងពេកហើយ សាកល្បងម្តងទៀត 1 ម៉ោងក្រោយ · Too many reveals, try again in 1 hour' });
+    const k = currentAdminKey();
+    if (!k) return sendJSON(res, 200, { ok: false, error: 'Admin key មិនទាន់បានកំណត់ទេ · Admin key is not configured' });
+    return sendJSON(res, 200, { ok: true, key: k });
+  }
+  // POST /api/admin/key/reset — {newKey} — requires header
+  // Authorization: Bearer <session>. Replaces the Admin Key with
+  // newKey (8–64 chars). The old key stops working immediately. The
+  // IP's lockout strikes are cleared and a security notification is
+  // logged. Max 5 resets per Gmail per hour.
+  if (req.method === 'POST' && urlPath === '/api/admin/key/reset') {
+    const s = adminKeySessionFromReq(req);
+    if (!s) return sendJSON(res, 200, { ok: false, error: 'Session ផុតកំណត់ហើយ សូមចូល Google ម្តងទៀត · Session expired, please sign in with Google again' });
+    readJSONBody(req, 64 * 1024).then(async (body) => {
+      const newKey = body && typeof body.newKey === 'string' ? body.newKey.trim() : '';
+      if (newKey.length < 8 || newKey.length > 64) return sendJSON(res, 200, { ok: false, error: 'Key ថ្មីត្រូវមាន 8–64 តួអក្សរ · New key must be 8–64 characters' });
+      if (!adminKeyRateOk(s.email, 'reset')) return sendJSON(res, 200, { ok: false, error: 'ប្តូរ key ច្រើនដងពេកហើយ សាកល្បងម្តងទៀត 1 ម៉ោងក្រោយ · Too many resets, try again in 1 hour' });
+      saveAdminKeyFile(newKey);
+      await ghFlushFile(ADMIN_KEY_FILE);
+      try { clearAdminLockout(getClientIp(req)); } catch (e) {}
+      addNotification('security', s.email, '🗝️ Admin Key ត្រូវបានប្តូរ · Admin Key changed', 'Admin Key ត្រូវបានប្តូរដោយ ' + s.email + ' (តាមរយៈ Google sign-in)');
+      return sendJSON(res, 200, { ok: true });
+    }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
+    return;
+  }
   // Test one provider key with a lightweight authenticated call.
   // status: 'ok' = works (green), 'blocked' = 401/403 invalid or blocked
   // (red), 'error' = rate limit / network / other (yellow), 'unknown' =
@@ -4009,7 +4130,7 @@ function apiRoute(req, res, urlPath) {
   }
   // Public view of a post. likedBy (liker emails) is never exposed.
   function pubPost(p) {
-    return { id: p.id, email: p.email, name: p.name || '', userId: p.userId || '', mode: p.mode, title: p.title, url: p.url, cover: p.cover || '', aspect: p.aspect || '', youtube: p.youtube || '', youtubeChannel: p.youtubeChannel || '', visibility: p.visibility, likes: p.likes || 0, views: p.views || 0, downloads: p.downloads || 0, createdAt: p.createdAt };
+    return { id: p.id, email: p.email, name: p.name || '', userId: p.userId || '', avatar: p.avatar || '', mode: p.mode, title: p.title, url: p.url, cover: p.cover || '', aspect: p.aspect || '', youtube: p.youtube || '', youtubeChannel: p.youtubeChannel || '', visibility: p.visibility, likes: p.likes || 0, views: p.views || 0, downloads: p.downloads || 0, createdAt: p.createdAt };
   }
   // ---- File uploads for the Admin app Post form (MP3 + cover image) ----
   // ---- Server-side MP3 conversion (WAV -> MP3 128kbps) ----
@@ -4975,6 +5096,7 @@ function apiRoute(req, res, urlPath) {
       const aspect = (aspectRaw === '1x1' || aspectRaw === '4x6') ? aspectRaw : '';
       const youtube = typeof body.youtube === 'string' ? body.youtube.trim().slice(0, 2000) : '';
       const youtubeChannel = typeof body.youtubeChannel === 'string' ? body.youtubeChannel.trim().slice(0, 2000) : '';
+      const avatar = typeof body.avatar === 'string' ? body.avatar.trim().slice(0, 500) : '';
       const now = new Date().toISOString();
       const posts = loadPublicPosts();
       const p = {
@@ -4983,7 +5105,7 @@ function apiRoute(req, res, urlPath) {
         userId: typeof body.userId === 'string' ? body.userId.trim().slice(0, 50) : '',
         mode, title, url,
         cover: typeof body.cover === 'string' ? body.cover.trim().slice(0, 2000) : '',
-        aspect, youtube, youtubeChannel, visibility, likes: 0, views: 0, downloads: 0, likedBy: [], createdAt: now,
+        aspect, youtube, youtubeChannel, avatar, visibility, likes: 0, views: 0, downloads: 0, likedBy: [], createdAt: now,
       };
       posts.push(p);
       if (posts.length > PUBLIC_MAX) posts.splice(0, posts.length - PUBLIC_MAX);
