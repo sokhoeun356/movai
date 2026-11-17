@@ -2511,6 +2511,8 @@ main{padding-top:calc(3.75rem + env(safe-area-inset-top,0px))}
 .st-prog.on{display:block}
 .st-prog-bar{height:10px;border-radius:999px;background:var(--field);border:1px solid var(--line2);overflow:hidden}
 .st-prog-fill{height:100%;width:0%;background:var(--accent-fill);transition:width .2s ease}
+.st-prog-fill.indet{width:40%!important;transition:none;animation:stProgIndet 1.1s ease-in-out infinite alternate}
+@keyframes stProgIndet{from{margin-left:0}to{margin-left:60%}}
 .st-prog-txt{font-size:0.8125rem;color:var(--text2);margin-top:6px;font-variant-numeric:tabular-nums}
 .st-transport{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:16px;padding-top:14px;border-top:1px solid var(--line)}
 .st-play{width:56px;height:56px;border-radius:50%;border:none;background:var(--accent-fill);color:#0d1005;font-size:1.25rem;cursor:pointer;flex:0 0 auto;display:flex;align-items:center;justify-content:center;font-family:inherit}
@@ -2951,6 +2953,7 @@ input[type=range].st-range{accent-color:var(--accent);min-height:32px;cursor:poi
     <div class="st-row">
       <button type="button" class="kbtn kbtn-black" onclick="document.getElementById('stFile').click()">បើក File · Open file</button>
       <button type="button" class="kbtn kbtn-white" id="stSplitBtn" onclick="stSplit()" disabled>បំបែក Track · Split</button>
+      <button type="button" class="kbtn kbtn-white" id="stSplitAIBtn" onclick="stSplitAI()" disabled>Split (AI) · បំបែក AI</button>
       <button type="button" class="kbtn kbtn-white" onclick="document.getElementById('stStemFile').click()">បន្ថែម Track · Add track</button>
       <button type="button" class="kbtn kbtn-white" id="stClearBtn" onclick="stClearProject()">សម្អាត · Clear</button>
     </div>
@@ -2960,7 +2963,7 @@ input[type=range].st-range{accent-color:var(--accent);min-height:32px;cursor:poi
     </div>
     <input type="file" id="stFile" accept="audio/*" style="display:none" onchange="stLoadFile(this)">
     <input type="file" id="stStemFile" accept="audio/*" multiple style="display:none" onchange="stAddStems(this)">
-    <p class="st-note">បំបែក Vocal / Instrumental (center-channel) — បំបែក 4 Track ពេញ (Vocal/Drums/Bass/Other) ត្រូវការសេវាបំបែកសំឡេងដាច់ដោយឡែក · Vocal / Instrumental split (center-channel) — a full 4-stem split (Vocal/Drums/Bass/Other) needs a dedicated separation service.</p>
+    <p class="st-note">បំបែក Vocal / Instrumental (center-channel) — បំបែក 4 Track ពេញ (Vocal/Drums/Bass/Other) ត្រូវការសេវាបំបែកសំឡេងដាច់ដោយឡែក · Vocal / Instrumental split (center-channel) — a full 4-stem split (Vocal/Drums/Bass/Other) needs a dedicated separation service. ប៊ូតុង «Split (AI)» បំបែក 4 Track តាម AI (MVSEP) — ត្រូវការ Link បទចម្រៀង · The «Split (AI)» button splits 4 stems with AI (MVSEP) — needs a song link.</p>
     <p class="st-msg" id="stMsg" style="display:none"></p>
     <p class="st-msg" id="stAutoNote" style="display:none"></p>
     <div class="st-prog" id="stProg">
@@ -20543,7 +20546,7 @@ function topSearchApply(){
      as «<song name> - MOVAI Studio.wav», with live progress
      (% + elapsed seconds).
    No server, no login, no API keys, no provider calls. */
-var ST={ctx:null,master:null,tracks:[],mainBuffer:null,songName:'',playing:false,loop:false,pos:0,startAt:0,startPos:0,raf:0,nextId:1,masterVol:0.9,busy:false,progPct:0,progLabel:'',progT0:0,progTimer:null,progSink:null,autoToken:0,projectKey:'',autoNote:''};
+var ST={ctx:null,master:null,tracks:[],mainBuffer:null,songName:'',songUrl:'',playing:false,loop:false,pos:0,startAt:0,startPos:0,raf:0,nextId:1,masterVol:0.9,busy:false,progPct:0,progLabel:'',progT0:0,progTimer:null,progSink:null,progNoPct:false,autoToken:0,projectKey:'',autoNote:''};
 function stCtx(){
   if(!ST.ctx){
     var AC=window.AudioContext||window.webkitAudioContext;
@@ -20579,12 +20582,20 @@ function stProgBegin(label){
 function stProgPaint(){
   var f=document.getElementById('stProgFill'),t=document.getElementById('stProgTxt');
   if(f)f.style.width=ST.progPct+'%';
-  if(t)t.textContent=ST.progLabel+' · '+Math.round(ST.progPct)+'% · '+stFmt((Date.now()-ST.progT0)/1000);
+  if(t){
+    /* Split (AI) shows NO fake % — the provider gives no real
+       progress, so the honest display is label + ticking seconds. */
+    if(ST.progNoPct)t.textContent=ST.progLabel+' · ⏳ '+stFmt((Date.now()-ST.progT0)/1000);
+    else t.textContent=ST.progLabel+' · '+Math.round(ST.progPct)+'% · '+stFmt((Date.now()-ST.progT0)/1000);
+  }
 }
 function stProgSet(pct){ST.progPct=Math.max(0,Math.min(100,pct));if(ST.progSink){try{ST.progSink(ST.progPct);}catch(e){}}stProgPaint();}
 function stProgEnd(){
   if(ST.progTimer){clearInterval(ST.progTimer);ST.progTimer=null;}
+  ST.progNoPct=false;
+  var fl=document.getElementById('stProgFill');if(fl)fl.classList.remove('indet');
   var p=document.getElementById('stProg');if(p)p.classList.remove('on');
+  try{stSyncAISplitBtn();}catch(e){}
 }
 /* ---- Tracks ---- */
 function stAddTrack(name,buffer,fromSong){
@@ -20828,6 +20839,7 @@ function stLoadFile(inp){
   ST.autoToken++;
   stMsg('កំពុងបើក · Loading…');
   stFileBuffer(f).then(function(ab){return stDecode(ab);}).then(function(buffer){
+    ST.songUrl='';/* a local file has no URL for MVSEP — Split (AI) stays off */
     stSetSong(f.name.replace(/\.[^.]+$/,''),buffer);
   }).catch(function(){stMsg('បើក File មិនបាន · Could not open that file',true);});
 }
@@ -20849,6 +20861,7 @@ function stLoadFromUrl(url,nameHint){
     if(!name){
       try{var seg=url.split('?')[0].split('#')[0].split('/').pop();if(seg)name=decodeURIComponent(seg).replace(/\.[^.]+$/,'');}catch(e){}
     }
+    ST.songUrl=url;/* the current song's audio URL — Split (AI) sends this to MVSEP */
     stSetSong(name||'Song',buffer);
   }).catch(function(){
     stMsg('បើក Link មិនបាន — Link នេះអាចប្លុក Cross-origin · Could not load that link (it may block cross-origin audio) — please upload the file instead.',true);
@@ -20897,8 +20910,16 @@ function stAddStems(inp){
    to that blank state: playback stops, every track is removed,
    and any background auto-split still in flight for the cleared
    project is discarded when it lands (ST.autoToken). */
+/* Split (AI) is enabled only while the current project came
+   from a song URL (MVSEP separates a URL — a local file upload
+   has no URL to send) and no Studio operation is running. */
+function stSyncAISplitBtn(){
+  var ab=document.getElementById('stSplitAIBtn');if(!ab)return;
+  ab.disabled=!ST.songUrl||!/^https?:\/\//i.test(ST.songUrl)||ST.busy;
+}
 function stSyncEmptyUI(){
   var has=!!(ST.mainBuffer||ST.tracks.length);
+  try{stSyncAISplitBtn();}catch(e){}
   var e=document.getElementById('stEmptyState');if(e)e.style.display=has?'none':'';
   var t=document.getElementById('stTransport');if(t)t.style.display=has?'':'none';
   var x=document.getElementById('stExportRow');if(x)x.style.display=has?'':'none';
@@ -20923,6 +20944,7 @@ function stClearProject(){
   ST.tracks=[];
   ST.mainBuffer=null;
   ST.songName='';
+  ST.songUrl='';
   ST.pos=0;
   ST.projectKey='';
   ST.autoNote='';
@@ -21088,6 +21110,7 @@ async function stAutoPrepareOne(job){
       stAutoBadgeDone(job,'');
       return;
     }
+    ST.songUrl=job.url;/* auto-split song came from this URL — Split (AI) can use it */
     if(splitOk&&vocBuf&&instBuf){
       stSetSplitProject(job.title||'Song',buffer,vocBuf,instBuf,job.key);
       stAutoProgress(job,100);
@@ -21224,6 +21247,7 @@ async function stPickLoad(it,row){
          and leave the current project exactly as it is. */
       return;
     }
+    ST.songUrl=it.url;/* picked song came from this URL — Split (AI) can use it */
     if(splitOk&&vocBuf&&instBuf){
       stSetSplitProject(it.title||'Song',buffer,vocBuf,instBuf,key);
     }else{
@@ -21344,6 +21368,156 @@ async function stSplit(){
   }
   stProgEnd();
   ST.busy=false;
+  try{stSyncAISplitBtn();}catch(e){}
+}
+/* ================= Studio SPLIT (AI) via MVSEP (owner order 2026-11-18) =================
+   The center-channel Split above is only a rough separation.
+   «Split (AI)» sends the current song's audio URL to the MovAi
+   server (POST /api/studio/separate), which runs Demucs AI on
+   MVSEP's own servers and returns clean stems (Vocals / Drums /
+   Bass / Other, possibly Piano / Guitar). The MVSEP key never
+   reaches the browser — every call goes through the server.
+   · Progress is honest: the server polls MVSEP internally for
+     up to ~4 minutes, so the wait can be long — the Studio bar
+     shows an indeterminate animation + ticking elapsed seconds,
+     never a fake % (ST.progNoPct).
+   · mvsep_timeout (job still processing, hash included) is NOT
+     an error: the SAME separation is resumed by polling GET
+     /api/studio/separate/status every 10 s for up to 10 more
+     minutes, without spending another daily quota.
+   · On success the stems are fetched + decoded (direct, then
+     once via the existing server proxy /api/gen/video/file) and
+     installed as the current project via stSetAIStemProject —
+     the same bookkeeping as stSetSplitProject, so Timeline /
+     Mixer / Trim / Export all work on them. A stem that fails
+     both ways is reported by name; the stems that did load
+     still install.
+   · On failure the EXACT server error is shown (message.km /
+     message.en when present, else the error text) — never a
+     generic message, never "[object Object]". */
+var stAIStemLabels={vocals:'សំឡេងច្រៀង · Vocals',drums:'ស្គរ · Drums',bass:'បាស · Bass',other:'ភ្លេងផ្សេង · Other',piano:'ព្យាណូ · Piano',guitar:'ហ្គីតា · Guitar'};
+var stAIStemOrder=['vocals','drums','bass','other','piano','guitar'];
+function stAIErrorText(d){
+  if(!d)return 'បំបែក AI មិនបាន · AI split failed';
+  var m=d.message;
+  if(m){
+    if(typeof m==='string')return m;
+    if(m.km||m.en)return (m.km?String(m.km):'')+((m.km&&m.en)?' · ':'')+(m.en?String(m.en):'');
+  }
+  var e=d.error;
+  if(typeof e==='string'&&e)return e;
+  return 'បំបែក AI មិនបាន · AI split failed';
+}
+function stAIStemLabel(name){
+  var n=String(name||'').toLowerCase();
+  return stAIStemLabels[n]||n||'Stem';
+}
+/* Fetch + decode one stem MP3 the same way the Studio loads
+   audio (stFetchDecode); on a direct failure (CORS) retry once
+   through the existing server proxy /api/gen/video/file. */
+function stAIStemFetch(url){
+  return stFetchDecode(url).catch(function(){
+    return fetch(GEN_API+'/gen/video/file?u='+encodeURIComponent(url)).then(function(r){
+      if(!r.ok)throw new Error('http '+r.status);
+      return r.arrayBuffer();
+    }).then(function(ab){return stDecode(ab);});
+  });
+}
+/* Install AI stems as the Studio's current project — the same
+   bookkeeping as stSetSplitProject (pause, drop old tracks,
+   keep mainBuffer/songName/projectKey, re-render), only with N
+   stem tracks instead of Vocals + Instruments. */
+function stSetAIStemProject(name,mainBuffer,stemBufs,key){
+  stPause(false);
+  for(var i=0;i<ST.tracks.length;i++){try{ST.tracks[i].gain.disconnect();}catch(e){}}
+  ST.tracks=[];
+  ST.mainBuffer=mainBuffer;
+  ST.songName=name||'Song';
+  ST.pos=0;
+  ST.projectKey=key||'';
+  ST.autoNote='';
+  for(var j=0;j<stemBufs.length;j++)stAddTrack(stemBufs[j].label,stemBufs[j].buffer,true);
+  var info=document.getElementById('stSongInfo');
+  if(info)info.textContent=ST.songName+' · '+stFmt(mainBuffer.duration);
+  var sb=document.getElementById('stSplitBtn');if(sb)sb.disabled=false;
+  stRenderAllTracks();
+  stMsg('');
+}
+async function stSplitAI(){
+  if(ST.busy)return;
+  var url=ST.songUrl||'';
+  if(!url||!/^https?:\/\//i.test(url)){stMsg('សូមបើកបទជាមុន (ត្រូវការ Link បទចម្រៀង) · Load a song first (needs a song link)',true);return;}
+  var email=genUserEmail();
+  if(!email){stMsg('សូមចូលគណនេយ្យជាមុនសិន · Please sign in first',true);return;}
+  ST.busy=true;
+  ST.autoToken++;
+  var token=ST['auto'+'Token'];
+  stPause(false);
+  stProgBegin('កំពុងបំបែក AI · Splitting with AI');
+  ST.progNoPct=true;
+  var fl=document.getElementById('stProgFill');if(fl)fl.classList.add('indet');
+  stProgPaint();
+  var ab=document.getElementById('stSplitAIBtn');if(ab)ab.disabled=true;
+  var stems=null,hash='';
+  try{
+    var r=await fetch(GEN_API+'/studio/separate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:email,audioUrl:url,songTitle:ST.songName||''})});
+    var d=null;try{d=await r.json();}catch(e){}
+    if(token!==ST.autoToken)return;/* owner loaded/cleared while the POST was in flight — abort silently, show nothing */
+    if(!d){stMsg('បំបែក AI មិនបាន — Server មិនឆ្លើយតប · AI split failed — server did not respond',true);return;}
+    if(d.ok&&d.stems&&d.stems.length){stems=d.stems;hash=d.hash||'';}
+    else if(!d.ok&&d.error==='mvsep_timeout'&&d.hash){
+      /* Still processing after the server-side wait — resume
+         the SAME separation (no extra quota) by polling the
+         status endpoint every 10 s for up to 10 more minutes. */
+      var t0=Date.now();
+      while(Date.now()-t0<10*60*1000){
+        await new Promise(function(res){setTimeout(res,10000);});
+        if(token!==ST.autoToken)return;/* owner loaded/cleared meanwhile — their action wins */
+        var sr=null,sd=null;
+        try{
+          sr=await fetch(GEN_API+'/studio/separate/status?hash='+encodeURIComponent(d.hash)+'&email='+encodeURIComponent(email));
+          sd=await sr.json();
+        }catch(e){sd=null;}
+        if(!sd)continue;/* transient status failure — keep waiting */
+        if(sd.ok&&sd.done&&sd.stems&&sd.stems.length){stems=sd.stems;hash=sd.hash||d.hash;break;}
+        if(!sd.ok){stMsg(stAIErrorText(sd),true);return;}
+        /* still processing — keep waiting, seconds keep ticking */
+      }
+      if(!stems){stMsg('បំបែក AI យូរពេក — សូមសាកល្បងម្តងទៀតនៅពេលក្រោយ · AI split timed out — please try again later',true);return;}
+    }
+    else if(!d.ok){stMsg(stAIErrorText(d),true);return;}
+    else{stMsg('បំបែក AI មិនបាន — Server មិនបានបញ្ជូន Stem ទេ · AI split failed — server returned no stems',true);return;}
+    /* Stems arrived — install them. The project may have been
+       replaced while waiting; only install into the same song. */
+    if(token!==ST.autoToken)return;
+    if(!ST.mainBuffer){stMsg('បំបែក AI រួច តែបទត្រូវបានសម្អាតចេញហើយ · AI split finished but the song was cleared',true);return;}
+    ST.progLabel='កំពុងផ្ទុក Stem · Loading stems';stProgPaint();
+    var ordered=stems.slice().sort(function(a,b){
+      var ia=stAIStemOrder.indexOf(String(a.name||'').toLowerCase()),ib=stAIStemOrder.indexOf(String(b.name||'').toLowerCase());
+      if(ia<0)ia=99;if(ib<0)ib=99;
+      return ia-ib;
+    });
+    var loaded=[],failed=[];
+    for(var i=0;i<ordered.length;i++){
+      var s=ordered[i];
+      if(!s||!s.url){failed.push(stAIStemLabel(s&&s.name));continue;}
+      try{
+        var buf=await stAIStemFetch(s.url);
+        loaded.push({label:stAIStemLabel(s.name),buffer:buf});
+      }catch(e){failed.push(stAIStemLabel(s.name));}
+      if(token!==ST.autoToken)return;
+    }
+    if(!loaded.length){stMsg('បំបែក AI បានតែ Stem បើកមិនបាន · AI split finished but no stem could be loaded',true);return;}
+    stSetAIStemProject(ST.songName,ST.mainBuffer,loaded,'ai-'+(hash||ST.projectKey||''));
+    if(failed.length)stMsg('បំបែក AI រួច ✓ — Stem ខ្លះបើកមិនបាន: '+failed.join(', ')+' · AI split done ✓ — some stems could not be loaded: '+failed.join(', '),true);
+    else stMsg('បំបែក AI រួច · AI split done ✓');
+  }catch(e){
+    if(token!==ST.autoToken)return;/* aborted by a manual load / Clear — stay silent */
+    stMsg('បំបែក AI មិនបាន — សូមពិនិត្យអ៊ីនធឺណិត ហើយសាកល្បងម្តងទៀត · AI split failed — check your connection and try again',true);
+  }finally{
+    ST.busy=false;
+    stProgEnd();
+  }
 }
 /* ---- Export: mix-down to WAV ---- */
 function stRenderMix(){
