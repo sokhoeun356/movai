@@ -1930,14 +1930,26 @@ function mvsepQuotaErr(detail, httpStatus) {
   return rotErr('MVSEP quota exceeded — daily limit 50 reached for this key' + (detail ? ': ' + String(detail).slice(0, 120) : ''), httpStatus || 429);
 }
 async function mvsepCreateSeparation(keyValue, audioUrl) {
-  // POST multipart form (mirrors the official curl / python examples).
+  // Upload the audio FILE itself (`audiofile`), exactly like the official
+  // MVSEP API example. The `url` remote-fetch parameter returned HTTP 400
+  // for every URL we tried (public MP3, MovAi proxy MP3, Cloudinary MP3),
+  // so the server downloads the song into memory first and uploads it.
+  // (In-memory Buffer only — no file is ever written to disk on Render,
+  // same as the /api/mv/lyrics audio handling.)
+  const au = await fetch(audioUrl, { signal: AbortSignal.timeout(90000) });
+  if (!au.ok) throw new Error('MVSEP: could not download the song audio (HTTP ' + au.status + ')');
+  const buf = Buffer.from(await au.arrayBuffer());
+  if (!buf.length) throw new Error('MVSEP: the song audio is empty');
+  if (buf.length > 100 * 1024 * 1024) throw new Error('MVSEP: the song is too large (over 100 MB)');
+  const ct = au.headers.get('content-type') || 'audio/mpeg';
+  const fname = String(audioUrl.split('/').pop().split('?')[0] || 'song.mp3').slice(0, 120) || 'song.mp3';
   const fd = new FormData();
   fd.append('api_token', keyValue);
-  fd.append('url', audioUrl);
+  fd.append('audiofile', new Blob([buf], { type: ct }), fname);
   fd.append('sep_type', String(MVSEP_SEP_TYPE));
   fd.append('add_opt1', String(MVSEP_MODEL_OPT));
   fd.append('output_format', '0');
-  const r = await fetch(MVSEP_CREATE_URL, { method: 'POST', body: fd, signal: AbortSignal.timeout(60000) });
+  const r = await fetch(MVSEP_CREATE_URL, { method: 'POST', body: fd, signal: AbortSignal.timeout(120000) });
   const j = await r.json().catch(() => null);
   const text = mvsepErrText(j) || ('HTTP ' + r.status);
   if (r.status === 429 || (j && j.success === false && mvsepIsLimitText(text))) throw mvsepQuotaErr(text, r.status);
