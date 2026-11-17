@@ -3585,6 +3585,51 @@ function apiRoute(req, res, urlPath) {
     if (!u) return sendJSON(res, 200, { ok: false, error: 'រកអ្នកប្រើនេះមិនឃើញទេ' });
     return sendJSON(res, 200, { ok: true, user: pubUser(u) });
   }
+  // GET /api/admin/email-usage — admin key required. Live Brevo usage
+  // for the Admin → Settings → Email panel: plan (Free), daily limit
+  // (300/day), how many emails sent today, and how many remain.
+  // Uses the stored Brevo API key; queries Brevo's account + today's
+  // SMTP aggregated report. Returns {ok, provider:'brevo', plan,
+  // dailyLimit, usedToday, remainingToday}. If no Brevo key is set,
+  // returns ok:false (Gmail SMTP has no quota to show).
+  if (req.method === 'GET' && urlPath === '/api/admin/email-usage') {
+    const a = adminKeyOk(req);
+    if (!a.ok) return sendJSON(res, 200, { ok: false, error: a.error });
+    const s = loadSettings();
+    const em = (s && s.email && typeof s.email === 'object') ? s.email : {};
+    const apiKey = typeof em.brevoApiKey === 'string' ? em.brevoApiKey.trim() : '';
+    if (!apiKey) return sendJSON(res, 200, { ok: false, error: 'Brevo API key not configured' });
+    (async () => {
+      try {
+        const ctrl = new AbortController();
+        const timer = setTimeout(() => { try { ctrl.abort(); } catch (e) {} }, 15000);
+        // Today's date in Phnom Penh (the user's day) for the report.
+        const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Phnom_Penh' });
+        const [accR, repR] = await Promise.all([
+          fetch('https://api.brevo.com/v3/account', { headers: { 'api-key': apiKey, 'Accept': 'application/json' }, signal: ctrl.signal }),
+          fetch('https://api.brevo.com/v3/smtp/statistics/aggregatedReport?startDate=' + today + '&endDate=' + today, { headers: { 'api-key': apiKey, 'Accept': 'application/json' }, signal: ctrl.signal }),
+        ]);
+        clearTimeout(timer);
+        if (!accR.ok) {
+          const t = await accR.text().catch(() => '');
+          return sendJSON(res, 200, { ok: false, error: 'Brevo error ' + accR.status + ': ' + String(t).slice(0, 200) });
+        }
+        const acc = await accR.json().catch(() => ({}));
+        let usedToday = 0;
+        if (repR.ok) {
+          const rep = await repR.json().catch(() => ({}));
+          usedToday = Number(rep.requests) || 0;
+        }
+        const planType = (acc && Array.isArray(acc.plan) && acc.plan[0] && typeof acc.plan[0].type === 'string') ? acc.plan[0].type : 'free';
+        const planName = planType.toLowerCase().includes('free') ? 'Free' : planType;
+        const dailyLimit = 300;
+        return sendJSON(res, 200, { ok: true, provider: 'brevo', plan: planName, dailyLimit, usedToday, remainingToday: Math.max(0, dailyLimit - usedToday), date: today });
+      } catch (e) {
+        return sendJSON(res, 200, { ok: false, error: 'Brevo usage check failed — ' + (e && e.message ? String(e.message).slice(0, 200) : 'error') });
+      }
+    })().catch(() => sendJSON(res, 200, { ok: false, error: 'Brevo usage check failed' }));
+    return;
+  }
   // POST /api/admin/grant — {email, credits, songCredits, note?} — admin key required.
   // credits/songCredits are DELTAS (can be negative to deduct, balance never below 0).
   if (req.method === 'POST' && urlPath === '/api/admin/grant') {
