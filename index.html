@@ -299,6 +299,51 @@ html[data-mode="light"] .err-title{color:#b91c1c}
 .hist-sec-head{font-size:1rem;font-weight:800;display:flex;align-items:center;gap:8px;margin-top:20px}
 .panel>.hist-sec-head:first-child{margin-top:0}
 .hist-sec-count{font-size:0.75rem;color:var(--muted);font-weight:700}
+/* ===== History tabs (owner order 2026-11-17) =====
+   Playlist / Songs / Images / Videos / 3D sit in ONE row of tabs
+   at the top of the History panel; tapping a tab shows only that
+   section below. The active tab is filled with the bright lime
+   accent so it is obvious which section is open. */
+.hist-tabs{display:flex;gap:6px;margin-top:14px}
+.hist-tab{flex:1 1 0;min-width:0;padding:9px 2px;min-height:42px;border-radius:10px;border:1px solid var(--line2);background:var(--card2);color:var(--muted);font-weight:800;font-size:0.78rem;font-family:inherit;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hist-tab.on{background:var(--accent);border-color:transparent;color:#101216}
+.hist-tab:active{opacity:.85}
+.hist-pane{margin-top:4px}
+.hist-pane>.hist-sec-head{margin-top:16px}
+/* ===== History lists: at most ~10 items tall, then scroll =====
+   Every history list (and the Playlist) lives in a scroll area:
+   the first ~10 items are visible, anything past that scrolls
+   up/down inside the area (max-height + overflow-y:auto) — the
+   same pattern as the Admin API lists (show a few + scroll). */
+.hist-scroll{overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;scrollbar-width:thin;scrollbar-color:var(--line3) transparent}
+.hist-scroll::-webkit-scrollbar{width:5px}
+.hist-scroll::-webkit-scrollbar-thumb{background:var(--line3);border-radius:99px}
+.hist-scroll-list{max-height:600px}
+.hist-scroll-media{max-height:480px}
+/* ===== Song creation progress ring (owner order 2026-11-17) =====
+   While a song is being created, the big «please wait» text is
+   replaced by ONE circular ring inside the song creation box:
+   the ring is large, it spins while it works, and the live
+   percentage (0→100%) sits in its centre. Done → the centre
+   shows a green ✓. Failed → a red ✗, and tapping the ring
+   retries the generation. A Cancel button lives in the same
+   box while the song is being made. */
+.song-ring-box{margin-top:14px;background:var(--card2);border:1px solid var(--line);border-radius:16px;padding:28px 18px 22px;text-align:center}
+.song-ring-wrap{position:relative;width:148px;height:148px;margin:0 auto}
+.song-ring-svg{width:148px;height:148px;transform:rotate(-90deg)}
+.song-ring-box.work .song-ring-svg{animation:songRingSpin 2.2s linear infinite}
+@keyframes songRingSpin{from{transform:rotate(-90deg)}to{transform:rotate(270deg)}}
+.song-ring-bg{fill:none;stroke:rgba(255,255,255,.09);stroke-width:10}
+.song-ring-fg{fill:none;stroke:var(--accent);stroke-width:10;stroke-linecap:round;stroke-dasharray:326.73;stroke-dashoffset:326.73;transition:stroke-dashoffset .6s ease,stroke .3s ease}
+.song-ring-box.done .song-ring-fg{stroke:#22c55e}
+.song-ring-box.fail .song-ring-fg{stroke:#ef4444}
+.song-ring-box.fail .song-ring-wrap{cursor:pointer}
+.song-ring-center{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:1.75rem;font-weight:900;color:var(--text);font-variant-numeric:tabular-nums;pointer-events:none}
+.song-ring-box.done .song-ring-center,.song-ring-box.fail .song-ring-center{font-size:2.75rem}
+.song-ring-label{margin-top:14px;font-size:0.9375rem;font-weight:800;color:var(--text)}
+.song-ring-sub{margin-top:3px;font-size:0.8125rem;color:var(--muted);font-variant-numeric:tabular-nums;min-height:18px}
+.song-ring-cancel{margin-top:12px;min-width:150px;min-height:44px}
+@media (prefers-reduced-motion:reduce){.song-ring-box.work .song-ring-svg{animation:none}}
 /* ===== History horizontal carousels (Image / Video / 3D) =====
    Each section is ONE horizontal swipe row, never a vertical list:
    the newest item sits centred and full-size, older items wait to
@@ -1366,6 +1411,14 @@ html[data-mode="light"] #genSunoModelFieldName .sm-6{color:var(--accent-text)}
    logo itself makes. */
 .mv-w{color:#fff}
 .mv-a{color:#addc29}
+/* Song provider display labels (owner rule 2026-11-17): ONLY the
+   two renamed Song providers («MovAi Music (V6 Pro)» and «Magic AI
+   Music (V5)») get pink letters with a red-to-yellow highlight wash
+   behind the text itself. The red circles in the owner's photo were
+   just annotations pointing at the names — NO ring, border or
+   outline is drawn around the name in the UI; only the letters are
+   coloured. Every other text keeps its original colour. */
+.prov-hl{color:#ff5da2;font-weight:800;background:linear-gradient(90deg,rgba(239,68,68,.42),rgba(245,158,11,.42));padding:1px 6px;border-radius:5px;white-space:nowrap}
 html[data-mode="light"] .mv-w{color:var(--text)}
 html[data-mode="light"] .mv-a{color:var(--accent-text)}
 /* ===== Song style tags (Style box + «Add» button) =====
@@ -1686,6 +1739,18 @@ html[data-smooth="1"] .brand-frame,html[data-smooth="1"] .acct-chip,html[data-sm
         <button type="button" class="kbtn kbtn-white gen-cancel-btn" style="flex:1;color:#f87171" onclick="genCancel()">បោះបង់ · Cancel</button>
       </div>
     </div>
+    <div id="songProgBox" class="song-ring-box" style="display:none" role="status" aria-live="polite">
+      <div class="song-ring-wrap" id="songRingWrap" onclick="songRingTap()">
+        <svg class="song-ring-svg" viewBox="0 0 120 120" aria-hidden="true">
+          <circle class="song-ring-bg" cx="60" cy="60" r="52"></circle>
+          <circle class="song-ring-fg" id="songRingFg" cx="60" cy="60" r="52"></circle>
+        </svg>
+        <div class="song-ring-center" id="songRingCenter">0%</div>
+      </div>
+      <div class="song-ring-label" id="songRingLabel"></div>
+      <div class="song-ring-sub" id="songRingSub"></div>
+      <button type="button" class="kbtn kbtn-white song-ring-cancel" id="songRingCancel" onclick="genCancel()" style="color:#f87171" data-i18n="btnCancelGen">បោះបង់ · Cancel</button>
+    </div>
     <div id="genResult" style="margin-top:14px"></div>
   </div>
 </section>
@@ -1740,36 +1805,47 @@ html[data-smooth="1"] .brand-frame,html[data-smooth="1"] .acct-chip,html[data-sm
   </div>
 </section>
 <section id="page-history" style="display:none">
-  <div class="panel" id="sec-playlist">
-    <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">
-      <h2 style="font-size:1.125rem;font-weight:800" data-i18n="plTitle">Playlist · បញ្ជីចម្រៀង</h2>
-      <span id="plCount" style="font-size:0.8125rem;color:var(--muted)"></span>
-    </div>
-    <div class="pub-modes" style="justify-content:flex-start;margin-top:10px">
-      <button type="button" class="pub-mode-btn" id="plModeBtn" onclick="pubSetPlayMode()" aria-pressed="false" aria-label="Loop · វិលជុំ"></button>
-    </div>
-    <div id="plList"></div>
-  </div>
   <div class="panel" id="sec-history">
     <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">
       <h2 style="font-size:1.125rem;font-weight:800" data-i18n="histTitle">ប្រវត្តិរបស់អ្នក</h2>
       <span id="histCount" style="font-size:0.8125rem;color:var(--muted)"></span>
     </div>
     <button type="button" class="kbtn kbtn-white" id="histClearBtn" onclick="histClearAll(this)" style="margin-top:12px;display:none;color:#f87171" data-i18n="histClearAll">លុបប្រវត្តិទាំងអស់</button>
-    <h3 class="hist-sec-head"><span data-i18n="histSecImage">ប្រវត្តិរូបភាព</span><span class="hist-sec-count" id="histCount-image"></span></h3>
-    <div id="histList-image"></div>
-  </div>
-  <div class="panel">
-    <h3 class="hist-sec-head"><span data-i18n="histSecVideo">ប្រវត្តិវីដេអូ</span><span class="hist-sec-count" id="histCount-video"></span></h3>
-    <div id="histList-video"></div>
-  </div>
-  <div class="panel">
-    <h3 class="hist-sec-head"><span data-i18n="histSecSong">ប្រវត្តិបទចម្រៀង</span><span class="hist-sec-count" id="histCount-song"></span></h3>
-    <div id="histList-song"></div>
-  </div>
-  <div class="panel">
-    <h3 class="hist-sec-head"><span data-i18n="histSec3d">ប្រវត្តិ 3D</span><span class="hist-sec-count" id="histCount-3d"></span></h3>
-    <div id="histList-3d"></div>
+    <div class="hist-tabs" role="tablist" aria-label="History sections">
+      <button type="button" class="hist-tab on" data-htab="playlist" role="tab" aria-selected="true" onclick="histTabSet('playlist')" data-i18n="histTabPlaylist">Playlist</button>
+      <button type="button" class="hist-tab" data-htab="song" role="tab" aria-selected="false" onclick="histTabSet('song')" data-i18n="histTabSong">បទចម្រៀង</button>
+      <button type="button" class="hist-tab" data-htab="image" role="tab" aria-selected="false" onclick="histTabSet('image')" data-i18n="histTabImage">រូបភាព</button>
+      <button type="button" class="hist-tab" data-htab="video" role="tab" aria-selected="false" onclick="histTabSet('video')" data-i18n="histTabVideo">វីដេអូ</button>
+      <button type="button" class="hist-tab" data-htab="3d" role="tab" aria-selected="false" onclick="histTabSet('3d')" data-i18n="histTab3d">3D</button>
+      <button type="button" class="hist-tab" data-htab="story" role="tab" aria-selected="false" onclick="histTabSet('story')" data-i18n="histTabStory">Story</button>
+    </div>
+    <div class="hist-pane" data-hpane="playlist" id="sec-playlist">
+      <h3 class="hist-sec-head"><span data-i18n="plTitle">Playlist · បញ្ជីចម្រៀង</span><span class="hist-sec-count" id="plCount"></span></h3>
+      <div class="pub-modes" style="justify-content:flex-start;margin-top:10px">
+        <button type="button" class="pub-mode-btn" id="plModeBtn" onclick="pubSetPlayMode()" aria-pressed="false" aria-label="Loop · វិលជុំ"></button>
+      </div>
+      <div class="hist-scroll hist-scroll-list"><div id="plList"></div></div>
+    </div>
+    <div class="hist-pane" data-hpane="song" style="display:none">
+      <h3 class="hist-sec-head"><span data-i18n="histSecSong">ប្រវត្តិបទចម្រៀង</span><span class="hist-sec-count" id="histCount-song"></span></h3>
+      <div class="hist-scroll hist-scroll-list"><div id="histList-song"></div></div>
+    </div>
+    <div class="hist-pane" data-hpane="image" style="display:none">
+      <h3 class="hist-sec-head"><span data-i18n="histSecImage">ប្រវត្តិរូបភាព</span><span class="hist-sec-count" id="histCount-image"></span></h3>
+      <div class="hist-scroll hist-scroll-media"><div id="histList-image"></div></div>
+    </div>
+    <div class="hist-pane" data-hpane="video" style="display:none">
+      <h3 class="hist-sec-head"><span data-i18n="histSecVideo">ប្រវត្តិវីដេអូ</span><span class="hist-sec-count" id="histCount-video"></span></h3>
+      <div class="hist-scroll hist-scroll-media"><div id="histList-video"></div></div>
+    </div>
+    <div class="hist-pane" data-hpane="3d" style="display:none">
+      <h3 class="hist-sec-head"><span data-i18n="histSec3d">ប្រវត្តិ 3D</span><span class="hist-sec-count" id="histCount-3d"></span></h3>
+      <div class="hist-scroll hist-scroll-media"><div id="histList-3d"></div></div>
+    </div>
+    <div class="hist-pane" data-hpane="story" style="display:none">
+      <h3 class="hist-sec-head"><span data-i18n="histSecStory">ប្រវត្តិ Story</span><span class="hist-sec-count" id="histCount-story"></span></h3>
+      <div class="hist-scroll hist-scroll-list"><div id="histList-story"></div></div>
+    </div>
   </div>
 </section>
 </main>
@@ -1906,13 +1982,12 @@ html[data-smooth="1"] .brand-frame,html[data-smooth="1"] .acct-chip,html[data-sm
   </div>
 </div>
 <input type="file" id="profPicInput" accept="image/*" style="display:none" onchange="profPicPicked(this)">
-<div id="giftSheet" class="pkg-sheet" style="display:none" role="dialog" aria-modal="true" onclick="if(event.target===this)giftDismiss()">
+<div id="giftSheet" class="pkg-sheet" style="display:none" role="dialog" aria-modal="true">
   <div class="pkg-sheet-card" style="text-align:center">
     <div style="font-size:3rem;line-height:1.1" aria-hidden="true">🎁</div>
     <h3 style="font-size:1.25rem;font-weight:900;margin-top:12px" data-i18n="giftTitle">កាដូពី Admin</h3>
     <p style="font-size:0.9375rem;line-height:1.75;margin-top:10px" data-i18n="giftBody">Free 250 Image.Video Credit + 24 Song Credit សម្រាប់អ្នកប្រើថ្មី</p>
     <button type="button" class="kbtn kbtn-black" style="margin-top:20px;width:100%" onclick="giftClaim()" data-i18n="giftClaim">ទទួលយក · Claim</button>
-    <button type="button" class="kbtn kbtn-white" style="margin-top:10px;width:100%" onclick="giftDismiss()" data-i18n="giftNotNow">មិនបាច់ទេ · Not now</button>
   </div>
 </div>
 <div id="pushSheet" class="pkg-sheet" style="display:none" role="dialog" aria-modal="true" onclick="if(event.target===this)pushAskDismiss()">
@@ -2132,10 +2207,10 @@ km:{
  postUploading:'កំពុង upload',postPosting:'កំពុងផុស',postFileBig:'ឯកសារធំពេក (MP3 អតិបរមា 15MB · រូបភាព 5MB)',
  postBadFile:'សូមជ្រើសឯកសារ MP3 / audio',postNeedTitle:'សូមដាក់ចំណងជើងបទ',postViewPublic:'មើលក្នុង Public',
  postSrcFile:'ពីទូរសព្ទ',postSrcWeb:'ពី website',postPackages:'មើលកញ្ចប់ · Packages',
- pubDlFreeLeft:'ទាញយកបទដោយសេរី · Unlimited downloads',
+ pubDlFreeLeft:'ទាញយកបទហ្វ្រីនៅសល់ {n}/4 ដង · Suno {s}/2 · Magic Hour {m}/2',
  pubDlLimit:'អ្នកបានប្រើអស់ការទាញយកហ្វ្រី {p} 2 ដងហើយ — សូមទិញកញ្ចប់បទចម្រៀង ដើម្បីទាញយកបន្ត',
  acctGotFree:'អបអរសាទរ! អ្នកទទួលបាន Credit ហ្វ្រី — Image.Video Credit 250 និង Song Credit 24 ក្នុងគណនីរបស់អ្នកហើយ',
- giftTitle:'កាដូពី Admin',giftBody:'Free 250 Image.Video Credit + 24 Song Credit សម្រាប់អ្នកប្រើថ្មី',giftClaim:'ទទួលយក · Claim',giftNotNow:'មិនបាច់ទេ · Not now',blockedTitle:'គណនីនេះត្រូវបានប្លុក · This account is blocked',blockedBody:'គណនី / IP / ឧបករណ៍នេះត្រូវបាន Admin ប្លុក — អ្នកចូលប្រើ ឬបង្កើតអ្វីមិនបានទេ។ បើចង់ដោះស្រាយ សូមទាក់ទង Admin។',blockedContact:'ទាក់ទង Admin តាម Telegram',blockedLogout:'ចេញពីគណនី · Log out',
+ giftTitle:'កាដូពី Admin',giftBody:'Free 250 Image.Video Credit + 24 Song Credit សម្រាប់អ្នកប្រើថ្មី',giftClaim:'ទទួលយក · Claim',blockedTitle:'គណនីនេះត្រូវបានប្លុក · This account is blocked',blockedBody:'គណនី / IP / ឧបករណ៍នេះត្រូវបាន Admin ប្លុក — អ្នកចូលប្រើ ឬបង្កើតអ្វីមិនបានទេ។ បើចង់ដោះស្រាយ សូមទាក់ទង Admin។',blockedContact:'ទាក់ទង Admin តាម Telegram',blockedLogout:'ចេញពីគណនី · Log out',
  navNotif:'ដំណឹង',notifTitle:'ដំណឹង · Notifications',notifEmpty:'មិនទាន់មានដំណឹងទេ',notifGuest:'សូម Log in ដើម្បីមើលដំណឹងរបស់អ្នក',notifLoading:'កំពុងផ្ទុក…',notifJustNow:'ទើបតែឥឡូវនេះ',notifMinAgo:'{n} នាទីមុន',notifHourAgo:'{n} ម៉ោងមុន',notifDayAgo:'{n} ថ្ងៃមុន',notifApproved:'កញ្ចប់របស់អ្នកត្រូវបានអនុម័ត ✓',notifRejected:'កញ្ចប់របស់អ្នកត្រូវបានបដិសេធ',notifLogin:'មានអ្នកប្រើថ្មី Log in',notifRequest:'មានសំណើទិញកញ្ចប់ថ្មី',notifGrant:'Admin បានបន្ថែម Credit ឲ្យអ្នក',notifDeduct:'Admin បានកាត់ Credit របស់អ្នក',notifInfo:'ដំណឹងពី MovAi',notifPost:'បានផុសថ្មីទៅ Public',notifGenCharge:'បានកាត់ Credit ពីការបង្កើត',notifGenRefund:'បានសង Credit វិញ · បង្កើតមិនបាន',
  pushAskTitle:'បើកដំណឹងពីទូរស័ព្ទ?',pushAskBody:'ទទួលដំណឹងពិតៗចេញពីទូរស័ព្ទរបស់អ្នកផ្ទាល់ — ពេលកញ្ចប់ត្រូវបានអនុម័ត ពេល Admin បន្ថែម ឬកាត់ Credit និងពេលមានកាដូ — ទោះបីអ្នកមិនបានបើក website ក៏ដោយ',pushAllow:'បើកដំណឹង · Enable',pushNotNow:'មិនបាច់ទេ · Not now',pushSetLabel:'ដំណឹងពីទូរស័ព្ទ · Push notifications',pushStateOn:'បើកហើយ — ដំណឹងនឹងលោតលើទូរស័ព្ទរបស់អ្នក',pushStateOff:'បិទ — បើកដើម្បីទទួលដំណឹងលើទូរស័ព្ទ',pushStateBlocked:'Browser បានបិទដំណឹងឲ្យ website នេះ — សូមបើក Notification ក្នុង Settings របស់ browser',pushStateUnsupported:'Browser នេះមិនគាំទ្រ Web Push ទេ',pushStateGuest:'សូម Log in ជាមុនសិន',pushBlockedTitle:'Browser បានបិទដំណឹង · Notifications blocked',pushBlockedBody:'អ្នកធ្លាប់ចុច «Block» ពីមុន ទើប browser លែងលោតសួរ «Allow ឬអត់» ទៀត ហើយ website ក៏សុំសិទ្ធិឡើងវិញអត់បានដែរ។ សូមបើកវាដោយខ្លួនឯងតាមជំហានខាងក្រោម — មិនដល់ ១ នាទីទេ៖',pushBlockedStep1:'ចុចរូបសោ 🔒 នៅខាងឆ្វេងអាសយដ្ឋាន website នេះ លើ address bar ខាងលើ',pushBlockedStep2:'ចុច «Site settings» (ការកំណត់គេហទំព័រ)',pushBlockedStep3:'ចុច «Notifications» (ដំណឹង) រួចជ្រើស «Allow» (អនុញ្ញាត)',pushBlockedStep4:'ត្រឡប់មក website នេះវិញ រួចបើក switch «Push notifications» ម្ដងទៀត — វានឹងដំណើរការភ្លាម',pushBlockedAlt:'រករូបសោ 🔒 អត់ឃើញ? ចុច ⋮ (ចំណុច ៣ នៅខាងលើស្ដាំនៃ browser) → Settings → Site settings → Notifications → រក website នេះក្នុងបញ្ជី «Blocked» → Allow',pushBlockedDone:'ខ្ញុំបើករួចហើយ · I turned it on',pushBlockedClose:'បិទ · Close',pushBlockedStill:'នៅតែ Block នៅឡើយ — សូមពិនិត្យជំហានខាងលើម្ដងទៀត',
  acctErrFill:'សូមបំពេញឲ្យគ្រប់ — អ៊ីមែលត្រូវមាន @ ហើយពាក្យសម្ងាត់យ៉ាងតិច 4 តួ',
@@ -2193,14 +2268,8 @@ km:{
  badImgUrl:'Provider បានផ្ដល់ URL រូបភាពមិនត្រឹមត្រូវទេ',badVidUrl:'Provider បានផ្ដល់ URL វីដេអូមិនត្រឹមត្រូវទេ',
  dlFailed:'ទាញយកមិនបានទេ — សូមព្យាយាមម្ដងទៀត',
  mp3Converting:'កំពុងបម្លែងទៅជា MP3…',
- mp3Preparing:'កំពុងរៀបចំបទចម្រៀង… · Preparing song…',
  mp3FailNet:'ទាញយកបទមិនបានទេ — បញ្ហាបណ្ដាញ ឬ server មិនឆ្លើយ សូមព្យាយាមម្ដងទៀត',
- mp3FailGone:'បទចម្រៀងនេះលែងមានទៀតហើយ · សូមបង្កើតបទថ្មី',
- mp3InAppHint:'សូមបើកក្នុង Chrome ដើម្បីដោនឡូត · Open in Chrome to download',
  mp3FailServer:'បម្លែងទៅជា MP3 មិនបានទេ — server បរាជ័យ សូមព្យាយាមម្ដងទៀត',
- mp3FailOffline:'ទូរស័ព្ទអត់មានអ៊ីនធឺណិត · សូមពិនិត្យ WiFi/4G សិន',
- mp3FailSlow:'បណ្ដាញយឺតពេក · Download មិនទាន់ទេ — សូមព្យាយាមម្ដងទៀតពេលបណ្ដាញល្អ',
- mp3FailServerDown:'Server មិនឆ្លើយ · វាអាចកំពុង restart — សូមព្យាយាមម្ដងទៀត 1 នាទីក្រោយ',
  puterRetry:'Puter.js មិនទាន់ផ្ទុកទេ — សូមព្យាយាមម្ដងទៀត',
  puterNoImg:'Puter: មិនបានរូបភាពទេ',puterNoVid:'Puter: មិនបានវីដេអូទេ',
  novaiAcc:'គណនី NovAI',novaiBalanceNote:'Balance នេះប្រើសម្រាប់ model បង់លុយតែប៉ុណ្ណោះ — វីដេអូហ្វ្រីមិនកាត់លុយទេ',
@@ -2213,7 +2282,7 @@ km:{
  pkgCreditsMonth:'11,000 Credit/ខែ',pkgCreditsYear:'140,000 Credit/ឆ្នាំ',
  pkgFeatMedia:'បង្កើតបានទាំងរូបភាព និងវីដេអូ',
  pkgFeatPremium:'បើក Model Premium ទាំងអស់',
- pkgModelSong:'ម៉ូដែល · Model v6',pkgSongPerGen:'បង្កើត 1 ដង · 12 Credit · បាន 2 បទ',pkgDlFree2:'Download · ឥតកំណត់',pkgDlUnlimited:'Download · ឥតកំណត់',pkgDur30:'រយៈពេល · 30 ថ្ងៃ (1 ខែ)',pkgDur365:'រយៈពេល · 365 ថ្ងៃ (12 ខែ)',pkgFeatImgModels:'រូបភាព · Z-Image Turbo · Qwen Image 2.1 · Flux 2 Klein · Krea 2',pkgFeatVidModels:'វីដេអូ · LTX 2.5 · MiniMax H3',pkgFeatPremImg:'Premium រូបភាព · GPT Image 2 · Nano Banana 2.1 · Nano Banana Pro',pkgFeatPremVid:'Premium វីដេអូ · Kling 3.0 · Kling 4.0 · Veo 3.1 · Seedance 2.5',
+ pkgModelSong:'ម៉ូដែល · Model v6',pkgSongPerGen:'បង្កើត 1 ដង · 12 Credit · បាន 2 បទ',pkgDlFree2:'Download · ហ្វ្រី 4 ដង (Suno 2 + Magic Hour 2)',pkgDlUnlimited:'Download · ឥតកំណត់',pkgDur30:'រយៈពេល · 30 ថ្ងៃ (1 ខែ)',pkgDur365:'រយៈពេល · 365 ថ្ងៃ (12 ខែ)',pkgFeatImgModels:'រូបភាព · Z-Image Turbo · Qwen Image 2.1 · Flux 2 Klein · Krea 2',pkgFeatVidModels:'វីដេអូ · LTX 2.5 · MiniMax H3',pkgFeatPremImg:'Premium រូបភាព · GPT Image 2 · Nano Banana 2.1 · Nano Banana Pro',pkgFeatPremVid:'Premium វីដេអូ · Kling 3.0 · Kling 4.0 · Veo 3.1 · Seedance 2.5',
  pkgBuy:'ទិញឥឡូវ',pkgActive:'កំពុងប្រើកញ្ចប់នេះ',pkgTabSong:'Create Music',pkgTabMedia:'Create Video',pkgDragHint:'អូសចុះក្រោមដើម្បីបិទ · Drag down to close',pkgWaitingAdmin:'រង់ចាំ Admin អនុម័ត',pkgReqSent:'បានផ្ញើសំណើរទិញទៅ Admin ហើយ — រង់ចាំ Admin អនុម័ត ទើប Credit ចូលគណនីរបស់អ្នក',pkgReqFail:'ផ្ញើសំណើរមិនបានទេ — Server មិនទាន់ភ្ជាប់ សូមព្យាយាមម្ដងទៀតបន្តិចក្រោយ',pkgReqSending:'កំពុងផ្ញើសំណើរទិញទៅ Admin…',
  pkgYourPlan:'កញ្ចប់របស់អ្នក',pkgActiveUntil:'ប្រើបានដល់ {d}',
  pkgGroupMedia:'សម្រាប់រូបភាព និង វីដេអូ · Image & Video Credit',pkgGroupMediaNote:'បន្ថែមតែ Image & Video Credit ប៉ុណ្ណោះ — ប្រើសម្រាប់បង្កើតរូបភាព និងវីដេអូ',
@@ -2281,11 +2350,14 @@ km:{
  histLinkCopied:'បានចម្លងលីងហើយ ✓',histGone:'ឯកសារនេះបើកវិញមិនបានទេ — លីងរបស់ provider អាចផុតកំណត់ហើយ',
  histClearAll:'លុបប្រវត្តិទាំងអស់',histClearConfirm:'លុបទាំងអស់មែន? ចុចម្ដងទៀត',histCountFmt:'សរុប {n} ធាតុ',
  fsView:'មើលពេញអេក្រង់',fsClose:'បិទ',
- histSecImage:'ប្រវត្តិរូបភាព',histSecVideo:'ប្រវត្តិវីដេអូ',histSecSong:'ប្រវត្តិបទចម្រៀង',histSec3d:'ប្រវត្តិ 3D',
+ histSecImage:'ប្រវត្តិរូបភាព',histSecVideo:'ប្រវត្តិវីដេអូ',histSecSong:'ប្រវត្តិបទចម្រៀង',histSec3d:'ប្រវត្តិ 3D',histSecStory:'ប្រវត្តិ Story',
+ histTabPlaylist:'Playlist',histTabSong:'បទចម្រៀង',histTabImage:'រូបភាព',histTabVideo:'វីដេអូ',histTab3d:'3D',histTabStory:'Story',
+ songRingCreating:'កំពុងបង្កើតបទចម្រៀង…',songRingDone:'បង្កើតរួចរាល់',songRingRetry:'មានបញ្ហា — ចុចរង្វង់ដើម្បីធ្វើម្ដងទៀត',
  histEmptyImage:'មិនទាន់មានរូបភាពទេ — រូបភាពដែលអ្នកបង្កើតនឹងរក្សាទុកនៅទីនេះជាប់រហូត',
  histEmptyVideo:'មិនទាន់មានវីដេអូទេ — វីដេអូដែលអ្នកបង្កើតនឹងរក្សាទុកនៅទីនេះជាប់រហូត',
  histEmptySong:'មិនទាន់មានបទចម្រៀងទេ — បទចម្រៀងដែលអ្នកបង្កើតនឹងរក្សាទុកនៅទីនេះជាប់រហូត',
- histEmpty3d:'មិនទាន់មាន 3D ទេ — ម៉ូដែល 3D ដែលអ្នកបង្កើតនឹងរក្សាទុកនៅទីនេះជាប់រហូត'
+ histEmpty3d:'មិនទាន់មាន 3D ទេ — ម៉ូដែល 3D ដែលអ្នកបង្កើតនឹងរក្សាទុកនៅទីនេះជាប់រហូត',
+ histEmptyStory:'មិនទាន់មាន Story ទេ — Story ដែលអ្នកបង្កើតនឹងរក្សាទុកនៅទីនេះជាប់រហូត'
 },
 en:{
  docTitle:'MovAi — Create Images & Videos',menuLabel:'Menu',closeLabel:'Close menu',
@@ -2363,10 +2435,10 @@ en:{
  postUploading:'Uploading',postPosting:'Posting',postFileBig:'File too large (MP3 max 15MB · image 5MB)',
  postBadFile:'Please pick an MP3 / audio file',postNeedTitle:'Please enter a song title',postViewPublic:'View in Public',
  postSrcFile:'From phone',postSrcWeb:'From website',postPackages:'View packages · កញ្ចប់',
- pubDlFreeLeft:'Unlimited song downloads',
+ pubDlFreeLeft:'{n}/4 free song downloads left · Suno {s}/2 · Magic Hour {m}/2',
  pubDlLimit:'You have used your 2 free {p} downloads — please buy a Song package to keep downloading',
  acctGotFree:'Welcome! You received free credits — 250 Image.Video Credit and 24 Song Credit in your account',
- giftTitle:'A Gift from Admin',giftBody:'Free 250 Image.Video Credit + 24 Song Credit for new users',giftClaim:'Claim · ទទួលយក',giftNotNow:'Not now · មិនបាច់ទេ',blockedTitle:'This account is blocked · គណនីនេះត្រូវបានប្លុក',blockedBody:'This account / IP / device has been blocked by the Admin — you cannot log in or create anything. To resolve this, contact the Admin.',blockedContact:'Contact Admin on Telegram',blockedLogout:'Log out · ចេញពីគណនី',
+ giftTitle:'A Gift from Admin',giftBody:'Free 250 Image.Video Credit + 24 Song Credit for new users',giftClaim:'Claim · ទទួលយក',blockedTitle:'This account is blocked · គណនីនេះត្រូវបានប្លុក',blockedBody:'This account / IP / device has been blocked by the Admin — you cannot log in or create anything. To resolve this, contact the Admin.',blockedContact:'Contact Admin on Telegram',blockedLogout:'Log out · ចេញពីគណនី',
  navNotif:'Notifications',notifTitle:'Notifications · ដំណឹង',notifEmpty:'No notifications yet',notifGuest:'Log in to see your notifications',notifLoading:'Loading…',notifJustNow:'Just now',notifMinAgo:'{n} min ago',notifHourAgo:'{n} hr ago',notifDayAgo:'{n} days ago',notifApproved:'Your package was approved ✓',notifRejected:'Your package was rejected',notifLogin:'New user signed in',notifRequest:'New package purchase request',notifGrant:'Admin added credits to your account',notifDeduct:'Admin deducted credits from your account',notifInfo:'MovAi notification',notifPost:'New post on Public',notifGenCharge:'Credit charged for a creation',notifGenRefund:'Credit refunded · creation failed',
  pushAskTitle:'Turn on phone notifications?',pushAskBody:'Get real alerts on your phone — when a package is approved, when Admin adds or deducts credits, and when a gift arrives — even when the website is closed',pushAllow:'Enable · បើកដំណឹង',pushNotNow:'Not now · មិនបាច់ទេ',pushSetLabel:'Push notifications · ដំណឹងពីទូរស័ព្ទ',pushStateOn:'On — alerts will pop up on your phone',pushStateOff:'Off — turn on to get alerts on your phone',pushStateBlocked:'This browser has blocked notifications for this site — allow Notifications in the browser settings',pushStateUnsupported:'This browser does not support Web Push',pushStateGuest:'Log in first',pushBlockedTitle:'Notifications blocked · Browser បានបិទដំណឹង',pushBlockedBody:'You tapped "Block" before, so the browser no longer shows the "Allow?" prompt — and the website cannot ask again. Turn it back on yourself with the steps below; it takes under a minute:',pushBlockedStep1:'Tap the 🔒 lock icon at the left end of the address bar at the top',pushBlockedStep2:'Tap "Site settings"',pushBlockedStep3:'Tap "Notifications", then choose "Allow"',pushBlockedStep4:'Come back to this website and turn the "Push notifications" switch on again — it will work right away',pushBlockedAlt:'Cannot find the 🔒? Tap ⋮ (the 3 dots at the top right of the browser) → Settings → Site settings → Notifications → find this site under "Blocked" → Allow',pushBlockedDone:'I turned it on · ខ្ញុំបើករួចហើយ',pushBlockedClose:'Close · បិទ',pushBlockedStill:'Still blocked — please check the steps above once more',
  acctErrFill:'Please fill everything — email must contain @ and password at least 4 characters',
@@ -2424,14 +2496,8 @@ en:{
  badImgUrl:'The provider returned an invalid image URL',badVidUrl:'The provider returned an invalid video URL',
  dlFailed:'Download failed — please try again',
  mp3Converting:'Converting to MP3…',
- mp3Preparing:'Preparing song… · កំពុងរៀបចំបទចម្រៀង…',
  mp3FailNet:'Could not fetch the song — network problem or the server did not answer, please try again',
- mp3FailGone:'This song is no longer available · Please create a new song',
- mp3InAppHint:'Open in Chrome to download · សូមបើកក្នុង Chrome ដើម្បីដោនឡូត',
  mp3FailServer:'Could not convert to MP3 — the server failed, please try again',
- mp3FailOffline:'No internet on your phone — please check WiFi/4G first',
- mp3FailSlow:'Network too slow — the download timed out, please try again when the connection is better',
- mp3FailServerDown:'Server not responding — it may be restarting, please try again in 1 minute',
  puterRetry:'Puter.js has not loaded yet — please try again',
  puterNoImg:'Puter: no image returned',puterNoVid:'Puter: no video returned',
  novaiAcc:'NovAI Account',novaiBalanceNote:'This balance is used for paid models only — free videos do not deduct money',
@@ -2444,7 +2510,7 @@ en:{
  pkgCreditsMonth:'11,000 credits/month',pkgCreditsYear:'140,000 credits/year',
  pkgFeatMedia:'Create both images and videos',
  pkgFeatPremium:'Unlocks every Premium model',
- pkgModelSong:'Model · Model v6',pkgSongPerGen:'Per generation · 12 credits · 2 songs',pkgDlFree2:'Downloads · Unlimited',pkgDlUnlimited:'Downloads · Unlimited',pkgDur30:'Duration · 30 days (1 month)',pkgDur365:'Duration · 365 days (12 months)',pkgFeatImgModels:'Image · Z-Image Turbo · Qwen Image 2.1 · Flux 2 Klein · Krea 2',pkgFeatVidModels:'Video · LTX 2.5 · MiniMax H3',pkgFeatPremImg:'Premium image · GPT Image 2 · Nano Banana 2.1 · Nano Banana Pro',pkgFeatPremVid:'Premium video · Kling 3.0 · Kling 4.0 · Veo 3.1 · Seedance 2.5',
+ pkgModelSong:'Model · Model v6',pkgSongPerGen:'Per generation · 12 credits · 2 songs',pkgDlFree2:'Downloads · 4 free (Suno 2 + Magic Hour 2)',pkgDlUnlimited:'Downloads · Unlimited',pkgDur30:'Duration · 30 days (1 month)',pkgDur365:'Duration · 365 days (12 months)',pkgFeatImgModels:'Image · Z-Image Turbo · Qwen Image 2.1 · Flux 2 Klein · Krea 2',pkgFeatVidModels:'Video · LTX 2.5 · MiniMax H3',pkgFeatPremImg:'Premium image · GPT Image 2 · Nano Banana 2.1 · Nano Banana Pro',pkgFeatPremVid:'Premium video · Kling 3.0 · Kling 4.0 · Veo 3.1 · Seedance 2.5',
  pkgBuy:'Buy now',pkgActive:'This is your active package',pkgTabSong:'Create Music',pkgTabMedia:'Create Video',pkgDragHint:'Drag down to close',pkgWaitingAdmin:'Waiting for Admin approval',pkgReqSent:'Your purchase request was sent to the Admin — credits will arrive after the Admin approves it',pkgReqFail:'Could not send the request — the server is not connected yet, please try again in a little while',pkgReqSending:'Sending your purchase request to the Admin…',
  pkgYourPlan:'Your package',pkgActiveUntil:'Active until {d}',
  pkgGroupMedia:'For Image & Video · Image & Video Credit',pkgGroupMediaNote:'Adds Image & Video Credit only — for creating images and videos',
@@ -2512,11 +2578,14 @@ en:{
  histLinkCopied:'Link copied ✓',histGone:'This file can no longer be opened — the provider link may have expired',
  histClearAll:'Delete all history',histClearConfirm:'Delete all? Tap again',histCountFmt:'{n} items total',
  fsView:'View fullscreen',fsClose:'Close',
- histSecImage:'Image History',histSecVideo:'Video History',histSecSong:'Song History',histSec3d:'3D History',
+ histSecImage:'Image History',histSecVideo:'Video History',histSecSong:'Song History',histSec3d:'3D History',histSecStory:'Story History',
+ histTabPlaylist:'Playlist',histTabSong:'Songs',histTabImage:'Images',histTabVideo:'Videos',histTab3d:'3D',histTabStory:'Story',
+ songRingCreating:'Creating your song…',songRingDone:'Done',songRingRetry:'Something went wrong — tap the ring to try again',
  histEmptyImage:'No images yet — images you create will be saved here permanently',
  histEmptyVideo:'No videos yet — videos you create will be saved here permanently',
  histEmptySong:'No songs yet — songs you create will be saved here permanently',
- histEmpty3d:'No 3D models yet — 3D models you create will be saved here permanently'
+ histEmpty3d:'No 3D models yet — 3D models you create will be saved here permanently',
+ histEmptyStory:'No stories yet — stories you create will be saved here permanently'
 }};
 function tx(k){var d=I18N[LANG]||I18N.km;return (k in d)?d[k]:(I18N.km[k]||k);}
 function loc(o){return (o&&typeof o==='object')?(o[LANG]||o.km||''):o;}
@@ -3270,6 +3339,15 @@ function provNameHtml(n){
   if(n==='MovAi')return '<span class="mv-w">Mov</span><span class="mv-a">Ai</span>';
   return n;
 }
+/* Display label for the provider field + dropdown (owner rule
+   2026-11-17): a provider with a `dispName` (the two visible Song
+   providers) shows that label in pink with a red-yellow highlight;
+   the stored `name` is untouched (history, admin lock matching and
+   generation logic all keep using it). */
+function provDispHtml(p){
+  if(p&&p.dispName)return '<span class="prov-hl">'+escHtml(p.dispName)+'</span>';
+  return provNameHtml(p?p.name:'');
+}
 function sunoModelAdminLocked(m){return adminIsLocked(m.id)||adminIsLocked(m.name);}
 function sunoModelEff(){
   var c=sunoModelCur();
@@ -3928,10 +4006,13 @@ var GEN_VID_PROVIDERS=[
  {id:'puter',name:'Puter.js',locked:true,lockNote:{km:'ចាក់សោរ · មិនទាន់ដំណើរការ',en:'Locked · Not yet available'},limit:{km:'ហ្វ្រី · ចូលគណនី Puter',en:'Free · Puter account'},puter:true,note:{km:'អ្នកប្រើម្នាក់ៗចូលគណនី Puter ហ្វ្រីរបស់ខ្លួន។ Model default Wan 2.7។',en:'Each user signs in with their own free Puter account. Default model: Wan 2.7.'}}
 ];
 var GEN_SONG_PROVIDERS=[
- {id:'suno',name:'MovAi',limit:{km:'កាត់ 12 Credit/ដង · បាន 2 បទ',en:'12 credits per generation · 2 songs'},key:'suno',note:{km:'Model v6 — ច្រៀងខ្មែរច្បាស់ជាងគេ។ MovAi មិនមាន API ផ្លូវការសាធារណៈទេ — ប្រើ API Key + Endpoint ដែលអ្នកដាក់ក្នុង ☰ → API Keys (កាត MovAi)។ កាត់ 12 Credit ក្នុងមួយដង បាន 2 បទ។',en:'Model v6 — sings Khmer the clearest. MovAi has no official public API — uses the API key + endpoint you add in ☰ → API Keys (MovAi card). 12 credits per generation, 2 songs.'}},
- {id:'magichour',name:'Magic Hour',glow:'green',key:'magichour'},
- {id:'acemusic',name:'ACE Music',locked:true,lockNote:{km:'ចាក់សោរ · មិនទាន់ដំណើរការ',en:'Locked · Not yet available'},limit:{km:'ហ្វ្រីរហូត · អត់កាត់ Credit',en:'Free forever · No credits charged'},key:'acemusic',note:{km:'ហ្វ្រីរហូត អត់កាត់ quota/Credit ទេ — បង្កើតបទមានសំឡេងច្រៀងបាន (Model ACE-Step 1.5)។ ត្រូវដាក់ API Key របស់អ្នកផ្ទាល់ក្នុង ☰ → API Keys (កាត ACE Music) — ចុះឈ្មោះយក Key ហ្វ្រីនៅ acemusic.ai អត់ត្រូវកាត។ MovAi មិនយក Key ឲ្យអ្នកដោយអូតូទេ។',en:'Free forever, no quota or credits charged — creates songs with vocals (ACE-Step 1.5 model). Add your own API key in ☰ → API Keys (ACE Music card) — sign up for a free key at acemusic.ai, no card needed. MovAi never fetches a key for you automatically.'}},
- {id:'musicapi',name:'MusicAPI',limit:{km:'កាត់ 20 Credit/ដង · ហ្វ្រី 75 Credit',en:'20 credits/generation · 75 free credits'},key:'musicapi',note:{km:'API ពិត — បង្កើតបទមានសំឡេងច្រៀង (MovAi models v6)។ កាត់ 20 Credit ក្នុងមួយដង បាន 2 បទ។ ចុះឈ្មោះហ្វ្រីនៅ musicapi.ai បាន 75 Credit អត់ត្រូវកាត — តែបានប្រហែល 6 បទម្ដងគត់ប៉ុណ្ណោះ បន្ទាប់មកត្រូវបង់លុយ។ ត្រូវដាក់ API Key របស់អ្នកផ្ទាល់ក្នុង ☰ → API Keys (កាត MusicAPI) — MovAi មិនយក Key ឲ្យអ្នកដោយអូតូទេ។',en:'Real API — creates songs with vocals (MovAi v6 models). 20 credits per generation, 2 songs. Free signup at musicapi.ai gives 75 credits, no card needed — but only about 6 songs, one-time only, then it is paid. Add your own API key in ☰ → API Keys (MusicAPI card) — MovAi never fetches a key for you automatically.'}}
+ {id:'suno',name:'MovAi',dispName:'MovAi Music (V6 Pro)',limit:{km:'កាត់ 12 Credit/ដង · បាន 2 បទ',en:'12 credits per generation · 2 songs'},key:'suno',note:{km:'Model v6 — ច្រៀងខ្មែរច្បាស់ជាងគេ។ MovAi មិនមាន API ផ្លូវការសាធារណៈទេ — ប្រើ API Key + Endpoint ដែលអ្នកដាក់ក្នុង ☰ → API Keys (កាត MovAi)។ កាត់ 12 Credit ក្នុងមួយដង បាន 2 បទ។',en:'Model v6 — sings Khmer the clearest. MovAi has no official public API — uses the API key + endpoint you add in ☰ → API Keys (MovAi card). 12 credits per generation, 2 songs.'}},
+ {id:'magichour',name:'Magic Hour',dispName:'Magic AI Music (V5)',glow:'green',key:'magichour'},
+ /* ACE Music + MusicAPI stay in the system (generation logic + API
+    Keys management untouched) but are hidden from the user-facing
+    Song provider dropdown (owner rule 2026-11-17). */
+ {id:'acemusic',name:'ACE Music',hidden:true,locked:true,lockNote:{km:'ចាក់សោរ · មិនទាន់ដំណើរការ',en:'Locked · Not yet available'},limit:{km:'ហ្វ្រីរហូត · អត់កាត់ Credit',en:'Free forever · No credits charged'},key:'acemusic',note:{km:'ហ្វ្រីរហូត អត់កាត់ quota/Credit ទេ — បង្កើតបទមានសំឡេងច្រៀងបាន (Model ACE-Step 1.5)។ ត្រូវដាក់ API Key របស់អ្នកផ្ទាល់ក្នុង ☰ → API Keys (កាត ACE Music) — ចុះឈ្មោះយក Key ហ្វ្រីនៅ acemusic.ai អត់ត្រូវកាត។ MovAi មិនយក Key ឲ្យអ្នកដោយអូតូទេ។',en:'Free forever, no quota or credits charged — creates songs with vocals (ACE-Step 1.5 model). Add your own API key in ☰ → API Keys (ACE Music card) — sign up for a free key at acemusic.ai, no card needed. MovAi never fetches a key for you automatically.'}},
+ {id:'musicapi',name:'MusicAPI',hidden:true,limit:{km:'កាត់ 20 Credit/ដង · ហ្វ្រី 75 Credit',en:'20 credits/generation · 75 free credits'},key:'musicapi',note:{km:'API ពិត — បង្កើតបទមានសំឡេងច្រៀង (MovAi models v6)។ កាត់ 20 Credit ក្នុងមួយដង បាន 2 បទ។ ចុះឈ្មោះហ្វ្រីនៅ musicapi.ai បាន 75 Credit អត់ត្រូវកាត — តែបានប្រហែល 6 បទម្ដងគត់ប៉ុណ្ណោះ បន្ទាប់មកត្រូវបង់លុយ។ ត្រូវដាក់ API Key របស់អ្នកផ្ទាល់ក្នុង ☰ → API Keys (កាត MusicAPI) — MovAi មិនយក Key ឲ្យអ្នកដោយអូតូទេ។',en:'Real API — creates songs with vocals (MovAi v6 models). 20 credits per generation, 2 songs. Free signup at musicapi.ai gives 75 credits, no card needed — but only about 6 songs, one-time only, then it is paid. Add your own API key in ☰ → API Keys (MusicAPI card) — MovAi never fetches a key for you automatically.'}}
 ];
 var GEN_KEY_PROVIDERS=[
  {id:'novai',name:'NovAI',limit:{km:'5 វីដេអូ/ថ្ងៃ',en:'5 videos/day'},url:'https://aiapi-pro.com',fields:[{k:'key',ph:'API Key'}],hint:{km:'ចុះឈ្មោះដោយ email នៅ aiapi-pro.com — មិនបាច់កាត។',en:'Sign up with email at aiapi-pro.com — no card.'}},
@@ -4064,6 +4145,9 @@ function genStartProg(){
   gen.progSec=0;gen.progPct=0;
   var e=genProgEls();
   if(e.wrap)e.wrap.style.display='block';
+  /* Songs: the circular progress ring replaces the plain
+     «please wait» line (owner order 2026-11-17). */
+  if(gen.mode==='song'&&!genProgTarget){songProgStart();if(e.wrap)e.wrap.style.display='none';}
   if(e.bar)e.bar.style.width='0%';
   genProgTxt(tx('progCreating'));
   if(e.sec)e.sec.textContent=genProgTarget?'0s · 0%':'0s';
@@ -4106,6 +4190,8 @@ function genStageBlur(pct){
      overlay on the blurred surface), not outside it. */
   var pc=document.getElementById('genBlurPct');
   if(pc)pc.textContent=Math.round(pct)+'%';
+  /* The song ring follows the same progress value. */
+  if(gen.mode==='song')songRingSet(pct);
 }
 /* Providers whose image URL is known up-front (Pollinations) feed the
    real picture into the stage, so it literally emerges from the blur
@@ -4116,7 +4202,75 @@ function genStageSetImage(url){
   im.onerror=function(){im.style.display='none';};
   im.src=url;
 }
-function genStopProg(){clearInterval(gen.progTimer);genCtlReset();var e=genProgEls();if(e.wrap)e.wrap.style.display='none';}
+function genStopProg(){clearInterval(gen.progTimer);genCtlReset();var e=genProgEls();if(e.wrap)e.wrap.style.display='none';if(songRingState==='work')songProgHide();}
+/* ===== Song creation progress ring (owner order 2026-11-17) =====
+   While a SONG is being created, the plain «please wait» progress
+   line is hidden and this ring shows instead, inside the song
+   creation area: a large spinning circle whose arc fills with
+   the same honest waiting percentage the progress clock already
+   computes (0→100%, 100% only when the song really lands), the
+   percentage in the centre, the elapsed seconds under it, and a
+   Cancel button in the same box (the shared genCancel). Success
+   turns the ring green with a ✓ in the centre, then it clears
+   itself; a failure turns it red with a ✗ — tapping the ring
+   then retries the same generation. Image / video / 3D keep
+   their existing progress untouched. */
+var songRingState='';
+var SONG_RING_C=2*Math.PI*52;
+function songRingEls(){
+  return {box:document.getElementById('songProgBox'),fg:document.getElementById('songRingFg'),center:document.getElementById('songRingCenter'),label:document.getElementById('songRingLabel'),sub:document.getElementById('songRingSub'),cancel:document.getElementById('songRingCancel')};
+}
+function songProgStart(){
+  var e=songRingEls();if(!e.box)return;
+  songRingState='work';
+  e.box.style.display='block';
+  e.box.className='song-ring-box work';
+  if(e.fg)e.fg.style.strokeDashoffset=String(SONG_RING_C);
+  if(e.center){e.center.textContent='0%';e.center.style.color='';}
+  if(e.label)e.label.textContent=tx('songRingCreating');
+  if(e.sub)e.sub.textContent='0s';
+  if(e.cancel)e.cancel.style.display='';
+}
+function songRingSet(pct){
+  if(songRingState!=='work')return;
+  var e=songRingEls();if(!e.box||e.box.style.display==='none')return;
+  var p=Math.max(0,Math.min(100,pct));
+  if(e.fg)e.fg.style.strokeDashoffset=String(SONG_RING_C*(1-p/100));
+  if(e.center)e.center.textContent=Math.round(p)+'%';
+  if(e.sub)e.sub.textContent=((typeof gen!=='undefined'&&gen.progSec)||0)+'s';
+}
+function songProgDone(){
+  if(songRingState!=='work')return;
+  var e=songRingEls();if(!e.box)return;
+  songRingState='done';
+  e.box.className='song-ring-box done';
+  if(e.fg)e.fg.style.strokeDashoffset='0';
+  if(e.center){e.center.textContent='✓';e.center.style.color='#22c55e';}
+  if(e.label)e.label.textContent=tx('songRingDone');
+  if(e.sub)e.sub.textContent='';
+  if(e.cancel)e.cancel.style.display='none';
+  setTimeout(function(){if(songRingState==='done'){e.box.style.display='none';songRingState='';}},1600);
+}
+function songProgFail(){
+  if(songRingState!=='work')return;
+  var e=songRingEls();if(!e.box)return;
+  songRingState='fail';
+  e.box.className='song-ring-box fail';
+  if(e.fg)e.fg.style.strokeDashoffset=String(SONG_RING_C*0.25);
+  if(e.center){e.center.textContent='✗';e.center.style.color='#ef4444';}
+  if(e.label)e.label.textContent=tx('songRingRetry');
+  if(e.sub)e.sub.textContent='';
+  if(e.cancel)e.cancel.style.display='none';
+}
+function songProgHide(){
+  songRingState='';
+  var e=songRingEls();if(e.box)e.box.style.display='none';
+}
+function songRingTap(){
+  if(songRingState!=='fail')return;
+  songProgHide();
+  genGenerate();
+}
 /* Busy providers (e.g. the NovAI free video model at peak time) are NOT
    shown as an error right away: MovAi waits on screen — seconds counting
    + the honest waiting percent — and retries on its own every 30-60s.
@@ -4195,7 +4349,7 @@ function genRenderProviders(){
     if(gen.mode==='3d'||!cur){pf.style.display='none';}
     else{
       pf.style.display='flex';
-      var nm=document.getElementById('genProviderFieldName');if(nm)nm.innerHTML=provNameHtml(cur.name);
+      var nm=document.getElementById('genProviderFieldName');if(nm)nm.innerHTML=provDispHtml(cur);
       var gl=document.getElementById('genProviderFieldGlow');
       var stEl=document.getElementById('genProviderFieldStat');
       var pstF=provStatusInfo(cur.id);
@@ -4214,7 +4368,9 @@ function genRenderProviders(){
         if(gl){if(cur.glow){gl.style.display='inline-block';gl.className='pglow pglow-'+cur.glow;gl.title='';}else{gl.style.display='none';}}
         if(stEl){stEl.textContent='';stEl.title='';}
       }
-      var lm=document.getElementById('genProviderFieldLimit');if(lm)lm.textContent=cur.limit?loc(cur.limit):'';
+      /* Song mode (owner rule 2026-11-17): the field shows the
+         provider name only — no credit/limit text beside it. */
+      var lm=document.getElementById('genProviderFieldLimit');if(lm)lm.textContent=(gen.mode==='song')?'':(cur.limit?loc(cur.limit):'');
     }
   }
   var drop=document.getElementById('genProviderDrop');
@@ -4230,9 +4386,13 @@ function genRenderProviders(){
          («Key 2») + an exhausted key's short reason; providers
          with no server status keep their built-in glow dot. */
       var pst=provStatusInfo(p.id);
-      h+='<span class="dd-opt-main"><span>'+provNameHtml(p.name)+'</span>'+(pst?provStatusInlineHtml(p.id):(p.glow?'<span class="pglow pglow-'+p.glow+'"></span>':''))+'</span>';
+      h+='<span class="dd-opt-main"><span>'+provDispHtml(p)+'</span>'+(pst?provStatusInlineHtml(p.id):(p.glow?'<span class="pglow pglow-'+p.glow+'"></span>':''))+'</span>';
       h+='<span class="dd-opt-right">';
       if(al)h+='<span class="dd-lock">'+escHtml(tx('adminLock'))+'</span>';
+      /* Song dropdown (owner rule 2026-11-17): name only — no
+         credit/limit text, no lock note, no status note on the
+         right side. Other modes keep their existing right side. */
+      else if(gen.mode==='song'){}
       else if(lk)h+='<span class="dd-locknote">'+escHtml(loc(p.lockNote))+'</span>';
       else{
         if(pst&&pst.state==='ok')h+=provStatusExNoteHtml(p.id);
@@ -4580,10 +4740,11 @@ async function genGenerate(){
       /* A real result has arrived — only NOW may the stage show 100%.
          A credit-blocked tap generated nothing: the not-enough
          message (and the Packages sheet) stays exactly as it is. */
-      if(!creditBlocked){genStageBlur(100);genMsg(tx('msgDone')+(doneNote?' · '+doneNote:''));}
+      if(!creditBlocked){genStageBlur(100);if(gen.mode==='song')songProgDone();genMsg(tx('msgDone')+(doneNote?' · '+doneNote:''));}
     }
   }catch(e){
     var sp=document.getElementById('genSongPending');if(sp)sp.remove();
+    if(gen.mode==='song'){if(e&&e.genCancelled)songProgHide();else songProgFail();}
     if(e&&e.genCancelled){genMsg(tx('msgGenCancelled'));}
     else if(e&&e.acctNotReady){genMsg(tx('acctLoading'));}
     else if(e&&e.adminServerDown){genMsg(tx('serverOffline'));}
@@ -4770,7 +4931,7 @@ function dlNameFor(raw,url,type,fallback){
 function dlBlobSave(blob,fname){
   var u=URL.createObjectURL(blob);
   var a=document.createElement('a');a.href=u;a.download=fname;document.body.appendChild(a);a.click();a.remove();
-  setTimeout(function(){try{URL.revokeObjectURL(u);}catch(e){}},5000);
+  setTimeout(function(){try{URL.revokeObjectURL(u);}catch(e){}},4000);
 }
 var dlFailTimer=null;
 function dlFailShow(){
@@ -4824,10 +4985,27 @@ async function dlSave(src,fname){
    Image / video / 3D downloads do not pass through here. */
 var mp3Busy=false;
 var mp3ProgEl=null,mp3ProgTimer=null,mp3ProgT0=0,mp3ProgPct=null;
-/* MP3 pre-warm REMOVED (owner order 2026-11-16 ~22:00): NO background
-   conversion. The MP3 is converted ONLY when the user taps Download on
-   that one song (dlSaveSongMp3) — never when a song is shown or played.
-   This stops the server converting many songs at once (which crashed it). */
+/* ===== MP3 pre-warm (owner fix 2026-11-16) =====
+   Download must be instant like the old site: the moment a song
+   is SHOWN (Create results / History / Public) or STARTS PLAYING,
+   the server is told in the background to convert that song's
+   MP3 ahead of time — GET /api/gen/song/mp3-warm?u=<audio-url>.
+   Fire-and-forget ONLY: never awaited, never shown in the UI,
+   every failure swallowed, so it can never slow down or break
+   rendering or playback. Each URL is warmed once per session
+   (mp3Warmed), so re-renders and replay taps never spam the
+   server. When the user later taps Download, dlSaveSongMp3
+   asks for the MP3 and the server already has it ready. */
+var mp3Warmed={};
+function mp3Warm(u){
+  try{
+    if(!u||!/^https?:\/\//i.test(u))return;
+    if(mp3Warmed[u])return;
+    mp3Warmed[u]=1;
+    var base=(typeof GEN_API!=='undefined'&&GEN_API)?GEN_API:'https://movai-proxy.onrender.com/api';
+    fetch(base+'/gen/song/mp3-warm?u='+encodeURIComponent(u)).catch(function(){});
+  }catch(e){}
+}
 function mp3ProgRender(){
   if(!mp3ProgEl)return;
   var sec=Math.max(0,Math.round((Date.now()-mp3ProgT0)/1000));
@@ -4907,110 +5085,50 @@ async function mp3ReadBody(rp){
   var b=await rp.blob();
   return new Blob([b],{type:'audio/mpeg'});
 }
+/* Cloudinary song URLs (owner order 2026-11-17): the downloaded
+   file must carry the SONG'S OWN title, never the provider's
+   stored file name («output.mp3»). When the song's URL is a
+   Cloudinary delivery URL, it is rewritten BEFORE the download
+   by inserting fl_attachment:<title> right after /upload/ —
+   Cloudinary then serves the file as an attachment under that
+   exact name. The title is stripped of / : * ? " < > | and
+   capped at 120 characters, then encodeURIComponent'd. */
+function dlCloudinaryAttach(url,title){
+  var u=String(url||'');
+  if(u.indexOf('res.cloudinary.com')<0||u.indexOf('/upload/')<0)return '';
+  var name=String(title||'').replace(/[\/:*?"<>|]+/g,' ').replace(/\s+/g,' ').trim().slice(0,120);
+  if(!name)return '';
+  var seg='fl_attachment:'+encodeURIComponent(name);
+  if(/\/fl_attachment:[^\/]*/.test(u))return u.replace(/\/fl_attachment:[^\/]*/,'/'+seg);
+  return u.replace('/upload/','/upload/'+seg+'/');
+}
 async function dlSaveSongMp3(src,title,fallback){
   if(!src||mp3Busy)return;
   mp3Busy=true;
-  /* In-app browser hint (Hercules plan Step 4.17): Telegram /
-     Facebook in-app browsers often cannot save a file. Tell the
-     user to open MovAi in Chrome — but still try the download,
-     because it sometimes works there too. */
-  try{
-    var _ua=String((navigator&&navigator.userAgent)||'');
-    if(/Telegram|FBAN|FBAV|Instagram/i.test(_ua))mp3FailShow('mp3InAppHint');
-  }catch(e){}
   var fname=dlCleanName(title,fallback||'movai-song')+'.mp3';
   mp3ProgStart();
-  /* REAL-ERROR REPORTING (owner order 2026-11-17): when a download
-     fails, show the SPECIFIC reason — offline phone, too-slow
-     network, server down/restarting, or the server's own message —
-     never a generic "Server unreachable". */
-  function mp3IsOffline(){ return typeof navigator!=='undefined'&&navigator.onLine===false; }
-  function mp3FailReal(errMsg){
-    mp3ProgDone();
-    if(mp3IsOffline()){ mp3FailShow('mp3FailOffline'); return; }
-    var em=String(errMsg||'');
-    /* The source audio is gone (provider URL expired, 404/403) —
-       show "This song is no longer available" instead of a generic
-       network error (Hercules plan Step 6.22 / Step 8.29). */
-    if(/gone|no longer available|410|expired/i.test(em)){ mp3FailShow('mp3FailGone'); return; }
-    if(/abort|timeout/i.test(em)){ mp3FailShow('mp3FailSlow'); return; }
-    mp3FailText(tx('mp3FailNet')+(em?' — '+em:''));
-  }
   try{
-    if(mp3IsOffline()){ mp3ProgDone(); mp3FailShow('mp3FailOffline'); return; }
-    /* CLOUDINARY (owner order 2026-11-17, Hercules FINAL FIX): the song
-       is already a permanent Cloudinary MP3 with the attachment flag —
-       open it DIRECTLY (plain anchor click), no fetch, no CORS, no
-       server work. Instant. The fl_attachment flag forces the browser
-       to download it instead of playing it. */
-    if(/res\.cloudinary\.com\//i.test(src)){
-      var ca=document.createElement('a');
-      ca.href=src; ca.download=fname; ca.rel='noopener';
-      document.body.appendChild(ca); ca.click(); ca.remove();
-      mp3ProgSet(100); mp3ProgDone(); return;
-    }
-    var rp=null, directErr='';
-    /* FAST PATH (owner order 2026-11-16): the audio is already an MP3
-       (Public feed songs, uploads/*.mp3) — download it DIRECTLY from
-       the browser, no server conversion, no waiting for the server to
-       wake. Falls through to the server conversion only if the direct
-       fetch fails (network/CORS) or the URL is not an MP3. */
-    if(/\.mp3(\?|#|$)/i.test(src)){
+    /* Cloudinary MP3 source: fetch it through the fl_attachment
+       URL above so the song's own title rides with the file; the
+       blob is then saved in-page under that same title. Any
+       failure falls through to the server endpoint below, which
+       receives the title via &name= exactly as before. (Only an
+       MP3 Cloudinary URL is fetched directly — anything else
+       still goes to the server so it can be converted first.) */
+    var attachUrl=dlCloudinaryAttach(src,title);
+    if(attachUrl&&(/\.mp3(\?|#|$)/i.test(src)||/f_mp3/i.test(src))){
       try{
-        var dctrl=new AbortController();
-        var dt=setTimeout(function(){dctrl.abort();},60000);
-        var dr=await fetch(src,{signal:dctrl.signal});
-        clearTimeout(dt);
-        if(dr.ok){
-          var dblob=await dr.blob();
-          if(dblob&&dblob.size){ mp3ProgSet(100); dlBlobSave(dblob,fname); mp3ProgDone(); return; }
+        var ra=await fetch(attachUrl);
+        if(ra.ok){
+          var ba=await mp3ReadBody(ra);
+          if(ba&&ba.size){mp3ProgSet(100);dlBlobSave(ba,fname);mp3ProgDone();return;}
         }
-      }catch(e){ directErr=String((e&&e.message)||e||''); }
+      }catch(ea){/* direct Cloudinary fetch failed — server path below */}
     }
-    /* Server conversion (WAV → MP3, or CORS-blocked MP3): wake the
-       server first (Render free tier sleeps after 15 min idle) — a
-       light request that absorbs the ~40s cold start — then retry the
-       conversion on network failure. The server caches/queues
-       conversions, so a retry never converts twice. If the wake
-       request itself fails, the server is down/restarting — say so
-       clearly instead of running 3 doomed conversion attempts. */
-    var wakeOk=false, wakeErr='';
+    var rp;
     try{
-      var wctrl=new AbortController();
-      var wt=setTimeout(function(){wctrl.abort();},60000);
-      var wk=await fetch(GEN_API+'/public/vapid-key',{signal:wctrl.signal});
-      clearTimeout(wt);
-      wakeOk=!!(wk&&wk.ok);
-    }catch(e){ wakeErr=String((e&&e.message)||e||''); }
-    if(!wakeOk){
-      if(mp3IsOffline()){ mp3ProgDone(); mp3FailShow('mp3FailOffline'); return; }
-      mp3ProgDone();
-      if(/abort|timeout/i.test(wakeErr)) mp3FailShow('mp3FailSlow');
-      else mp3FailText(tx('mp3FailServerDown')+(wakeErr?' — '+wakeErr:''));
-      return;
-    }
-    var attempt=0, lastErr='';
-    while(attempt<3&&!rp){
-      attempt++;
-      try{
-        rp=await fetch(GEN_API+'/gen/song/mp3?u='+encodeURIComponent(src)+'&name='+encodeURIComponent(fname));
-      }catch(fe){
-        rp=null;
-        lastErr=String((fe&&fe.message)||fe||'');
-        if(attempt<3) await new Promise(function(r){setTimeout(r,5000);});
-      }
-    }
-    if(!rp){
-      mp3FailReal(lastErr||directErr);
-      /* Hercules checklist C8 — last-resort fallback: the direct
-         fetch AND the server conversion both failed, so open the
-         source audio in a new tab where the user can still save it.
-         This only fires when the in-website download has already
-         failed completely (never on the normal path). Note: a popup
-         blocker may stop it — the error above is still shown. */
-      try{ if(/^https:/i.test(src))window.open(src,'_blank'); }catch(e){}
-      return;
-    }
+      rp=await fetch(GEN_API+'/gen/song/mp3?u='+encodeURIComponent(src)+'&name='+encodeURIComponent(fname));
+    }catch(fe){mp3ProgDone();mp3FailShow('mp3FailNet');return;}
     if(!rp.ok){
       /* Server failed — surface its REAL reason (JSON error or
          plain text) and save NOTHING (never the big WAV). */
@@ -5034,7 +5152,7 @@ async function dlSaveSongMp3(src,title,fallback){
     dlBlobSave(blob,fname);
     mp3ProgDone();
   }catch(e){
-    mp3FailReal(String((e&&e.message)||e||''));
+    mp3ProgDone();mp3FailShow('mp3FailNet');
   }finally{mp3Busy=false;}
 }
 async function genDownload(){
@@ -5043,7 +5161,7 @@ async function genDownload(){
   if(it.blob){
     var u=URL.createObjectURL(it.blob);
     var a=document.createElement('a');a.href=u;a.download=fname;document.body.appendChild(a);a.click();a.remove();
-    setTimeout(function(){try{URL.revokeObjectURL(u);}catch(e){}},5000);
+    setTimeout(function(){try{URL.revokeObjectURL(u);}catch(e){}},4000);
     return;
   }
   await dlSave(it.src,fname);
@@ -5669,19 +5787,7 @@ function genShowSongs(items,streaming,restored){
   if(!streaming&&!restored){
     songs.forEach(function(s){
       var su=/^https:/i.test(s.url)?s.url:((/^data:audio\//i.test(s.url)&&s.url.length<1200000)?s.url:null);
-      if(su){
-        var it={type:'song',url:su,title:s.title||sTitle,prompt:sPrompt,provider:sProv,image:(s.image&&/^https:/i.test(s.image))?s.image:undefined};
-        histAddTo(it,saveKey);
-        /* Permanent storage (Hercules checklist A, owner order
-           2026-11-17): the provider audio URL is TEMPORARY and
-           expires. In the background, ask the server to store this
-           song permanently (/uploads/, GitHub-backed) and swap the
-           History entry to the permanent URL once it is ready. The
-           song shows and plays immediately on the provider URL; the
-           swap only makes it permanent. If the store fails, the
-           provider URL stays — nothing is lost. */
-        try{histStorePermanent(it,saveKey);}catch(e){}
-      }
+      if(su)histAddTo({type:'song',url:su,title:s.title||sTitle,prompt:sPrompt,provider:sProv,image:(s.image&&/^https:/i.test(s.image))?s.image:undefined},saveKey);
     });
     /* The Create results themselves are kept too (owner rule
        2026-11-16): the songs stay in the creation place,
@@ -5745,6 +5851,7 @@ function lastSongsRestore(){
 }
 function genSongCard(song,n,it,title,prov,prompt,streaming){
   var u=song.url;
+  mp3Warm(u);
   var card=document.createElement('div');
   card.className='hist-card song-card';
   /* ONE compact row: small cover · Play · title · duration · icons.
@@ -5763,6 +5870,7 @@ function genSongCard(song,n,it,title,prov,prompt,streaming){
   au._miniKeep=true;
   au._miniIt={id:'gen:'+u,type:'song',url:u,title:title||tx('songLabelFmt').replace('{n}',n),image:(song&&song.image)||'',name:''};
   au.addEventListener('play',function(){
+    mp3Warm(u);
     try{
       var list=genSongAudios.map(function(a){return {au:a,it:a._miniIt};});
       pubMiniSet(au,au._miniIt,list);
@@ -5889,7 +5997,7 @@ async function genDownloadSong(src,n,title){
    Stop / seek / time / volume / speed) driven by one shared Audio
    element. Every item has Download, Like, Share and Delete. */
 var HIST_KEY_LEGACY='movai-history';
-var HIST_TYPES=['image','video','song','3d'];
+var HIST_TYPES=['image','video','song','3d','story'];
 var histCtx=null;
 var histAudio=null,histAudioId=null;
 /* The History store for whoever is using the app RIGHT NOW: the
@@ -5934,9 +6042,6 @@ function histOnAccountChange(){
   try{if(plAudio){plAudio.pause();plAudioUrl=null;}}catch(e){}
   histMigrateLegacy();
   histRender();
-  /* History sync (owner order 2026-11-17): after a sign-in, pull
-     the server copy for this Gmail so old creations appear here. */
-  try{histSyncPull();}catch(e){}
   try{plRender();plSyncSaveBtns();}catch(e){}
   /* The Create results are per-account too: a sign in / out
      clears the previous account's restored results (and stops
@@ -5964,186 +6069,13 @@ function histSaveTo(key,a){
   for(var v=0;v<variants.length;v++){
     var arr=variants[v];
     while(arr.length){
-      try{localStorage.setItem(key,JSON.stringify(arr));histSyncPushFor(key);return true;}
+      try{localStorage.setItem(key,JSON.stringify(arr));return true;}
       catch(e){arr=arr.slice(0,arr.length-1);}
     }
   }
   return false;
 }
 function histGetFrom(key){try{var a=JSON.parse(localStorage.getItem(key)||'[]');return Array.isArray(a)?a:[];}catch(e){return[];}}
-/* ===== History sync — ONE Gmail, ONE History, EVERYWHERE =====
-   Owner order 2026-11-17: a creation must be saved on the SERVER
-   tied to the Gmail, not only in this phone's localStorage — so the
-   SAME Gmail shows ALL old creations on ANY device / country, and
-   there is only ONE account, never two. The server holds the shared
-   copy; each device MERGES (union by id) so nothing is ever lost
-   by overwriting. Guests (no Gmail) keep local-only History. */
-var histSyncTimer=null, histSyncPulling=false, histSyncApplying=false, histSyncPending={};
-function histSyncEmail(){
-  var em='';try{em=(localStorage.getItem('movai-session')||'').trim().toLowerCase();}catch(e){}
-  return em;
-}
-function histSyncKey(it){
-  if(!it||typeof it!=='object')return '';
-  if(it.id)return 'id:'+it.id;
-  if(it.src)return 'src:'+it.src;
-  if(it.url)return 'url:'+it.url;
-  return '';
-}
-function histSyncMerge(a,b){
-  var map={}, out=[];
-  var all=(a||[]).concat(b||[]);
-  for(var i=0;i<all.length;i++){
-    var it=all[i];var k=histSyncKey(it);if(!k)continue;
-    var prev=map[k];
-    if(!prev||(it.ts||0)>(prev.ts||0))map[k]=it;
-  }
-  for(var key in map)out.push(map[key]);
-  out.sort(function(x,y){return (y.ts||0)-(x.ts||0);});
-  return out.slice(0,300);
-}
-function histSyncStrip(items){
-  return (items||[]).map(function(it){
-    var c={};for(var k in it){if(k!=='thumb')c[k]=it[k];}return c;
-  });
-}
-function histSyncPull(){
-  var em=histSyncEmail();if(!em||histSyncPulling)return;
-  histSyncPulling=true;
-  fetch(GEN_API+'/public/history?email='+encodeURIComponent(em))
-    .then(function(r){return r.json();})
-    .then(function(j){
-      histSyncPulling=false;
-      if(!j||!j.ok||!Array.isArray(j.items))return;
-      var local=histGet();
-      var merged=histSyncMerge(local,j.items);
-      if(JSON.stringify(merged)!==JSON.stringify(local)){
-        histSyncApplying=true;
-        try{histSaveTo(histKey(),merged);}catch(e){}
-        histSyncApplying=false;
-        try{histRender();}catch(e){}
-        /* Local had items the server lacked — push the merged
-           copy up so the other devices get them too. */
-        if(merged.length>j.items.length)histSyncPushFor(histKey());
-      }
-    })
-    .catch(function(){histSyncPulling=false;});
-}
-function histSyncPushFor(key){
-  if(histSyncApplying)return;
-  var em=String(key||'').replace(/^movai-history-/,'');
-  if(!em||em==='guest')return;
-  histSyncPending[em]=true;
-  if(histSyncTimer)clearTimeout(histSyncTimer);
-  histSyncTimer=setTimeout(function(){
-    histSyncTimer=null;
-    var emails=Object.keys(histSyncPending);histSyncPending={};
-    emails.forEach(function(em2){
-      var items=histSyncStrip(histGetFrom('movai-history-'+em2));
-      fetch(GEN_API+'/public/history',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:em2,items:items})})
-        .then(function(r){return r.json();})
-        .then(function(j){
-          if(!j||!j.ok||!Array.isArray(j.items))return;
-          var local=histGetFrom('movai-history-'+em2);
-          var merged=histSyncMerge(local,j.items);
-          if(JSON.stringify(merged)!==JSON.stringify(local)){
-            histSyncApplying=true;
-            try{histSaveTo('movai-history-'+em2,merged);}catch(e){}
-            histSyncApplying=false;
-            if(em2===histSyncEmail()){try{histRender();}catch(e){}}
-          }
-        }).catch(function(){});
-    });
-  },2000);
-}
-/* Permanent song storage (Hercules checklist A, owner order
-   2026-11-17): swap a History song's temporary provider URL for
-   the server's permanent /uploads/ URL. Runs in the background
-   after the song is saved — the song is already visible and
-   playable on the provider URL, and this only makes it permanent
-   (the provider URL expires; ours never does). Skips URLs that
-   are already permanent, and data: URLs (already self-contained).
-   On any failure the provider URL simply stays — nothing breaks. */
-var histRecoverDone=false;
-/* ONE-TIME RECOVERY (Hercules plan Step 6.20): when History is
-   first rendered in a session, re-store every OLD song that still
-   carries a temporary provider URL, so it becomes permanent too.
-   Runs once per session, in the background, one song at a time
-   (the server serialises the conversions). Songs whose provider
-   URL has already expired are marked gone (see histStorePermanent)
-   and History shows "no longer available" for them. */
-function histRecoverOld(){
-  if(histRecoverDone)return;
-  histRecoverDone=true;
-  try{
-    var key=histKey();
-    var arr=histGetFrom(key);
-    var i=0;
-    (function next(){
-      if(i>=arr.length)return;
-      var it=arr[i++];
-      if(!it||it.type!=='song'||!it.id||it.gone)return next();
-      if(!/^https:/i.test(it.url||''))return next();
-      if(/movai-proxy\.onrender\.com\/uploads\//i.test(it.url))return next();
-      /* Store this one, then move to the next only after it
-         finishes — one at a time, so the server never holds many
-         big downloads at once. */
-      fetch(GEN_API+'/public/song-store',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({url:it.url})})
-        .then(function(r){return r.json();})
-        .then(function(j){
-          var a2=histGetFrom(key);
-          for(var k=0;k<a2.length;k++){
-            if(a2[k]&&a2[k].id===it.id){
-              if(j&&j.ok&&j.url&&j.url!==it.url){a2[k].url=j.url;a2[k].perm=true;a2[k].gone=false;}
-              else if(j&&j.error==='gone'){a2[k].gone=true;}
-              break;
-            }
-          }
-          histSyncApplying=true;
-          try{histSaveTo(key,a2);}catch(e){}
-          histSyncApplying=false;
-          try{histRender();}catch(e){}
-        }).catch(function(){})
-        .finally(function(){next();});
-    })();
-  }catch(e){}
-}
-function histStorePermanent(item,saveKey){
-  if(!item||!item.id||!/^https:/i.test(item.url||''))return;
-  if(/movai-proxy\.onrender\.com\/uploads\//i.test(item.url))return;
-  fetch(GEN_API+'/public/song-store',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({url:item.url})})
-    .then(function(r){return r.json();})
-    .then(function(j){
-      if(!j||!j.ok||!j.url||j.url===item.url){
-        /* Store failed. If the provider URL is GONE (expired 404/
-           403), mark the song so History shows "This song is no
-           longer available" instead of a broken Download button
-           (Hercules plan Step 6.22). Any other failure just leaves
-           the provider URL in place — the download may still work. */
-        if(j&&j.error==='gone'){
-          var arr2=histGetFrom(saveKey||histKey());
-          for(var k=0;k<arr2.length;k++){
-            if(arr2[k]&&arr2[k].id===item.id){arr2[k].gone=true;break;}
-          }
-          histSyncApplying=true;
-          try{histSaveTo(saveKey||histKey(),arr2);}catch(e){}
-          histSyncApplying=false;
-          try{histRender();}catch(e){}
-        }
-        return;
-      }
-      var arr=histGetFrom(saveKey||histKey());
-      var changed=false;
-      for(var i=0;i<arr.length;i++){
-        if(arr[i]&&arr[i].id===item.id){arr[i].url=j.url;arr[i].perm=true;arr[i].gone=false;arr[i].status='ready';if(j.provider)arr[i].provider=j.provider;changed=true;break;}
-      }
-      if(!changed)return;
-      histSyncApplying=true;
-      try{histSaveTo(saveKey||histKey(),arr);}catch(e){}
-      histSyncApplying=false;
-      try{histRender();}catch(e){}
-    }).catch(function(){});
-}
 function histAdd(item){
   histAddTo(item,histKey());
 }
@@ -6159,15 +6091,6 @@ function histAddTo(item,key){
   item.id='h'+Date.now().toString(36)+Math.floor(Math.random()*1000000).toString(36);
   item.ts=Date.now();
   if(item.liked!==true)item.liked=false;
-  /* Song status (Hercules FINAL FIX Step 5): a new song whose URL is
-     still the provider's temporary link is 'saving' (being stored
-     permanently in the background); a song already on a permanent
-     URL (/uploads/ or Cloudinary) is 'ready'. The Download button is
-     only enabled when status is 'ready'. */
-  if(item.type==='song'){
-    var _u=String(item.url||'');
-    item.status=(/movai-proxy\.onrender\.com\/uploads\//i.test(_u)||/res\.cloudinary\.com\//i.test(_u))?'ready':'saving';
-  }
   var a=histGetFrom(key);a.unshift(item);
   if(a.length>300)a=a.slice(0,300);
   histSaveTo(key,a);
@@ -6235,8 +6158,31 @@ function histGoneEl(){
 function histHeartSvg(liked){
   return '<svg width="15" height="15" viewBox="0 0 24 24" fill="'+(liked?'#ff2e88':'none')+'" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.6l-1-1a5.5 5.5 0 1 0-7.8 7.8l1 1L12 21.2l7.8-7.8 1-1a5.5 5.5 0 0 0 0-7.8z"/></svg>';
 }
+/* ---- History tabs (owner order 2026-11-17) ----
+   One row of tabs at the top of the History panel — Playlist /
+   Songs / Images / Videos / 3D / Story. Tapping a tab shows ONLY that
+   section's list below; the active tab is filled bright lime.
+   Every list keeps rendering exactly as before (histRender /
+   plRender are untouched) — the tabs only show and hide the
+   panes the lists already live in. */
+var histTabCur='playlist';
+function histTabSet(name){
+  histTabCur=name;
+  var tabs=document.querySelectorAll('.hist-tab');
+  for(var i=0;i<tabs.length;i++){
+    var on=tabs[i].getAttribute('data-htab')===name;
+    tabs[i].classList.toggle('on',on);
+    tabs[i].setAttribute('aria-selected',on?'true':'false');
+  }
+  var panes=document.querySelectorAll('.hist-pane');
+  for(var j=0;j<panes.length;j++)panes[j].style.display=(panes[j].getAttribute('data-hpane')===name)?'':'none';
+  /* A media carousel rendered while its pane was hidden has no
+     width to centre against — re-run its setup now it is visible
+     so the newest item lands centred again. */
+  var box=document.getElementById('histList-'+name);
+  if(box&&box.classList.contains('hist-carousel'))histCarouselSetup(box);
+}
 function histRender(){
-  try{histRecoverOld();}catch(e){}
   var all=histGet();
   var cnt=document.getElementById('histCount');
   if(cnt)cnt.textContent=all.length?tx('histCountFmt').replace('{n}',all.length):'';
@@ -6256,10 +6202,11 @@ function histRender(){
       box.appendChild(p);
       return;
     }
-    if(t==='song'){
-      /* Song History cards stack vertically, one full-width card
-         under the other — the same layout as the generation results:
-         cover on top, title under it, then the player and actions. */
+    if(t==='song'||t==='story'){
+      /* Song and Story History cards stack vertically, one
+         full-width card under the other — the same layout as the
+         generation results: cover on top, title under it, then
+         the player and actions. */
       items.forEach(function(it){box.appendChild(histCard(it));});
       return;
     }
@@ -6472,6 +6419,7 @@ document.addEventListener('keydown',function(e){if(e.key==='Escape'){fsClose();p
    (histPlayToggle / histPlayerSync, via the .hist-* classes). The
    duration is read from the file's metadata once, lightly. */
 function histSongCard(it){
+  if(it&&it.url)mp3Warm(it.url);
   var card=document.createElement('div');
   card.className='hist-card song-card';
   card.setAttribute('data-hist-id',it.id);
@@ -6503,7 +6451,7 @@ function histSongCard(it){
   sub.textContent=(ownerName?(ownerName+' · '):'')+histFmtDate(it.ts)+' · ';
   sub.appendChild(time);
   meta.appendChild(sub);
-  if(it.url&&!it.gone){
+  if(it.url){
     var play=document.createElement('button');
     play.type='button';play.className='song-play hist-play';
     play.textContent='▶';play.setAttribute('aria-label',tx('histPlay'));
@@ -6525,15 +6473,8 @@ function histSongCard(it){
     if(it.liked)lk.classList.add('liked');
     lk.addEventListener('click',function(){histToggleLike(it.id,lk);});
     rowEl.appendChild(lk);
-    var dl=songIcoBtn(it.status==='saving'?tx('mp3Preparing'):tx('histDownload'),SONG_SVG_DL);
-    dl.addEventListener('click',function(){
-      /* Download is enabled only when the song is 'ready' (permanent
-         URL stored). While it is still 'saving', show "Preparing
-         song..." instead of downloading a temporary provider link
-         (Hercules FINAL FIX Step 5). */
-      if(it.status==='saving'){ mp3FailShow('mp3Preparing'); return; }
-      histDownload(it);
-    });
+    var dl=songIcoBtn(tx('histDownload'),SONG_SVG_DL);
+    dl.addEventListener('click',function(){histDownload(it);});
     rowEl.appendChild(dl);
     var sh=songIcoBtn(tx('histShare'),SONG_SVG_SHARE);
     sh.addEventListener('click',function(){histShare(it,sh);});
@@ -6777,6 +6718,7 @@ function histMiniList(){
 }
 function histCardEl(id){return document.querySelector('.hist-card[data-hist-id="'+id+'"]');}
 function histPlayToggle(it){
+  if(it&&it.url)mp3Warm(it.url);
   var au=histAudioGet();
   /* One song at a time, across sections: a History song starting
      puts the fresh-result song players to sleep. */
@@ -7395,6 +7337,9 @@ function menuGo(id,mode){
   if(id==='sec-packages'){packagesShow();return;}
   packagesHide();
   appSetView('create');
+  /* The Playlist now lives inside the History panel as a tab:
+     open that tab, then scroll to the panel itself. */
+  if(id==='sec-playlist'){try{histTabSet('playlist');}catch(e){}id='sec-history';}
   var el=document.getElementById(id);if(el)el.scrollIntoView({behavior:'smooth',block:'start'});
 }
 /* ===== Bottom dock navigation =====
@@ -7415,7 +7360,8 @@ function dockGo(dest){
   }
   if(dest==='playlist'){
     appSetView('create');
-    var elp=document.getElementById('sec-playlist');if(elp)elp.scrollIntoView({behavior:'smooth',block:'start'});
+    try{histTabSet('playlist');}catch(e){}
+    var elp=document.getElementById('sec-history');if(elp)elp.scrollIntoView({behavior:'smooth',block:'start'});
     dockSync('playlist');
     return;
   }
@@ -8338,6 +8284,7 @@ function pubAdvanceFrom(au){
 function pubWireFeedAudio(au,it,sync){
   au.loop=(pubPlayMode==='one');
   au.addEventListener('play',function(){
+    if(it&&it.url)mp3Warm(it.url);
     pubCountView(it.id);
     try{pubMiniSet(au,it);}catch(e){}
     try{
@@ -8485,6 +8432,7 @@ function plMiniList(){
 }
 function plPlay(entry){
   if(!entry||!entry.url)return;
+  mp3Warm(entry.url);
   var au=plAudioGet();
   if(plAudioUrl===entry.url){
     if(au.paused){var pr=au.play();if(pr&&pr.catch)pr.catch(function(){});}
@@ -8991,6 +8939,7 @@ function pubMiniStopAll(){
    Like / Dislike / Share as the big card — all in the normal
    vertical page scroll. */
 function pubSongRowEl(it){
+  if(it&&it.url)mp3Warm(it.url);
   var row=document.createElement('div');
   row.className='pub-songrow';
   row.setAttribute('data-pub-id',it.id);
@@ -9125,6 +9074,7 @@ function pubRenderSongs(box,songs){
   }
 }
 function pubCardEl(it){
+  if(it&&it.type==='song'&&it.url)mp3Warm(it.url);
   var card=document.createElement('div');
   card.className='pub-card';
   card.setAttribute('data-pub-id',it.id);
@@ -9439,6 +9389,7 @@ function pubCardEl(it){
       card.classList.toggle('np-glow',!au.paused);
     };
     au.addEventListener('play',function(){
+      if(it&&it.url)mp3Warm(it.url);
       pubCountView(it.id);
       try{pubMiniSet(au,it);}catch(e){}
       try{
@@ -9789,11 +9740,23 @@ function pubCountDownload(it){
 }
 function pubDownloadPost(it,btn){
   if(!it||!it.url)return;
-  /* Downloads are FREE / UNLIMITED (owner order 2026-11-16): the old
-     4-free limit (Suno 2 + Magic Hour 2, then buy a package) is
-     REMOVED — everyone downloads songs without limit, no package
-     needed. Downloads are still counted (pubCountDownload) so the
-     Admin stats show them. */
+  if(it.type==='song'&&!pubHasSongPlan()){
+    var bucket=pubSongBucket(it);
+    if(pubSongDlLeft(bucket)<=0){
+      if(btn){
+        var sp=btn.querySelector('span:last-child');
+        if(sp){var old=sp.textContent;sp.textContent=tx('pubDlLimit').replace('{p}',pubSongBucketName(bucket));setTimeout(function(){if(sp.isConnected)sp.textContent=old;},3200);}
+      }
+      try{pkgSetTab('song');}catch(e){}
+      packagesShow();
+      return;
+    }
+    pubSongDlBump(bucket);
+    pubCountDownload(it);
+    pubDownloadFile(it);
+    pubDlNoteRefresh();
+    return;
+  }
   pubCountDownload(it);
   pubDownloadFile(it);
 }
@@ -11521,14 +11484,14 @@ function verifyTokenFromUrl(){
    offered again (after the same delay) on the next app open. */
 var giftTimer=null;
 function giftSchedule(){
-  if(giftTimer||giftDismissedSession)return;
+  if(giftTimer)return;
   var u=null;try{u=acctCurrent();}catch(e){}
   if(!u||!u.giftPending)return;
   giftTimer=setTimeout(function(){giftTimer=null;giftShow();},7000);
 }
 function giftShow(){
   var u=null;try{u=acctCurrent();}catch(e){}
-  if(!u||!u.giftPending||giftDismissedSession)return;
+  if(!u||!u.giftPending)return;
   /* The mandatory name gate always comes first — the gift popup
      never stacks on top of it; it is offered again after the
      name is saved (nameGateSave calls giftSchedule). */
@@ -11546,19 +11509,6 @@ function giftClaim(){
   acctRender();
   acctSyncGiftFlag=true;
   acctAdminSync();
-}
-/* «មិនបាច់ទេ · Not now»: close the gift popup WITHOUT claiming.
-   The gift is NOT lost — giftPending stays true, so the popup is
-   offered again on the next app open (same as closing the app
-   before claiming). Dismissing only hides it for THIS session so
-   it never blocks Play / Download. Without this, the popup had
-   no close button at all and its overlay intercepted every tap —
-   the user could not play or download anything while it was up. */
-var giftDismissedSession=false;
-function giftDismiss(){
-  if(giftTimer){clearTimeout(giftTimer);giftTimer=null;}
-  giftDismissedSession=true;
-  var s=document.getElementById('giftSheet');if(s)sheetHideAnim(s);
 }
 /* ===== Web Push · ដំណឹងចេញពីទូរស័ព្ទ (the phone's own notifications) =====
    Separate from Telegram: these alerts arrive through Web Push and
@@ -13307,9 +13257,6 @@ function genInit(){
   storyUpdateTotal();
   try{histMigrateLegacy();}catch(e){}
   histRender();
-  /* History sync (owner order 2026-11-17): pull the server copy
-     for this Gmail so old creations show on ANY device. */
-  try{histSyncPull();}catch(e){}
   d3SetProvider('hunyuan3d');
   uiInit();
   try{verifyTokenFromUrl();}catch(e){}
@@ -13417,10 +13364,10 @@ function offlineShow(kind){
   offlineKind=kind;
   if(kind==='offline'){
     e.title.textContent='អត់មានអ៊ីនធឺណិត · No internet';
-    e.body.textContent='ទូរស័ព្ទអត់មានអ៊ីនធឺណិត ឬបណ្ដាញយឺតពេក — សូមពិនិត្យ WiFi/4G រួចព្យាយាមម្ដងទៀត';
+    e.body.textContent='សូមពិនិត្យអ៊ីនធឺណិតរបស់អ្នក រួចព្យាយាមម្ដងទៀត';
   }else{
     e.title.textContent='Server មិនឆ្លើយ · Server unreachable';
-    e.body.textContent='អ៊ីនធឺណិតទូរស័ព្ទដំណើរការ តែ server មិនឆ្លើយ — វាអាចកំពុង restart សូមព្យាយាមម្ដងទៀត 1 នាទីក្រោយ';
+    e.body.textContent='server កំពុងដេក/មិនឆ្លើយ · Server unreachable — សូមរង់ចាំបន្តិច';
   }
   if(!offlineDismissed){
     /* Animate in (blur → clear) only on the hidden → shown
@@ -13491,32 +13438,6 @@ function offlineHide(){
     celebrate();
   }
 }
-/* Probe an independent, tiny endpoint (Google generate_204) to tell
-   "phone has no/slow internet" apart from "server is really down"
-   (owner order 2026-11-17: show the REAL problem, never blame the
-   server when the phone network is the fault). Resolves 'online' if
-   the phone reaches the internet, 'offline' otherwise. no-cors mode:
-   any response — even opaque — proves the phone is online. */
-function netProbe(){
-  return new Promise(function(resolve){
-    var done=false;
-    var finish=function(v){ if(!done){done=true;resolve(v);} };
-    var ctrl=null, timer=null;
-    try{
-      if(window.AbortController){
-        ctrl=new AbortController();
-        timer=setTimeout(function(){try{ctrl.abort();}catch(e){}},5000);
-      }
-    }catch(e){}
-    var opts={method:'GET',mode:'no-cors',cache:'no-store'};
-    if(ctrl)opts.signal=ctrl.signal;
-    fetch('https://www.google.com/generate_204',opts).then(function(){
-      if(timer)clearTimeout(timer); finish('online');
-    }).catch(function(){
-      if(timer)clearTimeout(timer); finish('offline');
-    });
-  });
-}
 function offlineFetch(){
   return new Promise(function(resolve){
     var ctrl=null,timer=null;
@@ -13544,18 +13465,7 @@ function offlineCheck(){
     offlineBusy=false;
     if(ok){offlineFailCount=0;if(offlineKind)offlineHide();}
     else if(!navigator.onLine){offlineShow('offline');}
-    else{
-      offlineFailCount++;
-      if(offlineFailCount>=2){
-        /* Heartbeat failed twice — but don't blame the server yet.
-           If the phone can't reach the independent probe either,
-           the fault is the phone's network, not the server. */
-        netProbe().then(function(probe){
-          if(probe==='offline') offlineShow('offline');
-          else offlineShow('server');
-        });
-      }
-    }
+    else{offlineFailCount++;if(offlineFailCount>=2)offlineShow('server');}
   });
 }
 function offlineRetry(){
@@ -13577,12 +13487,8 @@ function offlineRetry(){
     if(ok){offlineHide();}
     else{
       offlineFailCount=2;
-      /* Same distinction as offlineCheck: don't blame the server
-         when the phone itself can't reach the internet. */
-      netProbe().then(function(probe){
-        offlineShow(probe==='offline'?'offline':'server');
-        if(e.msg)e.msg.textContent='នៅមិនទាន់ភ្ជាប់បានទេ · Still not connected';
-      });
+      offlineShow(navigator.onLine?'server':'offline');
+      if(e.msg)e.msg.textContent='នៅមិនទាន់ភ្ជាប់បានទេ · Still not connected';
     }
   });
 }
