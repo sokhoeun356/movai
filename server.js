@@ -939,9 +939,15 @@ function getEmailTransporter() {
     if (!user || !pass || !NodemailerLib) return null;
     const key = user + '|' + pass.length;
     if (!emailTransporter || emailTransporterKey !== key) {
+      // Port 587 + STARTTLS (not 465): Render's network times out on
+      // smtp.gmail.com:465 (implicit TLS), but 587 is the standard
+      // submission port and connects. Explicit timeouts so a dead
+      // connection fails fast (15s) instead of hanging the request
+      // for nodemailer's 2-minute default (owner order 2026-11-17).
       emailTransporter = NodemailerLib.createTransport({
-        host: 'smtp.gmail.com', port: 465, secure: true,
+        host: 'smtp.gmail.com', port: 587, secure: false, requireTLS: true,
         auth: { user, pass },
+        connectionTimeout: 15000, greetingTimeout: 15000, socketTimeout: 30000,
       });
       emailTransporterKey = key;
     }
