@@ -4480,18 +4480,16 @@ function apiRoute(req, res, urlPath) {
           fs.createReadStream(cachedFp).on('error', () => { try { res.end(); } catch (e) {} }).pipe(res);
           return;
         }
-        // CLOUDINARY FIRST (owner order 2026-11-17, bug found 09:20):
-        // a non-MP3 source (provider WAV, 40-50 MB) goes to Cloudinary
-        // — it fetches the URL itself and converts to MP3 — instead of
-        // the local lamejs path, which peaks at ~420 MB RSS and can
-        // OOM-crash the 512 MB Render instance mid-download (user hit
-        // "Server unreachable" during a 52s conversion, 09:19).
-        // Redirect the browser to the Cloudinary MP3; fetch follows the
-        // redirect and the website still saves it under the song's own
-        // filename. MP3 sources skip Cloudinary (local path is just a
-        // download + cache, no encode). Falls back to local conversion
-        // only when Cloudinary is not configured or its upload fails.
-        if (!/\.mp3(\?|#|$)/i.test(u) && cloudinaryConfigured()) {
+        // CLOUDINARY ONLY (owner order 2026-11-17 ~09:32): the local
+        // WAV→MP3 conversion is TURNED OFF — it peaks at ~420 MB RSS
+        // and OOM-crashes the 512 MB Render instance (user hit "Server
+        // unreachable" during a 52s conversion, 09:19). A WAV goes to
+        // Cloudinary only (it fetches + converts); if Cloudinary is not
+        // configured or its upload fails, return a clear error instead
+        // of crashing the server. MP3 sources still use the local
+        // download+cache path below (no encode, low memory).
+        if (!/\.mp3(\?|#|$)/i.test(u)) {
+          if (!cloudinaryConfigured()) return sendJSON(res, 503, { ok: false, error: 'MP3 conversion unavailable — Cloudinary not configured' });
           const cl = await cloudinaryStoreSong(u);
           if (cl === 'gone') return sendJSON(res, 410, { ok: false, error: 'gone', message: 'This song is no longer available' });
           if (cl && cl.mp3Url) {
@@ -4499,7 +4497,7 @@ function apiRoute(req, res, urlPath) {
             res.end();
             return;
           }
-          console.error('[mp3] cloudinary upload failed for', u.slice(0, 120), '— falling back to local conversion');
+          return sendJSON(res, 503, { ok: false, error: 'MP3 conversion failed — Cloudinary could not store this song' });
         }
         const fname = await convertAndCacheMp3(u);
         if (fname === 'gone') return sendJSON(res, 410, { ok: false, error: 'gone', message: 'This song is no longer available' });
@@ -4542,38 +4540,21 @@ function apiRoute(req, res, urlPath) {
           return sendJSON(res, 200, { ok: true, url, provider: 'cloudinary' });
         }
         memLog('songstore-start');
-        // CLOUDINARY FIRST (owner order 2026-11-17, Hercules FINAL FIX):
-        // Cloudinary fetches the provider URL itself and converts the
-        // 50 MB Magic Hour WAV to MP3, so Render never loads the file
-        // (the local path peaks at ~420 MB RSS and can OOM the 512 MB
-        // instance). Falls back to the local path only when Cloudinary
-        // is not configured or its upload fails after 3 tries.
-        if (cloudinaryConfigured()) {
-          const cl = await cloudinaryStoreSong(url);
-          if (cl === 'gone') return sendJSON(res, 200, { ok: false, error: 'gone', url });
-          if (cl && cl.mp3Url) {
-            memLog('song-store-end');
-            return sendJSON(res, 200, { ok: true, url: cl.mp3Url, provider: 'cloudinary', publicId: cl.publicId, account: cl.accountLabel || '', accountId: cl.accountId || '' });
-          }
-          console.error('[songstore] cloudinary upload failed for', url.slice(0, 120), '— falling back to local conversion');
+        // CLOUDINARY ONLY (owner order 2026-11-17 ~09:32): the local
+        // WAV→MP3 conversion is TURNED OFF — it peaks at ~420 MB RSS
+        // and OOM-crashes the 512 MB Render instance. A provider audio
+        // URL goes to Cloudinary only (it fetches + converts to MP3);
+        // if Cloudinary is not configured or its upload fails, return a
+        // clear error instead of crashing the server. The website keeps
+        // the provider URL in that case (temporary) and retries later.
+        if (!cloudinaryConfigured()) return sendJSON(res, 200, { ok: false, error: 'cloudinary not configured', url });
+        const cl = await cloudinaryStoreSong(url);
+        if (cl === 'gone') return sendJSON(res, 200, { ok: false, error: 'gone', url });
+        if (cl && cl.mp3Url) {
+          memLog('song-store-end');
+          return sendJSON(res, 200, { ok: true, url: cl.mp3Url, provider: 'cloudinary', publicId: cl.publicId, account: cl.accountLabel || '', accountId: cl.accountId || '' });
         }
-        const fname = await convertAndCacheMp3(url);
-        if (fname === 'gone') return sendJSON(res, 200, { ok: false, error: 'gone', url });
-        if (!fname) return sendJSON(res, 200, { ok: false, error: 'store failed', url });
-        // Back the cached MP3 up to GitHub so it survives a Render
-        // restart. (convertAndCacheMp3's ghPersistFile is a no-op for
-        // mp3 files — it only handles GH_DATA_FILES — so this explicit
-        // ghPutUpload is the real backup.) A GitHub failure does NOT
-        // fail the request: the local file works now, and /uploads/
-        // falls back to GitHub when present.
-        try {
-          const b64 = fs.readFileSync(path.join(DATA_DIR, 'uploads', fname)).toString('base64');
-          await ghPutUpload(fname, b64);
-        } catch (e) {
-          console.error('[songstore] github backup failed for', fname, ':', String((e && e.message) || e).slice(0, 200));
-        }
-        memLog('song-store-end');
-        return sendJSON(res, 200, { ok: true, url: ownBase + '/uploads/' + fname });
+        return sendJSON(res, 200, { ok: false, error: 'cloudinary failed', url });
       } catch (e) {
         console.error('[songstore] failed for', url.slice(0, 120), ':', String((e && e.message) || e).slice(0, 200));
         memLog('songstore-end-failed');
