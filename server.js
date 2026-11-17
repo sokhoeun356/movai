@@ -636,7 +636,7 @@ function pubUser(u, modelLogins) {
   const map = modelLogins || loadModelLogins();
   const model = u.model || '';
   const count = model && map && typeof map === 'object' ? (Number(map[model]) || 0) : 0;
-  return { id: u.id || '', email: u.email, name: u.name || '', firstName: u.firstName || '', lastName: u.lastName || '', credits: u.credits, songCredits: u.songCredits, plan: u.plan || '', songPlan: u.songPlan || '', createdAt: u.createdAt, updatedAt: u.updatedAt, lastIp: u.lastIp || '', country: u.country || '', countryCode: u.countryCode || '', device: u.device || '', model, modelLogins: count, lastSeen: u.lastSeen || '', knownDevices: Array.isArray(u.knownDevices) ? u.knownDevices : [] };
+  return { id: u.id || '', email: u.email, name: u.name || '', firstName: u.firstName || '', lastName: u.lastName || '', credits: u.credits, songCredits: u.songCredits, plan: u.plan || '', songPlan: u.songPlan || '', createdAt: u.createdAt, updatedAt: u.updatedAt, lastIp: u.lastIp || '', country: u.country || '', countryCode: u.countryCode || '', device: u.device || '', model, modelLogins: count, lastSeen: u.lastSeen || '', knownDevices: Array.isArray(u.knownDevices) ? u.knownDevices : [], hasPassword: !!(u.passwordHash && u.passwordSalt) };
 }
 function logGrant(entry) {
   try {
@@ -1099,6 +1099,67 @@ function adminKeyRateOk(email, action) {
   rec.count += 1;
   return true;
 }
+// ---- Password auth (owner order 2026-11-17) ----
+// Sign-up: Google (proves the Gmail belongs to them) -> create a
+// password -> Create Account. Sign-in: Gmail + password. Passwords are
+// NEVER stored in plain text — scrypt with a per-user random salt.
+// The hash/salt live on the user record in users.json; pubUser() never
+// returns them (only hasPassword:true/false so the website knows
+// whether to show the Create Password screen).
+const scryptAsync = (password, salt, keylen) => new Promise((resolve, reject) => {
+  crypto.scrypt(password, salt, keylen, (err, derived) => err ? reject(err) : resolve(derived));
+});
+async function hashPassword(password) {
+  const salt = crypto.randomBytes(16);
+  const hash = await scryptAsync(password, salt, 64);
+  return { salt: salt.toString('hex'), hash: hash.toString('hex') };
+}
+async function verifyPassword(password, saltHex, hashHex) {
+  try {
+    const hash = await scryptAsync(password, Buffer.from(saltHex, 'hex'), 64);
+    const expected = Buffer.from(hashHex, 'hex');
+    return hash.length === expected.length && crypto.timingSafeEqual(hash, expected);
+  } catch (e) { return false; }
+}
+// Verify a Google ID token for ANY Gmail (not just admins). Same checks
+// as the admin verify-google endpoint (aud, iss, email_verified, exp).
+// Returns {email, name, picture} or null.
+async function verifyGoogleIdToken(idToken) {
+  try {
+    const r = await fetch('https://oauth2.googleapis.com/tokeninfo?id_token=' + encodeURIComponent(idToken), { signal: AbortSignal.timeout(10000) });
+    if (!r.ok) return null;
+    const info = await r.json().catch(() => null);
+    if (!info || typeof info !== 'object') return null;
+    if (info.aud !== MOVAI_GOOGLE_CLIENT_ID) return null;
+    if (info.iss !== 'accounts.google.com' && info.iss !== 'https://accounts.google.com') return null;
+    if (info.email_verified !== 'true' && info.email_verified !== true) return null;
+    const expMs = Number(info.exp) * 1000;
+    if (!Number.isFinite(expMs) || expMs <= Date.now()) return null;
+    const email = normEmail(info.email);
+    if (!email) return null;
+    return { email, name: typeof info.name === 'string' ? info.name : '', picture: typeof info.picture === 'string' ? info.picture : '' };
+  } catch (e) { return null; }
+}
+// Brute-force guard for Gmail+password sign-in: 5 wrong passwords ->
+// that Gmail is locked for 15 minutes. A correct password always
+// clears the lock. In-memory only (a restart clears it); the lock is
+// a throttle, not a permanent block.
+const signinFails = new Map(); // email -> {count, lockedUntil}
+function signinLocked(email) {
+  const f = signinFails.get(email);
+  if (!f) return false;
+  if (f.lockedUntil && Date.now() < f.lockedUntil) return true;
+  if (f.lockedUntil && Date.now() >= f.lockedUntil) { signinFails.delete(email); return false; }
+  return false;
+}
+function signinFail(email) {
+  const f = signinFails.get(email) || { count: 0, lockedUntil: 0 };
+  f.count += 1;
+  if (f.count >= 5) f.lockedUntil = Date.now() + 15 * 60 * 1000;
+  signinFails.set(email, f);
+  return f;
+}
+function signinClear(email) { signinFails.delete(email); }
 const VAPID_FILE = path.join(DATA_DIR, 'vapid.json');
 const VAPID_SUBJECT = 'mailto:sokhoeun356@gmail.com';
 const PUSH_SUBS_FILE = path.join(DATA_DIR, 'push-subs.json');
@@ -3162,6 +3223,91 @@ function apiRoute(req, res, urlPath) {
         addNotification('security', email, '🔐 ឧបករណ៍ថ្មី · New device login', email + ' logged in from a new device: ' + (_model || _dev || 'Unknown') + ' · IP ' + (_cip || '—'));
       }
       return sendJSON(res, 200, { ok: true, user: pubUser(u, _modelLogins) });
+    }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
+    return;
+  }
+  // POST /api/auth/set-password — {idToken, password, passwordConfirm}
+  // PUBLIC. The website calls this after a Google sign-in (sign-up or
+  // forgot-password): the Google ID token proves the Gmail belongs to
+  // the caller, so the server sets (or resets) the MovAi password for
+  // that Gmail. Password 6–64 chars, must match the confirmation.
+  // Creates the user (0/0, giftClaimed:false) if they do not exist yet.
+  // Returns {ok:true, user} (pubUser, with hasPassword:true) so the
+  // website can log them in. The password hash is scrypt + per-user
+  // salt — never plain text, never returned.
+  if (req.method === 'POST' && urlPath === '/api/auth/set-password') {
+    readJSONBody(req, 64 * 1024).then(async (body) => {
+      const idToken = body && typeof body.idToken === 'string' ? body.idToken.trim() : '';
+      const password = body && typeof body.password === 'string' ? body.password : '';
+      const passwordConfirm = body && typeof body.passwordConfirm === 'string' ? body.passwordConfirm : '';
+      if (!idToken) return sendJSON(res, 200, { ok: false, error: 'Google sign-in មិនត្រឹមត្រូវទេ · Google sign-in failed' });
+      if (password.length < 6 || password.length > 64) return sendJSON(res, 200, { ok: false, error: 'Password ត្រូវមាន 6–64 តួអក្សរ · Password must be 6–64 characters' });
+      if (password !== passwordConfirm) return sendJSON(res, 200, { ok: false, error: 'Password ទាំងពីរមិនដូចគ្នាទេ · Passwords do not match' });
+      const g = await verifyGoogleIdToken(idToken);
+      if (!g) return sendJSON(res, 200, { ok: false, error: 'Google sign-in មិនត្រឹមត្រូវទេ · Google sign-in failed' });
+      const email = g.email;
+      // Blocked IP / Gmail: refuse (same as sync).
+      const _cip0 = getClientIp(req);
+      if (_cip0 && loadBlockedIps().some((b) => b === _cip0)) return sendJSON(res, 200, { ok: false, error: 'គណនីនេះត្រូវបានប្លុក · This account is blocked' });
+      if (loadBlockedEmails().some((b) => b === email)) return sendJSON(res, 200, { ok: false, error: 'គណនីនេះត្រូវបានប្លុក · This account is blocked' });
+      const now = new Date().toISOString();
+      logActivity({ at: now, mode: 'set-password', email });
+      const users = loadUsers();
+      const isNewUser = !users[email];
+      let u = users[email];
+      if (!u) {
+        const takenIds = new Set(Object.values(users).map((x) => x.id).filter(Boolean));
+        u = { id: genUserId(takenIds), email, name: g.name || '', credits: 0, songCredits: 0, giftClaimed: false, plan: '', songPlan: '', createdAt: now, updatedAt: now };
+        users[email] = u;
+      } else {
+        if (!u.id) { const takenIds = new Set(Object.values(users).map((x) => x.id).filter(Boolean)); u.id = genUserId(takenIds); }
+        if (g.name && !u.name) u.name = g.name;
+        u.updatedAt = now;
+      }
+      const hp = await hashPassword(password);
+      u.passwordSalt = hp.salt;
+      u.passwordHash = hp.hash;
+      u.updatedAt = now;
+      // A (re)set password clears any sign-in lock for this Gmail.
+      signinClear(email);
+      saveUsers(users);
+      await ghFlushFile(USERS_FILE);
+      if (isNewUser) addNotification('login', email, '👤 អ្នកប្រើថ្មី · New user', (u.name || email) + ' (' + email + ') បានចុះឈ្មោះ (Sign-up + Password)');
+      return sendJSON(res, 200, { ok: true, user: pubUser(u) });
+    }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
+    return;
+  }
+  // POST /api/auth/signin — {email, password} — PUBLIC. Gmail +
+  // password sign-in (the normal sign-in after sign-up). Verifies the
+  // scrypt hash; 5 wrong passwords lock the Gmail for 15 minutes.
+  // Returns {ok:true, user} (pubUser) so the website can log them in
+  // the same way as a Google sign-in. The error never says whether
+  // the Gmail exists or the password was wrong.
+  if (req.method === 'POST' && urlPath === '/api/auth/signin') {
+    readJSONBody(req, 64 * 1024).then(async (body) => {
+      const email = normEmail(body && body.email);
+      const password = body && typeof body.password === 'string' ? body.password : '';
+      if (!email || !password) return sendJSON(res, 200, { ok: false, error: 'សូមដាក់ Gmail និង Password · Please enter Gmail and password' });
+      // Blocked IP / Gmail: refuse (same as sync).
+      const _cip0 = getClientIp(req);
+      if (_cip0 && loadBlockedIps().some((b) => b === _cip0)) return sendJSON(res, 200, { ok: false, error: 'គណនីនេះត្រូវបានប្លុក · This account is blocked' });
+      if (loadBlockedEmails().some((b) => b === email)) return sendJSON(res, 200, { ok: false, error: 'គណនីនេះត្រូវបានប្លុក · This account is blocked' });
+      if (signinLocked(email)) return sendJSON(res, 200, { ok: false, error: 'បញ្ចូល Password ខុសច្រើនដងពេកហើយ សាកល្បងម្តងទៀត 15 នាទីក្រោយ · Too many wrong attempts, try again in 15 minutes' });
+      const users = loadUsers();
+      const u = users[email];
+      const bad = () => sendJSON(res, 200, { ok: false, error: 'Gmail ឬ Password មិនត្រឹមត្រូវទេ · Wrong Gmail or password' });
+      if (!u || !u.passwordHash || !u.passwordSalt) { signinFail(email); return bad(); }
+      const okPw = await verifyPassword(password, u.passwordSalt, u.passwordHash);
+      if (!okPw) { signinFail(email); return bad(); }
+      signinClear(email);
+      const now = new Date().toISOString();
+      logActivity({ at: now, mode: 'signin', email });
+      u.lastSeen = now;
+      if (_cip0) u.lastIp = _cip0;
+      u.updatedAt = now;
+      saveUsers(users);
+      await ghFlushFile(USERS_FILE);
+      return sendJSON(res, 200, { ok: true, user: pubUser(u) });
     }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
     return;
   }
