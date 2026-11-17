@@ -549,13 +549,13 @@ img.hist-media,.d3-preview{cursor:zoom-in}
 .mv-auto-grad .mc-name span{color:var(--accent)}
 .mv-shade{position:absolute;inset:0;background:linear-gradient(rgba(0,0,0,.46),rgba(0,0,0,.10) 24%,rgba(0,0,0,.30) 50%,rgba(0,0,0,.12) 64%,rgba(0,0,0,.68));pointer-events:none}
 .mv-title{position:absolute;top:6%;left:6%;right:6%;text-align:center;color:#fff;pointer-events:none;z-index:3}
-.mv-title-txt{display:inline-block;max-width:100%;background:rgba(0,0,0,.55);border-radius:12px;padding:9px 20px 11px;font-size:1.3125rem;font-weight:900;line-height:1.4;letter-spacing:.01em;color:#fff;text-shadow:0 1px 3px rgba(0,0,0,.95),0 3px 14px rgba(0,0,0,.85);box-shadow:0 6px 22px rgba(0,0,0,.4),inset 0 -3px 0 var(--mv-acc,var(--accent));overflow-wrap:break-word;box-decoration-break:clone;-webkit-box-decoration-break:clone}
+.mv-title-txt{display:inline-block;max-width:100%;background:rgba(0,0,0,.55);border-radius:12px;padding:10px 22px 13px;font-size:1.75rem;font-weight:900;line-height:1.35;letter-spacing:.01em;color:#fff;text-shadow:0 1px 3px rgba(0,0,0,.95),0 3px 14px rgba(0,0,0,.85);box-shadow:0 6px 22px rgba(0,0,0,.4),inset 0 -3px 0 var(--mv-acc,var(--accent));overflow-wrap:break-word;box-decoration-break:clone;-webkit-box-decoration-break:clone}
 .mv-bg-style{position:absolute;inset:0;pointer-events:none}
 .mv-lyrics{position:absolute;left:6%;right:6%;top:50%;transform:translateY(-50%);text-align:center;pointer-events:none;z-index:3}
-.mv-line{font-size:1.0625rem;line-height:1.55;color:rgba(255,255,255,.85);text-shadow:0 1px 3px rgba(0,0,0,.95),0 2px 12px rgba(0,0,0,.85);transition:color .25s ease,font-size .25s ease;overflow-wrap:break-word}
+.mv-line{font-size:0.9375rem;line-height:1.55;color:rgba(255,255,255,.85);text-shadow:0 1px 3px rgba(0,0,0,.95),0 2px 12px rgba(0,0,0,.85);transition:color .25s ease,font-size .25s ease;overflow-wrap:break-word}
 .mv-line .mv-line-txt{background:rgba(0,0,0,.40);border-radius:10px;padding:3px 12px;box-decoration-break:clone;-webkit-box-decoration-break:clone}
-.mv-line.on{color:#fff;font-size:1.625rem;font-weight:900;line-height:1.45}
-.mv-line.on + .mv-line{margin-top:12px}
+.mv-line.on{color:#fff;font-size:1.125rem;font-weight:800;line-height:1.5}
+.mv-line.on + .mv-line{margin-top:10px}
 .mv-line.on .mv-line-txt{background:rgba(0,0,0,.58);padding:4px 14px;box-shadow:0 4px 18px rgba(0,0,0,.35)}
 .mv-line .mv-line-tr{display:block;width:fit-content;max-width:100%;margin:6px auto 0;font-size:0.8125rem;font-weight:700;color:var(--mv-acc,var(--accent));background:rgba(0,0,0,.5);border-radius:8px;padding:2px 10px;text-shadow:0 1px 3px rgba(0,0,0,.9)}
 .mv-bigplay{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:72px;height:72px;border-radius:50%;border:1px solid rgba(255,255,255,.55);background:rgba(8,10,6,.48);-webkit-backdrop-filter:blur(4px);backdrop-filter:blur(4px);color:#fff;font-size:1.5rem;display:none;align-items:center;justify-content:center;cursor:pointer;padding:0;z-index:4;font-family:inherit}
@@ -16622,20 +16622,25 @@ try{if('speechSynthesis' in window){speechSynthesis.getVoices();if(speechSynthes
 </script>
 <script>
 /* ===== MV view (owner order 2026-11-17) =====
-   MV is a PLAYER / VIEW, not a video-file export. ONE TAP on
-   any song card's «MV» button (Create results, History,
-   Playlist, Public big card + compact rows) does everything:
-   the MV starts at once full-screen with the pre-selected AUTO
-   defaults — screen format 9:16, the automatic background (the
-   song's cover or a generated MovAi backdrop), the song title
-   on screen, lyrics fetched automatically when the song has
-   none, and playback starting immediately. The setup sheet
-   (screen format 9:16 / 16:9 / 1:1 / 4:5 / 3:4 / 4:3 / 21:9,
-   background auto or the user's own uploaded video / image,
-   optional translation language) stays available from the
-   options button inside the MV view for anyone who wants to
-   change those defaults. The lyrics run karaoke-style: the
-   line being sung is highlighted in time with the playback.
+   MV is a PLAYER / VIEW, not a video-file export. Tapping any
+   song card's «MV» button (Create results, History, Playlist,
+   Public big card + compact rows) opens the SETUP SHEET first
+   — it does NOT start the video. The sheet carries the
+   pre-selected defaults (screen format 9:16, the automatic
+   background — the song's cover or a generated MovAi
+   backdrop) and the user picks the format (9:16 / 16:9 / 1:1
+   / 4:5 / 3:4 / 4:3 / 21:9), the background (auto or their own
+   uploaded video / image), lyrics and an optional translation
+   language; only the sheet's Start MV button runs everything
+   at once into the full-screen video: the song title on
+   screen (the BIG text), lyrics fetched automatically when
+   the song has none, and playback starting. The options
+   button inside the MV view re-opens the same sheet with the
+   current choices kept. On screen the song TITLE is the large
+   headline text; the lyric lines stay normal small text, the
+   line being sung only slightly larger and bold. The lyrics
+   run karaoke-style: the line being sung is highlighted in
+   time with the playback.
    Lyrics come from the text the song was created with when it
    has some; when it has none, AI listens via the server (POST
    /api/mv/lyrics) using the song's STORED Cloudinary MP3 URL
@@ -16742,15 +16747,15 @@ function mvResolveLines(song){
   }
   return {kind:'none',lines:null};
 }
-/* ONE TAP (owner order 2026-11-17): tapping a song's MV button
-   does EVERYTHING at once — format and background are the
-   pre-selected AUTO defaults, lyrics are fetched automatically
-   when the song has none, and playback starts immediately; the
-   user never has to tap through the setup choices first. The
-   setup sheet still exists for anyone who wants to CHANGE the
-   format / background / translation: the options button inside
-   the MV view opens it (mvOpenSetup) with the current choices
-   kept, and its Start MV button re-runs the MV with them. */
+/* CHOOSE FIRST, THEN START (owner correction 2026-11-17,
+   supersedes the one-tap auto-start): tapping a song's MV
+   button does NOT start the video — it opens the setup sheet
+   with the defaults pre-selected (9:16, auto background), so
+   the user picks the format / background / lyrics /
+   translation properly first. Only the sheet's Start MV
+   button (mvStart) runs everything at once into the video.
+   The options button inside the MV view re-opens the same
+   sheet (mvOpenSetup) with the current choices kept. */
 function mvOpen(song){
   if(!song||!song.url)return;
   mvBgClear();
@@ -16758,7 +16763,7 @@ function mvOpen(song){
   mvState.fmt='9x16';mvState.bgMode='auto';mvState.curLine=-2;
   var sel=document.getElementById('mvTrLang');if(sel)sel.value='';
   mvMsgShow('','');
-  mvStart();
+  mvOpenSetup();
 }
 function mvOpenSetup(){
   if(!mvState.song)return;
@@ -17385,9 +17390,9 @@ function mvExpDraw(){
   /* Title: white bold text on its own dark plate with the song's
      accent underline and a hard shadow — readable on any frame. */
   cx.textAlign='center';cx.textBaseline='top';
-  cx.font='900 '+Math.round(W*0.052)+'px system-ui,sans-serif';
+  cx.font='900 '+Math.round(W*0.07)+'px system-ui,sans-serif';
   var tl=mvExpWrap(cx,song.title||'MovAi',W*0.82);
-  var tLines=Math.min(2,tl.length),tLh=W*0.066,tTw=0;
+  var tLines=Math.min(2,tl.length),tLh=W*0.088,tTw=0;
   for(var tm=0;tm<tLines;tm++)tTw=Math.max(tTw,cx.measureText(tl[tm]).width);
   var tPadX=W*0.035,tPadY=W*0.016,tPlateW=tTw+tPadX*2,tPlateH=tLines*tLh+tPadY*2,tPlateY=H*0.05;
   cx.fillStyle='rgba(0,0,0,.55)';
@@ -17409,8 +17414,8 @@ function mvExpDraw(){
     else idx=0;
     if(idx<0)idx=0;
     var cur=lines[idx];
-    var fs=Math.round(W*0.058);
-    cx.font='900 '+fs+'px system-ui,sans-serif';
+    var fs=Math.round(W*0.042);
+    cx.font='800 '+fs+'px system-ui,sans-serif';
     var cl=mvExpWrap(cx,cur.text,W*0.88);
     var lh=fs*1.4,totalH=cl.length*lh,y0=H*0.52-totalH/2,maxw=0;
     cl.forEach(function(L){maxw=Math.max(maxw,cx.measureText(L).width);});
