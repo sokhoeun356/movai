@@ -336,15 +336,15 @@ textarea.input{resize:vertical}
 .prov-combo{display:flex;gap:8px;align-items:flex-start;margin-bottom:12px}
 .prov-combo #genProviderWrap{position:relative;flex:1 1 auto;min-width:0}
 .prov-combo #genSongModelWrap{position:relative;flex:0 0 auto}
-.prov-combo #genImgModelWrap{position:relative;flex:0 0 auto}
+.prov-combo #genImgProviderWrap,.prov-combo #genAgnesModelWrap{position:relative;flex:0 0 auto}
 .prov-combo #genMhModelWrap,.prov-combo #genMhVidModelWrap,.prov-combo #genNovaiModelWrap,.prov-combo #genSunoModelWrap,.prov-combo #genMhSongVerWrap{position:relative;flex:0 1 46%;min-width:0}
 .prov-combo .input{min-height:38px;padding:8px 12px;font-size:0.84375rem;border-radius:999px;background:var(--card)}
 .prov-combo .kbtn{padding:8px 14px;font-size:0.8125rem;min-height:38px;border-radius:999px}
-.prov-combo #genProviderFieldName,.prov-combo #genMhModelFieldName,.prov-combo #genMhVidModelFieldName,.prov-combo #genNovaiModelFieldName,.prov-combo #genSunoModelFieldName,.prov-combo #genSongModelFieldName,.prov-combo #genImgModelFieldName{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.prov-combo #genProviderFieldName,.prov-combo #genMhModelFieldName,.prov-combo #genMhVidModelFieldName,.prov-combo #genNovaiModelFieldName,.prov-combo #genSunoModelFieldName,.prov-combo #genSongModelFieldName,.prov-combo #genImgProviderFieldName,.prov-combo #genAgnesModelFieldName{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .prov-combo #genSunoModelFieldTag,.prov-combo #genMhModelFieldCost,.prov-combo #genMhVidModelFieldTag{display:none}
 .prov-combo #genProviderDrop{left:0!important;right:auto!important;width:min(86vw,340px)}
 .prov-combo #genSongModelDrop{left:0!important;right:auto!important;width:min(86vw,300px)}
-.prov-combo #genImgModelDrop{left:0!important;right:auto!important;width:min(86vw,300px)}
+.prov-combo #genImgProviderDrop,.prov-combo #genAgnesModelDrop{left:0!important;right:auto!important;width:min(86vw,300px)}
 .prov-combo #genMhModelDrop,.prov-combo #genMhVidModelDrop,.prov-combo #genNovaiModelDrop,.prov-combo #genSunoModelDrop{left:auto!important;right:0;width:min(86vw,340px)}
 .prov-combo .mh-ver-chip{display:flex;justify-content:space-between;align-items:center;gap:8px;width:100%;min-height:38px;padding:8px 12px;border:1px solid var(--line2);border-radius:999px;background:var(--card);font-size:0.84375rem;color:var(--text)}
 .prov-combo .mh-ver-chip .mh-ver-auto{font-size:0.75rem;color:#9a9ea6;white-space:nowrap}
@@ -2253,7 +2253,7 @@ html[data-mode="light"] .chat-bubble.err{color:#b91c1c;background:rgba(220,38,38
 .chat-send:disabled{opacity:.45;cursor:not-allowed}
 /* ===== Light mode surfaces ===== */
 html[data-mode="light"] .drawer-backdrop{background:rgba(20,22,40,.35)}
-html[data-mode="light"] #genProviderDrop,html[data-mode="light"] #genMhModelDrop,html[data-mode="light"] #genMhVidModelDrop,html[data-mode="light"] #genSongModelDrop,html[data-mode="light"] #genImgModelDrop{background:#ffffff !important;border-color:rgba(20,22,30,.12) !important;box-shadow:0 16px 40px rgba(20,22,40,.16)}
+html[data-mode="light"] #genProviderDrop,html[data-mode="light"] #genMhModelDrop,html[data-mode="light"] #genMhVidModelDrop,html[data-mode="light"] #genSongModelDrop,html[data-mode="light"] #genImgProviderDrop,html[data-mode="light"] #genAgnesModelDrop{background:#ffffff !important;border-color:rgba(20,22,30,.12) !important;box-shadow:0 16px 40px rgba(20,22,40,.16)}
 html[data-mode="light"] [style*="color:#9a9ea6"]{color:#5f646e !important}
 html[data-mode="light"] [style*="background:rgba(255,255,255,.1)"]{background:rgba(20,22,30,.12) !important}
 html[data-mode="light"] [style*="border-top:1px solid rgba(255,255,255,.08)"]{border-top-color:rgba(20,22,30,.1) !important}
@@ -2357,7 +2357,7 @@ html[data-mode="light"] .mv-a{color:var(--accent-text)}
 .hist-carousel{transform:translateZ(0)}
 .drawer{will-change:transform}
 .pkg-sheet-card{transform:translateZ(0)}
-#genProviderDrop,#genMhModelDrop,#genMhVidModelDrop,#genSunoModelDrop,#genSongModelDrop,#genImgModelDrop{transform:translateZ(0)}
+#genProviderDrop,#genMhModelDrop,#genMhVidModelDrop,#genSunoModelDrop,#genSongModelDrop,#genImgProviderDrop,#genAgnesModelDrop{transform:translateZ(0)}
 /* Looping animations paused by the smart-activation observer while
    their element is off-screen (see animWatch in the script). */
 .anim-off{animation-play-state:paused !important}
@@ -2395,7 +2395,7 @@ html[data-smooth="1"] .brand-frame,html[data-smooth="1"] .acct-chip,html[data-sm
 @keyframes movaiBlurIn{from{opacity:0;filter:blur(14px)}to{opacity:1;filter:blur(0)}}
 .drawer{filter:blur(14px);opacity:0;transition:transform .28s ease,filter .28s ease,opacity .28s ease}
 .drawer.shown{filter:blur(0);opacity:1}
-#genProviderDrop[style*="display: block"],#genMhModelDrop[style*="display: block"],#genMhVidModelDrop[style*="display: block"],#genNovaiModelDrop[style*="display: block"],#genSunoModelDrop[style*="display: block"],#genSongModelDrop[style*="display: block"],#genImgModelDrop[style*="display: block"],#songStylePresetDrop[style*="display: block"],#genErrBox[style*="display: block"]{animation:movaiBlurIn .25s ease-out both}
+#genProviderDrop[style*="display: block"],#genMhModelDrop[style*="display: block"],#genMhVidModelDrop[style*="display: block"],#genNovaiModelDrop[style*="display: block"],#genSunoModelDrop[style*="display: block"],#genSongModelDrop[style*="display: block"],#genImgProviderDrop[style*="display: block"],#genAgnesModelDrop[style*="display: block"],#songStylePresetDrop[style*="display: block"],#genErrBox[style*="display: block"]{animation:movaiBlurIn .25s ease-out both}
 /* ===== SONAR style (owner order 2026-11-17) =====
    STYLE ONLY — no MovAi content or function changes. The
    owner pointed at the SONAR screenshot and asked for its
@@ -3023,12 +3023,19 @@ input[type=range].st-range{accent-color:var(--accent);min-height:32px;cursor:poi
           </button>
           <div id="genSongModelDrop" style="display:none;position:absolute;left:0;right:0;top:100%;z-index:30;background:#1a1c21;border:1px solid rgba(255,255,255,.12);border-radius:12px;margin-top:6px;overflow-y:auto;max-height:11.25rem;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;touch-action:pan-y;box-shadow:0 16px 40px rgba(0,0,0,.5)"></div>
         </div>
-        <div id="genImgModelWrap" style="display:none">
-          <button type="button" class="input" id="genImgModelField" onclick="genToggleImgModels()" style="display:none;justify-content:space-between;align-items:center;gap:10px;cursor:pointer;text-align:left;width:100%" aria-label="Image model">
-            <span style="display:flex;align-items:center;gap:8px;min-width:0"><span id="genImgModelFieldName" style="font-weight:700">NovAI</span></span>
+        <div id="genImgProviderWrap" style="display:none">
+          <button type="button" class="input" id="genImgProviderField" onclick="genToggleImgProviders()" style="display:none;justify-content:space-between;align-items:center;gap:10px;cursor:pointer;text-align:left;width:100%" aria-label="Image provider">
+            <span style="display:flex;align-items:center;gap:8px;min-width:0"><span id="genImgProviderFieldName" style="font-weight:700">NovAI</span></span>
             <span style="font-size:0.75rem;color:#9a9ea6">▼</span>
           </button>
-          <div id="genImgModelDrop" style="display:none;position:absolute;left:0;right:0;top:100%;z-index:30;background:#1a1c21;border:1px solid rgba(255,255,255,.12);border-radius:12px;margin-top:6px;overflow-y:auto;max-height:11.25rem;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;touch-action:pan-y;box-shadow:0 16px 40px rgba(0,0,0,.5)"></div>
+          <div id="genImgProviderDrop" style="display:none;position:absolute;left:0;right:0;top:100%;z-index:30;background:#1a1c21;border:1px solid rgba(255,255,255,.12);border-radius:12px;margin-top:6px;overflow-y:auto;max-height:11.25rem;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;touch-action:pan-y;box-shadow:0 16px 40px rgba(0,0,0,.5)"></div>
+        </div>
+        <div id="genAgnesModelWrap" style="display:none">
+          <button type="button" class="input" id="genAgnesModelField" onclick="genToggleAgnesModels()" style="display:none;justify-content:space-between;align-items:center;gap:10px;cursor:pointer;text-align:left;width:100%" aria-label="Agnes image model">
+            <span style="display:flex;align-items:center;gap:8px;min-width:0"><span id="genAgnesModelFieldName" style="font-weight:700">Agnes 2.5</span></span>
+            <span style="font-size:0.75rem;color:#9a9ea6">▼</span>
+          </button>
+          <div id="genAgnesModelDrop" style="display:none;position:absolute;left:0;right:0;top:100%;z-index:30;background:#1a1c21;border:1px solid rgba(255,255,255,.12);border-radius:12px;margin-top:6px;overflow-y:auto;max-height:11.25rem;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;touch-action:pan-y;box-shadow:0 16px 40px rgba(0,0,0,.5)"></div>
         </div>
         <div id="genMhModelWrap" style="display:none">
           <button type="button" class="input" id="genMhModelField" onclick="genToggleMhModels()" style="display:none;justify-content:space-between;align-items:center;gap:10px;cursor:pointer;text-align:left;width:100%" aria-label="Magic Hour image model">
@@ -5560,67 +5567,129 @@ function genSetSongModel(key){
   genRenderProviders();genCloseProviders();genRenderOptions();
   if(gen.mode==='song')songRenderOpts();
 }
-/* ===== Image model selector (owner order 2026-11-18: ADD Agnes
-   alongside NovAI; extended same day: ALL Agnes image models) =====
-   Image mode shows ONE compact dropdown with exactly FOUR models —
-   NovAI and the three Agnes image models. Each is named SIMPLY by
-   its own name (owner order: no messy extra labels). Picking a
-   model selects its provider automatically (NovAI → cogview-3-flash,
-   Agnes 2.0 → agnes-image-2.0-flash, Agnes 2.1 →
-   agnes-image-2.1-flash, Agnes 2.5 → agnes-image-2.5-flash).
-   NovAI is the pinned default and the last pick is remembered in
-   localStorage ('movai-img-model'). The Admin providers.image
+/* ===== Image provider + model selector, TWO STEPS (owner correction
+   2026-11-18: do NOT mix Agnes with NovAI) =====
+   Step 1 — PROVIDER: two separate, clear choices: NovAI or Agnes AI.
+   Step 2 — MODEL (only when Agnes AI is chosen): pick ONE of its
+   three image models: 2.0 / 2.1 / 2.5. NovAI has only
+   cogview-3-flash in MovAi, so it has no model step — the model
+   field hides when NovAI is picked. Names stay SIMPLE (just the
+   provider/model names, no messy extra labels). NovAI is the
+   pinned default. Both picks are remembered in localStorage
+   ('movai-img-provider' + 'movai-img-agnes-model'); the old single
+   key ('movai-img-model': novai / agnes / agnes-2.0 / agnes-2.1 /
+   agnes-2.5) is migrated on first read. The Admin providers.image
    setting is not used for the generate path, except when it names
    Magic Hour (the paid image path) — that keeps working exactly
    as before. NOTE on cost: the Agnes docs list 2.5-flash as free
    ($0) but 2.0/2.1-flash as paid ($0.015/image at 1K); other
-   sources say all three are $0. All three are charged 0 MovAi
+   sources say all three are $0, and all three were live-tested
+   working on the owner's free key. All three are charged 0 MovAi
    credits here — a paid-model failure is reported, never charged. */
-var IMG_MODELS=[
- {key:'novai',label:'NovAI',provider:'novai',model:'cogview-3-flash'},
- {key:'agnes-2.0',label:'Agnes 2.0',provider:'agnes',model:'agnes-image-2.0-flash'},
- {key:'agnes-2.1',label:'Agnes 2.1',provider:'agnes',model:'agnes-image-2.1-flash'},
- {key:'agnes-2.5',label:'Agnes 2.5',provider:'agnes',model:'agnes-image-2.5-flash'}
+var IMG_PROVIDERS=[
+ {key:'novai',label:'NovAI'},
+ {key:'agnes',label:'Agnes AI'}
 ];
-function imgModelByKey(k){for(var i=0;i<IMG_MODELS.length;i++)if(IMG_MODELS[i].key===k)return IMG_MODELS[i];return null;}
-function imgModelCurKey(){
+var AGNES_IMG_MODELS=[
+ {key:'2.0',label:'Agnes 2.0',model:'agnes-image-2.0-flash'},
+ {key:'2.1',label:'Agnes 2.1',model:'agnes-image-2.1-flash'},
+ {key:'2.5',label:'Agnes 2.5',model:'agnes-image-2.5-flash'}
+];
+function imgMigrateOldPick(){
   var k=null;try{k=localStorage.getItem('movai-img-model');}catch(e){}
-  if(k==='agnes')k='agnes-2.5'; /* old single Agnes pick = 2.5, same model */
-  return imgModelByKey(k)?k:'novai';
+  if(!k)return;
+  try{localStorage.removeItem('movai-img-model');}catch(e){}
+  if(k==='novai'){try{localStorage.setItem('movai-img-provider','novai');}catch(e){}return;}
+  var m=k==='agnes'?'2.5':(k.indexOf('agnes-')===0?k.slice(6):null);
+  if(m==='2.0'||m==='2.1'||m==='2.5'){
+    try{localStorage.setItem('movai-img-provider','agnes');localStorage.setItem('movai-img-agnes-model',m);}catch(e){}
+  }
 }
-function imgModelApplyKey(k){
-  var m=imgModelByKey(k)||IMG_MODELS[0];
-  try{localStorage.setItem('movai-img-model',m.key);}catch(e){}
+function imgProviderCur(){
+  imgMigrateOldPick();
+  var p=null;try{p=localStorage.getItem('movai-img-provider');}catch(e){}
+  return (p==='novai'||p==='agnes')?p:'novai';
+}
+function imgProviderApply(p){
+  p=(p==='agnes')?'agnes':'novai';
+  try{localStorage.setItem('movai-img-provider',p);}catch(e){}
+  return p;
+}
+function imgAgnesModelByKey(k){for(var i=0;i<AGNES_IMG_MODELS.length;i++)if(AGNES_IMG_MODELS[i].key===k)return AGNES_IMG_MODELS[i];return null;}
+function imgAgnesModelCur(){
+  var k=null;try{k=localStorage.getItem('movai-img-agnes-model');}catch(e){}
+  return imgAgnesModelByKey(k)?k:'2.5';
+}
+function imgAgnesModelApply(k){
+  var m=imgAgnesModelByKey(k)||AGNES_IMG_MODELS[2];
+  try{localStorage.setItem('movai-img-agnes-model',m.key);}catch(e){}
   return m;
 }
-function genRenderImgModels(){
-  var wrap=document.getElementById('genImgModelWrap');if(!wrap)return;
+/* The two-step pick as one {provider, model} pair for the server:
+   novai → cogview-3-flash; agnes + 2.0/2.1/2.5 → that Agnes model. */
+function imgPickCur(){
+  var p=imgProviderCur();
+  if(p==='agnes'){var m=imgAgnesModelByKey(imgAgnesModelCur())||AGNES_IMG_MODELS[2];return {provider:'agnes',model:m.model};}
+  return {provider:'novai',model:'cogview-3-flash'};
+}
+function genRenderImgProviders(){
+  var wrap=document.getElementById('genImgProviderWrap');if(!wrap)return;
   var show=gen.mode==='image';
   wrap.style.display=show?'block':'none';
-  if(!show){genCloseImgModels();return;}
-  var cur=imgModelByKey(imgModelCurKey())||IMG_MODELS[0];
-  var f=document.getElementById('genImgModelField');if(f)f.style.display='flex';
-  var nm=document.getElementById('genImgModelFieldName');if(nm)nm.textContent=cur.label;
-  var drop=document.getElementById('genImgModelDrop');
+  if(!show){genCloseImgProviders();return;}
+  var cur=imgProviderCur();
+  var f=document.getElementById('genImgProviderField');if(f)f.style.display='flex';
+  var nm=document.getElementById('genImgProviderFieldName');if(nm)nm.textContent=cur==='agnes'?'Agnes AI':'NovAI';
+  var drop=document.getElementById('genImgProviderDrop');
   if(drop){
-    drop.innerHTML=IMG_MODELS.map(function(m){
-      var h='<button type="button" class="dd-opt'+(m.key===cur.key?' on':'')+'" onclick="genSetImgModel(\''+m.key+'\')">';
+    drop.innerHTML=IMG_PROVIDERS.map(function(pr){
+      var h='<button type="button" class="dd-opt'+(pr.key===cur?' on':'')+'" onclick="genSetImgProvider(\''+pr.key+'\')">';
+      h+='<span class="dd-opt-main"><span>'+escHtml(pr.label)+'</span></span>';
+      h+='<span class="dd-opt-right">'+(pr.key===cur?'✓':'')+'</span></button>';
+      return h;
+    }).join('');
+  }
+}
+function genToggleImgProviders(){
+  var d=document.getElementById('genImgProviderDrop');if(!d)return;
+  d.style.display=d.style.display==='block'?'none':'block';
+}
+function genCloseImgProviders(){
+  var d=document.getElementById('genImgProviderDrop');if(d)d.style.display='none';
+}
+function genSetImgProvider(key){
+  imgProviderApply(key);
+  genRenderImgProviders();genCloseImgProviders();
+  genRenderAgnesModels();
+}
+function genRenderAgnesModels(){
+  var wrap=document.getElementById('genAgnesModelWrap');if(!wrap)return;
+  var show=gen.mode==='image'&&imgProviderCur()==='agnes';
+  wrap.style.display=show?'block':'none';
+  if(!show){genCloseAgnesModels();return;}
+  var cur=imgAgnesModelByKey(imgAgnesModelCur())||AGNES_IMG_MODELS[2];
+  var f=document.getElementById('genAgnesModelField');if(f)f.style.display='flex';
+  var nm=document.getElementById('genAgnesModelFieldName');if(nm)nm.textContent=cur.label;
+  var drop=document.getElementById('genAgnesModelDrop');
+  if(drop){
+    drop.innerHTML=AGNES_IMG_MODELS.map(function(m){
+      var h='<button type="button" class="dd-opt'+(m.key===cur.key?' on':'')+'" onclick="genSetAgnesModel(\''+m.key+'\')">';
       h+='<span class="dd-opt-main"><span>'+escHtml(m.label)+'</span></span>';
       h+='<span class="dd-opt-right">'+(m.key===cur.key?'✓':'')+'</span></button>';
       return h;
     }).join('');
   }
 }
-function genToggleImgModels(){
-  var d=document.getElementById('genImgModelDrop');if(!d)return;
+function genToggleAgnesModels(){
+  var d=document.getElementById('genAgnesModelDrop');if(!d)return;
   d.style.display=d.style.display==='block'?'none':'block';
 }
-function genCloseImgModels(){
-  var d=document.getElementById('genImgModelDrop');if(d)d.style.display='none';
+function genCloseAgnesModels(){
+  var d=document.getElementById('genAgnesModelDrop');if(d)d.style.display='none';
 }
-function genSetImgModel(key){
-  imgModelApplyKey(key);
-  genRenderImgModels();genCloseImgModels();
+function genSetAgnesModel(key){
+  imgAgnesModelApply(key);
+  genRenderAgnesModels();genCloseAgnesModels();
 }
 /* Magic Hour SONG version slot in the provider+version combo
    (owner order 2026-11-17): Magic Hour's music API takes NO
@@ -7522,7 +7591,7 @@ function genRenderOptions(){
   genRenderNovaiModels();
   genRenderMhSongVer();
   genRenderSongModels();
-  genRenderImgModels();
+  genRenderImgProviders();genRenderAgnesModels();
   storyUpdateTotal();
 }
 function genSetAspect(a){gen.aspect=a;genRenderOptions();}
@@ -7742,17 +7811,18 @@ async function genGenerate(){
       cfg={provider:sm.provider, model:sm.sunoModel||''};
     }
     if(gen.mode==='image'){
-      /* Image: the MODEL picks the provider (owner order 2026-11-18 —
-         ADD Agnes alongside NovAI; all three Agnes image models):
-         NovAI → cogview-3-flash, Agnes 2.0 → agnes-image-2.0-flash,
-         Agnes 2.1 → agnes-image-2.1-flash, Agnes 2.5 →
-         agnes-image-2.5-flash. The Admin providers.image setting is
-         not used for the generate path, except when it names Magic
-         Hour (the paid image path) — that keeps working exactly as
-         before. */
-      var imgM=imgModelByKey(imgModelCurKey())||IMG_MODELS[0];
+      /* Image: TWO STEPS (owner correction 2026-11-18 — do NOT mix
+         Agnes with NovAI): step 1 picks the provider (NovAI or
+         Agnes AI), step 2 picks ONE Agnes model (2.0 / 2.1 / 2.5)
+         when Agnes AI is chosen. NovAI → cogview-3-flash, Agnes
+         2.0 → agnes-image-2.0-flash, Agnes 2.1 →
+         agnes-image-2.1-flash, Agnes 2.5 → agnes-image-2.5-flash.
+         The Admin providers.image setting is not used for the
+         generate path, except when it names Magic Hour (the paid
+         image path) — that keeps working exactly as before. */
+      var imgPick=imgPickCur();
       if(!cfg||cfg.provider==='novai'||cfg.provider==='agnes'||cfg.provider==='pollinations'){
-        cfg={provider:imgM.provider, model:imgM.model};
+        cfg={provider:imgPick.provider, model:imgPick.model};
       }
     }
     var doneNote='',creditBlocked=false;
