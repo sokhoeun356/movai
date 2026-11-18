@@ -7653,6 +7653,14 @@ async function genGenerate(){
        calls the provider with the Admin's own key. */
     var cfgs=await adminGetProviders();
     var cfg=cfgs?cfgs[gen.mode]:null;
+    if(gen.mode==='song'){
+      /* Song: the MODEL picks the provider (owner order 2026-11-18 —
+         BOTH systems, switched by model): v6/v6-wild/v6-mini → Suno,
+         V5 → Magic Hour. The Admin providers.song setting is not
+         used for the generate path. */
+      var sm=songModelByKey(songModelCurKey())||SONG_MODELS[0];
+      cfg={provider:sm.provider, model:sm.sunoModel||''};
+    }
     var doneNote='',creditBlocked=false;
     if(!cfg||!cfg.provider){
       genMsg(tx('adminNotSet'));
@@ -8201,7 +8209,8 @@ async function dlSaveSongMp3(src,title,fallback,anchorEl){
       }
       var rp;
       try{
-        rp=await fetch(GEN_API+'/gen/song/mp3?u='+encodeURIComponent(src)+'&name='+encodeURIComponent(fname));
+        var _mp3em=genUserEmail();
+        rp=await fetch(GEN_API+'/gen/song/mp3?u='+encodeURIComponent(src)+'&name='+encodeURIComponent(fname)+(_mp3em?('&email='+encodeURIComponent(_mp3em)):''));
       }catch(fe){
         lastNet=true;lastReason='';
         if(attempt<1)continue;
@@ -8320,7 +8329,7 @@ async function genPollVideo(p,key,jobId){
     if(!r.ok)throw new Error('NovAI: '+genErrText(j,'HTTP '+r.status));
     var st=j&&(j.status||(j.data&&j.data.status));
     if(st==='succeeded'){
-      var u=j&&(j.url||j.video_url||(j.data&&(j.data.url||j.data.video_url))||(j.output&&j.output.url)||(j.result&&j.result.url));
+      var u=j&&(j.url||j.video_url||(j.content&&(j.content.video_url||j.content.url))||(j.data&&(j.data.url||j.data.video_url||(Array.isArray(j.data)&&j.data[0]&&j.data[0].url)))||(j.output&&j.output.url)||(j.result&&j.result.url));
       return u||'';
     }
     if(st==='failed'){var fe=new Error('NovAI: '+genErrText(j,tx('genFailed')));fe.finalPoll=true;throw fe;}
@@ -8430,7 +8439,7 @@ async function genDownloadVideo(src,name){
    updated to the final URL on completion — and Suno's own wait budget
    is 5 minutes, NOT the 25 minutes that belong to MusicAPI. */
 var SONG_WAIT_MAX=25*60*1000;
-var SUNO_WAIT_MAX=5*60*1000;
+var SUNO_WAIT_MAX=12*60*1000;
 var SONG_DURS=[1,2,3,3.5,5];
 /* Instrumental toggle icons (owner order 2026-11-17): custom-drawn
    SVGs in the app's own icon style (24×24 outline, round caps —
@@ -18212,7 +18221,7 @@ async function genDoImageServer(cfg,prompt){
 async function genDoVideoServer(cfg,prompt){
   histCtx={prompt:prompt,provider:cfg.provider};
   var a=GEN_ASPECTS[gen.aspect]||{w:768,h:432};
-  var j=await adminGenPost('/api/gen/video',{provider:cfg.provider,prompt:prompt,duration:gen.duration,res:gen.res,width:a.w,height:a.h},60000);
+  var j=await adminGenPost('/api/gen/video',{provider:cfg.provider,prompt:prompt,duration:gen.duration,res:gen.res,width:a.w,height:a.h},180000);
   var url=j.videoUrl||j.video_url||j.url||null;
   if(!url){
     var jobId=adminJobId(j);
