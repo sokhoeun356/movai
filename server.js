@@ -9869,6 +9869,182 @@ async function apiRoute(req, res, urlPath) {
     }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
     return;
   }
+  // ---- Promo Views + Watch Hours boost (owner order 2026-11-18 23:24) ----
+  // Pricing (linear, rounded to 2 decimals via walletMoney):
+  //   Views: $0.10 per 1k views = $0.0001/view (500=$0.05, 1k=$0.10,
+  //     5.5K=$0.55, 10K=$1.00, 100K=$10.00, 1M=$100.00, 10M=$1,000.00).
+  //   Watch hours: $8.00 per 500 hours = $0.016/hour (500=$8.00,
+  //     1k=$16.00, 5.5K=$88.00).
+  // Storage (exact fields — same fields the live site already reads):
+  //   Post views: public_posts row `data.views` (integer) — the same
+  //     field the feed sorts by and POST /api/public/view increments.
+  //   User TOTAL views for display: monetization-earnings record
+  //     (kv_docs key 'monetization-earnings', per-email) `views` — the
+  //     same field GET /api/public/monetization/status and /earnings
+  //     return as `views`. NOTE: organic views only increment that
+  //     field when monetization is ON and the owner is approved
+  //     (monetizationOnView); promo views add to it unconditionally,
+  //     so a boost is always visible on the Monetization sheet.
+  //   User TOTAL watch hours: the same record's `watchSeconds`
+  //     (SECONDS, integer) — watchHours = watchSeconds / 3600,
+  //     rounded to 2 decimals on read (same as /api/public/watch and
+  //     the monetization status). Promo hours are stored as
+  //     amount * 3600 seconds.
+  // Boosted views NEVER generate view earnings: this code only touches
+  // `views` / `watchSeconds` and never earnMicro / pendingMicro.
+  // Payment rule (same as the wallet package buy): deduct from the
+  // spendable Wallet `balance` BEFORE adding; refund on failure.
+  // Notifications use addNotification (Admin bell + Telegram), same as
+  // purchase-approve / grant / deduct.
+  const PROMO_VIEW_PRICE = 0.0001; // $ per view
+  const PROMO_HOUR_PRICE = 0.016; // $ per watch hour
+  function promoPriceFor(type, amount) {
+    return walletMoney(type === 'hours' ? amount * PROMO_HOUR_PRICE : amount * PROMO_VIEW_PRICE);
+  }
+  function promoValidAmount(v) {
+    const n = Number(v);
+    return (Number.isInteger(n) && n > 0) ? n : 0;
+  }
+  // Applies a promo boost that has already passed validation (and, for
+  // buys, payment). Saves the post row (views only) and the owner's
+  // monetization-earnings record. Returns {views, watchHours} where
+  // views is the post's view count (or null when no post was given)
+  // and watchHours is the owner's NEW total watch hours in HOURS
+  // (2 decimals).
+  async function promoApplyBoost(email, post, type, amount) {
+    let views = null;
+    if (type === 'views' && post) {
+      post.views = Math.max(0, Math.floor(numOr(post.views, 0)) + amount);
+      views = post.views;
+      const posts = await loadPublicPosts();
+      const idx = posts.findIndex((x) => x && x.id === post.id);
+      if (idx >= 0) posts[idx] = post; else posts.push(post);
+      await savePublicPosts(posts);
+      scheduleBackup('public.json');
+    } else if (post) {
+      views = Math.max(0, Math.floor(numOr(post.views, 0)));
+    }
+    const got = await monetizationRecord(email);
+    if (!got) throw new Error('no_account');
+    if (type === 'views') got.rec.views = numOr(got.rec.views, 0) + amount;
+    else got.rec.watchSeconds = numOr(got.rec.watchSeconds, 0) + amount * 3600;
+    await saveMonetizationEarnings(got.m);
+    const watchHours = Math.round(numOr(got.rec.watchSeconds, 0) / 3600 * 100) / 100;
+    return { views, watchHours };
+  }
+  // POST /api/public/promo/buy — {email, postId, type, amount} — PUBLIC
+  // (logged-in user). type 'views' (postId REQUIRED) or 'hours' (postId
+  // OPTIONAL — hours go to the user's total, not a post). Deducts the
+  // price from the spendable Wallet balance BEFORE adding; refunds on
+  // failure. Success: {ok:true, type, amount, price, balance, views,
+  // watchHours} — price in dollars (2 decimals), balance = NEW wallet
+  // balance, views = post's NEW view count (hours + postId: current
+  // views; hours without postId: null), watchHours = user's NEW total
+  // watch hours IN HOURS. Errors: insufficient_balance / not_found /
+  // not_owner / not_public / invalid_amount / invalid_type.
+  if (req.method === 'POST' && urlPath === '/api/public/promo/buy') {
+    readJSONBody(req, 64 * 1024).then(async (body) => {
+      const type = typeof body.type === 'string' ? body.type.trim().toLowerCase() : '';
+      if (type !== 'views' && type !== 'hours') return sendJSON(res, 200, { ok: false, error: 'invalid_type' });
+      const amount = promoValidAmount(body && body.amount);
+      if (!amount) return sendJSON(res, 200, { ok: false, error: 'invalid_amount' });
+      const email = normEmail(body && body.email);
+      if (!email) return sendJSON(res, 200, { ok: false, error: 'not_found' });
+      const users = await loadUsers();
+      const u = users[email];
+      if (!u) return sendJSON(res, 200, { ok: false, error: 'not_found' });
+      const postId = typeof body.postId === 'string' ? body.postId.trim() : '';
+      let post = null;
+      if (type === 'views') {
+        if (!postId) return sendJSON(res, 200, { ok: false, error: 'not_found' });
+        const posts = await loadPublicPosts();
+        post = posts.find((x) => x && x.id === postId) || null;
+        if (!post) return sendJSON(res, 200, { ok: false, error: 'not_found' });
+        if (normEmail(post.email) !== email) return sendJSON(res, 200, { ok: false, error: 'not_owner' });
+        if (post.visibility !== 'public') return sendJSON(res, 200, { ok: false, error: 'not_public' });
+      } else if (postId) {
+        const posts = await loadPublicPosts();
+        post = posts.find((x) => x && x.id === postId) || null;
+        if (!post) return sendJSON(res, 200, { ok: false, error: 'not_found' });
+        if (normEmail(post.email) !== email) return sendJSON(res, 200, { ok: false, error: 'not_owner' });
+        if (post.visibility !== 'public') return sendJSON(res, 200, { ok: false, error: 'not_public' });
+      }
+      const price = promoPriceFor(type, amount);
+      const bal = walletBalance(u);
+      if (price > bal) return sendJSON(res, 200, { ok: false, error: 'insufficient_balance', balance: bal, price });
+      // Deduct BEFORE adding (same pattern as the wallet package buy).
+      const now = new Date().toISOString();
+      u.balance = walletMoney(bal - price);
+      u.updatedAt = now;
+      await saveUsers(users);
+      scheduleBackup('users.json');
+      let applied;
+      try {
+        applied = await promoApplyBoost(email, post, type, amount);
+      } catch (e) {
+        // Add failed after deduction — REFUND the deduction.
+        try {
+          const users2 = await loadUsers();
+          const u2 = users2[email];
+          if (u2) { u2.balance = walletMoney(walletBalance(u2) + price); u2.updatedAt = new Date().toISOString(); await saveUsers(users2); scheduleBackup('users.json'); }
+        } catch (e2) {}
+        return sendJSON(res, 200, { ok: false, error: 'failed' });
+      }
+      await logGrant({ email, credits: 0, songCredits: 0, note: 'promo-buy:' + type + ':' + amount + ':$' + price.toFixed(2) + (post ? ' post:' + post.id : ''), at: now });
+      await addNotification('purchase-approved', email, '🚀 Promo · ' + (type === 'views' ? 'Views' : 'Watch hours') + ' +' + amount, (u.name || email) + ' (' + email + ') · ID: ' + (u.id || '—') + ' បានទិញ Promo ' + (type === 'views' ? 'Views' : 'Watch hours') + ' +' + amount + ' តម្លៃ $' + price.toFixed(2) + (post ? ' — «' + (post.title || '') + '»' : '') + ' (នៅសល់ $' + u.balance.toFixed(2) + ')', { extra: { promo: true, type, amount, price, balance: u.balance, buyerId: u.id || '—', decision: 'approved', paidBy: 'wallet' } });
+      return sendJSON(res, 200, { ok: true, type, amount, price, balance: u.balance, views: applied.views, watchHours: applied.watchHours });
+    }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
+    return;
+  }
+  // POST /api/admin/promo/grant — {targetId, postId, type, amount} —
+  // admin key ONLY (Authorization: Bearer <MOVAI_ADMIN_KEY>; the
+  // x-admin-key header is REJECTED, same as every other admin
+  // endpoint — adminKeyOk checks the Bearer header only). targetId is
+  // the user's User ID (e.g. "3Z96CSY5N4"). FREE — no payment, no
+  // deduction. For 'views', postId is REQUIRED. Success: {ok:true,
+  // type, amount, views, watchHours, email, name} — views = post's NEW
+  // view count (hours without postId: null), watchHours = user's NEW
+  // total watch hours IN HOURS. Errors: user_not_found / post_not_found
+  // / not_public / invalid_amount / invalid_type / unauthorized.
+  if (req.method === 'POST' && urlPath === '/api/admin/promo/grant') {
+    const a = await adminKeyOk(req);
+    if (!a.ok) return sendJSON(res, 200, { ok: false, error: 'unauthorized' });
+    readJSONBody(req, 64 * 1024).then(async (body) => {
+      const type = typeof body.type === 'string' ? body.type.trim().toLowerCase() : '';
+      if (type !== 'views' && type !== 'hours') return sendJSON(res, 200, { ok: false, error: 'invalid_type' });
+      const amount = promoValidAmount(body && body.amount);
+      if (!amount) return sendJSON(res, 200, { ok: false, error: 'invalid_amount' });
+      const targetId = typeof body.targetId === 'string' ? body.targetId.trim() : '';
+      if (!targetId) return sendJSON(res, 200, { ok: false, error: 'user_not_found' });
+      const users = await loadUsers();
+      const target = Object.values(users).find((x) => x && x.id === targetId) || null;
+      if (!target) return sendJSON(res, 200, { ok: false, error: 'user_not_found' });
+      const email = normEmail(Object.keys(users).find((k) => users[k] === target) || target.email || '');
+      if (!email) return sendJSON(res, 200, { ok: false, error: 'user_not_found' });
+      const postId = typeof body.postId === 'string' ? body.postId.trim() : '';
+      let post = null;
+      if (type === 'views') {
+        if (!postId) return sendJSON(res, 200, { ok: false, error: 'post_not_found' });
+        const posts = await loadPublicPosts();
+        post = posts.find((x) => x && x.id === postId) || null;
+        if (!post) return sendJSON(res, 200, { ok: false, error: 'post_not_found' });
+        if (normEmail(post.email) !== email) return sendJSON(res, 200, { ok: false, error: 'post_not_found' });
+        if (post.visibility !== 'public') return sendJSON(res, 200, { ok: false, error: 'not_public' });
+      } else if (postId) {
+        const posts = await loadPublicPosts();
+        post = posts.find((x) => x && x.id === postId) || null;
+        if (!post) return sendJSON(res, 200, { ok: false, error: 'post_not_found' });
+        if (normEmail(post.email) !== email) return sendJSON(res, 200, { ok: false, error: 'post_not_found' });
+        if (post.visibility !== 'public') return sendJSON(res, 200, { ok: false, error: 'not_public' });
+      }
+      const applied = await promoApplyBoost(email, post, type, amount);
+      const now = new Date().toISOString();
+      await logGrant({ email, credits: 0, songCredits: 0, note: 'promo-grant:' + type + ':' + amount + (post ? ' post:' + post.id : ''), at: now });
+      await addNotification('grant', email, '➕ Promo Free · ' + (type === 'views' ? 'Views' : 'Watch hours') + ' +' + amount, 'Admin បានបន្ថែម Promo ' + (type === 'views' ? 'Views' : 'Watch hours') + ' +' + amount + ' ឲ្យ ' + email + ' · ID: ' + (target.id || '—') + (post ? ' — «' + (post.title || '') + '»' : ''), { extra: { promo: true, type, amount, buyerId: target.id || '—' } });
+      return sendJSON(res, 200, { ok: true, type, amount, views: applied.views, watchHours: applied.watchHours, email, name: target.name || '' });
+    }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
+    return;
+  }
   // ---- "Free 2 + package allowance" limits (Download MP3, MV, Vocal Studio, Post to Public) ----
   // GET /api/public/image-free?email= — PUBLIC. Read-only; never
   // creates a user. Free allowances per 3-day window (owner order
