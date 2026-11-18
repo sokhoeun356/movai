@@ -11907,22 +11907,48 @@ function pubKeepViews(out){
   }catch(e){}
   return out;
 }
-/* ===== POSTED = LOCKED FOREVER (owner rule 2026-11-16) =====
-   A post that has appeared in Public must NEVER disappear
-   again — no «up, then gone, then up, then gone». Every post
-   this page has ever seen (from the server feed, or posted
-   from this device) is mirrored into a permanent local store
-   (localStorage 'movai-public-lock'), and every feed load and
-   every silent refresh MERGES the server snapshot with that
-   lock instead of replacing the feed with it. So when the
-   free-tier server sleeps, restarts, or loses a post from its
-   own snapshot, the post stays on screen from the lock —
-   forever, in every place the feed shows. A locked copy only
-   ever gets UPDATED by the server's fresher copy of the same
-   post (matched by id, or by media URL for a just-posted copy
-   the server has not id'd yet); it is never subtracted, and
-   its view count never goes down. The store keeps the newest
+/* ===== POSTED = LOCKED — UNTIL THE SERVER DELETES IT =====
+   A post that has appeared in Public is mirrored into a permanent
+   local store (localStorage 'movai-public-lock'), and every feed load
+   and every silent refresh MERGES the server snapshot with that lock
+   instead of replacing the feed with it — so when the free-tier
+   server sleeps or is unreachable, the post stays on screen from the
+   lock. BUT (owner order 2026-11-18): when the server ANSWERS and a
+   post is no longer in its snapshot — deleted, or tombstoned — the
+   locked copy is DROPPED from the feed and from the lock, so a
+   deleted/broken post can never stay visible forever. A failed
+   server answer (HTTP error, or {ok:false}) never drops anything:
+   the lock is kept exactly as it was. A locked copy only ever gets
+   UPDATED by the server's fresher copy of the same post (matched by
+   id, or by media URL for a just-posted copy the server has not id'd
+   yet); its view count never goes down. The store keeps the newest
    300 posts and sheds oldest-first only if storage runs out. */
+/* Server tombstones for feed posts (same pattern as History):
+   ids/urls the server deleted — recorded locally so a dropped post
+   can never come back, even if the server's deletedIds list later
+   truncates. Stored as 'id:<id>' / 'url:<url>' keys. */
+var PUB_TOMB_KEY='movai-public-deleted';
+function pubTombGet(){
+  try{var a=JSON.parse(localStorage.getItem(PUB_TOMB_KEY)||'[]');return Array.isArray(a)?a:[];}catch(e){return[];}
+}
+function pubTombAdd(keys){
+  if(!keys||!keys.length)return;
+  try{
+    var t=pubTombGet();
+    keys.forEach(function(k){if(k&&t.indexOf(k)<0)t.push(k);});
+    localStorage.setItem(PUB_TOMB_KEY,JSON.stringify(t.slice(-600)));
+  }catch(e){}
+}
+function pubTombHas(it){
+  if(!it)return false;
+  try{
+    var t=pubTombGet();
+    if(it.id&&t.indexOf('id:'+it.id)>=0)return true;
+    var u=it.url||it.src||'';
+    if(u&&t.indexOf('url:'+u)>=0)return true;
+  }catch(e){}
+  return false;
+}
 var PUB_LOCK_KEY='movai-public-lock';
 var PUB_LOCK_MAX=300;
 function pubLockRead(){
@@ -11937,19 +11963,57 @@ function pubLockRead(){
 function pubLockWrite(items){
   var arr=(items||[]).slice().sort(function(a,b){return pubTsVal(b)-pubTsVal(a);});
   if(arr.length>PUB_LOCK_MAX)arr=arr.slice(0,PUB_LOCK_MAX);
+  /* An empty merged set must CLEAR the stored lock — the old
+     while-loop never ran for an empty array, so a dropped post
+     would re-appear from the stale lock on the next app open. */
+  if(!arr.length){try{localStorage.setItem(PUB_LOCK_KEY,'[]');}catch(e){}return;}
   while(arr.length){
     try{localStorage.setItem(PUB_LOCK_KEY,JSON.stringify(arr));return;}
     catch(e){arr=arr.slice(0,Math.max(1,Math.floor(arr.length*0.8)));}
   }
 }
-/* Union of the server's fresh snapshot with the lock: fresh
-   copies win for posts the server still returns (with views
-   never dropping below the locked count); locked posts the
-   server no longer returns are carried over unchanged. The
-   merged set becomes the new lock. */
-function pubLockMerge(fresh){
+/* Union of the server's fresh snapshot with the lock — with the
+   server as the truth (owner order 2026-11-18): fresh copies win
+   for posts the server still returns (views never dropping below
+   the locked count); a locked post the server no longer returns
+   is DROPPED (it was deleted, or its audio broke and the server
+   removed it), and a tombstoned post is dropped and recorded
+   locally so it can never come back. Only a FAILED server answer
+   keeps the lock untouched — that case never reaches this merge
+   (callers throw into the catch path instead). Likes/dislikes
+   live on the server record and in the pubLiked/pubDisliked maps
+   (never cleared here); only the post card is dropped. */
+function pubLockMerge(fresh, deletedIds, deletedUrls){
+  var delId={},delUrl={};
+  (deletedIds||[]).forEach(function(id){if(id)delId[id]=1;});
+  (deletedUrls||[]).forEach(function(u){if(u)delUrl[u]=1;});
+  try{
+    pubTombGet().forEach(function(k){
+      if(k.indexOf('id:')===0)delId[k.slice(3)]=1;
+      else if(k.indexOf('url:')===0)delUrl[k.slice(4)]=1;
+    });
+  }catch(e){}
+  var isDel=function(it){
+    if(!it)return true;
+    if(it.id&&delId[it.id])return true;
+    var u=it.url||it.src||'';
+    if(u&&delUrl[u])return true;
+    return false;
+  };
+  /* A tombstoned fresh copy is dropped too (defensive — the server
+     already filters them) and recorded locally. */
+  var keptFresh=[];
+  var tombKeys=[];
+  fresh.forEach(function(it){
+    if(isDel(it)){if(it.id)tombKeys.push('id:'+it.id);return;}
+    keptFresh.push(it);
+  });
+  fresh=keptFresh;
   var lock=pubLockRead();
-  if(!lock.length){pubLockWrite(fresh);return fresh;}
+  if(!lock.length){
+    try{if(tombKeys.length)pubTombAdd(tombKeys);}catch(e){}
+    pubLockWrite(fresh);return fresh;
+  }
   var byId={},byUrl={};
   fresh.forEach(function(it){
     byId[it.id]=it;
@@ -11957,6 +12021,7 @@ function pubLockMerge(fresh){
   });
   var out=fresh.slice();
   lock.forEach(function(old){
+    if(isDel(old)){if(old.id)tombKeys.push('id:'+old.id);return;}
     var f=byId[old.id];
     if(f){
       /* Views never go down (owner rule) — the locked count is
@@ -11974,8 +12039,11 @@ function pubLockMerge(fresh){
        media URL): its fresh copy replaces the locked one — the
        post shows once, never twice. */
     if(old.url&&byUrl[old.type+'|'+old.url])return;
-    out.push(old);
+    /* The server answered and this post is NOT in its snapshot
+       any more: it was deleted (or auto-removed as broken) — drop
+       it from the feed and the lock instead of carrying it over. */
   });
+  try{if(tombKeys.length)pubTombAdd(tombKeys);}catch(e){}
   pubLockWrite(out);
   return out;
 }
@@ -12005,6 +12073,7 @@ function pubLockTouch(){
    if the server later drops it from its snapshot. */
 function pubLockAdd(item){
   if(!item||!item.url)return;
+  if(pubTombHas(item))return; /* a tombstoned (deleted) post is never re-locked */
   var found=false;
   for(var i=0;i<pubItems.length;i++){
     if(pubItems[i].id===item.id||(pubItems[i].type===item.type&&pubItems[i].url===item.url)){pubItems[i]=item;found=true;break;}
@@ -12042,13 +12111,18 @@ function pubLoadFeed(force){
     return r.json();
   }).then(function(data){
     pubLoading=false;
+    /* A server answer of {ok:false} means the DB read failed — treat
+       it like a failed fetch so the lock is kept untouched (a failed
+       read must never look like an empty feed). */
+    if(data&&data.ok===false)throw new Error((data&&(data.error||data.message))||'feed error');
     var arr=Array.isArray(data)?data:(data&&(data.items||data.feed||data.posts||data.data));
     if(!Array.isArray(arr))arr=[];
     var out=[];
     arr.forEach(function(x){var n=pubNormItem(x);if(n)out.push(n);});
-    /* MERGE with the lock, never replace: posts the server
-       stopped returning stay in the feed forever. */
-    pubItems=pubSortItems(pubLockMerge(pubKeepViews(out)));
+    /* Merge with the lock, server as truth: posts the server no
+       longer returns (deleted / auto-removed as broken) are dropped
+       from the feed and the lock. */
+    pubItems=pubSortItems(pubLockMerge(pubKeepViews(out), data&&data.deletedIds, data&&data.deletedUrls));
     pubItems.forEach(function(it){if(it.liked)pubLiked[it.id]=true;if(it.disliked)pubDisliked[it.id]=true;});
     pubLoaded=true;
     pubRender();
@@ -12108,13 +12182,15 @@ function pubSilentRefresh(){
   }).then(function(data){
     pubAutoBusy=false;
     if(APP_VIEW!=='public')return;
+    if(data&&data.ok===false)throw new Error((data&&(data.error||data.message))||'feed error');
     var arr=Array.isArray(data)?data:(data&&(data.items||data.feed||data.posts||data.data));
     if(!Array.isArray(arr))arr=[];
     var out=[];
     arr.forEach(function(x){var n=pubNormItem(x);if(n)out.push(n);});
-    /* Same lock merge as a full load: a silent tick can add or
-       update posts, but it can never make one disappear. */
-    out=pubSortItems(pubLockMerge(pubKeepViews(out)));
+    /* Same lock merge as a full load: a silent tick can add, update
+       or drop posts the server no longer returns (deleted /
+       auto-removed as broken); a failed tick changes nothing. */
+    out=pubSortItems(pubLockMerge(pubKeepViews(out), data&&data.deletedIds, data&&data.deletedUrls));
     if(pubLoaded&&pubFeedSig(out)===pubFeedSig(pubItems))return;
     var sy=window.scrollY||window.pageYOffset||0;
     var anchorId=null,anchorTop=0;
