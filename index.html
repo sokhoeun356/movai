@@ -3133,6 +3133,21 @@ input[type=range].st-range{accent-color:var(--accent);min-height:32px;cursor:poi
         <button class="btn" id="genAutoBtn" onclick="genAutoGenerate()" style="background:var(--card);border:1px solid var(--line2);color:var(--accent-text);flex:0 0 auto" title="ប្តូរទៅ Pollinations ហើយបង្កើតរូប · Switch to Pollinations &amp; generate" data-i18n="btnAuto">អូតូ</button>
       </div>
     </div>
+    <div id="thumbBox" style="display:none;margin-top:14px;border-top:1px solid var(--line);padding-top:12px">
+      <h3 style="font-size:1rem;font-weight:800" data-i18n="thumbTitle">Thumbnail · រូបតូច</h3>
+      <p style="font-size:0.8125rem;color:var(--muted);margin-top:4px" data-i18n="thumbDesc">រូប 16:9 + ចំណងជើងលើរូប — ដាក់លើបទ/វីដេអូដូច YouTube</p>
+      <div style="margin-top:10px">
+        <span class="chip-label" data-i18n="thumbTitleLbl">ចំណងជើង</span>
+        <input type="text" class="input" id="thumbTitle" data-i18n-ph="thumbTitlePh" placeholder="ឧ. ឈ្មោះបទចម្រៀងរបស់អ្នក..." maxlength="120" oninput="thumbRetitleSoon()" style="width:100%;min-height:44px;padding:10px 14px">
+      </div>
+      <div style="margin-top:10px">
+        <span class="chip-label" data-i18n="thumbPromptLbl">រូបផ្ទៃខាងក្រោយ</span>
+        <textarea class="input" id="thumbPrompt" rows="2" data-i18n-ph="thumbPromptPh" placeholder="ពណ៌នារូបផ្ទៃខាងក្រោយ..." style="width:100%;min-height:64px;padding:10px 14px;border-radius:12px"></textarea>
+      </div>
+      <button type="button" class="btn btn-green" id="thumbGenBtn" onclick="thumbGenerate()" style="width:100%;margin-top:10px" data-i18n="thumbGen">បង្កើត Thumbnail</button>
+      <p id="thumbMsg" style="font-size:0.8125rem;margin-top:8px;min-height:16px;line-height:1.6"></p>
+      <div id="thumbResult" style="margin-top:10px"></div>
+    </div>
     <div id="storyBox" style="display:none;margin-top:12px;border-top:1px solid var(--line);padding-top:12px">
       <h3 style="font-size:1rem;font-weight:800" data-i18n="storyTitle">រឿង · វគ្គ</h3>
       <button class="btn btn-green btn-block" id="storySplitBtn" onclick="storySplit()" style="margin-top:10px" data-i18n="storySplit">បែងចែកជាវគ្គ</button>
@@ -4276,6 +4291,7 @@ km:{
  keyRotate:'Key នេះអស់ Credit — ប្ដូរទៅ Key បន្ទាប់…',
  msgAutoFallback:'{name} បង្កើតមិនបានទេ — បានប្តូរទៅ Pollinations ឲ្យដោយស្វ័យប្រវត្តិ ហើយបង្កើតរូបឲ្យនៅទីនេះហើយ',progFallback:'កំពុងប្តូរទៅ Pollinations…',
  dlImage:'ទាញយករូបភាព',dlVideo:'ទាញយកវីដេអូ',dlPrefix:'ទាញយក ',
+ thumbTitle:'Thumbnail · រូបតូច',thumbDesc:'រូប 16:9 + ចំណងជើងលើរូប — ដាក់លើបទ/វីដេអូដូច YouTube',thumbTitleLbl:'ចំណងជើង',thumbTitlePh:'ឧ. ឈ្មោះបទចម្រៀងរបស់អ្នក...',thumbPromptLbl:'រូបផ្ទៃខាងក្រោយ',thumbPromptPh:'ពណ៌នារូបផ្ទៃខាងក្រោយ...',thumbGen:'បង្កើត Thumbnail',thumbUseCover:'ប្រើជា Cover',thumbCoverReady:'Thumbnail រួចរាល់ជា Cover — បើក Post to Public លើបទ/វីដេអូរបស់អ្នក វានឹងប្រើរូបនេះ',thumbCoverFail:'ធ្វើ Thumbnail ជា Cover មិនបានទេ — សូមព្យាយាមម្ដងទៀត',
  imgAltCreated:'រូបភាពដែលបានបង្កើត',alt3dPreview:'រូបមើលមុនរបស់ 3D model',
  noKeyNeeded:'មិនបាច់ Key',
  pollinationsBody:'មិនត្រូវការ API key — បង្កើតបានភ្លាម។',
@@ -4579,6 +4595,7 @@ en:{
  keyRotate:'This key is out of credits — switching to the next key…',
  msgAutoFallback:'{name} could not generate — automatically switched to Pollinations and created your image right here',progFallback:'Switching to Pollinations…',
  dlImage:'Download Image',dlVideo:'Download Video',dlPrefix:'Download ',
+ thumbTitle:'Thumbnail',thumbDesc:'16:9 image + title text on it — for your song/video, like YouTube',thumbTitleLbl:'Title',thumbTitlePh:'e.g. Your song title...',thumbPromptLbl:'Background image',thumbPromptPh:'Describe the background image...',thumbGen:'Create Thumbnail',thumbUseCover:'Use as cover',thumbCoverReady:'Thumbnail saved as cover — open Post to Public on your song/video and it will use this image',thumbCoverFail:'Could not use thumbnail as cover — please try again',
  imgAltCreated:'Generated image',alt3dPreview:'3D model preview',
  noKeyNeeded:'No key needed',
  pollinationsBody:'No API key needed — generate right away.',
@@ -7470,6 +7487,7 @@ function genSetMode(m){
   if(gl){gl.style.display=m==='song'?'none':'block';gl.textContent=tx('promptLabel');}
   var ag=document.getElementById('genAspectGroup');if(ag)ag.style.display=m==='song'?'none':'flex';
   var sb=document.getElementById('storyBox');if(sb)sb.style.display=m==='video'?'block':'none';
+  var tb=document.getElementById('thumbBox');if(tb)tb.style.display=m==='image'?'block':'none';
   genRenderProviders();genCloseProviders();genRenderOptions();
   if(m==='song')songRenderOpts();
 }
@@ -8060,6 +8078,199 @@ function genShowImage(src,blob,remoteSrc){
   box.appendChild(row);
   gen.lastImg={src:src,blob:blob,remote:remoteSrc,name:(histCtx?histCtx.prompt:'')};
   histAddImage(src,blob,remoteSrc);
+}
+/* ===== Thumbnail maker (owner order 2026-11-18) =====
+   YouTube-style thumbnail: a 16:9 image with the song/video
+   title text overlaid on it. Uses the SAME image path as normal
+   image generation (POST /api/gen/image, provider + model from
+   the two-step picker, 0 MovAi credits) at a fixed 16:9 size
+   (768x432 to the server). The title is drawn on a canvas
+   (1280x720, bold white text with a dark stroke + bottom scrim,
+   YouTube style) so it reads over any background; the user can
+   edit the title and re-render the overlay without regenerating
+   the image. «Use as cover» stages the finished thumbnail as
+   the picked cover for the NEXT Post-to-Public sheet, which
+   uploads it through the normal cover flow. */
+var thumbCoverFile=null;
+var thumbLastUrl='';
+var thumbLastTitle='';
+var thumbLastImg=null;
+function thumbMsg(t){var el=document.getElementById('thumbMsg');if(el)el.textContent=t;}
+async function thumbGenerate(){
+  if(!requireLogin())return;
+  if(!genUserEmail()){thumbMsg(tx('acctLoading'));return;}
+  if(genAnyBusy)return;
+  var prompt=(document.getElementById('thumbPrompt').value||'').trim();
+  if(!prompt){thumbMsg(tx('msgEnterPrompt'));return;}
+  var title=(document.getElementById('thumbTitle').value||'').trim();
+  var btn=document.getElementById('thumbGenBtn');if(btn)btn.disabled=true;
+  genAnyBusy=true;epSyncButtons();
+  var box=document.getElementById('thumbResult');if(box)box.innerHTML='';
+  thumbMsg('');genMsg('');
+  genStartProg();
+  var _bs=document.getElementById('genBlurStage');if(_bs)_bs.style.aspectRatio='16 / 9';
+  try{
+    var imgPick=imgPickCur();
+    var cfg={provider:imgPick.provider,model:imgPick.model};
+    histCtx={prompt:prompt,provider:cfg.provider};
+    var j=await adminGenPost('/api/gen/image',{provider:cfg.provider,prompt:genEnhanceImgPrompt(prompt),model:cfg.model,width:768,height:432},60000);
+    var url=j.imageUrl||j.image_url||j.url||null;
+    if(!url){
+      var jobId=adminJobId(j);
+      if(!jobId)throw new Error(tx('badImgUrl'));
+      var done=await adminPollJob('image',cfg.provider,jobId,10*60*1000,function(t0){genProgTxt(tx('progCreating')+' ('+Math.floor((Date.now()-t0)/1000)+'s)');});
+      if(!done)throw new Error(tx('errTimeoutImage'));
+      url=done.imageUrl||done.image_url||done.url||null;
+      if(!url)throw new Error(tx('badImgUrl'));
+    }
+    if(genCtl.cancelled)throw genCtlErr();
+    await thumbShowImage(url,title);
+    genStageBlur(100);
+    thumbMsg(tx('msgDone'));
+  }catch(e){
+    if(e&&e.genCancelled){thumbMsg(tx('msgGenCancelled'));}
+    else if(e&&e.acctNotReady){thumbMsg(tx('acctLoading'));}
+    else if(e&&e.adminServerDown){thumbMsg(tx('serverOffline'));}
+    else{var m=(e&&e.message?e.message:String(e));if(/failed to fetch|networkerror|load failed/i.test(m))m=tx('serverOffline');thumbMsg(m);}
+  }
+  finally{genStopProg();if(btn)btn.disabled=false;genAnyBusy=false;epSyncButtons();try{genGateSync();}catch(e){}try{provStatusLoad();}catch(e){}}
+}
+/* Fetch the image bytes through the server proxy (CORS *) so the
+   canvas stays clean and exportable; fall back to a direct
+   fetch. Returns a loaded <img> or null. */
+function thumbLoadImage(url){
+  function via(u){
+    return fetch(u).then(function(r){if(!r.ok)throw new Error('http '+r.status);return r.blob();}).then(function(b){
+      return new Promise(function(res){
+        var iu=URL.createObjectURL(b);
+        var im=new Image();
+        im.onload=function(){res(im);};
+        im.onerror=function(){try{URL.revokeObjectURL(iu);}catch(e){}res(null);};
+        im.src=iu;
+      });
+    });
+  }
+  var proxy=GEN_API+'/gen/video/file?u='+encodeURIComponent(url)+'&name='+encodeURIComponent('thumbnail.jpg');
+  return via(proxy).catch(function(){return via(url);}).catch(function(){return null;});
+}
+function thumbDrawCover(x,img,W,H){
+  var iw=img.naturalWidth||img.width,ih=img.naturalHeight||img.height;
+  if(!iw||!ih)return;
+  var s=Math.max(W/iw,H/ih);
+  var dw=iw*s,dh=ih*s;
+  x.drawImage(img,(W-dw)/2,(H-dh)/2,dw,dh);
+}
+function thumbDrawTitle(x,title,W,H){
+  var words=String(title).split(/\s+/).filter(function(w){return !!w;});
+  if(!words.length)return;
+  var padX=Math.round(W*0.045),padB=Math.round(H*0.055);
+  var maxW=W-padX*2;
+  var size=Math.round(W*0.062);
+  function wrap(sz){
+    x.font='800 '+sz+'px system-ui, -apple-system, "Segoe UI", "Noto Sans Khmer", sans-serif';
+    var ls=[],cur='';
+    for(var i=0;i<words.length;i++){
+      var t=cur?cur+' '+words[i]:words[i];
+      if(x.measureText(t).width<=maxW||!cur)cur=t;
+      else{ls.push(cur);cur=words[i];}
+    }
+    if(cur)ls.push(cur);
+    return ls;
+  }
+  var lines=wrap(size);
+  while(lines.length>3&&size>40){size-=4;lines=wrap(size);}
+  if(lines.length>3)lines=lines.slice(0,3);
+  var lh=Math.round(size*1.18);
+  var yLast=H-padB;
+  var y0=yLast-(lines.length-1)*lh;
+  var scrimTop=Math.max(0,y0-size-Math.round(padB*0.6));
+  var g=x.createLinearGradient(0,scrimTop,0,H);
+  g.addColorStop(0,'rgba(0,0,0,0)');g.addColorStop(1,'rgba(0,0,0,0.62)');
+  x.fillStyle=g;x.fillRect(0,scrimTop,W,H-scrimTop);
+  x.textAlign='left';x.textBaseline='alphabetic';
+  x.lineJoin='round';x.strokeStyle='rgba(0,0,0,0.85)';x.lineWidth=Math.max(4,Math.round(size/11));
+  x.fillStyle='#ffffff';
+  for(var j=0;j<lines.length;j++){
+    var y=y0+j*lh;
+    x.strokeText(lines[j],padX,y);
+    x.fillText(lines[j],padX,y);
+  }
+}
+async function thumbShowImage(url,title){
+  var box=document.getElementById('thumbResult');if(!box)return;
+  thumbLastUrl=url;thumbLastTitle=title||'';
+  var img=await thumbLoadImage(url);
+  var c=document.createElement('canvas');c.id='thumbCanvas';c.width=1280;c.height=720;
+  c.style.cssText='width:100%;border-radius:14px;display:block';
+  var x=c.getContext('2d');
+  if(!x)throw new Error(tx('genFailed'));
+  if(!img){
+    /* Last resort: draw the remote image directly (no CORS-clean
+       bytes). It displays, but the canvas may be tainted, so
+       Download / Use as cover fall back to the plain image. */
+    img=await new Promise(function(res){
+      var im=new Image();im.crossOrigin='anonymous';
+      im.onload=function(){res(im);};im.onerror=function(){res(null);};im.src=url;
+    });
+    if(!img||!img.naturalWidth)throw new Error(tx('badImgUrl'));
+  }
+  thumbLastImg=img;
+  thumbDrawCover(x,img,1280,720);
+  if(title)thumbDrawTitle(x,title,1280,720);
+  box.innerHTML='';
+  box.appendChild(c);
+  var row=document.createElement('div');
+  row.style.cssText='display:flex;gap:8px;margin-top:10px';
+  var dl=document.createElement('button');
+  dl.className='kbtn kbtn-black';dl.style.flex='1';dl.textContent=tx('dlImage');
+  dl.addEventListener('click',function(){thumbDownload();});
+  row.appendChild(dl);
+  var uc=document.createElement('button');
+  uc.className='kbtn kbtn-white';uc.style.flex='1';uc.textContent=tx('thumbUseCover');
+  uc.addEventListener('click',function(){thumbUseAsCover();});
+  row.appendChild(uc);
+  box.appendChild(row);
+}
+function thumbCanvasToFile(){
+  var c=document.getElementById('thumbCanvas');if(!c)return Promise.resolve(null);
+  return new Promise(function(resolve){
+    try{
+      c.toBlob(function(b){
+        if(!b){resolve(null);return;}
+        try{resolve(new File([b],'thumbnail.jpg',{type:'image/jpeg'}));}catch(e){resolve(null);}
+      },'image/jpeg',0.88);
+    }catch(e){resolve(null);}
+  });
+}
+async function thumbDownload(){
+  var f=await thumbCanvasToFile();
+  var name=dlCleanName(thumbLastTitle||'thumbnail','thumbnail')+'.jpg';
+  if(f){dlBlobSave(f,name);return;}
+  if(thumbLastUrl)dlSave(thumbLastUrl,name);
+}
+async function thumbUseAsCover(){
+  var f=await thumbCanvasToFile();
+  if(!f){thumbMsg(tx('thumbCoverFail'));return;}
+  thumbCoverFile=f;
+  thumbMsg(tx('thumbCoverReady'));
+}
+/* Re-render the title overlay on the current thumbnail without
+   regenerating the image (title edited after generation) — draws
+   from the cached image, no new fetch. Debounced on input. */
+var thumbRetitleTimer=null;
+function thumbRetitleSoon(){
+  if(thumbRetitleTimer)clearTimeout(thumbRetitleTimer);
+  thumbRetitleTimer=setTimeout(function(){thumbRetitle();},400);
+}
+function thumbRetitle(){
+  if(!thumbLastImg)return;
+  var title=(document.getElementById('thumbTitle').value||'').trim();
+  thumbLastTitle=title;
+  var c=document.getElementById('thumbCanvas');if(!c)return;
+  var x=c.getContext('2d');if(!x)return;
+  x.clearRect(0,0,1280,720);
+  thumbDrawCover(x,thumbLastImg,1280,720);
+  if(title)thumbDrawTitle(x,title,1280,720);
 }
 /* ===== In-page downloads (owner rule 2026-11-16) =====
    Every Download tap saves the file FROM this page, under the
@@ -14204,6 +14415,18 @@ function pubOpenSheet(item){
   pubCoverBusyStop();pubCoverBusy=false;
   if(pubCoverObjUrl){try{URL.revokeObjectURL(pubCoverObjUrl);}catch(e){} pubCoverObjUrl='';}
   pubCoverFile=null;
+  /* Thumbnail as cover (owner order 2026-11-18): a thumbnail saved
+     with «Use as cover» waits in thumbCoverFile; the next Post
+     sheet for a SONG or VIDEO adopts it as the picked cover (it
+     uploads through the normal cover flow when the post goes
+     out). One-shot: cleared after adopting, so it never leaks
+     into a later post — and never into an image post, where the
+     cover would replace the image itself. */
+  if((item.type==='song'||item.type==='video')&&typeof thumbCoverFile!=='undefined'&&thumbCoverFile){
+    pubCoverFile=thumbCoverFile;
+    try{pubCoverObjUrl=URL.createObjectURL(thumbCoverFile);}catch(e){pubCoverObjUrl='';}
+    thumbCoverFile=null;
+  }
   var u=null;try{u=acctCurrent();}catch(e){}
   var t=document.getElementById('pubSheetItemTitle');
   if(t)t.textContent=item.title||item.prompt||'';
@@ -14236,11 +14459,12 @@ function pubOpenSheet(item){
       });
       h+='</div>';
     }
-    if(!plHit&&item.type==='song')h+=pubCoverHtml(item);
+    if(!plHit&&(item.type==='song'||item.type==='video'))h+=pubCoverHtml(item);
     if(!plHit)h+=pubOptBtnsHtml();
   }
   h+='<p id="pubSheetMsg" style="font-size:0.8125rem;margin-top:10px;min-height:16px;line-height:1.6"></p>';
   body.innerHTML=h;
+  if(pubCoverFile)pubCoverPreviewSync();
   var cb=document.getElementById('pubCoverPickBtn');
   if(cb)cb.addEventListener('click',function(){var inp=document.getElementById('pubCoverInput');if(inp){inp.value='';inp.click();}});
   var cl=document.getElementById('pubCoverClearBtn');
