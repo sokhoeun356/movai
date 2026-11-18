@@ -143,7 +143,7 @@ const GH_DATA_FILES = [
   'public.json', 'package-events.json', 'blocked-models.json',
   'model-logins.json', 'blocked-ips.json', 'blocked-emails.json',
   'updates.json', 'admin-lockouts.json', 'history.json', 'mp3cache.json',
-  'cloudinary-accounts.json', 'cloudinary-rotation.json', 'admin-key.json',
+  'cloudinary-accounts.json', 'cloudinary-rotation.json', 'admin-key.json', 'mvsep-cache.json',
 ];
 const ghShaCache = {}; // filename -> GitHub blob sha (for PUT updates)
 function ghEnabled() { return !!GH_TOKEN; }
@@ -1849,6 +1849,53 @@ function mvsepUsageList() {
   }
   return { date: today, dailyLimit: MVSEP_DAILY_LIMIT, keys: out };
 }
+// ---- MVSEP separation cache (fast re-split) ----
+// audioUrl sha256 -> {hash, savedAt}. When the same song is split again
+// (re-tap, reopen, another device), the server first asks MVSEP for the
+// OLD job's fresh stem URLs instead of creating (and paying quota for) a
+// new separation — re-splits return in ~1-2s instead of ~2 min. The
+// status check is the source of truth for fresh URLs (MVSEP download
+// links may expire); any failure falls through to a fresh separation.
+// Entries expire after 7 days; capped at 500 songs (oldest evicted).
+// Persisted to mvsep-cache.json (GitHub-backed) so it survives restarts.
+const MVSEP_CACHE_FILE = path.join(DATA_DIR, 'mvsep-cache.json');
+const MVSEP_CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+const MVSEP_CACHE_MAX = 500;
+let _mvsepCache = null;
+function mvsepCacheLoad() {
+  if (_mvsepCache && typeof _mvsepCache === 'object') return _mvsepCache;
+  try { const j = JSON.parse(fs.readFileSync(MVSEP_CACHE_FILE, 'utf8')); if (j && typeof j === 'object' && j.entries && typeof j.entries === 'object') { _mvsepCache = j; return _mvsepCache; } } catch (e) {}
+  _mvsepCache = { entries: {} };
+  return _mvsepCache;
+}
+function mvsepCacheSave() {
+  try { fs.mkdirSync(DATA_DIR, { recursive: true }); fs.writeFileSync(MVSEP_CACHE_FILE, JSON.stringify(_mvsepCache, null, 2)); ghPersistFile(MVSEP_CACHE_FILE); } catch (e) {}
+}
+function mvsepCacheKey(audioUrl) {
+  return crypto.createHash('sha256').update(String(audioUrl)).digest('hex');
+}
+function mvsepCacheGet(audioUrl) {
+  try {
+    const c = mvsepCacheLoad();
+    const e = c.entries[mvsepCacheKey(audioUrl)];
+    if (!e || typeof e.hash !== 'string' || !e.hash) return '';
+    if (!e.savedAt || (Date.now() - Number(e.savedAt)) > MVSEP_CACHE_TTL_MS) return '';
+    return e.hash;
+  } catch (err) { return ''; }
+}
+function mvsepCachePut(audioUrl, hash) {
+  try {
+    if (!hash) return;
+    const c = mvsepCacheLoad();
+    c.entries[mvsepCacheKey(audioUrl)] = { hash, savedAt: Date.now() };
+    const keys = Object.keys(c.entries);
+    if (keys.length > MVSEP_CACHE_MAX) {
+      keys.sort((a, b) => (c.entries[a].savedAt || 0) - (c.entries[b].savedAt || 0));
+      for (let i = 0; i < keys.length - MVSEP_CACHE_MAX; i++) delete c.entries[keys[i]];
+    }
+    mvsepCacheSave();
+  } catch (err) {}
+}
 // ---- MVSEP stem separation (Demucs4 HT) ----
 // Official API (mvsep.com/en/full_api + ZFTurbo/MVSep-API-Examples):
 // Create: POST https://mvsep.com/api/separation/create with multipart
@@ -1866,7 +1913,7 @@ const MVSEP_CREATE_URL = 'https://mvsep.com/api/separation/create';
 const MVSEP_GET_URL = 'https://mvsep.com/api/separation/get';
 const MVSEP_SEP_TYPE = 20;
 const MVSEP_MODEL_OPT = 2; // htdemucs_6s — 6 stems: vocals, drums, bass, other, piano, guitar (owner asked for 6, not 4; 8 is not available in one MVSEP call)
-const MVSEP_POLL_INTERVAL_MS = 10000;
+const MVSEP_POLL_INTERVAL_MS = 5000; // 5s — detects a finished separation sooner (owner: split takes 2+ min, make it faster where possible)
 const MVSEP_POLL_TIMEOUT_MS = 240000; // 4 min server-side; the Studio resumes longer jobs via /api/studio/separate/status
 const MVSEP_STEM_ORDER = ['vocals', 'drums', 'bass', 'other', 'piano', 'guitar'];
 // hash -> key value that created it (in-memory only; used to count a
@@ -3561,6 +3608,22 @@ function apiRoute(req, res, urlPath) {
         const audioUrl = body && typeof body.audioUrl === 'string' ? body.audioUrl.trim() : '';
         if (!audioUrl || !/^https?:\/\//i.test(audioUrl)) return sendJSON(res, 200, { ok: false, error: 'មិនមាន Link បទចម្រៀងទេ · No song audio URL' });
         const songTitle = body && typeof body.songTitle === 'string' ? body.songTitle.trim().slice(0, 200) : '';
+        // Fast path: this song was separated before — ask MVSEP for the
+        // OLD job's fresh stem URLs instead of creating (and paying quota
+        // for) a new separation. Re-splits return in ~1-2s. If the old
+        // job is still processing, hand its hash back so the Studio
+        // resumes via the status endpoint (no second job, no extra quota).
+        // Any failure falls through to a fresh separation below.
+        const cachedHash = mvsepCacheGet(audioUrl);
+        if (cachedHash) {
+          try {
+            const r = await mvsepGetSeparation(cachedHash);
+            if (r.done && r.stems && r.stems.length) {
+              return sendJSON(res, 200, { ok: true, provider: 'mvsep', hash: cachedHash, songTitle, stems: r.stems, cached: true });
+            }
+            return sendJSON(res, 200, { ok: false, error: 'mvsep_timeout', hash: cachedHash, message: { km: 'MVSEP កំពុងបំបែកបទនេះ — សូមរង់ចាំបន្តិច ហើយចុច Split (AI) ម្តងទៀត', en: 'MVSEP is still separating this song — please wait a bit and tap Split (AI) again' } });
+          } catch (e) { /* old job gone/failed — fall through to a fresh separation */ }
+        }
         let out;
         try {
           out = await withProviderKeyRotation('mvsep', async (k) => {
@@ -3575,6 +3638,8 @@ function apiRoute(req, res, urlPath) {
         }
         // Success: count it against the key that did the work (server-side daily counter for the Admin display).
         recordMvsepSeparation(out.keyUsed, out.hash);
+        // Remember this song's separation so a later re-split returns in ~1-2s from the cache instead of ~2 min.
+        mvsepCachePut(audioUrl, out.hash);
         return sendJSON(res, 200, { ok: true, provider: 'mvsep', hash: out.hash, songTitle, stems: out.stems });
       } catch (e) { return sendJSON(res, 200, { ok: false, error: 'MVSEP: ' + (e && e.message ? String(e.message).slice(0, 200) : 'request failed') }); }
     }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
