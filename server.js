@@ -918,7 +918,7 @@ async function pubUser(u, modelLogins, deviceInfo) {
   const map = modelLogins || await loadModelLogins();
   const model = u.model || '';
   const count = model && map && typeof map === 'object' ? (Number(map[model]) || 0) : 0;
-  const out = { id: u.id || '', email: u.email, name: u.name || '', firstName: u.firstName || '', lastName: u.lastName || '', credits: u.credits, songCredits: u.songCredits, balance: Math.round(numOr(u.balance, 0) * 100) / 100, earnBalance: Math.round(numOr(u.earnBalance, 0) * 100) / 100, plan: u.plan || '', songPlan: u.songPlan || '', freeDlUsed: featureFreeUsed(u, 'freeDlUsed'), freeMvUsed: featureFreeUsed(u, 'freeMvUsed'), freeVsUsed: featureFreeUsed(u, 'freeVsUsed'), mvLeft: featurePkgLeft(u, 'mvLeft'), vsLeft: featurePkgLeft(u, 'vsLeft'), createdAt: u.createdAt, updatedAt: u.updatedAt, lastIp: u.lastIp || '', country: u.country || '', countryCode: u.countryCode || '', device: u.device || '', model, modelLogins: count, lastSeen: u.lastSeen || '', knownDevices: Array.isArray(u.knownDevices) ? u.knownDevices : [], hasPassword: !!(u.passwordHash && u.passwordSalt),
+  const out = { id: u.id || '', email: u.email, name: u.name || '', firstName: u.firstName || '', lastName: u.lastName || '', credits: u.credits, songCredits: u.songCredits, balance: Math.round(numOr(u.balance, 0) * 100) / 100, earnBalance: Math.round(numOr(u.earnBalance, 0) * 100) / 100, plan: u.plan || '', songPlan: u.songPlan || '', freeDlUsed: featureFreeUsed(u, 'freeDlUsed'), freeMvUsed: featureFreeUsed(u, 'freeMvUsed'), freeVsUsed: featureFreeUsed(u, 'freeVsUsed'), freePostUsed: featureFreeUsed(u, 'freePostUsed'), mvLeft: featurePkgLeft(u, 'mvLeft'), vsLeft: featurePkgLeft(u, 'vsLeft'), createdAt: u.createdAt, updatedAt: u.updatedAt, lastIp: u.lastIp || '', country: u.country || '', countryCode: u.countryCode || '', device: u.device || '', model, modelLogins: count, lastSeen: u.lastSeen || '', knownDevices: Array.isArray(u.knownDevices) ? u.knownDevices : [], hasPassword: !!(u.passwordHash && u.passwordSalt),
     // Device fingerprint (anti-abuse): the device the account was
     // registered on (deviceId, never overwritten by later sign-ins from
     // other devices), the most recent device seen, and the model the
@@ -942,9 +942,9 @@ async function pubUser(u, modelLogins, deviceInfo) {
   }
   return out;
 }
-// ---- "Free 2 + package allowance" limits (Download MP3, MV, Vocal Studio) ----
+// ---- "Free 2 + package allowance" limits (Download MP3, MV, Vocal Studio, Post to Public) ----
 // Counters live on the user record (users.data jsonb): freeDlUsed,
-// freeMvUsed, freeVsUsed (0–2 each), mvLeft, vsLeft. Existing users
+// freeMvUsed, freeVsUsed, freePostUsed (0–2 each), mvLeft, vsLeft. Existing users
 // default to 0 via numOr() — no migration, no schema change, no new table.
 const FEATURE_FREE_LIMIT = 2;
 const FEATURE_MV_VS_GRANT = {
@@ -972,6 +972,7 @@ function featureLimitsFor(u) {
   const dlUsed = featureFreeUsed(u, 'freeDlUsed');
   const mvUsed = featureFreeUsed(u, 'freeMvUsed');
   const vsUsed = featureFreeUsed(u, 'freeVsUsed');
+  const postUsed = featureFreeUsed(u, 'freePostUsed');
   // Package allowances are usable ONLY while a package is active.
   // When the package expires, any remaining mvLeft/vsLeft is LOST
   // (effective 0 here) — only the lifetime Free 2 survive expiry.
@@ -984,6 +985,12 @@ function featureLimitsFor(u) {
     download: { free: FEATURE_FREE_LIMIT, used: dlUsed, freeLeft: Math.max(0, FEATURE_FREE_LIMIT - dlUsed), unlimited: active },
     mv: { free: FEATURE_FREE_LIMIT, used: mvUsed, freeLeft: mvFreeLeft, pkgLeft: mvPkg, left: mvFreeLeft + mvPkg },
     vs: { free: FEATURE_FREE_LIMIT, used: vsUsed, freeLeft: vsFreeLeft, pkgLeft: vsPkg, left: vsFreeLeft + vsPkg },
+    // Post to Public (owner order 2026-11-18): Free 2 LIFETIME, same
+    // as Download. ANY active package makes posting UNLIMITED
+    // (no mvLeft-style pool — the package itself is the allowance).
+    // When the package expires, posting locks unless a free post
+    // remains; freePostUsed is lifetime and never resets on re-buy.
+    post: { free: FEATURE_FREE_LIMIT, used: postUsed, freeLeft: Math.max(0, FEATURE_FREE_LIMIT - postUsed), unlimited: active },
   };
 }
 // Grant MV/VS allowances for a song-package purchase. Media packages
@@ -5206,6 +5213,7 @@ async function apiRoute(req, res, urlPath) {
           freeDlUsed: 0,
           freeMvUsed: 0,
           freeVsUsed: 0,
+          freePostUsed: 0,
           mvLeft: 0,
           vsLeft: 0,
           plan: typeof body.plan === 'string' ? body.plan.slice(0, 50) : '',
@@ -5377,7 +5385,7 @@ async function apiRoute(req, res, urlPath) {
       }
       if (!u) {
         const takenIds = new Set(Object.values(users).map((x) => x.id).filter(Boolean));
-        u = { id: genUserId(takenIds), email, name: g.name || '', credits: 0, songCredits: 0, balance: 0, earnBalance: 0, giftClaimed: false, freeDlUsed: 0, freeMvUsed: 0, freeVsUsed: 0, mvLeft: 0, vsLeft: 0, plan: '', songPlan: '', createdAt: now, updatedAt: now };
+        u = { id: genUserId(takenIds), email, name: g.name || '', credits: 0, songCredits: 0, balance: 0, earnBalance: 0, giftClaimed: false, freeDlUsed: 0, freeMvUsed: 0, freeVsUsed: 0, freePostUsed: 0, mvLeft: 0, vsLeft: 0, plan: '', songPlan: '', createdAt: now, updatedAt: now };
         users[email] = u;
       } else {
         if (!u.id) { const takenIds = new Set(Object.values(users).map((x) => x.id).filter(Boolean)); u.id = genUserId(takenIds); }
@@ -9223,6 +9231,23 @@ async function apiRoute(req, res, urlPath) {
           }
         }
       }
+      // Free 2 — Post to Public (owner order 2026-11-18): a post
+      // costs one of the user's 2 LIFETIME free posts, unless ANY
+      // package is active (then posting is UNLIMITED, nothing is
+      // consumed). The daily post limit (Free 5/day, package
+      // 20/day, Admin unlimited) is SEPARATE and untouched — this
+      // lifetime cap sits ON TOP of it. The counter is consumed
+      // only after the post is actually created below. When the
+      // package EXPIRES, posting locks unless a free post remains;
+      // freePostUsed is lifetime and never resets on re-buy.
+      const users = await loadUsers();
+      const _postU = users[email];
+      let _postFree = false;
+      if (_postU) {
+        if (hasActivePackage(_postU)) { /* unlimited — consume nothing */ }
+        else if (featureFreeUsed(_postU, 'freePostUsed') < FEATURE_FREE_LIMIT) { _postFree = true; }
+        else return sendJSON(res, 200, { ok: false, error: 'post_out', message: 'You have used your 2 free public posts — please buy a package to post unlimited songs.' });
+      }
       const p = {
         id: clientId || newPublicId(), email,
         name: typeof body.name === 'string' ? body.name.trim().slice(0, 100) : '',
@@ -9234,6 +9259,18 @@ async function apiRoute(req, res, urlPath) {
       posts.push(p);
       if (posts.length > PUBLIC_MAX) posts.splice(0, posts.length - PUBLIC_MAX);
       await savePublicPosts(posts);
+      // Free 2 — Post to Public (owner order 2026-11-18): consume
+      // one free post ONLY now that the post is durably created.
+      // A failed URL conversion or a refused client id above never
+      // burns a free post. Active package -> unlimited, consume
+      // nothing. Unknown email (no user record) fails OPEN — this
+      // endpoint never required a user record before.
+      if (_postFree && _postU) {
+        _postU.freePostUsed = featureFreeUsed(_postU, 'freePostUsed') + 1;
+        _postU.updatedAt = now;
+        await saveUsers(users);
+        scheduleBackup('users.json');
+      }
       // Critical write: confirm public.json is on GitHub BEFORE returning
       // success, so a restart in the next second cannot lose a post that
       // the Admin app already reported as posted.
@@ -9364,13 +9401,15 @@ async function apiRoute(req, res, urlPath) {
     }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
     return;
   }
-  // ---- "Free 2 + package allowance" limits (Download MP3, MV, Vocal Studio) ----
+  // ---- "Free 2 + package allowance" limits (Download MP3, MV, Vocal Studio, Post to Public) ----
   // GET /api/public/feature-limits?email= — PUBLIC. Read-only; never
   // creates a user. Returns the Free-2 + package-allowance state:
   // {ok:true, email, download:{free:2, used, freeLeft, unlimited},
   //  mv:{free:2, used, freeLeft, pkgLeft, left},
-  //  vs:{free:2, used, freeLeft, pkgLeft, left}}
+  //  vs:{free:2, used, freeLeft, pkgLeft, left},
+  //  post:{free:2, used, freeLeft, unlimited}}
   // download.unlimited = the user has ANY active (non-expired) package.
+  // post.unlimited = same (any active package -> unlimited posting).
   // Unknown email -> {ok:false, error:'no_account'}.
   if (req.method === 'GET' && urlPath === '/api/public/feature-limits') {
     const email = normEmail(new URL(req.url, 'http://localhost').searchParams.get('email') || '');
@@ -9378,7 +9417,7 @@ async function apiRoute(req, res, urlPath) {
     const u = (await loadUsers())[email];
     if (!u) return sendJSON(res, 200, { ok: false, error: 'no_account' });
     const lim = featureLimitsFor(u);
-    return sendJSON(res, 200, { ok: true, email, download: lim.download, mv: lim.mv, vs: lim.vs });
+    return sendJSON(res, 200, { ok: true, email, download: lim.download, mv: lim.mv, vs: lim.vs, post: lim.post });
   }
   // POST /api/public/mv-use — PUBLIC. {email}. The website calls this
   // when the user taps MV, before opening the MV player. Package
