@@ -918,7 +918,7 @@ async function pubUser(u, modelLogins, deviceInfo) {
   const map = modelLogins || await loadModelLogins();
   const model = u.model || '';
   const count = model && map && typeof map === 'object' ? (Number(map[model]) || 0) : 0;
-  const out = { id: u.id || '', email: u.email, name: u.name || '', firstName: u.firstName || '', lastName: u.lastName || '', address: u.address || '', credits: u.credits, songCredits: u.songCredits, balance: Math.round(numOr(u.balance, 0) * 100) / 100, earnBalance: Math.round(numOr(u.earnBalance, 0) * 100) / 100, plan: u.plan || '', songPlan: u.songPlan || '', freeDlUsed: featureFreeUsed(u, 'freeDlUsed'), freeMvUsed: featureFreeUsed(u, 'freeMvUsed'), freeVsUsed: featureFreeUsed(u, 'freeVsUsed'), freePostUsed: featureFreeUsed(u, 'freePostUsed'), freePostUsedByType: freePostUsedByType(u), mvLeft: featurePkgLeft(u, 'mvLeft'), vsLeft: featurePkgLeft(u, 'vsLeft'), createdAt: u.createdAt, updatedAt: u.updatedAt, lastIp: u.lastIp || '', country: u.country || '', countryCode: u.countryCode || '', device: u.device || '', model, modelLogins: count, lastSeen: u.lastSeen || '', knownDevices: Array.isArray(u.knownDevices) ? u.knownDevices : [], hasPassword: !!(u.passwordHash && u.passwordSalt),
+  const out = { id: u.id || '', email: u.email, name: u.name || '', firstName: u.firstName || '', lastName: u.lastName || '', address: u.address || '', credits: u.credits, songCredits: u.songCredits, balance: Math.round(numOr(u.balance, 0) * 100) / 100, earnBalance: Math.round(numOr(u.earnBalance, 0) * 100) / 100, plan: u.plan || '', songPlan: u.songPlan || '', freeDlUsed: featureFreeUsed(u, 'freeDlUsed'), freeMvUsed: featureFreeUsed(u, 'freeMvUsed'), freeVsUsed: featureFreeUsed(u, 'freeVsUsed'), freePostUsed: featureFreeUsed(u, 'freePostUsed'), freePostUsedByType: freePostUsedByType(u), mvLeft: featurePkgLeft(u, 'mvLeft'), vsLeft: featurePkgLeft(u, 'vsLeft'), bonusDl: featureBonus(u, 'bonusDl'), bonusMv: featureBonus(u, 'bonusMv'), bonusVs: featureBonus(u, 'bonusVs'), bonusPostByType: bonusPostByType(u), createdAt: u.createdAt, updatedAt: u.updatedAt, lastIp: u.lastIp || '', country: u.country || '', countryCode: u.countryCode || '', device: u.device || '', model, modelLogins: count, lastSeen: u.lastSeen || '', knownDevices: Array.isArray(u.knownDevices) ? u.knownDevices : [], hasPassword: !!(u.passwordHash && u.passwordSalt),
     // Device fingerprint (anti-abuse): the device the account was
     // registered on (deviceId, never overwritten by later sign-ins from
     // other devices), the most recent device seen, and the model the
@@ -986,6 +986,42 @@ function freePostUsedByType(u) {
   for (const t of POST_TYPES) out[t] = Math.min(FEATURE_FREE_LIMIT, Math.max(0, Math.floor(numOr(o[t], 0))));
   return out;
 }
+// ---- Discount packs (owner order 2026-11-18 23:57): buy 4 uses of ONE
+// feature (Post $0.99 / Download $1.29 / MV $1.99 / Vocal Studio $0.29).
+// Bonus counters live on the user record (users.data jsonb): bonusDl,
+// bonusMv, bonusVs (numbers) and bonusPostByType {song,image,video,'3d'}.
+// Unlike mvLeft/vsLeft, bonus NEVER expires with a package — it is a
+// purchased allowance, spendable any time until used up. Existing users
+// default to 0 via numOr() — no migration, no schema change.
+const DISCOUNT_PACK = {
+  post: { price: 0.99, uses: 4 },
+  download: { price: 1.29, uses: 4 },
+  mv: { price: 1.99, uses: 4 },
+  vs: { price: 0.29, uses: 4 },
+};
+const DISCOUNT_FEATURES = ['post', 'download', 'mv', 'vs'];
+function featureBonus(u, field) { return Math.max(0, Math.floor(numOr(u && u[field], 0))); }
+function bonusPostByType(u) {
+  let o = u && u.bonusPostByType;
+  if (!o || typeof o !== 'object' || Array.isArray(o)) o = { song: 0, image: 0, video: 0, '3d': 0 };
+  const out = {};
+  for (const t of POST_TYPES) out[t] = Math.max(0, Math.floor(numOr(o[t], 0)));
+  return out;
+}
+function grantDiscountBonus(u, feature, postType) {
+  // Adds 4 uses of ONE feature to the bonus counters. Returns the new bonus left.
+  if (feature === 'post') {
+    const t = postTypeOf('', postType);
+    const b = bonusPostByType(u);
+    b[t] = b[t] + DISCOUNT_PACK.post.uses;
+    u.bonusPostByType = b;
+    return b[t];
+  }
+  if (feature === 'download') { u.bonusDl = featureBonus(u, 'bonusDl') + DISCOUNT_PACK.download.uses; return u.bonusDl; }
+  if (feature === 'mv') { u.bonusMv = featureBonus(u, 'bonusMv') + DISCOUNT_PACK.mv.uses; return u.bonusMv; }
+  if (feature === 'vs') { u.bonusVs = featureBonus(u, 'bonusVs') + DISCOUNT_PACK.vs.uses; return u.bonusVs; }
+  return 0;
+}
 // Active package = either plan expiry (media: monthly/yearly) or
 // song-plan expiry (song-trial/popular/pro) is still in the future.
 // Both expiries are set when a package is activated (purchase approve /
@@ -1011,10 +1047,11 @@ function featureLimitsFor(u) {
   const postByType = freePostUsedByType(u);
   const postTypes = {};
   let postUsedMax = 0, postFreeMin = FEATURE_FREE_LIMIT;
+  const postBonus = bonusPostByType(u);
   for (const t of POST_TYPES) {
     const used = postByType[t];
     const freeLeft = Math.max(0, FEATURE_FREE_LIMIT - used);
-    postTypes[t] = { used, freeLeft };
+    postTypes[t] = { used, freeLeft, bonusLeft: postBonus[t] };
     if (used > postUsedMax) postUsedMax = used;
     if (freeLeft < postFreeMin) postFreeMin = freeLeft;
   }
@@ -1026,10 +1063,13 @@ function featureLimitsFor(u) {
   const vsPkg = active ? featurePkgLeft(u, 'vsLeft') : 0;
   const mvFreeLeft = Math.max(0, FEATURE_FREE_LIMIT - mvUsed);
   const vsFreeLeft = Math.max(0, FEATURE_FREE_LIMIT - vsUsed);
+  const dlBonus = featureBonus(u, 'bonusDl');
+  const mvBonus = featureBonus(u, 'bonusMv');
+  const vsBonus = featureBonus(u, 'bonusVs');
   return {
-    download: { free: FEATURE_FREE_LIMIT, used: dlUsed, freeLeft: Math.max(0, FEATURE_FREE_LIMIT - dlUsed), unlimited: active },
-    mv: { free: FEATURE_FREE_LIMIT, used: mvUsed, freeLeft: mvFreeLeft, pkgLeft: mvPkg, left: mvFreeLeft + mvPkg },
-    vs: { free: FEATURE_FREE_LIMIT, used: vsUsed, freeLeft: vsFreeLeft, pkgLeft: vsPkg, left: vsFreeLeft + vsPkg },
+    download: { free: FEATURE_FREE_LIMIT, used: dlUsed, freeLeft: Math.max(0, FEATURE_FREE_LIMIT - dlUsed), unlimited: active, bonusLeft: dlBonus },
+    mv: { free: FEATURE_FREE_LIMIT, used: mvUsed, freeLeft: mvFreeLeft, pkgLeft: mvPkg, bonusLeft: mvBonus, left: mvFreeLeft + mvPkg + mvBonus },
+    vs: { free: FEATURE_FREE_LIMIT, used: vsUsed, freeLeft: vsFreeLeft, pkgLeft: vsPkg, bonusLeft: vsBonus, left: vsFreeLeft + vsPkg + vsBonus },
     // Post to Public (owner order 2026-11-18, per-type 2026-11-18 15:12):
     // Free 2 LIFETIME per media type (song/image/video/3d each get 2),
     // same as Download. ANY active package makes ALL types UNLIMITED
@@ -5430,6 +5470,7 @@ async function apiRoute(req, res, urlPath) {
         // never spent; go straight to the lifetime Free 2 instead.
         if (hasActivePackage(_vsU) && featurePkgLeft(_vsU, 'vsLeft') > 0) { _vsU.vsLeft = featurePkgLeft(_vsU, 'vsLeft') - 1; }
         else if (featureFreeUsed(_vsU, 'freeVsUsed') < FEATURE_FREE_LIMIT) { _vsU.freeVsUsed = featureFreeUsed(_vsU, 'freeVsUsed') + 1; }
+        else if (featureBonus(_vsU, 'bonusVs') > 0) { _vsU.bonusVs = featureBonus(_vsU, 'bonusVs') - 1; }
         else return sendJSON(res, 200, { ok: false, error: 'vs_out', message: 'You have used your 2 free Vocal Studio splits and have no allowance left — please buy a song package to continue.' });
         _vsU.updatedAt = new Date().toISOString();
         await saveUsers(_vsUsers);
@@ -7283,16 +7324,29 @@ async function apiRoute(req, res, urlPath) {
     readJSONBody(req, 64 * 1024).then(async (body) => {
       const email = normEmail(body && body.email);
       if (!email) return sendJSON(res, 200, { ok: false, error: 'សូមដាក់ Gmail ត្រឹមត្រូវ' });
-      const packageId = typeof body.packageId === 'string' ? body.packageId.trim() : '';
-      const pkg = (await loadPackages())[packageId];
-      if (!pkg) return sendJSON(res, 200, { ok: false, error: 'កញ្ចប់នេះមិនស្គាល់ទេ' });
+      const kind = typeof body.kind === 'string' ? body.kind.trim().toLowerCase() : 'package';
+      let packageId = '', pkg = null, feature = '', postType = '', discLabel = '';
+      if (kind === 'discount') {
+        feature = typeof body.feature === 'string' ? body.feature.trim().toLowerCase() : '';
+        if (DISCOUNT_FEATURES.indexOf(feature) < 0) return sendJSON(res, 200, { ok: false, error: 'សូមជ្រើសរើស Feature ត្រឹមត្រូវ' });
+        postType = feature === 'post' ? postTypeOf('', body.postType) : '';
+        packageId = 'discount:' + feature + (postType ? ':' + postType : '');
+        discLabel = 'Discount 4× ' + (feature === 'post' ? 'Post' : feature === 'download' ? 'Download' : feature === 'mv' ? 'MV' : 'Vocal Studio') + (postType ? ' (' + postType + ')' : '');
+      } else {
+        packageId = typeof body.packageId === 'string' ? body.packageId.trim() : '';
+        pkg = (await loadPackages())[packageId];
+        if (!pkg) return sendJSON(res, 200, { ok: false, error: 'កញ្ចប់នេះមិនស្គាល់ទេ' });
+      }
       const now = new Date().toISOString();
       const reqs = await loadPurchaseRequests();
       const r = {
         id: newPurchaseId(), email, packageId,
-        plan: typeof body.plan === 'string' ? body.plan.slice(0, 50) : packageId,
-        amount: pkg.price,
-        credits: pkg.credits, songCredits: pkg.songCredits, days: pkg.days,
+        kind: kind === 'discount' ? 'discount' : 'package',
+        feature: kind === 'discount' ? feature : '',
+        postType: kind === 'discount' ? postType : '',
+        plan: kind === 'discount' ? discLabel : (typeof body.plan === 'string' ? body.plan.slice(0, 50) : packageId),
+        amount: kind === 'discount' ? DISCOUNT_PACK[feature].price : pkg.price,
+        credits: kind === 'discount' ? 0 : pkg.credits, songCredits: kind === 'discount' ? 0 : pkg.songCredits, days: kind === 'discount' ? 0 : pkg.days,
         receiptUrl: typeof body.receiptUrl === 'string' ? body.receiptUrl.trim().slice(0, 500) : '',
         status: 'pending', createdAt: now, updatedAt: now,
       };
@@ -7300,8 +7354,12 @@ async function apiRoute(req, res, urlPath) {
       await savePurchaseRequests(reqs);
       const _pu = (await loadUsers())[email];
       const _puid = _pu && _pu.id ? _pu.id : '—';
-      const _pd = pkgDisplay(pkg);
-      await addNotification('purchase-request', email, '🛒 សំណើទិញកញ្ចប់ · Purchase request', pkgNotifText(pkg, email, _puid), { extra: { pkg: packageId, pkgName: _pd.pkgName, priceText: _pd.priceText, creditText: _pd.creditText, buyerId: _puid }, telegramHtml: pkgNotifTelegram('🛒 សំណើទិញកញ្ចប់ · Purchase request', pkg, email, _puid) });
+      if (kind === 'discount') {
+        await addNotification('purchase-request', email, '🛒 សំណើទិញ Discount · Discount purchase request', email + ' · ID: ' + _puid + ' សុំទិញ ' + discLabel + ' តម្លៃ $' + DISCOUNT_PACK[feature].price.toFixed(2) + ' (KHQR/USDT — បានបង់ហើយ មានវិក្កយបត្រភ្ជាប់មក)', { extra: { pkg: packageId, pkgName: discLabel, priceText: '$' + DISCOUNT_PACK[feature].price.toFixed(2), creditText: '4× ' + (feature === 'post' ? 'Post' : feature === 'download' ? 'Download' : feature === 'mv' ? 'MV' : 'Vocal Studio'), buyerId: _puid, discount: true, feature, postType } });
+      } else {
+        const _pd = pkgDisplay(pkg);
+        await addNotification('purchase-request', email, '🛒 សំណើទិញកញ្ចប់ · Purchase request', pkgNotifText(pkg, email, _puid), { extra: { pkg: packageId, pkgName: _pd.pkgName, priceText: _pd.priceText, creditText: _pd.creditText, buyerId: _puid }, telegramHtml: pkgNotifTelegram('🛒 សំណើទិញកញ្ចប់ · Purchase request', pkg, email, _puid) });
+      }
       return sendJSON(res, 200, { ok: true, request: r });
     }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
     return;
@@ -7335,12 +7393,32 @@ async function apiRoute(req, res, urlPath) {
       const r = reqs.find((x) => x.id === id);
       if (!r) return sendJSON(res, 200, { ok: false, error: 'រកសំណើនេះមិនឃើញទេ' });
       if (r.status !== 'pending') return sendJSON(res, 200, { ok: false, error: 'សំណើនេះបានសម្រេចរួចហើយ' });
-      const pkg = (await loadPackages())[r.packageId];
-      if (!pkg) return sendJSON(res, 200, { ok: false, error: 'កញ្ចប់នេះមិនស្គាល់ទេ' });
+      const pkg = r.kind === 'discount' ? null : (await loadPackages())[r.packageId];
+      if (!pkg && r.kind !== 'discount') return sendJSON(res, 200, { ok: false, error: 'កញ្ចប់នេះមិនស្គាល់ទេ' });
       const users = await loadUsers();
       const u = users[r.email];
       if (!u) return sendJSON(res, 200, { ok: false, error: 'រកអ្នកប្រើនេះមិនឃើញទេ' });
       const now = new Date().toISOString();
+      if (r.kind === 'discount') {
+        // Discount pack (KHQR/USDT): grant 4 bonus uses of the feature.
+        const df = typeof r.feature === 'string' ? r.feature.trim().toLowerCase() : '';
+        if (DISCOUNT_FEATURES.indexOf(df) < 0) return sendJSON(res, 200, { ok: false, error: 'សំណើនេះមិនត្រឹមត្រូវទេ' });
+        const dpt = df === 'post' ? postTypeOf('', r.postType) : '';
+        grantDiscountBonus(u, df, dpt);
+        u.updatedAt = now;
+        await saveUsers(users);
+        await logGrant({ email: r.email, credits: 0, songCredits: 0, note: 'discount-approve:' + df + (dpt ? ':' + dpt : '') + ':4:$' + walletMoney(r.amount || 0).toFixed(2), at: now });
+        r.status = 'approved';
+        r.decidedAt = now;
+        r.updatedAt = now;
+        await savePurchaseRequests(reqs);
+        scheduleBackup('users.json');
+        scheduleBackup('purchase-requests.json');
+        const dfl = df === 'post' ? 'Post' : df === 'download' ? 'Download' : df === 'mv' ? 'MV' : 'Vocal Studio';
+        await addNotification('purchase-approved', r.email, '✅ បានអនុម័ត · Discount approved', 'Discount 4× ' + dfl + (dpt ? ' (' + dpt + ')' : '') + ' ($' + walletMoney(r.amount || 0).toFixed(2) + ') បានអនុម័ត — ឥឡូវអ្នកមាន 4 ដងបន្ថែម · You now have 4 extra uses', { extra: { discount: true, feature: df, postType: dpt, buyerId: u.id || '—', decision: 'approved' } });
+        await markPurchaseRequestDecided(r.email, r.packageId, 'approved', now);
+        return sendJSON(res, 200, { ok: true, request: r, user: await pubUser(u), cashback: 0 });
+      }
       // Capture BEFORE the plan activation below: if the previous
       // package had already expired, its leftover MV/VS allowance is
       // lost and the new grant must NOT stack on it (see
@@ -8770,8 +8848,9 @@ async function apiRoute(req, res, urlPath) {
         const _dlU = _dlUsers[_dlEmail];
         if (!_dlU) return sendJSON(res, 200, { ok: false, error: 'no_account' });
         if (!hasActivePackage(_dlU)) {
-          if (featureFreeUsed(_dlU, 'freeDlUsed') >= FEATURE_FREE_LIMIT) return sendJSON(res, 200, { ok: false, error: 'download_out', message: 'You have used your 2 free downloads — please buy a package to download unlimited songs.' });
-          _dlU.freeDlUsed = featureFreeUsed(_dlU, 'freeDlUsed') + 1;
+          if (featureFreeUsed(_dlU, 'freeDlUsed') < FEATURE_FREE_LIMIT) { _dlU.freeDlUsed = featureFreeUsed(_dlU, 'freeDlUsed') + 1; }
+          else if (featureBonus(_dlU, 'bonusDl') > 0) { _dlU.bonusDl = featureBonus(_dlU, 'bonusDl') - 1; }
+          else return sendJSON(res, 200, { ok: false, error: 'download_out', message: 'You have used your 2 free downloads — please buy a package to download unlimited songs.' });
           _dlU.updatedAt = new Date().toISOString();
           await saveUsers(_dlUsers);
           scheduleBackup('users.json');
@@ -9685,11 +9764,13 @@ async function apiRoute(req, res, urlPath) {
       const users = await loadUsers();
       const _postU = users[email];
       let _postFree = false;
+      let _postBonus = false;
       let _postType = null;
       if (_postU && visibility === 'public') {
         _postType = postTypeOf(mode, body.type);
         if (hasActivePackage(_postU)) { /* unlimited — consume nothing */ }
         else if (freePostUsedByType(_postU)[_postType] < FEATURE_FREE_LIMIT) { _postFree = true; }
+        else if (bonusPostByType(_postU)[_postType] > 0) { _postBonus = true; }
         else return sendJSON(res, 200, { ok: false, error: 'post_out', message: 'You have used your 2 free public posts for this type — please buy a package to post unlimited.' });
       }
       const p = {
@@ -9714,6 +9795,14 @@ async function apiRoute(req, res, urlPath) {
         const _byType = freePostUsedByType(_postU);
         _byType[_postType] = Math.min(FEATURE_FREE_LIMIT, _byType[_postType] + 1);
         _postU.freePostUsedByType = _byType;
+        _postU.updatedAt = now;
+        await saveUsers(users);
+        scheduleBackup('users.json');
+      }
+      if (_postBonus && _postU && _postType) {
+        const _bByType = bonusPostByType(_postU);
+        _bByType[_postType] = Math.max(0, _bByType[_postType] - 1);
+        _postU.bonusPostByType = _bByType;
         _postU.updatedAt = now;
         await saveUsers(users);
         scheduleBackup('users.json');
@@ -10041,6 +10130,55 @@ async function apiRoute(req, res, urlPath) {
     }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
     return;
   }
+  // POST /api/public/discount/buy — {email, feature, postType?} — PUBLIC
+  // (logged-in user). Buys 4 uses of ONE feature at the discount price
+  // (owner order 2026-11-18 23:57): Post $0.99 / Download $1.29 /
+  // MV $1.99 / Vocal Studio $0.29. feature 'post' takes postType
+  // (song/image/video/3d, default 'song'). Deducts the price from the
+  // spendable Wallet balance BEFORE adding; refunds on failure.
+  // Success: {ok:true, feature, postType, price, balance, bonusLeft, left}.
+  // Errors: insufficient_balance / not_found / invalid_feature.
+  if (req.method === 'POST' && urlPath === '/api/public/discount/buy') {
+    readJSONBody(req, 64 * 1024).then(async (body) => {
+      const feature = typeof body.feature === 'string' ? body.feature.trim().toLowerCase() : '';
+      if (DISCOUNT_FEATURES.indexOf(feature) < 0) return sendJSON(res, 200, { ok: false, error: 'invalid_feature' });
+      const postType = feature === 'post' ? postTypeOf('', body && body.postType) : '';
+      const email = normEmail(body && body.email);
+      if (!email) return sendJSON(res, 200, { ok: false, error: 'not_found' });
+      const users = await loadUsers();
+      const u = users[email];
+      if (!u) return sendJSON(res, 200, { ok: false, error: 'not_found' });
+      const price = DISCOUNT_PACK[feature].price;
+      const bal = walletBalance(u);
+      if (price > bal) return sendJSON(res, 200, { ok: false, error: 'insufficient_balance', balance: bal, price });
+      const now = new Date().toISOString();
+      u.balance = walletMoney(bal - price);
+      u.updatedAt = now;
+      await saveUsers(users);
+      scheduleBackup('users.json');
+      let bonusLeft;
+      try {
+        bonusLeft = grantDiscountBonus(u, feature, postType);
+        u.updatedAt = new Date().toISOString();
+        await saveUsers(users);
+        scheduleBackup('users.json');
+      } catch (e) {
+        try {
+          const users2 = await loadUsers();
+          const u2 = users2[email];
+          if (u2) { u2.balance = walletMoney(walletBalance(u2) + price); u2.updatedAt = new Date().toISOString(); await saveUsers(users2); scheduleBackup('users.json'); }
+        } catch (e2) {}
+        return sendJSON(res, 200, { ok: false, error: 'failed' });
+      }
+      const featLabel = feature === 'post' ? 'Post' : feature === 'download' ? 'Download' : feature === 'mv' ? 'MV' : 'Vocal Studio';
+      await logGrant({ email, credits: 0, songCredits: 0, note: 'discount-buy:' + feature + (postType ? ':' + postType : '') + ':4:$' + price.toFixed(2), at: now });
+      await addNotification('purchase-approved', email, '💥 Discount · 4× ' + featLabel + ' +' + 4, (u.name || email) + ' (' + email + ') · ID: ' + (u.id || '—') + ' បានទិញ Discount 4× ' + featLabel + (postType ? ' (' + postType + ')' : '') + ' តម្លៃ $' + price.toFixed(2) + ' (នៅសល់ $' + u.balance.toFixed(2) + ')', { extra: { discount: true, feature, postType, price, balance: u.balance, buyerId: u.id || '—', decision: 'approved', paidBy: 'wallet' } });
+      const lim = featureLimitsFor(u);
+      const left = feature === 'post' ? (lim.post.unlimited ? Infinity : (lim.post.byType[postType] ? lim.post.byType[postType].freeLeft + lim.post.byType[postType].bonusLeft : 0)) : feature === 'download' ? (lim.download.unlimited ? Infinity : lim.download.freeLeft + lim.download.bonusLeft) : feature === 'mv' ? lim.mv.left : lim.vs.left;
+      return sendJSON(res, 200, { ok: true, feature, postType, price, balance: u.balance, bonusLeft, left });
+    }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
+    return;
+  }
   // POST /api/admin/promo/grant — {targetId, postId, type, amount} —
   // admin key ONLY (Authorization: Bearer <MOVAI_ADMIN_KEY>; the
   // x-admin-key header is REJECTED, same as every other admin
@@ -10188,6 +10326,7 @@ async function apiRoute(req, res, urlPath) {
       // go straight to the lifetime Free 2 instead.
       if (hasActivePackage(u) && featurePkgLeft(u, 'mvLeft') > 0) { u.mvLeft = featurePkgLeft(u, 'mvLeft') - 1; source = 'package'; }
       else if (featureFreeUsed(u, 'freeMvUsed') < FEATURE_FREE_LIMIT) { u.freeMvUsed = featureFreeUsed(u, 'freeMvUsed') + 1; source = 'free'; }
+      else if (featureBonus(u, 'bonusMv') > 0) { u.bonusMv = featureBonus(u, 'bonusMv') - 1; source = 'bonus'; }
       else return sendJSON(res, 200, { ok: false, error: 'mv_out', message: 'You have used your 2 free MV plays and have no MV allowance left — please buy a song package to continue.' });
       u.updatedAt = now;
       await saveUsers(users);
