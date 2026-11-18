@@ -884,13 +884,12 @@ img.hist-media,.d3-preview{cursor:zoom-in}
 .feat-limit-badge .fl-num{font-size:0.6875rem;font-weight:900}
 .feat-limit-badge.fl-pkg{background:var(--accent);color:#101216}
 .feat-limit-badge.fl-out{background:#7f1d1d;color:#fff}
-/* History buttons: the Free badge sits BESIDE the green «AI»
-   badge, on its right — NOT over the button icon and NOT at the
-   far top-right. Download has no AI badge, so its Free badge sits
-   at the top-left; MV / Vocal Studio have the AI badge, so theirs
-   shifts right to sit next to it. */
-.hist-song-lg .song-act > .feat-limit-badge{left:4px;right:auto}
-.hist-song-lg .song-act:has(>.song-ai-badge) > .feat-limit-badge{left:30px}
+/* History buttons: the Free badge sits at the BOTTOM of the
+   button, dropped down from the top edge (owner order 2026-11-18
+   13:36 — the top-edge pill was too easy to miss). Download has
+   no AI badge, so its Free badge sits bottom-left; MV / Vocal
+   Studio keep the AI badge at the top-left, Free at the bottom. */
+.hist-song-lg .song-act > .feat-limit-badge{top:auto;bottom:4px;left:4px;right:auto}
 .pub-pill,.pub-act{position:relative}
 .song-menu-item{position:relative}
 .song-menu-item .feat-limit-badge{top:6px;right:8px}
