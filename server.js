@@ -125,24 +125,138 @@ const FREE_SONG_CREDITS = 24;
 const GIFT50_SONG_CREDITS = 50;
 const GIFT50_NEW_ACCOUNT_WINDOW_MS = 24 * 60 * 60 * 1000; // 24 hours
 
-/* ---------------- GitHub-backed persistent storage ----------------- */
-// Render free disk is ephemeral — ./data/*.json is wiped on restart, so
-// posts, credits and users vanish. When MOVAI_GITHUB_TOKEN is set, the 21
-// JSON data files are ALSO stored in a private GitHub repo (branch main,
-// repo root, same filenames). On startup the server pulls each file from
-// GitHub into the local ./data/ cache (overwriting local); on every local
-// write it ALSO pushes to GitHub. Most files are fire-and-forget (never
-// blocks a response, failures only logged); the CRITICAL writes (public
-// post, grant, purchase approve, user sync) AWAIT the GitHub PUT via
-// ghFlushFile before returning success, so a restart cannot lose a write
-// already reported as ok. When the token is unset, behaviour is EXACTLY
-// as before (local ./data/*.json only).
-// Uploads (./data/uploads/) are binary. They are ALSO backed up to
-// GitHub (movai-data repo, uploads/) on every upload and restored on
-// startup (ghPutUpload / ghRestoreUploads) — a proxy restart/redeploy
-// can no longer wipe a song MP3 or cover. (2026-11-16: uploads were
-// wiped on EVERY restart — the recurring song-breaker.)
-// The token is NEVER hardcoded and NEVER logged — only process.env.
+/* ---------------- Supabase-backed persistent storage ----------------- */
+// Supabase (PostgreSQL via PostgREST) is now the SINGLE source of truth
+// for ALL live data. The old GitHub JSON files are BACKUP ONLY (see
+// scheduleBackup below). No npm dependencies: the adapter uses only the
+// built-in global fetch.
+// Required env vars (already set on Render movai-proxy):
+//   SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY
+// They are read ONLY from process.env, never hardcoded, never logged.
+// If they are unset the server refuses to start (see the main block at
+// the bottom) — there is no local-file fallback for live data.
+// Table map (see supabase-schema.sql):
+//   users                     -> one row per user (email PK, data jsonb)
+//   history_items             -> one row per history item (email, item_key)
+//   public_posts              -> one row per public post (id PK)
+//   wallet_requests           -> one row per wallet request (id PK)
+//   notifications             -> one row per notification (id PK)
+//   creator_follows           -> one row per follow (follower+creator PK)
+//   monetization_applications -> one row per application (email PK)
+//   device_records            -> one row per device (device_key PK)
+//   kv_docs                   -> one row per remaining document file
+// Uploads (./data/uploads/ binary MP3/covers + ghPutUpload /
+// ghRestoreUploads) are SEPARATE and untouched by this migration.
+const SUPABASE_URL = String(process.env.SUPABASE_URL || '').replace(/\/+$/, '');
+const SUPABASE_SERVICE_ROLE_KEY = String(process.env.SUPABASE_SERVICE_ROLE_KEY || '');
+function sbEnabled() { return !!SUPABASE_URL && !!SUPABASE_SERVICE_ROLE_KEY; }
+function sbHeaders() {
+  return {
+    'apikey': SUPABASE_SERVICE_ROLE_KEY,
+    'Authorization': 'Bearer ' + SUPABASE_SERVICE_ROLE_KEY,
+    'Content-Type': 'application/json',
+  };
+}
+function sbUrl(table, query) {
+  return SUPABASE_URL + '/rest/v1/' + table + (query ? '?' + query : '');
+}
+// One fetch with a timeout. Returns {ok, status, json}, or null on any
+// failure (network, timeout, bad JSON). NEVER throws; logs one line.
+async function sbFetch(table, query, opts) {
+  if (!sbEnabled()) return null;
+  try {
+    const r = await fetch(sbUrl(table, query), Object.assign({ signal: AbortSignal.timeout(15000) }, opts || {}));
+    const text = await r.text().catch(() => '');
+    let j = null;
+    try { j = text ? JSON.parse(text) : null; } catch (e) { j = null; }
+    if (!r.ok) { console.log('[supabase] ' + (opts && opts.method ? opts.method : 'GET') + ' ' + table + ' failed: HTTP ' + r.status); return { ok: false, status: r.status, json: j }; }
+    return { ok: true, status: r.status, json: j };
+  } catch (e) {
+    console.log('[supabase] ' + table + ' error: ' + (e && e.message ? e.message : e));
+    return null;
+  }
+}
+// SELECT rows. Returns an array, or null on failure. Never throws.
+async function sbSelect(table, query) {
+  const r = await sbFetch(table, query, { headers: sbHeaders() });
+  if (!r || !r.ok || !Array.isArray(r.json)) return null;
+  return r.json;
+}
+// SELECT the first row, or null. Never throws.
+async function sbSelectOne(table, query) {
+  const rows = await sbSelect(table, query);
+  if (!rows || !rows.length) return null;
+  return rows[0];
+}
+// Upsert rows (insert or update on conflict). Returns true/false.
+// Never throws.
+async function sbUpsert(table, rows, onConflict) {
+  if (!rows || !rows.length) return true;
+  const q = onConflict ? 'on_conflict=' + encodeURIComponent(onConflict) : '';
+  const r = await sbFetch(table, q, {
+    method: 'POST',
+    headers: Object.assign({ 'Prefer': 'resolution=merge-duplicates,return=minimal' }, sbHeaders()),
+    body: JSON.stringify(rows),
+  });
+  return !!(r && r.ok);
+}
+// DELETE rows matching a PostgREST query (e.g. 'email=eq.x@y.z').
+// Returns true/false. Never throws.
+async function sbDelete(table, query) {
+  const r = await sbFetch(table, query, { method: 'DELETE', headers: sbHeaders() });
+  return !!(r && r.ok);
+}
+// Upsert every row in `rows`, then delete stored rows whose key is no
+// longer present (single-key tables only). The delete step runs ONLY
+// when the verification SELECT succeeds — a failed SELECT deletes
+// nothing, so a transient outage can never wipe a table. Never throws.
+async function sbSyncTable(table, keyCol, rows, onConflict) {
+  try {
+    if (rows.length) {
+      const ok = await sbUpsert(table, rows, onConflict);
+      if (!ok) return false;
+    }
+    const existing = await sbSelect(table, 'select=' + keyCol);
+    if (!existing) return true;
+    const keep = new Set(rows.map((r) => String(r[keyCol])));
+    const gone = existing.map((r) => r[keyCol]).filter((k) => k !== undefined && k !== null && !keep.has(String(k)));
+    for (const k of gone) await sbDelete(table, keyCol + '=eq.' + encodeURIComponent(String(k)));
+    return true;
+  } catch (e) { return false; }
+}
+// ---- kv_docs helpers (one row per remaining document file) ----
+// loadKvDoc returns the stored document, or a fresh copy of `dflt`
+// when the row is missing/unreadable (mirrors the old load* defaults).
+// saveKvDoc upserts the single row and schedules a GitHub backup.
+function kvClone(v) {
+  if (v === null || typeof v !== 'object') return v;
+  try { return JSON.parse(JSON.stringify(v)); } catch (e) { return v; }
+}
+async function loadKvDoc(name, dflt) {
+  try {
+    const row = await sbSelectOne('kv_docs', 'select=data&name=eq.' + encodeURIComponent(name) + '&limit=1');
+    if (row && row.data !== undefined && row.data !== null) return row.data;
+  } catch (e) {}
+  return kvClone(dflt);
+}
+async function saveKvDoc(name, data, backupName) {
+  try {
+    await sbUpsert('kv_docs', [{ name, data, updated_at: new Date().toISOString() }], 'name');
+  } catch (e) {}
+  if (backupName) scheduleBackup(backupName);
+}
+
+/* ---------------- GitHub BACKUP ONLY (write-only) ----------------- */
+// GitHub is no longer read for data (no restore, no merge — Supabase
+// is the single source of truth). The movai-data repo keeps a backup
+// copy of each JSON document: scheduleBackup(name) marks a file dirty
+// and a timer flushes dirty files at most once per 60 seconds; a full
+// snapshot of all 32 files runs at most once per 30 minutes. Backup
+// writes NEVER block a response and NEVER throw. Worst-case PUT rate:
+// one 32-file snapshot every 30 min = 64 PUTs/hour, far under GitHub's
+// 5,000/hour limit. If MOVAI_GITHUB_TOKEN is unset, backup is a no-op.
+// ghGetSha below is a SHA-only lookup (no file content) used solely
+// because GitHub's contents PUT requires the current blob sha.
 const GH_REPO = process.env.MOVAI_DATA_REPO || 'sokhoeun356/movai-data';
 const GH_TOKEN = process.env.MOVAI_GITHUB_TOKEN || '';
 const GH_DATA_FILES = [
@@ -170,15 +284,15 @@ function ghHeaders() {
 function ghContentsUrl(name) {
   return 'https://api.github.com/repos/' + GH_REPO + '/contents/' + encodeURIComponent(name);
 }
-// GET one file from GitHub. Returns {sha, text} or null (missing/unreachable).
-async function ghGetFile(name) {
-  const r = await fetch(ghContentsUrl(name) + '?ref=main', { headers: ghHeaders(), signal: AbortSignal.timeout(15000) });
-  if (r.status === 404) return null;
-  if (!r.ok) return null;
-  const j = await r.json().catch(() => null);
-  if (!j || typeof j.content !== 'string') return null;
-  const text = Buffer.from(j.content.replace(/\s/g, ''), 'base64').toString('utf8');
-  return { sha: typeof j.sha === 'string' ? j.sha : '', text };
+// SHA-only lookup for the backup writer (see header above). Returns the
+// blob sha string or ''. Never file content; never used for data reads.
+async function ghGetSha(name) {
+  try {
+    const r = await fetch(ghContentsUrl(name) + '?ref=main', { headers: ghHeaders(), signal: AbortSignal.timeout(15000) });
+    if (!r.ok) return '';
+    const j = await r.json().catch(() => null);
+    return (j && typeof j.sha === 'string') ? j.sha : '';
+  } catch (e) { return ''; }
 }
 // PUT one file to GitHub (create or update). Returns a Promise<boolean>:
 // true = confirmed on GitHub, false = failed (logged, never throws).
@@ -200,8 +314,8 @@ async function ghPutFileInner(name, text) {
   try {
     let sha = ghShaCache[name] || '';
     if (!sha) {
-      const cur = await ghGetFile(name);
-      if (cur && cur.sha) sha = cur.sha;
+      const curSha = await ghGetSha(name);
+      if (curSha) sha = curSha;
     }
     const send = async (useSha) => {
       const body = { message: 'movai-proxy: update ' + name, content: Buffer.from(text, 'utf8').toString('base64'), branch: 'main' };
@@ -216,8 +330,8 @@ async function ghPutFileInner(name, text) {
     let r = await send(sha);
     if ((r.status === 409 || r.status === 422) && sha) {
       // Sha went stale (concurrent update) — refetch and retry once.
-      const cur = await ghGetFile(name);
-      if (cur && cur.sha) r = await send(cur.sha);
+      const curSha = await ghGetSha(name);
+      if (curSha) r = await send(curSha);
     }
     if (!r.ok) { console.log('[github] PUT ' + name + ' failed: HTTP ' + r.status); return false; }
     const j = await r.json().catch(() => null);
@@ -228,57 +342,133 @@ async function ghPutFileInner(name, text) {
     return false;
   }
 }
-// Called AFTER a local write of a JSON data file. Fire-and-forget: never
-// blocks the API response and never throws. No-op when the token is unset.
-function ghPersistFile(filePath) {
-  if (!ghEnabled()) return;
-  const name = path.basename(filePath);
-  if (!GH_DATA_FILES.includes(name)) return;
-  let text;
-  try { text = fs.readFileSync(filePath, 'utf8'); } catch (e) { return; }
-  ghPutFile(name, text).catch(() => {});
-}
-// Awaited flush for CRITICAL data (public post, grant, purchase approve,
-// user sync): waits until the latest local content of filePath is confirmed
-// on GitHub BEFORE the handler returns success, so a Render restart in the
-// next second cannot lose a write that was already reported as ok.
-// Returns true on success, false when GitHub failed — the local data is
-// still saved, so the caller must NOT fail the request for a GitHub
-// hiccup, only log it. Never throws. No-op (returns true) when GitHub is
-// disabled or the file is not a tracked data file.
-async function ghFlushFile(filePath) {
-  if (!ghEnabled()) return true;
-  const name = path.basename(filePath);
-  if (!GH_DATA_FILES.includes(name)) return true;
-  let text;
-  try { text = fs.readFileSync(filePath, 'utf8'); } catch (e) { return false; }
-  const ok = await ghPutFile(name, text);
-  if (!ok) console.log('[github] FLUSH ' + name + ' failed — local data saved, GitHub not yet updated (will retry on next write)');
-  return ok;
-}
-// Startup restore: pull every JSON data file from GitHub into the local
-// ./data/ cache (overwrites local). Missing/unreachable files keep the
-// local copy. Never throws. Runs before the server starts listening.
-async function ghRestoreAll() {
-  if (!ghEnabled()) return;
-  try { fs.mkdirSync(DATA_DIR, { recursive: true }); } catch (e) {}
-  await Promise.all(GH_DATA_FILES.map(async (name) => {
-    try {
-      const cur = await ghGetFile(name);
-      if (!cur) return;
-      JSON.parse(cur.text); // validate JSON before overwriting the local cache
-      fs.writeFileSync(path.join(DATA_DIR, name), cur.text);
-      if (cur.sha) ghShaCache[name] = cur.sha;
-      console.log('[github] restored ' + name);
-    } catch (e) {
-      console.log('[github] restore ' + name + ' skipped: ' + (e && e.message ? e.message : e));
+// Serialize one document from Supabase exactly as the old JSON file
+// looked (same shape/key order as the old files, so a backup can be
+// read back by the old code). Returns the JSON text or null to skip.
+// Never throws.
+async function backupDocText(name) {
+  try {
+    switch (name) {
+      case 'users.json': {
+        const rows = await sbSelect('users', 'select=email,data');
+        if (!rows) return null;
+        const o = {};
+        for (const r of rows) if (r && r.email) o[r.email] = r.data || {};
+        return JSON.stringify(o, null, 2);
+      }
+      case 'history.json': {
+        const rows = await sbSelect('history_items', 'select=email,data');
+        if (!rows) return null;
+        const o = {};
+        for (const r of rows) {
+          if (!r || !r.email) continue;
+          (o[r.email] = o[r.email] || []).push(r.data);
+        }
+        for (const k of Object.keys(o)) o[k].sort((a, b) => numOr(b.ts, 0) - numOr(a.ts, 0));
+        return JSON.stringify(o, null, 2);
+      }
+      case 'public.json': {
+        const rows = await sbSelect('public_posts', 'select=data');
+        if (!rows) return null;
+        const arr = rows.map((r) => r.data).filter(Boolean);
+        arr.sort((a, b) => String(b.createdAt || b.at || '').localeCompare(String(a.createdAt || a.at || '')));
+        return JSON.stringify(arr, null, 2);
+      }
+      case 'wallet-requests.json': {
+        const rows = await sbSelect('wallet_requests', 'select=data');
+        if (!rows) return null;
+        const arr = rows.map((r) => r.data).filter(Boolean);
+        arr.sort((a, b) => String(b.at || b.createdAt || '').localeCompare(String(a.at || a.createdAt || '')));
+        return JSON.stringify(arr, null, 2);
+      }
+      case 'notifications.json': {
+        const rows = await sbSelect('notifications', 'select=data');
+        if (!rows) return null;
+        const arr = rows.map((r) => r.data).filter(Boolean);
+        arr.sort((a, b) => String(b.at || '').localeCompare(String(a.at || '')));
+        return JSON.stringify(arr, null, 2);
+      }
+      case 'creator-follows.json': {
+        const rows = await sbSelect('creator_follows', 'select=follower_email,creator_email');
+        if (!rows) return null;
+        const o = {};
+        for (const r of rows) {
+          if (!r || !r.creator_email || !r.follower_email) continue;
+          (o[r.creator_email] = o[r.creator_email] || []).push(r.follower_email);
+        }
+        return JSON.stringify(o, null, 2);
+      }
+      case 'monetization-applications.json': {
+        const rows = await sbSelect('monetization_applications', 'select=email,data');
+        if (!rows) return null;
+        const o = {};
+        for (const r of rows) if (r && r.email) o[r.email] = r.data || {};
+        return JSON.stringify(o, null, 2);
+      }
+      case 'device-records.json': {
+        const rows = await sbSelect('device_records', 'select=device_key,data');
+        if (!rows) return null;
+        const o = {};
+        for (const r of rows) if (r && r.device_key) o[r.device_key] = r.data || {};
+        return JSON.stringify(o, null, 2);
+      }
+      default: {
+        // Every remaining document lives in kv_docs under its base name.
+        const kvName = name.replace(/\.json$/, '');
+        const doc = await loadKvDoc(kvName, null);
+        if (doc === null || doc === undefined) return null;
+        return JSON.stringify(doc, null, 2);
+      }
     }
-  })); // uploaded MP3/cover files are restored lazily on the first API
-  // request (see apiRoute top) — ghRestoreUploads lives inside apiRoute
-  // and is not in scope here; calling it here threw a ReferenceError
-  // that .catch(()=>{}) swallowed, so the restore never ran (root cause
-  // of uploads vanishing on restart, owner order 2026-11-18).
+  } catch (e) { return null; }
 }
+// Debounced background backup (see header above). Marks `name` dirty;
+// a timer flushes dirty files at most once per 60 seconds. Never
+// blocks a response, never throws. No-op when GitHub is not configured.
+const BACKUP_FLUSH_MS = 60 * 1000; // dirty files flush at most once/min
+const BACKUP_SNAPSHOT_MS = 30 * 60 * 1000; // full snapshot at most once/30 min
+const _backupDirty = new Set();
+let _backupTimer = null;
+let _backupRunning = false;
+let _backupLastSnapshot = 0;
+function scheduleBackup(name) {
+  if (!ghEnabled()) return;
+  if (!GH_DATA_FILES.includes(name)) return;
+  _backupDirty.add(name);
+  if (!_backupTimer) {
+    _backupTimer = setTimeout(() => { _backupTimer = null; flushBackups().catch(() => {}); }, BACKUP_FLUSH_MS);
+    if (_backupTimer && typeof _backupTimer.unref === 'function') { try { _backupTimer.unref(); } catch (e) {} }
+  }
+}
+async function flushBackups() {
+  if (_backupRunning) return;
+  _backupRunning = true;
+  try {
+    const names = Array.from(_backupDirty);
+    _backupDirty.clear();
+    for (const name of names) {
+      try {
+        const text = await backupDocText(name);
+        if (typeof text !== 'string') continue;
+        await ghPutFile(name, text);
+      } catch (e) {}
+    }
+  } finally { _backupRunning = false; }
+}
+// Full snapshot: mark every tracked file dirty and flush now.
+// Returns {backedUp, skipped}. Never throws.
+async function runBackupSnapshot() {
+  if (!ghEnabled()) return { backedUp: 0, skipped: true };
+  for (const n of GH_DATA_FILES) _backupDirty.add(n);
+  _backupLastSnapshot = Date.now();
+  await flushBackups();
+  return { backedUp: GH_DATA_FILES.length, skipped: false };
+}
+const _backupInterval = setInterval(() => {
+  try { if (Date.now() - _backupLastSnapshot >= BACKUP_SNAPSHOT_MS) runBackupSnapshot().catch(() => {}); } catch (e) {}
+}, BACKUP_SNAPSHOT_MS);
+if (_backupInterval && typeof _backupInterval.unref === 'function') { try { _backupInterval.unref(); } catch (e) {} }
+
 
 // Graduated admin-key lockout (owner order 2026-11-16, corrected) —
 // wrong Admin key attempts escalate per IP in LEVELS, stored in
@@ -300,19 +490,17 @@ const LOCKOUT_LEVELS = [
 function lockoutLevelCfg(level) {
   return LOCKOUT_LEVELS[Math.min(Math.max(level, 1) - 1, LOCKOUT_LEVELS.length - 1)];
 }
-function loadAdminLockouts() {
-  try { const j = JSON.parse(fs.readFileSync(ADMIN_LOCKOUTS_FILE, 'utf8')); if (j && typeof j === 'object' && !Array.isArray(j)) return j; } catch (e) {}
-  return {};
+async function loadAdminLockouts() {
+  const j = await loadKvDoc('admin-lockouts', {});
+    return (j && typeof j === 'object' && !Array.isArray(j)) ? j : {};
 }
-function saveAdminLockouts(obj) {
-  try { fs.mkdirSync(DATA_DIR, { recursive: true }); } catch (e) {}
-  fs.writeFileSync(ADMIN_LOCKOUTS_FILE, JSON.stringify(obj, null, 2));
-  ghPersistFile(ADMIN_LOCKOUTS_FILE);
+async function saveAdminLockouts(obj) {
+  await saveKvDoc('admin-lockouts', obj, 'admin-lockouts.json');
 }
-function adminLockoutRemainingMs(ip) {
+async function adminLockoutRemainingMs(ip) {
   try {
     if (!ip) return 0;
-    const rec = loadAdminLockouts()[ip];
+    const rec = (await loadAdminLockouts())[ip];
     if (!rec || !rec.blockedUntil) return 0;
     return Math.max(0, rec.blockedUntil - Date.now());
   } catch (e) { return 0; }
@@ -329,18 +517,18 @@ function lockoutTextEn(ms) {
   const h = Math.floor(mins / 60), r = mins % 60;
   return h + (h === 1 ? ' hour' : ' hours') + (r ? ' ' + r + (r === 1 ? ' minute' : ' minutes') : '');
 }
-function clearAdminLockout(ip) {
+async function clearAdminLockout(ip) {
   try {
     if (!ip) return;
-    const all = loadAdminLockouts();
-    if (all[ip]) { delete all[ip]; saveAdminLockouts(all); ghFlushFile(ADMIN_LOCKOUTS_FILE).catch(() => {}); }
+    const all = await loadAdminLockouts();
+    if (all[ip]) { delete all[ip]; await saveAdminLockouts(all); scheduleBackup('admin-lockouts.json'); }
   } catch (e) {}
 }
-function recordFailedAdminAttempt(req, ip) {
+async function recordFailedAdminAttempt(req, ip) {
   try {
     if (!ip) return 0;
     const now = Date.now();
-    const all = loadAdminLockouts();
+    const all = await loadAdminLockouts();
     let rec = all[ip];
     if (!rec || typeof rec !== 'object') rec = { level: 1, tries: 0, blockedUntil: 0, model: '' };
     // Already inside a lockout: do not extend it, do not count tries.
@@ -358,15 +546,15 @@ function recordFailedAdminAttempt(req, ip) {
       rec.level = Math.min(level + 1, LOCKOUT_LEVELS.length);
       rec.updatedAt = new Date().toISOString();
       all[ip] = rec;
-      saveAdminLockouts(all);
-      ghFlushFile(ADMIN_LOCKOUTS_FILE).catch(() => {});
-      addNotification('security', '', '🚫 វាយប្រហារ · Auto-blocked attack', 'IP ' + ip + (rec.model ? ' (' + rec.model + ')' : '') + ' ព្យាយាមចូល Admin ដោយ key ខុស (កម្រិតទី ' + level + ') — ត្រូវបានប្លុក ' + cfg.mins + ' នាទី');
+      await saveAdminLockouts(all);
+      scheduleBackup('admin-lockouts.json');
+      await addNotification('security', '', '🚫 វាយប្រហារ · Auto-blocked attack', 'IP ' + ip + (rec.model ? ' (' + rec.model + ')' : '') + ' ព្យាយាមចូល Admin ដោយ key ខុស (កម្រិតទី ' + level + ') — ត្រូវបានប្លុក ' + cfg.mins + ' នាទី');
       return cfg.mins;
     }
     rec.updatedAt = new Date().toISOString();
     all[ip] = rec;
-    saveAdminLockouts(all);
-    ghFlushFile(ADMIN_LOCKOUTS_FILE).catch(() => {});
+    await saveAdminLockouts(all);
+    scheduleBackup('admin-lockouts.json');
     return 0;
   } catch (e) { return 0; }
 }
@@ -377,51 +565,50 @@ function recordFailedAdminAttempt(req, ip) {
 // seed: when the file has no key yet, the env value is copied into it
 // (the value is never logged).
 const ADMIN_KEY_FILE = path.join(DATA_DIR, 'admin-key.json');
-function loadAdminKeyFile() {
-  try { const j = JSON.parse(fs.readFileSync(ADMIN_KEY_FILE, 'utf8')); if (j && typeof j.key === 'string' && j.key) return j.key; } catch (e) {}
-  return '';
+async function loadAdminKeyFile() {
+  const j = await loadKvDoc('admin-key', null);
+    if (j && typeof j.key === 'string' && j.key) return j.key;
+    return '';
 }
-function saveAdminKeyFile(key) {
-  try { fs.mkdirSync(DATA_DIR, { recursive: true }); } catch (e) {}
-  fs.writeFileSync(ADMIN_KEY_FILE, JSON.stringify({ key, updatedAt: new Date().toISOString() }, null, 2));
-  ghPersistFile(ADMIN_KEY_FILE);
+async function saveAdminKeyFile(key) {
+  await saveKvDoc('admin-key', { key, updatedAt: new Date().toISOString() }, 'admin-key.json');
 }
-function currentAdminKey() {
-  let k = loadAdminKeyFile();
+async function currentAdminKey() {
+  let k = await loadAdminKeyFile();
   if (!k) {
     const env = process.env.MOVAI_ADMIN_KEY || '';
-    if (env) { k = env; try { saveAdminKeyFile(env); } catch (e) {} }
+    if (env) { k = env; try { await saveAdminKeyFile(env); } catch (e) {} }
   }
   return k;
 }
-function adminKeyOk(req) {
-  const k = currentAdminKey();
+async function adminKeyOk(req) {
+  const k = await currentAdminKey();
   if (!k) return { ok: false, error: 'Admin key not configured on server' };
   const h = String(req.headers['authorization'] || '');
   const m = /^Bearer\s+(.+)$/.exec(h);
   if (m && m[1] === k) {
     // Correct key proves the admin — clear any lockout/strikes from
     // this IP (a typo storm is forgiven once the right key arrives).
-    try { clearAdminLockout(getClientIp(req)); } catch (e) {}
+    try { await clearAdminLockout(getClientIp(req)); } catch (e) {}
     return { ok: true };
   }
   // Wrong or missing key. A manually-blocked IP stays blocked.
   const ip = getClientIp(req);
-  if (ip && loadBlockedIps().some((b) => b === ip)) {
+  if (ip && (await loadBlockedIps()).some((b) => b === ip)) {
     return { ok: false, error: 'គណនីនេះត្រូវបានប្លុក · This account is blocked' };
   }
-  const remMs = adminLockoutRemainingMs(ip);
+  const remMs = await adminLockoutRemainingMs(ip);
   if (remMs > 0) {
     return { ok: false, error: 'គណនីនេះត្រូវបានប្លុក ' + lockoutTextKm(remMs) + 'ទៀត · This account is blocked for ' + lockoutTextEn(remMs) + ' more' };
   }
-  const blockedMins = recordFailedAdminAttempt(req, ip);
+  const blockedMins = await recordFailedAdminAttempt(req, ip);
   if (blockedMins > 0) {
     const ms = blockedMins * 60 * 1000;
     return { ok: false, error: 'Admin key មិនត្រឹមត្រូវទេ — ត្រូវបានប្លុក ' + lockoutTextKm(ms) + ' · Wrong admin key — blocked for ' + lockoutTextEn(ms) };
   }
   // Wrong key but not blocked yet: say how many tries are left at this level.
   try {
-    const rec = loadAdminLockouts()[ip];
+    const rec = (await loadAdminLockouts())[ip];
     if (rec) {
       const cfg = lockoutLevelCfg(rec.level || 1);
       const left = Math.max(0, cfg.tries - (rec.tries || 0));
@@ -436,27 +623,69 @@ function normEmail(v) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e) ? e : '';
 }
 function numOr(v, dflt) { const n = Number(v); return Number.isFinite(n) ? n : dflt; }
-function loadUsers() {
-  try { const j = JSON.parse(fs.readFileSync(USERS_FILE, 'utf8')); if (j && typeof j === 'object' && !Array.isArray(j)) return j; } catch (e) {}
-  return {};
+async function loadUsers() {
+  const rows = await sbSelect('users', 'select=email,data');
+    if (!rows) return {};
+    const out = {};
+    for (const r of rows) {
+      if (r && typeof r.email === 'string' && r.email) out[r.email] = (r.data && typeof r.data === 'object') ? r.data : {};
+    }
+    return out;
 }
-function saveUsers(u) {
-  try { fs.mkdirSync(DATA_DIR, { recursive: true }); } catch (e) {}
-  fs.writeFileSync(USERS_FILE, JSON.stringify(u, null, 2));
-  ghPersistFile(USERS_FILE);
+async function saveUsers(u) {
+  const doc = (u && typeof u === 'object' && !Array.isArray(u)) ? u : {};
+    const rows = Object.keys(doc).map((email) => ({ email, data: doc[email] || {}, updated_at: new Date().toISOString() }));
+    await sbSyncTable('users', 'email', rows, 'email');
+    scheduleBackup('users.json');
 }
 // History: each user's created things (songs/images/videos), keyed by
 // lowercased email: {"<email>": [items...]}. The website's localStorage
 // is only a cache; the server is the truth, so ONE Gmail shows ALL old
 // data on ANY device. Base64 thumbnails are NEVER stored here.
-function loadHistory() {
-  try { const j = JSON.parse(fs.readFileSync(HISTORY_FILE, 'utf8')); if (j && typeof j === 'object' && !Array.isArray(j)) return j; } catch (e) {}
-  return {};
+async function loadHistory() {
+  const rows = await sbSelect('history_items', 'select=email,data');
+    if (!rows) return {};
+    const out = {};
+    for (const r of rows) {
+      if (!r || typeof r.email !== 'string' || !r.email) continue;
+      if (!Array.isArray(out[r.email])) out[r.email] = [];
+      out[r.email].push(r.data);
+    }
+    for (const k of Object.keys(out)) out[k].sort((a, b) => numOr(b.ts, 0) - numOr(a.ts, 0));
+    return out;
 }
-function saveHistory(h) {
-  try { fs.mkdirSync(DATA_DIR, { recursive: true }); } catch (e) {}
-  fs.writeFileSync(HISTORY_FILE, JSON.stringify(h, null, 2));
-  ghPersistFile(HISTORY_FILE);
+async function saveHistory(h) {
+  const doc = (h && typeof h === 'object' && !Array.isArray(h)) ? h : {};
+    const rows = [];
+    for (const email of Object.keys(doc)) {
+      const items = Array.isArray(doc[email]) ? doc[email] : [];
+      for (const it of items) {
+        if (!it || typeof it !== 'object') continue;
+        // histKey() rule (supabase-schema.sql note 3): items with NEITHER
+        // id NOR src/url have an empty key and cannot be stored in this
+        // table — skip them, exactly as the sync handler already does.
+        const k = histKey(it);
+        if (!k) continue;
+        rows.push({ email, item_key: k, data: it });
+      }
+    }
+    // Composite key (email, item_key): upsert all rows, then delete stored
+    // rows no longer present — only when the verification SELECT succeeds.
+    try {
+      if (rows.length) {
+        const ok = await sbUpsert('history_items', rows, 'email,item_key');
+        if (!ok) { scheduleBackup('history.json'); return; }
+      }
+      const existing = await sbSelect('history_items', 'select=email,item_key');
+      if (existing) {
+        const keep = new Set(rows.map((r) => r.email + '\0' + r.item_key));
+        for (const r of existing) {
+          if (!r || typeof r.email !== 'string') continue;
+          if (!keep.has(r.email + '\0' + r.item_key)) await sbDelete('history_items', 'email=eq.' + encodeURIComponent(r.email) + '&item_key=eq.' + encodeURIComponent(String(r.item_key)));
+        }
+      }
+    } catch (e) {}
+    scheduleBackup('history.json');
 }
 // History merge key: item id first, else its src/url. Items with neither
 // cannot be matched across devices and are skipped on sync.
@@ -474,30 +703,26 @@ function histKey(it) {
 // tombstones anything it drops as a GitHub deletion; the sync and post
 // handlers refuse anything whose key/id is tombstoned.
 const DELETED_ITEMS_FILE = path.join(DATA_DIR, 'deleted-items.json');
-function loadDeletedItems() {
-  try {
-    const j = JSON.parse(fs.readFileSync(DELETED_ITEMS_FILE, 'utf8'));
+async function loadDeletedItems() {
+  const j = await loadKvDoc('deleted-items', null);
     if (j && typeof j === 'object' && !Array.isArray(j)) {
       return {
         history: (j.history && typeof j.history === 'object' && !Array.isArray(j.history)) ? j.history : {},
         posts: (j.posts && typeof j.posts === 'object' && !Array.isArray(j.posts)) ? j.posts : {},
       };
     }
-  } catch (e) {}
-  return { history: {}, posts: {} };
+    return { history: {}, posts: {} };
 }
-function saveDeletedItems(t) {
-  try { fs.mkdirSync(DATA_DIR, { recursive: true }); } catch (e) {}
-  fs.writeFileSync(DELETED_ITEMS_FILE, JSON.stringify(t, null, 2));
-  ghPersistFile(DELETED_ITEMS_FILE);
+async function saveDeletedItems(t) {
+  await saveKvDoc('deleted-items', t, 'deleted-items.json');
 }
 // Tombstone one public post id immediately (load, add, save). Idempotent.
-function tombstonePostIdNow(id) {
+async function tombstonePostIdNow(id) {
   if (typeof id !== 'string' || !id.trim()) return false;
-  const t = loadDeletedItems();
+  const t = await loadDeletedItems();
   if (t.posts[id]) return false;
   t.posts[id] = new Date().toISOString();
-  saveDeletedItems(t);
+  await saveDeletedItems(t);
   return true;
 }
 // User IDs: 10 chars, uppercase letters + digits, no confusing chars
@@ -569,14 +794,12 @@ function modelFromUA(ua) {
 // codes. A blocked model cannot sync (no user created/updated, no credits
 // granted). GitHub-backed like the other data files.
 const BLOCKED_MODELS_FILE = path.join(DATA_DIR, 'blocked-models.json');
-function loadBlockedModels() {
-  try { const j = JSON.parse(fs.readFileSync(BLOCKED_MODELS_FILE, 'utf8')); if (Array.isArray(j)) return j.filter((x) => typeof x === 'string'); } catch (e) {}
-  return [];
+async function loadBlockedModels() {
+  const j = await loadKvDoc('blocked-models', []);
+    return Array.isArray(j) ? j.filter((x) => typeof x === 'string') : [];
 }
-function saveBlockedModels(arr) {
-  try { fs.mkdirSync(DATA_DIR, { recursive: true }); } catch (e) {}
-  fs.writeFileSync(BLOCKED_MODELS_FILE, JSON.stringify(arr, null, 2));
-  ghPersistFile(BLOCKED_MODELS_FILE);
+async function saveBlockedModels(arr) {
+  await saveKvDoc('blocked-models', arr, 'blocked-models.json');
 }
 // Blocked IPs (./data/blocked-ips.json) + blocked Gmails
 // (./data/blocked-emails.json) — MANUAL blocks by the admin only. The
@@ -586,37 +809,31 @@ function saveBlockedModels(arr) {
 // admin-key attempts in 10 minutes). Both files are GitHub-backed like
 // the other data files.
 const BLOCKED_IPS_FILE = path.join(DATA_DIR, 'blocked-ips.json');
-function loadBlockedIps() {
-  try { const j = JSON.parse(fs.readFileSync(BLOCKED_IPS_FILE, 'utf8')); if (Array.isArray(j)) return j.filter((x) => typeof x === 'string'); } catch (e) {}
-  return [];
+async function loadBlockedIps() {
+  const j = await loadKvDoc('blocked-ips', []);
+    return Array.isArray(j) ? j.filter((x) => typeof x === 'string') : [];
 }
-function saveBlockedIps(arr) {
-  try { fs.mkdirSync(DATA_DIR, { recursive: true }); } catch (e) {}
-  fs.writeFileSync(BLOCKED_IPS_FILE, JSON.stringify(arr, null, 2));
-  ghPersistFile(BLOCKED_IPS_FILE);
+async function saveBlockedIps(arr) {
+  await saveKvDoc('blocked-ips', arr, 'blocked-ips.json');
 }
 const BLOCKED_EMAILS_FILE = path.join(DATA_DIR, 'blocked-emails.json');
-function loadBlockedEmails() {
-  try { const j = JSON.parse(fs.readFileSync(BLOCKED_EMAILS_FILE, 'utf8')); if (Array.isArray(j)) return j.filter((x) => typeof x === 'string'); } catch (e) {}
-  return [];
+async function loadBlockedEmails() {
+  const j = await loadKvDoc('blocked-emails', []);
+    return Array.isArray(j) ? j.filter((x) => typeof x === 'string') : [];
 }
-function saveBlockedEmails(arr) {
-  try { fs.mkdirSync(DATA_DIR, { recursive: true }); } catch (e) {}
-  fs.writeFileSync(BLOCKED_EMAILS_FILE, JSON.stringify(arr, null, 2));
-  ghPersistFile(BLOCKED_EMAILS_FILE);
+async function saveBlockedEmails(arr) {
+  await saveKvDoc('blocked-emails', arr, 'blocked-emails.json');
 }
 // Login count per device model (./data/model-logins.json) — a map
 // model code -> number of syncs (logins) from that model. Incremented on
 // every /api/admin/sync that carries a model. GitHub-backed.
 const MODEL_LOGINS_FILE = path.join(DATA_DIR, 'model-logins.json');
-function loadModelLogins() {
-  try { const j = JSON.parse(fs.readFileSync(MODEL_LOGINS_FILE, 'utf8')); if (j && typeof j === 'object' && !Array.isArray(j)) return j; } catch (e) {}
-  return {};
+async function loadModelLogins() {
+  const j = await loadKvDoc('model-logins', {});
+    return (j && typeof j === 'object' && !Array.isArray(j)) ? j : {};
 }
-function saveModelLogins(m) {
-  try { fs.mkdirSync(DATA_DIR, { recursive: true }); } catch (e) {}
-  fs.writeFileSync(MODEL_LOGINS_FILE, JSON.stringify(m, null, 2));
-  ghPersistFile(MODEL_LOGINS_FILE);
+async function saveModelLogins(m) {
+  await saveKvDoc('model-logins', m, 'model-logins.json');
 }
 // Known devices per user — u.knownDevices is an array (max 20, newest
 // first) of {model, device, ip, firstSeen, lastSeen}. Updated on every
@@ -653,53 +870,52 @@ function trackKnownDevice(u, model, device, ip, now, country, countryCode) {
 // user record + the knownDevices entry for that IP in the background; on
 // failure (rate-limited, unreachable) both stay '' and the sync still
 // succeeds. No dependency.
-function lookupIpCountryAsync(email, ip) {
+async function lookupIpCountryAsync(email, ip) {
   if (!email || !ip) return;
-  fetch('https://ipapi.co/' + encodeURIComponent(ip) + '/json/', { signal: AbortSignal.timeout(3000) })
-    .then((r) => (r.ok ? r.json().catch(() => null) : null))
-    .then((j) => {
+  (async () => {
+    try {
+      const r = await fetch('https://ipapi.co/' + encodeURIComponent(ip) + '/json/', { signal: AbortSignal.timeout(3000) });
+      const j = r.ok ? await r.json().catch(() => null) : null;
       const country = j && typeof j.country_name === 'string' ? j.country_name.trim().slice(0, 100) : '';
       const countryCode = j && typeof j.country_code === 'string' ? j.country_code.trim().toUpperCase().slice(0, 8) : '';
       if (!country && !countryCode) return;
+      const users = await loadUsers();
+      const u = users[email];
+      if (!u) return;
+      // VPN flag (country change for the DEVICE): if this device was
+      // previously seen in a DIFFERENT country, the IP's country
+      // changed — likely VPN (or travel). The fingerprint still
+      // identifies the device; the flag is informational only.
       try {
-        const users = loadUsers();
-        const u = users[email];
-        if (!u) return;
-        // VPN flag (country change for the DEVICE): if this device was
-        // previously seen in a DIFFERENT country, the IP's country
-        // changed — likely VPN (or travel). The fingerprint still
-        // identifies the device; the flag is informational only.
-        try {
-          const did = u.lastDeviceId || u.deviceId || '';
-          if (did && country) {
-            const dall = loadDeviceRecords();
-            const dk = 'id:' + did;
-            const dr = dall[dk];
-            if (dr && typeof dr === 'object') {
-              if (dr.country && dr.country !== country) { dr.vpnDetected = true; dr.vpnLastSeen = new Date().toISOString(); }
-              if (dr.country !== country) { dr.country = country; saveDeviceRecords(dall); }
-            }
-          }
-        } catch (e) {}
-        let changed = false;
-        if (country && u.country !== country) { u.country = country; changed = true; }
-        if (countryCode && u.countryCode !== countryCode) { u.countryCode = countryCode; changed = true; }
-        if (!changed) return;
-        if (Array.isArray(u.knownDevices)) {
-          for (const e of u.knownDevices) {
-            if (e && e.ip === ip) {
-              if (country && !e.country) e.country = country;
-              if (countryCode && !e.countryCode) e.countryCode = countryCode;
-            }
+        const did = u.lastDeviceId || u.deviceId || '';
+        if (did && country) {
+          const dall = await loadDeviceRecords();
+          const dk = 'id:' + did;
+          const dr = dall[dk];
+          if (dr && typeof dr === 'object') {
+            if (dr.country && dr.country !== country) { dr.vpnDetected = true; dr.vpnLastSeen = new Date().toISOString(); }
+            if (dr.country !== country) { dr.country = country; await saveDeviceRecords(dall); }
           }
         }
-        saveUsers(users);
       } catch (e) {}
-    })
-    .catch(() => {});
+      let changed = false;
+      if (country && u.country !== country) { u.country = country; changed = true; }
+      if (countryCode && u.countryCode !== countryCode) { u.countryCode = countryCode; changed = true; }
+      if (!changed) return;
+      if (Array.isArray(u.knownDevices)) {
+        for (const e of u.knownDevices) {
+          if (e && e.ip === ip) {
+            if (country && !e.country) e.country = country;
+            if (countryCode && !e.countryCode) e.countryCode = countryCode;
+          }
+        }
+      }
+      await saveUsers(users);
+    } catch (e) {}
+  })().catch(() => {});
 }
-function pubUser(u, modelLogins, deviceInfo) {
-  const map = modelLogins || loadModelLogins();
+async function pubUser(u, modelLogins, deviceInfo) {
+  const map = modelLogins || await loadModelLogins();
   const model = u.model || '';
   const count = model && map && typeof map === 'object' ? (Number(map[model]) || 0) : 0;
   const out = { id: u.id || '', email: u.email, name: u.name || '', firstName: u.firstName || '', lastName: u.lastName || '', credits: u.credits, songCredits: u.songCredits, balance: Math.round(numOr(u.balance, 0) * 100) / 100, earnBalance: Math.round(numOr(u.earnBalance, 0) * 100) / 100, plan: u.plan || '', songPlan: u.songPlan || '', createdAt: u.createdAt, updatedAt: u.updatedAt, lastIp: u.lastIp || '', country: u.country || '', countryCode: u.countryCode || '', device: u.device || '', model, modelLogins: count, lastSeen: u.lastSeen || '', knownDevices: Array.isArray(u.knownDevices) ? u.knownDevices : [], hasPassword: !!(u.passwordHash && u.passwordSalt),
@@ -726,15 +942,16 @@ function pubUser(u, modelLogins, deviceInfo) {
   }
   return out;
 }
-function logGrant(entry) {
+async function loadGrants() {
+  const j = await loadKvDoc('grants', []);
+  return Array.isArray(j) ? j : [];
+}
+async function logGrant(entry) {
   try {
-    fs.mkdirSync(DATA_DIR, { recursive: true });
-    let arr = [];
-    try { const j = JSON.parse(fs.readFileSync(GRANTS_FILE, 'utf8')); if (Array.isArray(j)) arr = j; } catch (e) {}
+    let arr = await loadGrants();
     arr.push(entry);
     if (arr.length > 1000) arr = arr.slice(-1000);
-    fs.writeFileSync(GRANTS_FILE, JSON.stringify(arr, null, 2));
-    ghPersistFile(GRANTS_FILE);
+    await saveKvDoc('grants', arr, 'grants.json');
   } catch (e) {}
 }
 // ---- Server-side credit deduction (real, persistent) ----
@@ -748,7 +965,7 @@ function logGrant(entry) {
 // hammering Generate does not spam the Admin bell + Telegram. Goes to
 // Admin (bell) + Telegram via the 'out-of-credit' kind.
 const outOfCreditNotifiedAt = new Map();
-function notifyOutOfCredit(email, kind, balance, cost) {
+async function notifyOutOfCredit(email, kind, balance, cost) {
   try {
     const em = normEmail(email);
     if (!em) return;
@@ -756,31 +973,31 @@ function notifyOutOfCredit(email, kind, balance, cost) {
     const last = outOfCreditNotifiedAt.get(em) || 0;
     if (now - last < 24 * 60 * 60 * 1000) return;
     outOfCreditNotifiedAt.set(em, now);
-    const users = loadUsers();
+    const users = await loadUsers();
     const u = users[em];
     const uid = u && u.id ? u.id : '—';
-    addNotification('out-of-credit', em, '⚠️ Credit អស់ · Out of credit', (u && u.name ? u.name : em) + ' · ' + em + ' · ID: ' + uid + ' — ' + (kind === 'media' ? 'Image.Video' : 'Song') + ' Credit មិនគ្រប់ (នៅសល់ ' + Math.floor(numOr(balance, 0)) + ' / ត្រូវការ ' + Math.floor(numOr(cost, 0)) + ')');
+    await addNotification('out-of-credit', em, '⚠️ Credit អស់ · Out of credit', (u && u.name ? u.name : em) + ' · ' + em + ' · ID: ' + uid + ' — ' + (kind === 'media' ? 'Image.Video' : 'Song') + ' Credit មិនគ្រប់ (នៅសល់ ' + Math.floor(numOr(balance, 0)) + ' / ត្រូវការ ' + Math.floor(numOr(cost, 0)) + ')');
   } catch (e) {}
 }
 async function deductForGeneration(email, mediaCost, songCost, reason) {
   const em = normEmail(email);
   if (!em) return { ok: true, guest: true };
-  const users = loadUsers();
+  const users = await loadUsers();
   const u = users[em];
   if (!u) return { ok: true, guest: true };
   const mCost = Math.floor(numOr(mediaCost, 0));
   const sCost = Math.floor(numOr(songCost, 0));
   const mBal = Math.floor(numOr(u.credits, 0));
   const sBal = Math.floor(numOr(u.songCredits, 0));
-  if (mCost > 0 && mBal < mCost) { notifyOutOfCredit(em, 'media', mBal, mCost); return { ok: false, error: 'Image.Video Credit មិនគ្រប់ទេ', needBuy: true, kind: 'media', balance: mBal, cost: mCost }; }
-  if (sCost > 0 && sBal < sCost) { notifyOutOfCredit(em, 'song', sBal, sCost); return { ok: false, error: 'Song Credit មិនគ្រប់ទេ', needBuy: true, kind: 'song', balance: sBal, cost: sCost }; }
+  if (mCost > 0 && mBal < mCost) { await notifyOutOfCredit(em, 'media', mBal, mCost); return { ok: false, error: 'Image.Video Credit មិនគ្រប់ទេ', needBuy: true, kind: 'media', balance: mBal, cost: mCost }; }
+  if (sCost > 0 && sBal < sCost) { await notifyOutOfCredit(em, 'song', sBal, sCost); return { ok: false, error: 'Song Credit មិនគ្រប់ទេ', needBuy: true, kind: 'song', balance: sBal, cost: sCost }; }
   if (mCost > 0 || sCost > 0) {
     if (mCost > 0) u.credits = Math.max(0, mBal - mCost);
     if (sCost > 0) u.songCredits = Math.max(0, sBal - sCost);
     u.updatedAt = new Date().toISOString();
-    saveUsers(users);
-    await ghFlushFile(USERS_FILE);
-    logGrant({ email: em, credits: -mCost, songCredits: -sCost, note: reason || 'generation', at: u.updatedAt });
+    await saveUsers(users);
+    scheduleBackup('users.json');
+    await logGrant({ email: em, credits: -mCost, songCredits: -sCost, note: reason || 'generation', at: u.updatedAt });
     // Admin bell: every generation deduction is visible to the Admin
     // immediately (account + amount), and to the user in their own bell.
     // The website also raises a local bell notice instantly; this is the
@@ -789,7 +1006,7 @@ async function deductForGeneration(email, mediaCost, songCost, reason) {
       const _parts = [];
       if (mCost > 0) _parts.push('-' + mCost + ' Image.Video');
       if (sCost > 0) _parts.push('-' + sCost + ' Song');
-      addNotification('deduct', em, '➖ កាត់ Credit · ' + (u.name || em), _parts.join(' · ') + ' — ' + (reason || 'generation') + ' · នៅសល់ ' + Math.floor(numOr(u.credits, 0)) + ' Image.Video / ' + Math.floor(numOr(u.songCredits, 0)) + ' Song · ' + em + ' · ID: ' + (u.id || '—'));
+      await addNotification('deduct', em, '➖ កាត់ Credit · ' + (u.name || em), _parts.join(' · ') + ' — ' + (reason || 'generation') + ' · នៅសល់ ' + Math.floor(numOr(u.credits, 0)) + ' Image.Video / ' + Math.floor(numOr(u.songCredits, 0)) + ' Song · ' + em + ' · ID: ' + (u.id || '—'));
     } catch (e) {}
   }
   return { ok: true, credits: Math.floor(numOr(u.credits, 0)), songCredits: Math.floor(numOr(u.songCredits, 0)) };
@@ -799,7 +1016,7 @@ async function deductForGeneration(email, mediaCost, songCost, reason) {
 async function refundForGeneration(email, mediaCost, songCost, reason) {
   const em = normEmail(email);
   if (!em) return { ok: true };
-  const users = loadUsers();
+  const users = await loadUsers();
   const u = users[em];
   if (!u) return { ok: true };
   const mCost = Math.floor(numOr(mediaCost, 0));
@@ -807,9 +1024,9 @@ async function refundForGeneration(email, mediaCost, songCost, reason) {
   if (mCost > 0) u.credits = Math.floor(numOr(u.credits, 0)) + mCost;
   if (sCost > 0) u.songCredits = Math.floor(numOr(u.songCredits, 0)) + sCost;
   u.updatedAt = new Date().toISOString();
-  saveUsers(users);
-  await ghFlushFile(USERS_FILE);
-  logGrant({ email: em, credits: mCost, songCredits: sCost, note: 'refund: ' + (reason || 'generation failed'), at: u.updatedAt });
+  await saveUsers(users);
+  scheduleBackup('users.json');
+  await logGrant({ email: em, credits: mCost, songCredits: sCost, note: 'refund: ' + (reason || 'generation failed'), at: u.updatedAt });
   return { ok: true, credits: Math.floor(numOr(u.credits, 0)), songCredits: Math.floor(numOr(u.songCredits, 0)) };
 }
 
@@ -820,28 +1037,26 @@ async function refundForGeneration(email, mediaCost, songCost, reason) {
 // Never logs API keys. Capped at 5000 records (oldest dropped).
 const ACTIVITY_FILE = path.join(DATA_DIR, 'activity.json');
 const ACTIVITY_MAX = 5000;
-function loadActivity() {
-  try { const j = JSON.parse(fs.readFileSync(ACTIVITY_FILE, 'utf8')); if (Array.isArray(j)) return j; } catch (e) {}
-  return [];
+async function loadActivity() {
+  const j = await loadKvDoc('activity', []);
+    return Array.isArray(j) ? j : [];
 }
-function saveActivity(arr) {
-  try { fs.mkdirSync(DATA_DIR, { recursive: true }); } catch (e) {}
-  fs.writeFileSync(ACTIVITY_FILE, JSON.stringify(arr, null, 2));
-  ghPersistFile(ACTIVITY_FILE);
+async function saveActivity(arr) {
+  await saveKvDoc('activity', arr, 'activity.json');
 }
-function logActivity(rec) {
+async function logActivity(rec) {
   try {
-    const arr = loadActivity();
+    const arr = await loadActivity();
     arr.push(rec);
     if (arr.length > ACTIVITY_MAX) arr.splice(0, arr.length - ACTIVITY_MAX);
-    saveActivity(arr);
+    await saveActivity(arr);
   } catch (e) {}
 }
 // Wrap res.end so exactly one activity record is written when a generation
 // endpoint sends its response. ctx = {provider, email} — the handler fills
 // it in after parsing the body; the wrapper reads it at response time.
 // mode = 'image' | 'video' | 'song'.
-function wrapGenLog(res, mode, ctx) {
+async function wrapGenLog(res, mode, ctx) {
   const origEnd = res.end.bind(res);
   let logged = false;
   res.end = function (chunk, ...rest) {
@@ -868,14 +1083,12 @@ function wrapGenLog(res, mode, ctx) {
 // plain array of lowercased emails, capped at 5000.
 const FOLLOWERS_FILE = path.join(DATA_DIR, 'followers.json');
 const FOLLOWERS_MAX = 5000;
-function loadFollowers() {
-  try { const j = JSON.parse(fs.readFileSync(FOLLOWERS_FILE, 'utf8')); if (Array.isArray(j)) return j.filter((e) => typeof e === 'string'); } catch (e) {}
-  return [];
+async function loadFollowers() {
+  const j = await loadKvDoc('followers', []);
+    return Array.isArray(j) ? j.filter((x) => typeof x === 'string') : [];
 }
-function saveFollowers(arr) {
-  try { fs.mkdirSync(DATA_DIR, { recursive: true }); } catch (e) {}
-  fs.writeFileSync(FOLLOWERS_FILE, JSON.stringify(arr, null, 2));
-  ghPersistFile(FOLLOWERS_FILE);
+async function saveFollowers(arr) {
+  await saveKvDoc('followers', arr, 'followers.json');
 }
 // Notifications (./data/notifications.json) — real notifications for the
 // admin AND for users. The Admin app reads them (GET /api/admin/notifications)
@@ -891,14 +1104,19 @@ function saveFollowers(arr) {
 // Stored newest first, capped at 5000 (oldest dropped).
 const NOTIFICATIONS_FILE = path.join(DATA_DIR, 'notifications.json');
 const NOTIFICATIONS_MAX = 5000;
-function loadNotifications() {
-  try { const j = JSON.parse(fs.readFileSync(NOTIFICATIONS_FILE, 'utf8')); if (Array.isArray(j)) return j; } catch (e) {}
-  return [];
+async function loadNotifications() {
+  const rows = await sbSelect('notifications', 'select=id,data');
+    if (!rows) return [];
+    const arr = rows.map((r) => r.data).filter(Boolean);
+    arr.sort((a, b) => String(b.at || '').localeCompare(String(a.at || '')));
+    return arr;
 }
-function saveNotifications(arr) {
-  try { fs.mkdirSync(DATA_DIR, { recursive: true }); } catch (e) {}
-  fs.writeFileSync(NOTIFICATIONS_FILE, JSON.stringify(arr, null, 2));
-  ghPersistFile(NOTIFICATIONS_FILE);
+async function saveNotifications(arr) {
+  const list = Array.isArray(arr) ? arr : [];
+    for (const n of list) { if (n && !n.id) n.id = newNotificationId(); }
+    const rows = list.filter((n) => n && typeof n.id === 'string' && n.id).map((n) => ({ id: n.id, data: n }));
+    await sbSyncTable('notifications', 'id', rows, 'id');
+    scheduleBackup('notifications.json');
 }
 function newNotificationId() {
   return 'ntf_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
@@ -939,15 +1157,15 @@ function pkgNotifTelegram(title, pkg, email, buyerId) {
 // When a purchase request is decided (approved/rejected), mark the
 // original purchase-request notification as decided so the Admin bell
 // no longer shows it as a pending/new request.
-function markPurchaseRequestDecided(email, packageId, decision, at) {
+async function markPurchaseRequestDecided(email, packageId, decision, at) {
   try {
-    const arr = loadNotifications();
+    const arr = await loadNotifications();
     const orig = arr.find((x) => x && x.kind === 'purchase-request' && x.email === email && !x.decision && (!x.pkg || x.pkg === packageId));
     if (orig) {
       orig.decision = decision;
       orig.decidedAt = at || new Date().toISOString();
       orig.read = true;
-      saveNotifications(arr);
+      await saveNotifications(arr);
     }
   } catch (e) {}
 }
@@ -957,14 +1175,14 @@ function markPurchaseRequestDecided(email, packageId, decision, at) {
 // message to the admin (fire-and-forget:
 // it never blocks the response and its errors are swallowed). The bot token
 // is never logged and never returned by any endpoint.
-function addNotification(kind, email, title, text, opts) {
+async function addNotification(kind, email, title, text, opts) {
   const n = { id: newNotificationId(), at: new Date().toISOString(), kind, email: email || '', title: title || '', text: text || '', read: false };
   if (opts && typeof opts === 'object' && opts.extra && typeof opts.extra === 'object') Object.assign(n, opts.extra);
   try {
-    const arr = loadNotifications();
+    const arr = await loadNotifications();
     arr.unshift(n);
     if (arr.length > NOTIFICATIONS_MAX) arr.length = NOTIFICATIONS_MAX;
-    saveNotifications(arr);
+    await saveNotifications(arr);
   } catch (e) {}
   if (kind === 'login' || kind === 'purchase-request' || kind === 'gift-claimed' || kind === 'security' || kind === 'update' || kind === 'grant' || kind === 'deduct' || kind === 'purchase-approved' || kind === 'purchase-rejected' || kind === 'plan-expired' || kind === 'out-of-credit') {
     if (opts && typeof opts === 'object' && typeof opts.telegramHtml === 'string' && opts.telegramHtml) {
@@ -978,9 +1196,9 @@ function addNotification(kind, email, title, text, opts) {
   sendPushForNotification(n);
   return n;
 }
-function sendTelegramAdmin(text, parseMode) {
+async function sendTelegramAdmin(text, parseMode) {
   try {
-    const s = loadSettings();
+    const s = await loadSettings();
     const tel = (s && s.telegram && typeof s.telegram === 'object' && !Array.isArray(s.telegram)) ? s.telegram : {};
     const token = typeof tel.botToken === 'string' ? tel.botToken.trim() : '';
     const chatId = typeof tel.chatId === 'string' ? tel.chatId.trim() : '';
@@ -1018,9 +1236,9 @@ const verifyStore = new Map(); // email -> {code, token, expiresAt, attempts}
 const verifySendCount = new Map(); // email -> {count, windowStart}
 let emailTransporter = null;
 let emailTransporterKey = '';
-function getEmailTransporter() {
+async function getEmailTransporter() {
   try {
-    const s = loadSettings();
+    const s = await loadSettings();
     const em = (s && s.email && typeof s.email === 'object') ? s.email : {};
     const user = typeof em.user === 'string' ? em.user.trim() : '';
     const pass = typeof em.appPassword === 'string' ? em.appPassword.replace(/\s+/g, '') : '';
@@ -1054,27 +1272,28 @@ function getEmailTransporter() {
 // emails MovAi sends through Brevo (the only use of this Brevo account).
 const BREVO_USAGE_FILE = path.join(DATA_DIR, 'brevo-usage.json');
 let _brevoUsage = null;
-function brevoUsageLoad() {
+async function brevoUsageLoad() {
   if (_brevoUsage && typeof _brevoUsage === 'object') return _brevoUsage;
-  try { const j = JSON.parse(fs.readFileSync(BREVO_USAGE_FILE, 'utf8')); if (j && typeof j === 'object' && typeof j.date === 'string') { _brevoUsage = j; return _brevoUsage; } } catch (e) {}
-  _brevoUsage = { date: '', sent: 0 };
-  return _brevoUsage;
+    const j = await loadKvDoc('brevo-usage', null);
+    if (j && typeof j === 'object' && typeof j.date === 'string') { _brevoUsage = j; return _brevoUsage; }
+    _brevoUsage = { date: '', sent: 0 };
+    return _brevoUsage;
 }
-function brevoUsageSave() {
-  try { fs.mkdirSync(DATA_DIR, { recursive: true }); fs.writeFileSync(BREVO_USAGE_FILE, JSON.stringify(_brevoUsage, null, 2)); ghPersistFile(BREVO_USAGE_FILE); } catch (e) {}
+async function brevoUsageSave() {
+  try { await saveKvDoc('brevo-usage', _brevoUsage, 'brevo-usage.json'); } catch (e) {}
 }
-function brevoUsageRecordSent() {
+async function brevoUsageRecordSent() {
   try {
     const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Phnom_Penh' });
-    const u = brevoUsageLoad();
+    const u = await brevoUsageLoad();
     if (u.date !== today) { u.date = today; u.sent = 0; }
     u.sent = (Number(u.sent) || 0) + 1;
-    brevoUsageSave();
+    await brevoUsageSave();
   } catch (e) {}
 }
-function brevoUsageToday() {
+async function brevoUsageToday() {
   const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Phnom_Penh' });
-  const u = brevoUsageLoad();
+  const u = await brevoUsageLoad();
   if (u.date !== today) { u.date = today; u.sent = 0; }
   return { date: today, sent: Number(u.sent) || 0 };
 }
@@ -1084,7 +1303,7 @@ function brevoUsageToday() {
 // key lives in settings.email.brevoApiKey (set in Admin → Settings →
 // Email). Sender must be a Brevo-verified sender (sokhoeun356).
 async function sendViaBrevo(toEmail, fromEmail, subject, html, text) {
-  const s = loadSettings();
+  const s = await loadSettings();
   const em = (s && s.email && typeof s.email === 'object') ? s.email : {};
   const apiKey = typeof em.brevoApiKey === 'string' ? em.brevoApiKey.trim() : '';
   if (!apiKey) return { ok: false, error: 'Brevo API key not configured' };
@@ -1109,16 +1328,16 @@ async function sendViaBrevo(toEmail, fromEmail, subject, html, text) {
       const t = await r.text().catch(() => '');
       return { ok: false, error: 'Brevo error ' + r.status + ': ' + String(t).slice(0, 200) };
     }
-    brevoUsageRecordSent();
+    await brevoUsageRecordSent();
     return { ok: true };
   } catch (e) {
     clearTimeout(timer);
     return { ok: false, error: 'Brevo send failed — ' + (e && e.message ? String(e.message).slice(0, 200) : 'error') };
   }
 }
-function verifyEmailConfigured() {
+async function verifyEmailConfigured() {
   try {
-    const s = loadSettings();
+    const s = await loadSettings();
     const em = (s && s.email && typeof s.email === 'object') ? s.email : {};
     const brevoOk = typeof em.brevoApiKey === 'string' && em.brevoApiKey.trim().length > 0;
     const gmailOk = !!(typeof em.user === 'string' && em.user.trim() && typeof em.appPassword === 'string' && em.appPassword.trim() && NodemailerLib);
@@ -1180,7 +1399,7 @@ async function sendVerificationEmail(email) {
   const token = crypto.randomBytes(24).toString('hex');
   const link = VERIFY_SITE_URL + '/?verify=' + token;
   verifyStore.set(em, { code, token, expiresAt: now + VERIFY_CODE_TTL_MS, attempts: 0 });
-  const s = loadSettings();
+  const s = await loadSettings();
   const fromUser = (s && s.email && typeof s.email.user === 'string' && s.email.user.trim()) ? s.email.user.trim() : 'sokhoeun7788@gmail.com';
   const subject = 'MovAi — លេខកូដផ្ទៀងផ្ទាត់ ' + code;
   const html = buildVerifyEmailHtml(code, link);
@@ -1193,7 +1412,7 @@ async function sendVerificationEmail(email) {
     return { ok: true, sent: true, via: 'brevo' };
   }
   // Brevo not configured or failed — fall back to Gmail SMTP.
-  const transporter = getEmailTransporter();
+  const transporter = await getEmailTransporter();
   if (!transporter) {
     verifyStore.delete(em);
     return { ok: false, error: brevo.error && brevo.error !== 'Brevo API key not configured' ? brevo.error : 'Admin មិនទាន់ដាក់ Email (Gmail App Password) ទេ' };
@@ -1401,37 +1620,30 @@ function getWebPush() {
   }
   return webPushLib;
 }
-function getVapidKeys() {
+async function getVapidKeys() {
   const wp = getWebPush();
-  if (!wp) return null;
-  try {
-    let keys = null;
+    if (!wp) return null;
     try {
-      const j = JSON.parse(fs.readFileSync(VAPID_FILE, 'utf8'));
-      if (j && typeof j.publicKey === 'string' && j.publicKey && typeof j.privateKey === 'string' && j.privateKey) keys = j;
-    } catch (e) {}
-    if (!keys) {
-      keys = wp.generateVAPIDKeys();
-      try { fs.mkdirSync(DATA_DIR, { recursive: true }); } catch (e) {}
-      fs.writeFileSync(VAPID_FILE, JSON.stringify(keys, null, 2));
-      ghPersistFile(VAPID_FILE);
-    }
-    wp.setVapidDetails(VAPID_SUBJECT, keys.publicKey, keys.privateKey);
-    return keys;
-  } catch (e) { return null; }
+      let keys = await loadKvDoc('vapid', null);
+      if (!(keys && typeof keys.publicKey === 'string' && keys.publicKey && typeof keys.privateKey === 'string' && keys.privateKey)) keys = null;
+      if (!keys) {
+        keys = wp.generateVAPIDKeys();
+        await saveKvDoc('vapid', keys, 'vapid.json');
+      }
+      wp.setVapidDetails(VAPID_SUBJECT, keys.publicKey, keys.privateKey);
+      return keys;
+    } catch (e) { return null; }
 }
-function getVapidPublicKey() {
-  const keys = getVapidKeys();
+async function getVapidPublicKey() {
+  const keys = await getVapidKeys();
   return keys ? keys.publicKey : '';
 }
-function loadPushSubs() {
-  try { const j = JSON.parse(fs.readFileSync(PUSH_SUBS_FILE, 'utf8')); if (Array.isArray(j)) return j; } catch (e) {}
-  return [];
+async function loadPushSubs() {
+  const j = await loadKvDoc('push-subs', []);
+    return Array.isArray(j) ? j : [];
 }
-function savePushSubs(arr) {
-  try { fs.mkdirSync(DATA_DIR, { recursive: true }); } catch (e) {}
-  fs.writeFileSync(PUSH_SUBS_FILE, JSON.stringify(arr, null, 2));
-  ghPersistFile(PUSH_SUBS_FILE);
+async function savePushSubs(arr) {
+  await saveKvDoc('push-subs', arr, 'push-subs.json');
 }
 // Validate a browser PushSubscription JSON. Returns {endpoint, keys} or null.
 function cleanPushSub(s) {
@@ -1444,20 +1656,20 @@ function cleanPushSub(s) {
   if (!p256dh || !auth) return null;
   return { endpoint, keys: { p256dh, auth } };
 }
-function removePushSubByEndpoint(endpoint) {
+async function removePushSubByEndpoint(endpoint) {
   try {
-    const arr = loadPushSubs();
+    const arr = await loadPushSubs();
     const kept = arr.filter((s) => s && s.endpoint !== endpoint);
-    if (kept.length !== arr.length) savePushSubs(kept);
+    if (kept.length !== arr.length) await savePushSubs(kept);
   } catch (e) {}
 }
 // Send one Web Push. Fire-and-forget: the caller never awaits it. A 410/404
 // from the push service means the subscription is gone — delete it. All
 // other push errors are swallowed.
-function sendWebPush(sub, payload) {
+async function sendWebPush(sub, payload) {
   const wp = getWebPush();
   if (!wp) return;
-  const keys = getVapidKeys();
+  const keys = await getVapidKeys();
   if (!keys) return;
   const subObj = cleanPushSub(sub);
   if (!subObj) return;
@@ -1474,11 +1686,11 @@ function sendWebPush(sub, payload) {
 // user kinds (purchase-approved, purchase-rejected, grant, deduct,
 // gift-claimed) go to that user's own subscriptions. Deduplicated by
 // endpoint. Fire-and-forget — never blocks the response.
-function sendPushForNotification(n) {
+async function sendPushForNotification(n) {
   try {
     const ADMIN_KINDS = ['login', 'purchase-request', 'gift-claimed', 'security'];
     const USER_KINDS = ['purchase-approved', 'purchase-rejected', 'grant', 'deduct', 'gift-claimed', 'post'];
-    const subs = loadPushSubs();
+    const subs = await loadPushSubs();
     if (!subs.length) return;
     const targets = new Map();
     for (const s of subs) {
@@ -1691,20 +1903,15 @@ function cleanSettings(j, base) {
   s.email = { user: emUser, appPassword: emPass, brevoApiKey: emBrevo };
   return s;
 }
-function loadSettings() {
-  try {
-    const j = JSON.parse(fs.readFileSync(SETTINGS_FILE, 'utf8'));
+async function loadSettings() {
+  const j = await loadKvDoc('settings', null);
     return cleanSettings(j);
-  } catch (e) {}
-  return Object.assign({}, SETTINGS_DEFAULTS);
 }
-function saveSettings(s, base) {
-  try { fs.mkdirSync(DATA_DIR, { recursive: true }); } catch (e) {}
+async function saveSettings(s, base) {
   const out = cleanSettings(s, base);
-  out.updatedAt = new Date().toISOString();
-  fs.writeFileSync(SETTINGS_FILE, JSON.stringify(out, null, 2));
-  ghPersistFile(SETTINGS_FILE);
-  return out;
+    out.updatedAt = new Date().toISOString();
+    await saveKvDoc('settings', out, 'settings.json');
+    return out;
 }
 // Public-safe settings: the Telegram bot token is a secret and is NEVER
 // returned (GET /api/admin/settings is public). Clients only see
@@ -1757,46 +1964,45 @@ function normAdminKeyRecord(v, fallbackAt) {
   }
   return { keys: [], updatedAt: at };
 }
-function loadAdminKeys() {
+async function loadAdminKeys() {
   let j = null;
-  try { const parsed = JSON.parse(fs.readFileSync(ADMIN_KEYS_FILE, 'utf8')); if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) j = parsed; } catch (e) {}
-  if (!j) return {};
-  // Migrate old single-key records to the multi-key shape on load and
-  // persist the migrated file (once — later loads already see the new shape).
-  let changed = false;
-  const out = {};
-  for (const p of Object.keys(j)) {
-    const v = j[p];
-    if (v && typeof v === 'object' && !Array.isArray(v) && typeof v.key === 'string' && !Array.isArray(v.keys)) changed = true;
-    out[p] = normAdminKeyRecord(v);
-  }
-  if (changed) saveAdminKeys(out);
-  return out;
+    const parsed = await loadKvDoc('admin-keys', null);
+    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) j = parsed;
+    if (!j) return {};
+    // Migrate old single-key records to the multi-key shape on load and
+    // persist the migrated file (once — later loads already see the new shape).
+    let changed = false;
+    const out = {};
+    for (const p of Object.keys(j)) {
+      const v = j[p];
+      if (v && typeof v === 'object' && !Array.isArray(v) && typeof v.key === 'string' && !Array.isArray(v.keys)) changed = true;
+      out[p] = normAdminKeyRecord(v);
+    }
+    if (changed) await saveAdminKeys(out);
+    return out;
 }
-function saveAdminKeys(k) {
-  try { fs.mkdirSync(DATA_DIR, { recursive: true }); } catch (e) {}
-  fs.writeFileSync(ADMIN_KEYS_FILE, JSON.stringify(k, null, 2));
-  ghPersistFile(ADMIN_KEYS_FILE);
+async function saveAdminKeys(k) {
+  await saveKvDoc('admin-keys', k, 'admin-keys.json');
 }
 // The provider's stored keys as a list [{key, endpoint}] (multi-key
 // shape). Key VALUES are only used server-side — never returned or logged.
-function adminProviderKeyList(provider) {
-  const rec = loadAdminKeys()[normProvider(provider)];
+async function adminProviderKeyList(provider) {
+  const rec = (await loadAdminKeys())[normProvider(provider)];
   if (!rec || !Array.isArray(rec.keys)) return [];
   return rec.keys.filter((e) => e && typeof e.key === 'string' && e.key.trim()).map((e) => ({ key: e.key.trim(), endpoint: typeof e.endpoint === 'string' ? e.endpoint.trim() : '' }));
 }
 // First stored key for a provider, or null (kept for single-key checks
 // like "is a Groq key configured?"). endpoint is the Suno gateway URL
 // (only Suno needs one — the other providers have fixed hosts).
-function adminProviderKey(provider) {
-  const list = adminProviderKeyList(provider);
+async function adminProviderKey(provider) {
+  const list = await adminProviderKeyList(provider);
   return list.length ? list[0] : null;
 }
 // Resolve a provider API key: the request's own key first, else the
 // admin-stored key. The browser now sends no key — the admin key is used.
-function resolveProviderKey(reqKey, provider) {
+async function resolveProviderKey(reqKey, provider) {
   if (typeof reqKey === 'string' && reqKey.trim()) return reqKey.trim();
-  const a = adminProviderKey(provider);
+  const a = await adminProviderKey(provider);
   return a && a.key ? a.key : '';
 }
 // Error that carries the upstream HTTP status (for rotation decisions).
@@ -1820,18 +2026,27 @@ const _keyRotationStart = new Map();
 // the index + status + a short error note.
 const KEY_HEALTH_FILE = path.join(DATA_DIR, 'key-health.json');
 let _keyHealth = {};
-try { const _kh = JSON.parse(fs.readFileSync(KEY_HEALTH_FILE, 'utf8')); if (_kh && typeof _kh === 'object') _keyHealth = _kh; } catch (e) {}
-function keyHealthSave() {
-  try { fs.mkdirSync(DATA_DIR, { recursive: true }); fs.writeFileSync(KEY_HEALTH_FILE, JSON.stringify(_keyHealth, null, 2)); ghPersistFile(KEY_HEALTH_FILE); } catch (e) {}
+let _keyHealthLoaded = false; // lazy-loaded from Supabase (kv_docs 'key-health') on first use
+async function keyHealthEnsure() {
+  if (_keyHealthLoaded) return;
+  const j = await loadKvDoc('key-health', {});
+  _keyHealth = (j && typeof j === 'object' && !Array.isArray(j)) ? j : {};
+  _keyHealthLoaded = true;
 }
-function keyHealthSet(provider, idx, status, note) {
+async function keyHealthSave() {
+  await keyHealthEnsure();
+  try { await saveKvDoc('key-health', _keyHealth, 'key-health.json'); } catch (e) {}
+}
+async function keyHealthSet(provider, idx, status, note) {
+  await keyHealthEnsure();
   const p = String(provider || '').toLowerCase();
   if (!_keyHealth[p]) _keyHealth[p] = {};
   const cur = _keyHealth[p][String(idx)] || {};
   _keyHealth[p][String(idx)] = { status, note: String(note || '').slice(0, 120), at: new Date().toISOString(), lastOk: status === 'ok' ? new Date().toISOString() : (cur.lastOk || '') };
-  keyHealthSave();
+  await keyHealthSave();
 }
-function keyHealthList() {
+async function keyHealthList() {
+  await keyHealthEnsure();
   // Returns {provider: [{key: 1, status, note, at, lastOk}, ...]} for every
   // provider that has stored keys. Keys are identified by 1-based index only.
   const out = {};
@@ -1847,7 +2062,7 @@ function keyHealthList() {
   // yet (shown as 'unknown' until first use).
   try {
     for (const p of ['suno', 'magichour', 'musicapi', 'novai', 'groq', 'mvsep']) {
-      const n = adminProviderKeyList(p).length;
+      const n = (await adminProviderKeyList(p)).length;
       if (!n) continue;
       if (!out[p]) out[p] = [];
       for (let i = 0; i < n; i++) {
@@ -1871,43 +2086,44 @@ function keyHealthList() {
 const GROQ_USAGE_FILE = path.join(DATA_DIR, 'groq-usage.json');
 const GROQ_DAILY_LIMIT = 200000;
 let _groqUsage = null;
-function groqUsageLoad() {
+async function groqUsageLoad() {
   if (_groqUsage && typeof _groqUsage === 'object') return _groqUsage;
-  try { const j = JSON.parse(fs.readFileSync(GROQ_USAGE_FILE, 'utf8')); if (j && typeof j === 'object' && typeof j.date === 'string') { _groqUsage = j; return _groqUsage; } } catch (e) {}
-  _groqUsage = { date: '', keys: {} };
-  return _groqUsage;
+    const j = await loadKvDoc('groq-usage', null);
+    if (j && typeof j === 'object' && typeof j.date === 'string') { _groqUsage = j; return _groqUsage; }
+    _groqUsage = { date: '', keys: {} };
+    return _groqUsage;
 }
-function groqUsageSave() {
-  try { fs.mkdirSync(DATA_DIR, { recursive: true }); fs.writeFileSync(GROQ_USAGE_FILE, JSON.stringify(_groqUsage, null, 2)); ghPersistFile(GROQ_USAGE_FILE); } catch (e) {}
+async function groqUsageSave() {
+  try { await saveKvDoc('groq-usage', _groqUsage, 'groq-usage.json'); } catch (e) {}
 }
 function groqUsageTodayDate() {
   return new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Phnom_Penh' });
 }
-function recordGroqTokens(keyValue, totalTokens) {
+async function recordGroqTokens(keyValue, totalTokens) {
   try {
     const n = Number(totalTokens) || 0;
     if (n <= 0) return;
     const today = groqUsageTodayDate();
-    const u = groqUsageLoad();
+    const u = await groqUsageLoad();
     if (u.date !== today) { u.date = today; u.keys = {}; }
-    const list = adminProviderKeyList('groq');
+    const list = await adminProviderKeyList('groq');
     let idx = -1;
     for (let i = 0; i < list.length; i++) { if (list[i].key === keyValue) { idx = i; break; } }
     if (idx < 0) return; // request-provided key, not an admin-stored one
     const k = String(idx);
     const prev = (u.keys[k] && Number(u.keys[k].used)) || 0;
     u.keys[k] = { used: prev + n };
-    groqUsageSave();
+    await groqUsageSave();
   } catch (e) {}
 }
-function groqUsageList() {
+async function groqUsageList() {
   // Returns {date, dailyLimit, keys:[{key, usedToday, remainingToday,
   // percentRemaining, status}]} — status: green (>50% left), yellow
   // (<=50% left, still >0), red (0 left / exhausted). Keys are 1-based.
   const today = groqUsageTodayDate();
-  const u = groqUsageLoad();
+  const u = await groqUsageLoad();
   if (u.date !== today) { u.date = today; u.keys = {}; }
-  const n = adminProviderKeyList('groq').length;
+  const n = (await adminProviderKeyList('groq')).length;
   const out = [];
   for (let i = 0; i < n; i++) {
     const used = (u.keys[String(i)] && Number(u.keys[String(i)].used)) || 0;
@@ -1928,19 +2144,20 @@ const MVSEP_USAGE_FILE = path.join(DATA_DIR, 'mvsep-usage.json');
 const MVSEP_DAILY_LIMIT = 50;
 const MVSEP_NEAR_EXHAUST_REMAINING = 5; // remaining <= 5 = "nearly exhausted" — jump to a fresh key AT ONCE, before it fails (owner order 2026-11-18)
 let _mvsepUsage = null;
-function mvsepUsageLoad() {
+async function mvsepUsageLoad() {
   if (_mvsepUsage && typeof _mvsepUsage === 'object') return _mvsepUsage;
-  try { const j = JSON.parse(fs.readFileSync(MVSEP_USAGE_FILE, 'utf8')); if (j && typeof j === 'object' && typeof j.date === 'string') { _mvsepUsage = j; return _mvsepUsage; } } catch (e) {}
-  _mvsepUsage = { date: '', keys: {} };
-  return _mvsepUsage;
+    const j = await loadKvDoc('mvsep-usage', null);
+    if (j && typeof j === 'object' && typeof j.date === 'string') { _mvsepUsage = j; return _mvsepUsage; }
+    _mvsepUsage = { date: '', keys: {} };
+    return _mvsepUsage;
 }
-function mvsepUsageSave() {
-  try { fs.mkdirSync(DATA_DIR, { recursive: true }); fs.writeFileSync(MVSEP_USAGE_FILE, JSON.stringify(_mvsepUsage, null, 2)); ghPersistFile(MVSEP_USAGE_FILE); } catch (e) {}
+async function mvsepUsageSave() {
+  try { await saveKvDoc('mvsep-usage', _mvsepUsage, 'mvsep-usage.json'); } catch (e) {}
 }
 function mvsepUsageTodayDate() {
   return new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Phnom_Penh' });
 }
-function recordMvsepSeparation(keyValue, hash) {
+async function recordMvsepSeparation(keyValue, hash) {
   try {
     if (hash) {
       if (_mvsepCountedHashes.has(hash)) return; // already counted — never count one separation twice
@@ -1948,26 +2165,26 @@ function recordMvsepSeparation(keyValue, hash) {
       _mvsepCountedHashes.add(hash);
     }
     const today = mvsepUsageTodayDate();
-    const u = mvsepUsageLoad();
+    const u = await mvsepUsageLoad();
     if (u.date !== today) { u.date = today; u.keys = {}; }
-    const list = adminProviderKeyList('mvsep');
+    const list = await adminProviderKeyList('mvsep');
     let idx = -1;
     for (let i = 0; i < list.length; i++) { if (list[i].key === keyValue) { idx = i; break; } }
     if (idx < 0) return; // not an admin-stored key
     const k = String(idx);
     const prev = (u.keys[k] && Number(u.keys[k].used)) || 0;
     u.keys[k] = { used: prev + 1 };
-    mvsepUsageSave();
+    await mvsepUsageSave();
   } catch (e) {}
 }
-function mvsepUsageList() {
+async function mvsepUsageList() {
   // Returns {date, dailyLimit, keys:[{key, usedToday, remainingToday,
   // status}]} — status: green (separations left), red (0 left / daily
   // limit reached). Keys are 1-based.
   const today = mvsepUsageTodayDate();
-  const u = mvsepUsageLoad();
+  const u = await mvsepUsageLoad();
   if (u.date !== today) { u.date = today; u.keys = {}; }
-  const n = adminProviderKeyList('mvsep').length;
+  const n = (await adminProviderKeyList('mvsep')).length;
   const out = [];
   for (let i = 0; i < n; i++) {
     const used = (u.keys[String(i)] && Number(u.keys[String(i)].used)) || 0;
@@ -1979,9 +2196,9 @@ function mvsepUsageList() {
 // Remaining MVSEP separations today for the key at 0-based index idx
 // (server-side daily counter, limit 50/day/key). Returns null when the
 // counter is unavailable — then the key is treated as usable.
-function mvsepKeyRemaining(idx) {
+async function mvsepKeyRemaining(idx) {
   try {
-    const list = mvsepUsageList();
+    const list = await mvsepUsageList();
     const e = list && Array.isArray(list.keys) ? list.keys[idx] : null;
     if (!e || typeof e.remainingToday !== 'number') return null;
     return e.remainingToday;
@@ -2000,14 +2217,15 @@ function mvsepKeyRemaining(idx) {
 const FEATURE_USAGE_FILE = path.join(DATA_DIR, 'feature-usage.json');
 const FEATURE_USAGE_MAX_DAYS = 90;
 let _featureUsage = null;
-function featureUsageLoad() {
+async function featureUsageLoad() {
   if (_featureUsage && typeof _featureUsage === 'object') return _featureUsage;
-  try { const j = JSON.parse(fs.readFileSync(FEATURE_USAGE_FILE, 'utf8')); if (j && typeof j === 'object' && j.features && typeof j.features === 'object') { _featureUsage = j; return _featureUsage; } } catch (e) {}
-  _featureUsage = { features: {} };
-  return _featureUsage;
+    const j = await loadKvDoc('feature-usage', null);
+    if (j && typeof j === 'object' && j.features && typeof j.features === 'object') { _featureUsage = j; return _featureUsage; }
+    _featureUsage = { features: {} };
+    return _featureUsage;
 }
-function featureUsageSave() {
-  try { fs.mkdirSync(DATA_DIR, { recursive: true }); fs.writeFileSync(FEATURE_USAGE_FILE, JSON.stringify(_featureUsage, null, 2)); ghPersistFile(FEATURE_USAGE_FILE); } catch (e) {}
+async function featureUsageSave() {
+  try { await saveKvDoc('feature-usage', _featureUsage, 'feature-usage.json'); } catch (e) {}
 }
 function featureUsageDate() {
   return new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Phnom_Penh' });
@@ -2017,11 +2235,11 @@ function featureUsageCleanName(raw) {
   const name = raw.trim().toLowerCase().replace(/[^a-z0-9_-]/g, '_').replace(/_+/g, '_').replace(/^_+|_+$/g, '').slice(0, 64);
   return /^[a-z0-9][a-z0-9_-]*$/.test(name) ? name : '';
 }
-function featureUsageRecord(rawFeature) {
+async function featureUsageRecord(rawFeature) {
   const feature = featureUsageCleanName(rawFeature);
   if (!feature) return null;
   const today = featureUsageDate();
-  const u = featureUsageLoad();
+  const u = await featureUsageLoad();
   if (!u.features || typeof u.features !== 'object') u.features = {};
   let f = u.features[feature];
   if (!f || typeof f !== 'object') f = u.features[feature] = { total: 0, days: {} };
@@ -2031,14 +2249,14 @@ function featureUsageRecord(rawFeature) {
   // Prune day entries older than FEATURE_USAGE_MAX_DAYS to bound file growth.
   const cutoff = new Date(Date.now() - FEATURE_USAGE_MAX_DAYS * 24 * 60 * 60 * 1000).toLocaleDateString('en-CA', { timeZone: 'Asia/Phnom_Penh' });
   for (const d of Object.keys(f.days)) { if (d < cutoff) delete f.days[d]; }
-  featureUsageSave();
+  await featureUsageSave();
   return { feature, total: f.total, today: f.days[today] || 0 };
 }
-function featureUsageList() {
+async function featureUsageList() {
   // Returns {date, features:[{feature, total, today, days:{date:count}}]}
   // sorted by total descending. days is the per-day breakdown.
   const today = featureUsageDate();
-  const u = featureUsageLoad();
+  const u = await featureUsageLoad();
   const out = [];
   const feats = (u.features && typeof u.features === 'object') ? u.features : {};
   for (const name of Object.keys(feats)) {
@@ -2084,14 +2302,19 @@ function walletWithdrawFee(amount) {
   if (a < 50) return 0.50;
   return walletMoney(a * 0.05);
 }
-function loadWalletRequests() {
-  try { const j = JSON.parse(fs.readFileSync(WALLET_REQUESTS_FILE, 'utf8')); if (Array.isArray(j)) return j; } catch (e) {}
-  return [];
+async function loadWalletRequests() {
+  const rows = await sbSelect('wallet_requests', 'select=id,data');
+    if (!rows) return [];
+    const arr = rows.map((r) => r.data).filter(Boolean);
+    arr.sort((a, b) => String(b.at || b.createdAt || '').localeCompare(String(a.at || a.createdAt || '')));
+    return arr;
 }
-function saveWalletRequests(arr) {
-  try { fs.mkdirSync(DATA_DIR, { recursive: true }); } catch (e) {}
-  fs.writeFileSync(WALLET_REQUESTS_FILE, JSON.stringify(arr, null, 2));
-  ghPersistFile(WALLET_REQUESTS_FILE);
+async function saveWalletRequests(arr) {
+  const list = Array.isArray(arr) ? arr : [];
+    for (const r of list) { if (r && !r.id) r.id = newWalletRequestId(); }
+    const rows = list.filter((r) => r && typeof r.id === 'string' && r.id).map((r) => ({ id: r.id, data: r }));
+    await sbSyncTable('wallet_requests', 'id', rows, 'id');
+    scheduleBackup('wallet-requests.json');
 }
 function newWalletRequestId() {
   return 'wr_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
@@ -2135,61 +2358,93 @@ function monetizationCashbackForPrice(price) {
   for (const t of MONETIZATION_CASHBACK_TIERS) { if (p >= t[0]) return t[1]; }
   return 0;
 }
-function loadMonetizationEarnings() {
-  try { const j = JSON.parse(fs.readFileSync(MONETIZATION_EARNINGS_FILE, 'utf8')); if (j && typeof j === 'object' && !Array.isArray(j)) return j; } catch (e) {}
-  return {};
+async function loadMonetizationEarnings() {
+  const j = await loadKvDoc('monetization-earnings', {});
+    return (j && typeof j === 'object' && !Array.isArray(j)) ? j : {};
 }
-function saveMonetizationEarnings(m) {
-  try { fs.mkdirSync(DATA_DIR, { recursive: true }); } catch (e) {}
-  fs.writeFileSync(MONETIZATION_EARNINGS_FILE, JSON.stringify(m, null, 2));
-  ghPersistFile(MONETIZATION_EARNINGS_FILE);
+async function saveMonetizationEarnings(m) {
+  await saveKvDoc('monetization-earnings', m, 'monetization-earnings.json');
 }
-function monetizationRecord(email) {
+async function monetizationRecord(email) {
   const em = normEmail(email);
   if (!em) return null;
-  const m = loadMonetizationEarnings();
+  const m = await loadMonetizationEarnings();
   if (!m[em] || typeof m[em] !== 'object') m[em] = { views: 0, watchSeconds: 0, earnMicro: 0, pendingMicro: 0, paidOutMicro: 0, cashbackTotal: 0, byCountry: {} };
   return { m, rec: m[em], em };
 }
 // Lifetime package-cashback total for one user (dollars, 2 decimals).
 // Called from the purchase-approve and wallet buy-package paths AFTER
 // the balance was already updated by the caller (the caller saves users).
-function monetizationRecordCashback(email, amount) {
+async function monetizationRecordCashback(email, amount) {
   try {
-    const got = monetizationRecord(email);
+    const got = await monetizationRecord(email);
     if (!got) return;
     got.rec.cashbackTotal = walletMoney(numOr(got.rec.cashbackTotal, 0) + walletMoney(amount));
-    saveMonetizationEarnings(got.m);
+    await saveMonetizationEarnings(got.m);
   } catch (e) {}
 }
-function loadMonetizationApplications() {
-  try { const j = JSON.parse(fs.readFileSync(MONETIZATION_APPLICATIONS_FILE, 'utf8')); if (j && typeof j === 'object' && !Array.isArray(j)) return j; } catch (e) {}
-  return {};
+async function loadMonetizationApplications() {
+  const rows = await sbSelect('monetization_applications', 'select=email,data');
+    if (!rows) return {};
+    const out = {};
+    for (const r of rows) { if (r && typeof r.email === 'string' && r.email) out[r.email] = r.data || {}; }
+    return out;
 }
-function saveMonetizationApplications(a) {
-  try { fs.mkdirSync(DATA_DIR, { recursive: true }); } catch (e) {}
-  fs.writeFileSync(MONETIZATION_APPLICATIONS_FILE, JSON.stringify(a, null, 2));
-  ghPersistFile(MONETIZATION_APPLICATIONS_FILE);
+async function saveMonetizationApplications(a) {
+  const doc = (a && typeof a === 'object' && !Array.isArray(a)) ? a : {};
+    const rows = Object.keys(doc).map((email) => ({ email, data: doc[email] || {} }));
+    await sbSyncTable('monetization_applications', 'email', rows, 'email');
+    scheduleBackup('monetization-applications.json');
 }
-function monetizationIsApproved(email) {
+async function monetizationIsApproved(email) {
   try {
-    const a = loadMonetizationApplications();
+    const a = await loadMonetizationApplications();
     const app = a[normEmail(email)];
     return !!(app && app.status === 'approved');
   } catch (e) { return false; }
 }
-function loadCreatorFollows() {
-  try { const j = JSON.parse(fs.readFileSync(CREATOR_FOLLOWS_FILE, 'utf8')); if (j && typeof j === 'object' && !Array.isArray(j)) return j; } catch (e) {}
-  return {};
+async function loadCreatorFollows() {
+  const rows = await sbSelect('creator_follows', 'select=follower_email,creator_email');
+    if (!rows) return {};
+    const out = {};
+    for (const r of rows) {
+      if (!r || typeof r.creator_email !== 'string' || !r.creator_email || typeof r.follower_email !== 'string' || !r.follower_email) continue;
+      if (!Array.isArray(out[r.creator_email])) out[r.creator_email] = [];
+      out[r.creator_email].push(r.follower_email);
+    }
+    return out;
 }
-function saveCreatorFollows(f) {
-  try { fs.mkdirSync(DATA_DIR, { recursive: true }); } catch (e) {}
-  fs.writeFileSync(CREATOR_FOLLOWS_FILE, JSON.stringify(f, null, 2));
-  ghPersistFile(CREATOR_FOLLOWS_FILE);
+async function saveCreatorFollows(f) {
+  const doc = (f && typeof f === 'object' && !Array.isArray(f)) ? f : {};
+    const rows = [];
+    for (const creator of Object.keys(doc)) {
+      const list = Array.isArray(doc[creator]) ? doc[creator] : [];
+      for (const follower of list) {
+        if (typeof follower !== 'string' || !follower) continue;
+        // data holds the pair object, matching the migration convention
+        // (supabase-schema.sql: creator_follows).
+        rows.push({ follower_email: follower, creator_email: creator, data: { creator_email: creator, follower_email: follower } });
+      }
+    }
+    try {
+      if (rows.length) {
+        const ok = await sbUpsert('creator_follows', rows, 'follower_email,creator_email');
+        if (!ok) { scheduleBackup('creator-follows.json'); return; }
+      }
+      const existing = await sbSelect('creator_follows', 'select=follower_email,creator_email');
+      if (existing) {
+        const keep = new Set(rows.map((r) => r.follower_email + '\0' + r.creator_email));
+        for (const r of existing) {
+          if (!r || typeof r.follower_email !== 'string') continue;
+          if (!keep.has(r.follower_email + '\0' + r.creator_email)) await sbDelete('creator_follows', 'follower_email=eq.' + encodeURIComponent(r.follower_email) + '&creator_email=eq.' + encodeURIComponent(String(r.creator_email)));
+        }
+      }
+    } catch (e) {}
+    scheduleBackup('creator-follows.json');
 }
-function monetizationFollowerCount(email) {
+async function monetizationFollowerCount(email) {
   try {
-    const f = loadCreatorFollows();
+    const f = await loadCreatorFollows();
     const arr = f[normEmail(email)];
     return Array.isArray(arr) ? arr.length : 0;
   } catch (e) { return 0; }
@@ -2205,13 +2460,13 @@ async function monetizationOnView(ownerEmail, viewerEmail, country, durationSec)
   const owner = normEmail(ownerEmail);
   const viewer = normEmail(viewerEmail);
   if (!owner || !viewer) return null;
-  const got = monetizationRecord(owner);
+  const got = await monetizationRecord(owner);
   if (!got) return null;
   const rec = got.rec;
   const dur = Math.max(0, Math.floor(numOr(durationSec, 0)));
   if (dur > 0) rec.watchSeconds = numOr(rec.watchSeconds, 0) + dur;
   const cc = (typeof country === 'string' && country.trim()) ? country.trim().toUpperCase().slice(0, 8) : 'Unknown';
-  if (monetizationEnabled() && monetizationIsApproved(owner)) {
+  if (await monetizationEnabled() && await monetizationIsApproved(owner)) {
     rec.views = numOr(rec.views, 0) + 1;
     rec.earnMicro = numOr(rec.earnMicro, 0) + MONETIZATION_VIEW_EARN_MICRO;
     rec.pendingMicro = numOr(rec.pendingMicro, 0) + MONETIZATION_VIEW_EARN_MICRO;
@@ -2225,19 +2480,19 @@ async function monetizationOnView(ownerEmail, viewerEmail, country, durationSec)
     const wholeMicro = Math.floor(numOr(rec.pendingMicro, 0) / MONETIZATION_MICRO_PER_CENT) * MONETIZATION_MICRO_PER_CENT;
     if (wholeMicro > 0) {
       const dollars = walletMoney(wholeMicro / 1000000);
-      const users = loadUsers();
+      const users = await loadUsers();
       const u = users[owner];
       if (u) {
         u.earnBalance = walletMoney(walletEarnBalance(u) + dollars);
         u.updatedAt = new Date().toISOString();
-        saveUsers(users);
-        await ghFlushFile(USERS_FILE);
+        await saveUsers(users);
+        scheduleBackup('users.json');
         rec.paidOutMicro = numOr(rec.paidOutMicro, 0) + wholeMicro;
         rec.pendingMicro = numOr(rec.pendingMicro, 0) - wholeMicro;
       }
     }
   }
-  saveMonetizationEarnings(got.m);
+  await saveMonetizationEarnings(got.m);
   return rec;
 }
 // ---- Device account limit + VPN-proof fingerprint (owner order 2026-11-18) ----
@@ -2279,8 +2534,8 @@ const DEVICE_STRIKE_BLOCK_AT = 4; // block the device at strike 4
 // separate deviceLimitEnabled setting below — autoCatch only gates
 // the strike emails / auto-blocks. A VPN flag alone NEVER blocks
 // anything — it is only an indicator.
-function autoCatchEnabled() {
-  try { const s = loadSettings(); return s && s.autoCatch === true; } catch (e) { return false; }
+async function autoCatchEnabled() {
+  try { const s = await loadSettings(); return s && s.autoCatch === true; } catch (e) { return false; }
 }
 // Device account-limit setting (owner order 2026-11-18). Stored in
 // settings (GitHub-backed). deviceLimitEnabled (default OFF) = enforce
@@ -2290,9 +2545,9 @@ function autoCatchEnabled() {
 // in-memory cache) so an Admin change takes effect immediately on the
 // next registration, even on Render. Separate from autoCatch (which
 // gates strike emails / auto-blocks only).
-function deviceLimitSetting() {
+async function deviceLimitSetting() {
   try {
-    const s = loadSettings();
+    const s = await loadSettings();
     const enabled = !!(s && s.deviceLimitEnabled === true);
     let limit = DEVICE_FREE_ACCOUNT_LIMIT;
     if (s && Number.isFinite(s.deviceLimit)) limit = Math.min(100, Math.max(1, Math.floor(s.deviceLimit)));
@@ -2306,14 +2561,14 @@ function deviceLimitSetting() {
 // Read FRESH from disk on every call (loadSettings re-reads
 // settings.json — no in-memory cache) so an Admin change takes effect
 // immediately. Separate from autoCatch and deviceLimitEnabled.
-function gift50Enabled() {
-  try { const s = loadSettings(); return s && s.gift50 === true; } catch (e) { return false; }
+async function gift50Enabled() {
+  try { const s = await loadSettings(); return s && s.gift50 === true; } catch (e) { return false; }
 }
 // Monetization toggle, read FRESH from disk on every call
 // (loadSettings re-reads settings.json — no in-memory cache), so an
 // Admin change takes effect immediately. Default OFF.
-function monetizationEnabled() {
-  try { const s = loadSettings(); return s && s.monetization === true; } catch (e) { return false; }
+async function monetizationEnabled() {
+  try { const s = await loadSettings(); return s && s.monetization === true; } catch (e) { return false; }
 }
 const DEVICE_RECORDS_FILE = path.join(DATA_DIR, 'device-records.json');
 // device-records.json shape: { "<fingerprintKey>": {
@@ -2323,14 +2578,18 @@ const DEVICE_RECORDS_FILE = path.join(DATA_DIR, 'device-records.json');
 //   firstSeen, lastSeen, emails: [] } }
 // Fingerprint key: 'id:<deviceId>' when the website sends a device ID
 // (primary, VPN-proof); 'mi:<model>|<ip>' fallback when it does not.
-function loadDeviceRecords() {
-  try { const j = JSON.parse(fs.readFileSync(DEVICE_RECORDS_FILE, 'utf8')); if (j && typeof j === 'object' && !Array.isArray(j)) return j; } catch (e) {}
-  return {};
+async function loadDeviceRecords() {
+  const rows = await sbSelect('device_records', 'select=device_key,data');
+    if (!rows) return {};
+    const out = {};
+    for (const r of rows) { if (r && typeof r.device_key === 'string' && r.device_key) out[r.device_key] = r.data || {}; }
+    return out;
 }
-function saveDeviceRecords(m) {
-  try { fs.mkdirSync(DATA_DIR, { recursive: true }); } catch (e) {}
-  fs.writeFileSync(DEVICE_RECORDS_FILE, JSON.stringify(m, null, 2));
-  ghPersistFile(DEVICE_RECORDS_FILE);
+async function saveDeviceRecords(m) {
+  const doc = (m && typeof m === 'object' && !Array.isArray(m)) ? m : {};
+    const rows = Object.keys(doc).map((k) => ({ device_key: k, data: doc[k] || {} }));
+    await sbSyncTable('device_records', 'device_key', rows, 'device_key');
+    scheduleBackup('device-records.json');
 }
 function deviceCleanId(v) {
   const s = typeof v === 'string' ? v.trim() : '';
@@ -2365,8 +2624,8 @@ function deviceFingerprintKey(fp) {
 // when the website starts sending a deviceId for a device previously
 // tracked under the model+IP key, its slots/strikes/block move to the
 // 'id:' key once, so paid slots are not lost.
-function getDeviceRecord(fp, create) {
-  const all = loadDeviceRecords();
+async function getDeviceRecord(fp, create) {
+  const all = await loadDeviceRecords();
   const key = deviceFingerprintKey(fp);
   if (key && all[key] && typeof all[key] === 'object') return { rec: all[key], key, all };
   if (fp.deviceId && fp.model && fp.ip) {
@@ -2375,7 +2634,7 @@ function getDeviceRecord(fp, create) {
       const migrated = all[miKey];
       delete all[miKey];
       all[key] = migrated;
-      saveDeviceRecords(all);
+      await saveDeviceRecords(all);
       return { rec: migrated, key, all };
     }
   }
@@ -2387,8 +2646,8 @@ function getDeviceRecord(fp, create) {
 }
 // Purchased extra slots for this device (0 when none). Checks the
 // canonical key and, for migration, the model+IP key — takes the max.
-function deviceSlotsFor(fp) {
-  const all = loadDeviceRecords();
+async function deviceSlotsFor(fp) {
+  const all = await loadDeviceRecords();
   let n = 0;
   const key = deviceFingerprintKey(fp);
   if (key && all[key] && typeof all[key] === 'object') n = Math.max(n, Math.floor(numOr(all[key].slots, 0)));
@@ -2401,8 +2660,8 @@ function deviceSlotsFor(fp) {
 // Is this device blocked? Canonical key only (precise): a cleared
 // localStorage (new deviceId) cannot be matched to the old record, but
 // the registration limit (model+IP count) still catches a 4th account.
-function deviceIsBlocked(fp) {
-  const got = getDeviceRecord(fp, false);
+async function deviceIsBlocked(fp) {
+  const got = await getDeviceRecord(fp, false);
   const rec = got.rec;
   if (rec && rec.blocked) return { blocked: true, reason: rec.blockedReason || 'device-blocked', key: got.key };
   return { blocked: false, reason: '', key: got.key };
@@ -2440,8 +2699,8 @@ function deviceNoteVpn(rec, fp, now) {
 }
 // Record this device sighting on the device record (last seen/IP/model,
 // VPN flags, and the Gmails seen from it). Never creates a block.
-function deviceTouchRecord(fp, email, now) {
-  const got = getDeviceRecord(fp, true);
+async function deviceTouchRecord(fp, email, now) {
+  const got = await getDeviceRecord(fp, true);
   const rec = got.rec;
   if (!rec) return null;
   deviceNoteVpn(rec, fp, now);
@@ -2458,16 +2717,16 @@ function deviceTouchRecord(fp, email, now) {
       if (rec.emails.length > 10) rec.emails.length = 10;
     }
   }
-  saveDeviceRecords(got.all);
+  await saveDeviceRecords(got.all);
   return rec;
 }
 // Full device picture for one user (Admin visibility): accounts on the
 // user's registered device, purchased slots, limit, strikes, VPN flags,
 // block state.
-function deviceInfoForUser(users, u) {
+async function deviceInfoForUser(users, u) {
   const fp = { deviceId: u.deviceId || '', model: u.registeredModel || u.model || '', ip: u.lastIp || '' };
   const accounts = deviceAccountsCount(users, fp);
-  const all = loadDeviceRecords();
+  const all = await loadDeviceRecords();
   let slots = 0, strikes = 0, vpnDetected = false, vpnLastSeen = '', deviceBlocked = false, blockedReason = '';
   const keys = [];
   const ck = deviceFingerprintKey(fp);
@@ -2482,7 +2741,7 @@ function deviceInfoForUser(users, u) {
     if (r.vpnLastSeen && (!vpnLastSeen || r.vpnLastSeen > vpnLastSeen)) vpnLastSeen = r.vpnLastSeen;
     if (r.blocked) { deviceBlocked = true; blockedReason = r.blockedReason || 'device-blocked'; }
   }
-  return { fingerprint: ck, accounts, slots, limit: deviceLimitSetting().limit + slots, strikes, vpnDetected, vpnSuspected: vpnDetected, vpnLastSeen, deviceBlocked, blockedReason, emailBlocked: loadBlockedEmails().some((b) => b === (u.email || '')) };
+  return { fingerprint: ck, accounts, slots, limit: (await deviceLimitSetting()).limit + slots, strikes, vpnDetected, vpnSuspected: vpnDetected, vpnLastSeen, deviceBlocked, blockedReason, emailBlocked: (await loadBlockedEmails()).some((b) => b === (u.email || '')) };
 }
 // Strike / block emails — APPROVED DESIGN (owner order 2026-11-18).
 // Matches the approved Strike 1 preview (strike-1-warning-email-preview):
@@ -2725,7 +2984,7 @@ async function recordDeviceStrike(all, key, rec, email, reason, fp, extra) {
   const strikes = rec.strikes;
   const level = strikes >= DEVICE_STRIKE_BLOCK_AT ? 4 : strikes; // 1, 2, 3, 4
   let blocked = false;
-  const catchOn = autoCatchEnabled();
+  const catchOn = await autoCatchEnabled();
   // Auto-Catch ON only: at strike 4 block the device + the Gmail.
   if (catchOn && strikes >= DEVICE_STRIKE_BLOCK_AT) {
     rec.blocked = true;
@@ -2734,15 +2993,15 @@ async function recordDeviceStrike(all, key, rec, email, reason, fp, extra) {
     blocked = true;
     // Block the attempting Gmail too, so it cannot register later from
     // another device until the Admin unblocks it (unblock-email).
-    const bem = loadBlockedEmails();
-    if (!bem.some((b) => b === email)) { bem.push(email); saveBlockedEmails(bem); await ghFlushFile(BLOCKED_EMAILS_FILE); }
+    const bem = await loadBlockedEmails();
+    if (!bem.some((b) => b === email)) { bem.push(email); await saveBlockedEmails(bem); scheduleBackup('blocked-emails.json'); }
     if (!Array.isArray(rec.blockedEmails)) rec.blockedEmails = [];
     if (!rec.blockedEmails.includes(email)) rec.blockedEmails.push(email);
   }
-  saveDeviceRecords(all);
-  await ghFlushFile(DEVICE_RECORDS_FILE);
-  logActivity({ at: now, mode: 'device-strike', email, deviceId: fp.deviceId || '', model: fp.model || '', ip: fp.ip || '', strikes, level, blocked, reason });
-  addNotification('security', email, level === 4 ? '🚫 ឧបករណ៍ត្រូវបានប្លុក · Device blocked (strikes)' : '⚠️ បំពានច្បាប់គណនី · Device-limit violation', email + ' បានព្យាយាមចុះឈ្មោះគណនីលើសកំណត់ពីឧបករណ៍ ' + (fp.model || fp.deviceId || 'Unknown') + ' · IP ' + (fp.ip || '—') + ' · Strike ' + strikes + (blocked ? ' — ឧបករណ៍ត្រូវបានប្លុក' : ''));
+  await saveDeviceRecords(all);
+  scheduleBackup('device-records.json');
+  await logActivity({ at: now, mode: 'device-strike', email, deviceId: fp.deviceId || '', model: fp.model || '', ip: fp.ip || '', strikes, level, blocked, reason });
+  await addNotification('security', email, level === 4 ? '🚫 ឧបករណ៍ត្រូវបានប្លុក · Device blocked (strikes)' : '⚠️ បំពានច្បាប់គណនី · Device-limit violation', email + ' បានព្យាយាមចុះឈ្មោះគណនីលើសកំណត់ពីឧបករណ៍ ' + (fp.model || fp.deviceId || 'Unknown') + ' · IP ' + (fp.ip || '—') + ' · Strike ' + strikes + (blocked ? ' — ឧបករណ៍ត្រូវបានប្លុក' : ''));
   // Strike email to the user — Auto-Catch ON only. Never fails the
   // request if Brevo is down — the strike is already recorded.
   if (catchOn) {
@@ -2768,11 +3027,11 @@ async function recordDeviceStrike(all, key, rec, email, reason, fp, extra) {
 // enforcement, so it applies whenever the limit toggle is ON.
 async function deviceLimitGate(users, fp, email, name) {
   const count = deviceAccountsCount(users, fp);
-  const got = getDeviceRecord(fp, true);
+  const got = await getDeviceRecord(fp, true);
   const rec = got.rec;
   const all = got.all;
   const slots = Math.floor(numOr(rec.slots, 0));
-  const dl = deviceLimitSetting(); // fresh from settings, every call
+  const dl = await deviceLimitSetting(); // fresh from settings, every call
   const freeLimit = dl.limit;
   const limit = freeLimit + slots;
   // A blocked device cannot register at all.
@@ -2922,10 +3181,10 @@ async function reportScamHacker(o) {
   const ip = (o && o.ip) || '';
   const detail = (o && o.detail) || '';
   const now = new Date().toISOString();
-  logActivity({ at: now, mode: 'scam-hacker-alert', email, deviceId: (o && o.deviceId) || '', model, ip, kind, detail });
+  await logActivity({ at: now, mode: 'scam-hacker-alert', email, deviceId: (o && o.deviceId) || '', model, ip, kind, detail });
   // Admin: bell + Telegram (security kind). The Admin reviews the
   // Gmail manually and decides whether to block.
-  addNotification('security', email, '🕵️ រកឃើញ Scam / Hacker · Scam or hacker detected', email + ' — ' + (kind === 'brute-force' ? 'មានអ្នកព្យាយាមចូលគណនី ដោយបញ្ចូល Password ខុស 5 ដងជាប់គ្នា' : 'រកឃើញសកម្មភាពគួរឲ្យសង្ស័យ') + ' · ' + (model || 'Unknown') + ' · IP ' + (ip || '—') + ' — គណនីមិនទាន់ត្រូវបានប្លុកទេ សូម Admin ពិនិត្យដោយផ្ទាល់');
+  await addNotification('security', email, '🕵️ រកឃើញ Scam / Hacker · Scam or hacker detected', email + ' — ' + (kind === 'brute-force' ? 'មានអ្នកព្យាយាមចូលគណនី ដោយបញ្ចូល Password ខុស 5 ដងជាប់គ្នា' : 'រកឃើញសកម្មភាពគួរឲ្យសង្ស័យ') + ' · ' + (model || 'Unknown') + ' · IP ' + (ip || '—') + ' — គណនីមិនទាន់ត្រូវបានប្លុកទេ សូម Admin ពិនិត្យដោយផ្ទាល់');
   // User: email (bilingual). Never fails the request if Brevo is down.
   try {
     const msg = scamHackerEmail({ email, name, kind, detail, model, ip });
@@ -2945,38 +3204,39 @@ const MVSEP_CACHE_FILE = path.join(DATA_DIR, 'mvsep-cache.json');
 const MVSEP_CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const MVSEP_CACHE_MAX = 500;
 let _mvsepCache = null;
-function mvsepCacheLoad() {
+async function mvsepCacheLoad() {
   if (_mvsepCache && typeof _mvsepCache === 'object') return _mvsepCache;
-  try { const j = JSON.parse(fs.readFileSync(MVSEP_CACHE_FILE, 'utf8')); if (j && typeof j === 'object' && j.entries && typeof j.entries === 'object') { _mvsepCache = j; return _mvsepCache; } } catch (e) {}
-  _mvsepCache = { entries: {} };
-  return _mvsepCache;
+    const j = await loadKvDoc('mvsep-cache', null);
+    if (j && typeof j === 'object' && j.entries && typeof j.entries === 'object') { _mvsepCache = j; return _mvsepCache; }
+    _mvsepCache = { entries: {} };
+    return _mvsepCache;
 }
-function mvsepCacheSave() {
-  try { fs.mkdirSync(DATA_DIR, { recursive: true }); fs.writeFileSync(MVSEP_CACHE_FILE, JSON.stringify(_mvsepCache, null, 2)); ghPersistFile(MVSEP_CACHE_FILE); } catch (e) {}
+async function mvsepCacheSave() {
+  try { await saveKvDoc('mvsep-cache', _mvsepCache, 'mvsep-cache.json'); } catch (e) {}
 }
 function mvsepCacheKey(audioUrl) {
   return crypto.createHash('sha256').update(String(audioUrl)).digest('hex');
 }
-function mvsepCacheGet(audioUrl) {
+async function mvsepCacheGet(audioUrl) {
   try {
-    const c = mvsepCacheLoad();
+    const c = await mvsepCacheLoad();
     const e = c.entries[mvsepCacheKey(audioUrl)];
     if (!e || typeof e.hash !== 'string' || !e.hash) return '';
     if (!e.savedAt || (Date.now() - Number(e.savedAt)) > MVSEP_CACHE_TTL_MS) return '';
     return e.hash;
   } catch (err) { return ''; }
 }
-function mvsepCachePut(audioUrl, hash) {
+async function mvsepCachePut(audioUrl, hash) {
   try {
     if (!hash) return;
-    const c = mvsepCacheLoad();
+    const c = await mvsepCacheLoad();
     c.entries[mvsepCacheKey(audioUrl)] = { hash, savedAt: Date.now() };
     const keys = Object.keys(c.entries);
     if (keys.length > MVSEP_CACHE_MAX) {
       keys.sort((a, b) => (c.entries[a].savedAt || 0) - (c.entries[b].savedAt || 0));
       for (let i = 0; i < keys.length - MVSEP_CACHE_MAX; i++) delete c.entries[keys[i]];
     }
-    mvsepCacheSave();
+    await mvsepCacheSave();
   } catch (err) {}
 }
 // ---- MVSEP stem separation (Demucs4 HT) ----
@@ -3176,7 +3436,7 @@ async function withProviderKeyRotation(provider, fn, reqKey, candidatesOverride)
   } else if (typeof reqKey === 'string' && reqKey.trim()) {
     candidates = [{ key: reqKey.trim(), endpoint: '' }];
   } else {
-    candidates = adminProviderKeyList(p);
+    candidates = await adminProviderKeyList(p);
   }
   if (!candidates.length) {
     const err = new Error('no key configured');
@@ -3197,8 +3457,9 @@ async function withProviderKeyRotation(provider, fn, reqKey, candidatesOverride)
   // source of truth. If EVERY key is nearly exhausted, keep them all so
   // the best available is still tried (failover on error still applies).
   if (p === 'mvsep') {
-    const fresh = order.filter((idx) => {
-      const rem = mvsepKeyRemaining(idx);
+    const _rems = await Promise.all(order.map((idx) => mvsepKeyRemaining(idx)));
+    const fresh = order.filter((idx, i) => {
+      const rem = _rems[i];
       return rem === null || rem > MVSEP_NEAR_EXHAUST_REMAINING;
     });
     if (fresh.length) order = fresh;
@@ -3217,7 +3478,7 @@ async function withProviderKeyRotation(provider, fn, reqKey, candidatesOverride)
       // An exhausted key is retried when the rotation wraps back to it,
       // so it works again automatically after its quota resets.)
       _keyRotationStart.set(p, idx);
-      keyHealthSet(p, idx, 'ok', '');
+      await keyHealthSet(p, idx, 'ok', '');
       return out;
     } catch (e) {
       lastErr = e;
@@ -3226,7 +3487,7 @@ async function withProviderKeyRotation(provider, fn, reqKey, candidatesOverride)
       // without reading server logs.
       attempts.push({ key: idx + 1, http: (e && e.httpStatus) || 0, err: String((e && e.message) || e).slice(0, 160) });
       if (!_isRotatableError(e)) { lastErr.attempts = attempts; throw lastErr; }
-      keyHealthSet(p, idx, 'exhausted', String((e && e.message) || e).slice(0, 120));
+      await keyHealthSet(p, idx, 'exhausted', String((e && e.message) || e).slice(0, 120));
       if (oi < order.length - 1) console.log('[keys] ' + p + ' key ' + (idx + 1) + '/' + n + ' failed (' + String((e && e.message) || e).slice(0, 120) + '), trying next key');
     }
   }
@@ -3258,9 +3519,8 @@ const UPDATES_SEED_MODELS = {
   masterpiecex: [],
   hunyuan3d: [],
 };
-function loadUpdates() {
-  try {
-    const j = JSON.parse(fs.readFileSync(UPDATES_FILE, 'utf8'));
+async function loadUpdates() {
+  const j = await loadKvDoc('updates', null);
     if (j && typeof j === 'object') {
       if (!j.knownModels || typeof j.knownModels !== 'object') j.knownModels = {};
       if (!j.approvedModels || typeof j.approvedModels !== 'object') j.approvedModels = {};
@@ -3276,15 +3536,12 @@ function loadUpdates() {
       }
       return j;
     }
-  } catch (e) {}
-  const d = { knownModels: {}, approvedModels: {}, blockedModels: [], updates: [], settings: { autoApply: true, autoApplyHours: 24, checkIntervalHours: 6 }, lastCheckAt: null, lastCheckResult: '' };
-  for (const p of Object.keys(UPDATES_SEED_MODELS)) { d.approvedModels[p] = UPDATES_SEED_MODELS[p].slice(); d.knownModels[p] = UPDATES_SEED_MODELS[p].slice(); }
-  return d;
+    const d = { knownModels: {}, approvedModels: {}, blockedModels: [], updates: [], settings: { autoApply: true, autoApplyHours: 24, checkIntervalHours: 6 }, lastCheckAt: null, lastCheckResult: '' };
+    for (const p of Object.keys(UPDATES_SEED_MODELS)) { d.approvedModels[p] = UPDATES_SEED_MODELS[p].slice(); d.knownModels[p] = UPDATES_SEED_MODELS[p].slice(); }
+    return d;
 }
-function saveUpdates(u) {
-  try { fs.mkdirSync(DATA_DIR, { recursive: true }); } catch (e) {}
-  fs.writeFileSync(UPDATES_FILE, JSON.stringify(u, null, 2));
-  ghPersistFile(UPDATES_FILE);
+async function saveUpdates(u) {
+  await saveKvDoc('updates', u, 'updates.json');
 }
 function newUpdateId() { return 'upd_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8); }
 // Fetch a provider's model list (array of model ids) or null when the
@@ -3305,7 +3562,7 @@ async function fetchProviderModelList(provider) {
       return ids;
     }
     if (p === 'suno') {
-      const list = adminProviderKeyList('suno');
+      const list = await adminProviderKeyList('suno');
       const ep = list.length && typeof list[0].endpoint === 'string' ? list[0].endpoint.replace(/\/+$/, '') : '';
       if (!ep) return null;
       const key = list[0].key;
@@ -3327,7 +3584,7 @@ async function fetchProviderModelList(provider) {
 // One full check: poll listable providers, record any NEW model as a
 // pending update + notify the admin. Returns the number of new models.
 async function autoUpdateCheckModels() {
-  const u = loadUpdates();
+  const u = await loadUpdates();
   let added = 0;
   for (const p of ['groq', 'novai', 'suno']) {
     const ids = await fetchProviderModelList(p);
@@ -3343,19 +3600,19 @@ async function autoUpdateCheckModels() {
       const rec = { id: newUpdateId(), provider: p, model: id, status: 'pending', source: 'auto-detect', detectedAt: new Date().toISOString(), decidedAt: null, decidedBy: '', note: '' };
       u.updates.unshift(rec);
       added++;
-      addNotification('update', '', '🆕 Model ថ្មី · ' + p + ' — ' + id, 'Provider ' + p + ' មាន model ថ្មី៖ ' + id + '។ សូម Approve ឬដាក់ "មិនចាំបាច់ Update" ក្នុង Admin → Auto Update។ បើមិនឆ្លើយក្នុង ' + u.settings.autoApplyHours + ' ម៉ោង ហើយ Auto-Apply បើក វានឹង Update ដោយខ្លួនឯង។');
+      await addNotification('update', '', '🆕 Model ថ្មី · ' + p + ' — ' + id, 'Provider ' + p + ' មាន model ថ្មី៖ ' + id + '។ សូម Approve ឬដាក់ "មិនចាំបាច់ Update" ក្នុង Admin → Auto Update។ បើមិនឆ្លើយក្នុង ' + u.settings.autoApplyHours + ' ម៉ោង ហើយ Auto-Apply បើក វានឹង Update ដោយខ្លួនឯង។');
     }
   }
   u.lastCheckAt = new Date().toISOString();
   u.lastCheckResult = added ? ('រកឃើញ model ថ្មី ' + added) : 'មិនមាន model ថ្មីទេ';
-  saveUpdates(u);
-  await ghFlushFile(UPDATES_FILE);
+  await saveUpdates(u);
+  scheduleBackup('updates.json');
   return added;
 }
 // Apply one update (add the model to the approved list shown on the
 // website). decidedBy: 'admin' or 'auto'.
 async function autoUpdateApplyUpdate(rec, decidedBy) {
-  const u = loadUpdates();
+  const u = await loadUpdates();
   const r = u.updates.find((x) => x.id === rec.id);
   if (!r || r.status !== 'pending') return false;
   if (!Array.isArray(u.approvedModels[r.provider])) u.approvedModels[r.provider] = [];
@@ -3363,17 +3620,17 @@ async function autoUpdateApplyUpdate(rec, decidedBy) {
   r.status = decidedBy === 'auto' ? 'auto-applied' : 'approved';
   r.decidedAt = new Date().toISOString();
   r.decidedBy = decidedBy;
-  saveUpdates(u);
-  await ghFlushFile(UPDATES_FILE);
+  await saveUpdates(u);
+  scheduleBackup('updates.json');
   const who = decidedBy === 'auto' ? 'ប្រព័ន្ធ Auto-Apply' : 'Admin';
-  addNotification('update', '', '✅ Model ថ្មីបាន Update · ' + r.provider + ' — ' + r.model, who + ' បានអនុម័ត model ថ្មី៖ ' + r.model + '។ វាបង្ហាញក្នុង website ហើយ (New)។');
+  await addNotification('update', '', '✅ Model ថ្មីបាន Update · ' + r.provider + ' — ' + r.model, who + ' បានអនុម័ត model ថ្មី៖ ' + r.model + '។ វាបង្ហាញក្នុង website ហើយ (New)។');
   return true;
 }
 // Hourly sweep: auto-apply pending updates older than autoApplyHours
 // (when Auto-Apply is ON), then run a model check when due.
 async function autoUpdateSweep() {
   try {
-    const u = loadUpdates();
+    const u = await loadUpdates();
     if (u.settings.autoApply) {
       const now = Date.now();
       const cutoff = u.settings.autoApplyHours * 3600 * 1000;
@@ -3446,11 +3703,11 @@ const IP_LIMIT_PER_MIN = 120;
 const IP_BLOCK_PER_MIN = 300;
 const IP_WINDOW_MS = 60 * 1000;
 const _ipRate = new Map();
-function ipRateCheck(req) {
+async function ipRateCheck(req) {
   const ip = getClientIp(req);
   if (!ip) return { ok: true };
-  if (loadBlockedIps().some((b) => b === ip)) return { ok: false, blocked: true };
-  const lockMs = adminLockoutRemainingMs(ip);
+  if ((await loadBlockedIps()).some((b) => b === ip)) return { ok: false, blocked: true };
+  const lockMs = await adminLockoutRemainingMs(ip);
   if (lockMs > 0) return { ok: false, blocked: true, lockoutMs: lockMs };
   const now = Date.now();
   let rec = _ipRate.get(ip);
@@ -3458,12 +3715,12 @@ function ipRateCheck(req) {
   rec.count += 1;
   if (rec.count > IP_BLOCK_PER_MIN) {
     _ipRate.delete(ip);
-    const blocked = loadBlockedIps();
+    const blocked = await loadBlockedIps();
     if (!blocked.some((b) => b === ip)) {
       blocked.push(ip);
-      saveBlockedIps(blocked);
-      ghFlushFile(BLOCKED_IPS_FILE).catch(() => {});
-      addNotification('security', '', '🚫 វាយប្រហារ · Auto-blocked attack', 'IP ' + ip + ' request ' + rec.count + ' ដងក្នុង 1 នាទី (spam/DDoS) — ត្រូវបានប្លុកដោយអូតូ');
+      await saveBlockedIps(blocked);
+      scheduleBackup('blocked-ips.json');
+      await addNotification('security', '', '🚫 វាយប្រហារ · Auto-blocked attack', 'IP ' + ip + ' request ' + rec.count + ' ដងក្នុង 1 នាទី (spam/DDoS) — ត្រូវបានប្លុកដោយអូតូ');
     }
     return { ok: false, blocked: true };
   }
@@ -3477,12 +3734,12 @@ function ipRateCheck(req) {
 // Returns an error string to send, or '' when the request may proceed.
 // The model block is enforced at sync/login only (gen requests do not
 // reliably carry the device model).
-function genBlockedCheck(email, req) {
+async function genBlockedCheck(email, req) {
   try {
     const em = normEmail(email);
-    if (em && loadBlockedEmails().some((b) => b === em)) return 'គណនីនេះត្រូវបានប្លុក · This account is blocked';
+    if (em && (await loadBlockedEmails()).some((b) => b === em)) return 'គណនីនេះត្រូវបានប្លុក · This account is blocked';
     const ip = getClientIp(req);
-    if (ip && loadBlockedIps().some((b) => b === ip)) return 'គណនីនេះត្រូវបានប្លុក · This account is blocked';
+    if (ip && (await loadBlockedIps()).some((b) => b === ip)) return 'គណនីនេះត្រូវបានប្លុក · This account is blocked';
   } catch (e) {}
   return '';
 }
@@ -3537,22 +3794,19 @@ function sunoPreviewFromData(d) {
   return first ? (first.stream_audio_url || first.audio_url) : '';
 }
 let _healStarted = false; // startup song-URL heal runs once (see apiRoute top)
-let _ghResyncLastAt = 0; // last GitHub data resync (see ghMergePublicHistoryFromGitHub)
-function apiRoute(req, res, urlPath) {
+async function apiRoute(req, res, urlPath) {
   // Startup heal (owner order 2026-11-18): once, on the first request
   // after (re)start, re-link dead Magic Hour / proxy-upload song URLs to
   // their Cloudinary copy when one exists. Fire-and-forget, never blocks.
   if (!_healStarted) { _healStarted = true; try { (async () => { try { await ghRestoreUploads(); } catch (e) {} try { await healDeadSongUrls(); } catch (e) {} })().catch(() => {}); } catch (e) {} }
-  // Periodic GitHub data resync (§6 fix): every 5 min, re-pull
-  // public.json + history.json from GitHub so external edits (e.g.
-  // deleting broken songs) take effect on the RUNNING server without
-  // a restart. Fire-and-forget, never blocks.
-  if (Date.now() - _ghResyncLastAt > 5 * 60 * 1000) { _ghResyncLastAt = Date.now(); ghMergePublicHistoryFromGitHub().catch(() => {}); }
+  // Supabase is the single source of truth — there is no GitHub
+  // resync any more: every read already sees the latest stored state.
+  // GitHub only receives debounced backup snapshots (scheduleBackup).
   // Attack protection: count this IP's requests (all /api/* + /uploads/*).
   // A correct admin key is never rate-limited or blocked here (the admin
   // can never lock themselves out — see isAdminKeyRequest).
   if (!isAdminKeyRequest(req)) {
-    const ipc = ipRateCheck(req);
+    const ipc = await ipRateCheck(req);
     if (!ipc.ok) {
       if (ipc.blocked) {
         const rem = ipc.lockoutMs || 0;
@@ -3575,7 +3829,7 @@ function apiRoute(req, res, urlPath) {
   // POST /api/gen/image — {provider:'cloudflare'|'gemini'|'hf', key, accountId, prompt, width, height}
   if (req.method === 'POST' && urlPath === '/api/gen/image') {
     const genCtx = { provider: '', email: '' };
-    wrapGenLog(res, 'image', genCtx);
+    await wrapGenLog(res, 'image', genCtx);
     readJSONBody(req, 64 * 1024).then(async (body) => {
       if (body && typeof body === 'object') {
         if (typeof body.provider === 'string') genCtx.provider = body.provider;
@@ -3587,7 +3841,7 @@ function apiRoute(req, res, urlPath) {
         const provider = body.provider;
         const _gateErr = await genFairnessGate(normEmail(body.email), provider);
         if (_gateErr) return sendJSON(res, 200, { ok: false, error: _gateErr });
-        const _blkErr = genBlockedCheck(normEmail(body.email), req);
+        const _blkErr = await genBlockedCheck(normEmail(body.email), req);
         if (_blkErr) return sendJSON(res, 200, { ok: false, error: _blkErr });
         const key = typeof body.key === 'string' ? body.key : '';
         const prompt = body.prompt.trim().slice(0, 2000);
@@ -3605,10 +3859,10 @@ function apiRoute(req, res, urlPath) {
         if (imgCost > 0) {
           const _imgEm = normEmail(body.email);
           if (_imgEm) {
-            const _imgUsers = loadUsers();
+            const _imgUsers = await loadUsers();
             const _imgU = _imgUsers[_imgEm];
             if (_imgU && Math.floor(numOr(_imgU.credits, 0)) < imgCost) {
-              notifyOutOfCredit(_imgEm, 'media', Math.floor(numOr(_imgU.credits, 0)), imgCost);
+              await notifyOutOfCredit(_imgEm, 'media', Math.floor(numOr(_imgU.credits, 0)), imgCost);
               return sendJSON(res, 200, { ok: false, error: 'Image.Video Credit មិនគ្រប់ទេ · Not enough Image/Video Credits — សូមទិញ Credit បន្ថែម', needBuy: true, kind: 'media', balance: Math.floor(numOr(_imgU.credits, 0)), cost: imgCost });
             }
           }
@@ -3745,7 +3999,7 @@ function apiRoute(req, res, urlPath) {
   // POST /api/gen/video — {provider:'novai'|'magichour'|'tavus'|'hf', key, prompt, duration, res, width, height, replicaId}
   if (req.method === 'POST' && urlPath === '/api/gen/video') {
     const genCtx = { provider: '', email: '' };
-    wrapGenLog(res, 'video', genCtx);
+    await wrapGenLog(res, 'video', genCtx);
     readJSONBody(req, 64 * 1024).then(async (body) => {
       if (body && typeof body === 'object') {
         if (typeof body.provider === 'string') genCtx.provider = body.provider;
@@ -3757,7 +4011,7 @@ function apiRoute(req, res, urlPath) {
         const provider = body.provider;
         const _gateErr = await genFairnessGate(normEmail(body.email), provider);
         if (_gateErr) return sendJSON(res, 200, { ok: false, error: _gateErr });
-        const _blkErr = genBlockedCheck(normEmail(body.email), req);
+        const _blkErr = await genBlockedCheck(normEmail(body.email), req);
         if (_blkErr) return sendJSON(res, 200, { ok: false, error: _blkErr });
         const reqKey = typeof body.key === 'string' ? body.key : '';
         const prompt = body.prompt.trim().slice(0, 4000);
@@ -3770,17 +4024,17 @@ function apiRoute(req, res, urlPath) {
         if (vidCost > 0) {
           const _vidEm = normEmail(body.email);
           if (_vidEm) {
-            const _vidUsers = loadUsers();
+            const _vidUsers = await loadUsers();
             const _vidU = _vidUsers[_vidEm];
             if (_vidU && Math.floor(numOr(_vidU.credits, 0)) < vidCost) {
-              notifyOutOfCredit(_vidEm, 'media', Math.floor(numOr(_vidU.credits, 0)), vidCost);
+              await notifyOutOfCredit(_vidEm, 'media', Math.floor(numOr(_vidU.credits, 0)), vidCost);
               return sendJSON(res, 200, { ok: false, error: 'Image.Video Credit មិនគ្រប់ទេ · Not enough Image/Video Credits — សូមទិញ Credit បន្ថែម', needBuy: true, kind: 'media', balance: Math.floor(numOr(_vidU.credits, 0)), cost: vidCost });
             }
           }
         }
         // No key at all (no request key and no admin key for this
         // provider): same message as before. Rotation happens per branch.
-        if (!reqKey.trim() && !adminProviderKeyList(provider).length) {
+        if (!reqKey.trim() && !(await adminProviderKeyList(provider)).length) {
           const pname = provider === 'novai' ? 'NovAI' : provider === 'magichour' ? 'Magic Hour' : provider === 'tavus' ? 'Tavus' : null;
           return sendJSON(res, 200, { ok: false, error: pname ? ('Admin មិនទាន់ដាក់ ' + pname + ' Key ទេ') : 'មិនទាន់មាន API Key ទេ' });
         }
@@ -3862,7 +4116,7 @@ function apiRoute(req, res, urlPath) {
         const reqKey = typeof body.key === 'string' ? body.key : '';
         const jobId = String(body.jobId || '');
         if (!jobId) return sendJSON(res, 200, { ok: false, error: 'មិនមាន jobId ទេ' });
-        if (!reqKey.trim() && !adminProviderKeyList(provider).length) {
+        if (!reqKey.trim() && !(await adminProviderKeyList(provider)).length) {
           const pname = provider === 'novai' ? 'NovAI' : provider === 'magichour' ? 'Magic Hour' : provider === 'tavus' ? 'Tavus' : null;
           return sendJSON(res, 200, { ok: false, error: pname ? ('Admin មិនទាន់ដាក់ ' + pname + ' Key ទេ') : 'មិនទាន់មាន API Key ទេ' });
         }
@@ -3958,7 +4212,7 @@ function apiRoute(req, res, urlPath) {
   // Keys arrive with each request only (from the visitor's own browser).
   if (req.method === 'POST' && urlPath === '/api/gen/song') {
     const genCtx = { provider: '', email: '' };
-    wrapGenLog(res, 'song', genCtx);
+    await wrapGenLog(res, 'song', genCtx);
     readJSONBody(req, 64 * 1024).then(async (body) => {
       if (body && typeof body === 'object') {
         if (typeof body.provider === 'string') genCtx.provider = body.provider;
@@ -3969,7 +4223,7 @@ function apiRoute(req, res, urlPath) {
         const provider = body.provider;
         const _gateErr = await genFairnessGate(normEmail(body.email), provider);
         if (_gateErr) return sendJSON(res, 200, { ok: false, error: _gateErr });
-        const _blkErr = genBlockedCheck(normEmail(body.email), req);
+        const _blkErr = await genBlockedCheck(normEmail(body.email), req);
         if (_blkErr) return sendJSON(res, 200, { ok: false, error: _blkErr });
         const reqKey = typeof body.key === 'string' ? body.key : '';
         const title = typeof body.title === 'string' ? body.title.trim().slice(0, 200) : '';
@@ -4008,12 +4262,12 @@ function apiRoute(req, res, urlPath) {
         }
         const _songEm = normEmail(body.email);
         if (_songEm) {
-          const _songUsers = loadUsers();
+          const _songUsers = await loadUsers();
           const _songU = _songUsers[_songEm];
           const _bal = SONG_POOL === 'media' ? Math.floor(numOr(_songU.credits, 0)) : Math.floor(numOr(_songU.songCredits, 0));
           if (_songU && _bal < SONG_COST) {
             const _err = SONG_POOL === 'media' ? 'Image.Video Credit មិនគ្រប់ទេ · Not enough Image/Video Credits — សូមទិញ Credit បន្ថែម' : 'Song Credit មិនគ្រប់ទេ · Not enough Song Credits — សូមទិញ Credit បន្ថែម';
-            notifyOutOfCredit(_songEm, SONG_POOL, _bal, SONG_COST);
+            await notifyOutOfCredit(_songEm, SONG_POOL, _bal, SONG_COST);
             return sendJSON(res, 200, { ok: false, error: _err, needBuy: true, kind: SONG_POOL, balance: _bal, cost: SONG_COST });
           }
         }
@@ -4071,9 +4325,9 @@ function apiRoute(req, res, urlPath) {
           // called and are skipped. Rotates to the next key when one is
           // exhausted. sunoapi.org requires customMode + instrumental +
           // callBackUrl + model (V6/V6_WILD/V6_MINI).
-          const sunoKeys = adminProviderKeyList('suno').filter((e) => e.endpoint);
+          const sunoKeys = (await adminProviderKeyList('suno')).filter((e) => e.endpoint);
           if (!sunoKeys.length) {
-            if (!adminProviderKeyList('suno').length) return sendJSON(res, 200, { ok: false, error: 'Admin មិនទាន់ដាក់ Suno Key ទេ' });
+            if (!(await adminProviderKeyList('suno')).length) return sendJSON(res, 200, { ok: false, error: 'Admin មិនទាន់ដាក់ Suno Key ទេ' });
             return sendJSON(res, 200, { ok: false, error: 'Admin មិនទាន់ដាក់ Suno endpoint ទេ' });
           }
           const genBody = {
@@ -4173,9 +4427,9 @@ function apiRoute(req, res, urlPath) {
           // (the gateway calls /api/suno/callback when a stage
           // completes), then poll /api/v1/generate/record-info.
           // Keys without an endpoint cannot be called and are skipped.
-          const sunoKeys = adminProviderKeyList('suno').filter((e) => e.endpoint);
+          const sunoKeys = (await adminProviderKeyList('suno')).filter((e) => e.endpoint);
           if (!sunoKeys.length) {
-            if (!adminProviderKeyList('suno').length) return sendJSON(res, 200, { ok: false, error: 'Admin មិនទាន់ដាក់ Suno Key ទេ' });
+            if (!(await adminProviderKeyList('suno')).length) return sendJSON(res, 200, { ok: false, error: 'Admin មិនទាន់ដាក់ Suno Key ទេ' });
             return sendJSON(res, 200, { ok: false, error: 'Admin មិនទាន់ដាក់ Suno endpoint ទេ' });
           }
           const cb = sunoCallbacks.get(jobId);
@@ -4375,8 +4629,8 @@ function apiRoute(req, res, urlPath) {
     if (message.length > 2000) return { ok: false, error: 'សារវែងពេក (អតិបរមា 2000 តួអក្សរ) · Message too long (max 2000 characters)' };
     return { ok: true, message };
   }
-  function chatReceiverContext(email) {
-    const s = loadSettings();
+  async function chatReceiverContext(email) {
+    const s = await loadSettings();
     const providers = (s && s.providers && typeof s.providers === 'object') ? s.providers : {};
     const fmtMode = (mode) => {
       const p = providers[mode];
@@ -4387,11 +4641,11 @@ function apiRoute(req, res, urlPath) {
     const uptimeText = uptimeSec < 60 ? uptimeSec + 's' : uptimeSec < 3600 ? Math.floor(uptimeSec / 60) + 'm ' + (uptimeSec % 60) + 's' : Math.floor(uptimeSec / 3600) + 'h ' + Math.floor((uptimeSec % 3600) / 60) + 'm';
     let userText = 'guest (no Gmail given)';
     if (email) {
-      const u = loadUsers()[email];
+      const u = (await loadUsers())[email];
       if (u) { const nm = [u.firstName, u.lastName].filter(Boolean).join(' ').trim(); userText = email + (nm ? ' — name "' + nm + '"' : '') + ' — Image/Video Credit ' + Math.max(0, Math.floor(numOr(u.credits, 0))) + ', Song Credit ' + Math.max(0, Math.floor(numOr(u.songCredits, 0))) + ', media plan ' + (u.plan || 'free') + ', song plan ' + (u.songPlan || 'free'); }
       else userText = email + ' — no account on this server yet';
     }
-    const gk = adminProviderKey('groq');
+    const gk = await adminProviderKey('groq');
     const groqConfigured = !!(gk && gk.key);
     return [
       'LIVE CONTEXT (use this for status questions; never invent status):',
@@ -4438,7 +4692,7 @@ function apiRoute(req, res, urlPath) {
         const content = j && j.choices && j.choices[0] && j.choices[0].message && typeof j.choices[0].message.content === 'string' ? j.choices[0].message.content : '';
         if (!content.trim()) return { ok: false, error: 'Groq: empty reply', status: r.status };
         // Record chat tokens for the live per-key remaining display.
-        try { const tot = j && j.usage && Number(j.usage.total_tokens); if (tot > 0) recordGroqTokens(key, tot); } catch (e) {}
+        try { const tot = j && j.usage && Number(j.usage.total_tokens); if (tot > 0) await recordGroqTokens(key, tot); } catch (e) {}
         return { ok: true, reply: content.trim(), model };
       } catch (e) {
         lastErr = { ok: false, error: 'Groq: ' + (e && e.message ? e.message : 'request failed'), status: 0 };
@@ -4478,11 +4732,11 @@ function apiRoute(req, res, urlPath) {
   if (req.method === 'POST' && urlPath === '/api/chat') {
     readJSONBody(req, 64 * 1024).then(async (body) => {
       const email = normEmail(body && body.email);
-      logActivity({ at: new Date().toISOString(), mode: 'chat', email: email || '' });
+      await logActivity({ at: new Date().toISOString(), mode: 'chat', email: email || '' });
       const v = chatLeaderValidate(body);
       if (!v.ok) return sendJSON(res, 200, { ok: false, error: v.error });
       const reqKey = body && typeof body.key === 'string' ? body.key : '';
-      const context = chatReceiverContext(email);
+      const context = await chatReceiverContext(email);
       const t0 = Date.now();
       let replyObj;
       try {
@@ -4724,7 +4978,7 @@ function apiRoute(req, res, urlPath) {
         // job is still processing, hand its hash back so the Studio
         // resumes via the status endpoint (no second job, no extra quota).
         // Any failure falls through to a fresh separation below.
-        const cachedHash = mvsepCacheGet(audioUrl);
+        const cachedHash = await mvsepCacheGet(audioUrl);
         if (cachedHash) {
           try {
             const r = await mvsepGetSeparation(cachedHash);
@@ -4747,9 +5001,9 @@ function apiRoute(req, res, urlPath) {
           return sendJSON(res, 200, { ok: false, error: (e && e.message) || 'MVSEP: request failed' });
         }
         // Success: count it against the key that did the work (server-side daily counter for the Admin display).
-        recordMvsepSeparation(out.keyUsed, out.hash);
+        await recordMvsepSeparation(out.keyUsed, out.hash);
         // Remember this song's separation so a later re-split returns in ~1-2s from the cache instead of ~2 min.
-        mvsepCachePut(audioUrl, out.hash);
+        await mvsepCachePut(audioUrl, out.hash);
         return sendJSON(res, 200, { ok: true, provider: 'mvsep', hash: out.hash, songTitle, stems: out.stems });
       } catch (e) { return sendJSON(res, 200, { ok: false, error: 'MVSEP: ' + (e && e.message ? String(e.message).slice(0, 200) : 'request failed') }); }
     }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
@@ -4769,7 +5023,7 @@ function apiRoute(req, res, urlPath) {
         if (!email) return sendJSON(res, 200, { ok: false, error: 'សូមចូលគណនេយ្យជាមុនសិន · Please sign in first', needLogin: true });
         const hash = String(qp.get('hash') || '').trim().slice(0, 200);
         if (!hash) return sendJSON(res, 200, { ok: false, error: 'មិនមាន hash ទេ · No separation hash' });
-        const keys = adminProviderKeyList('mvsep');
+        const keys = await adminProviderKeyList('mvsep');
         if (!keys.length) return sendJSON(res, 200, { ok: false, error: 'mvsep_no_key', message: { km: 'Admin មិនទាន់ដាក់ MVSEP API Key ទេ', en: 'Admin has not added an MVSEP API key yet' } });
         // The GET status endpoint takes only the hash (official example
         // passes no api_token), so one check is enough — no key loop.
@@ -4781,7 +5035,7 @@ function apiRoute(req, res, urlPath) {
         }
         if (r.done) {
           const kv = _mvsepHashKey.get(hash);
-          if (kv) recordMvsepSeparation(kv, hash);
+          if (kv) await recordMvsepSeparation(kv, hash);
           return sendJSON(res, 200, { ok: true, done: true, hash, stems: r.stems });
         }
         return sendJSON(res, 200, { ok: true, done: false, status: 'processing', hash });
@@ -4805,12 +5059,12 @@ function apiRoute(req, res, urlPath) {
       // granted. A NEW or changed IP is never blocked here — it only
       // raises a 'new device' notification for the admin to review.
       const _cip0 = getClientIp(req);
-      if (_cip0 && loadBlockedIps().some((b) => b === _cip0)) {
-        addNotification('security', email, '🚫 គណនី/IP ត្រូវបានប្លុកព្យាយាមចូល · Blocked account/IP login attempt', email + ' tried to log in from blocked IP ' + _cip0 + ' · IP ' + _cip0);
+      if (_cip0 && (await loadBlockedIps()).some((b) => b === _cip0)) {
+        await addNotification('security', email, '🚫 គណនី/IP ត្រូវបានប្លុកព្យាយាមចូល · Blocked account/IP login attempt', email + ' tried to log in from blocked IP ' + _cip0 + ' · IP ' + _cip0);
         return sendJSON(res, 200, { ok: false, error: 'គណនីនេះត្រូវបានប្លុក · This account is blocked' });
       }
-      if (loadBlockedEmails().some((b) => b === email)) {
-        addNotification('security', email, '🚫 គណនី/IP ត្រូវបានប្លុកព្យាយាមចូល · Blocked account/IP login attempt', email + ' tried to log in from blocked email ' + email + ' · IP ' + (_cip0 || '—'));
+      if ((await loadBlockedEmails()).some((b) => b === email)) {
+        await addNotification('security', email, '🚫 គណនី/IP ត្រូវបានប្លុកព្យាយាមចូល · Blocked account/IP login attempt', email + ' tried to log in from blocked email ' + email + ' · IP ' + (_cip0 || '—'));
         return sendJSON(res, 200, { ok: false, error: 'គណនីនេះត្រូវបានប្លុក · This account is blocked' });
       }
       // Blocked device model: refuse the sync entirely — no user is
@@ -4821,8 +5075,8 @@ function apiRoute(req, res, urlPath) {
       // model is missing or is the "K" placeholder.
       const _bodyModel = typeof body.model === 'string' ? body.model.trim().slice(0, 64) : '';
       const _model = (_bodyModel && _bodyModel !== 'K') ? _bodyModel : modelFromUA(req.headers && req.headers['user-agent']);
-      if (_model && loadBlockedModels().some((b) => b.toUpperCase() === _model.toUpperCase())) {
-        addNotification('security', email, '🚫 ម៉ូឌែលត្រូវបានប្លុកព្យាយាមចូល · Blocked model login attempt', email + ' tried to log in from blocked model ' + _model + ' · IP ' + (getClientIp(req) || '—'));
+      if (_model && (await loadBlockedModels()).some((b) => b.toUpperCase() === _model.toUpperCase())) {
+        await addNotification('security', email, '🚫 ម៉ូឌែលត្រូវបានប្លុកព្យាយាមចូល · Blocked model login attempt', email + ' tried to log in from blocked model ' + _model + ' · IP ' + (getClientIp(req) || '—'));
         return sendJSON(res, 200, { ok: false, error: 'ម៉ូដែលនេះត្រូវបានប្លុក · This device model is blocked' });
       }
       const now = new Date().toISOString();
@@ -4830,8 +5084,8 @@ function apiRoute(req, res, urlPath) {
       // timezone + vpn flag from the website; IP server-side). It survives
       // VPN — only the IP changes, the device is still recognised.
       const _fp = deviceFingerprintFor(req, body, _model);
-      logActivity({ at: now, mode: 'sync', email, deviceId: _fp.deviceId || '', model: _fp.model || '', ip: _fp.ip || '', vpn: !!_fp.vpn });
-      const users = loadUsers();
+      await logActivity({ at: now, mode: 'sync', email, deviceId: _fp.deviceId || '', model: _fp.model || '', ip: _fp.ip || '', vpn: !!_fp.vpn });
+      const users = await loadUsers();
       const isNewUser = !users[email];
       let u = users[email];
       // DEVICE ACCOUNT LIMIT (owner order 2026-11-18): max N accounts per
@@ -4891,9 +5145,9 @@ function apiRoute(req, res, urlPath) {
       // only part of the fingerprint; a brand-new device gets its 3
       // free accounts. The block is for limit abuse, not for a new phone.
       if (!isNewUser) {
-        const _blk = deviceIsBlocked(_fp);
+        const _blk = await deviceIsBlocked(_fp);
         if (_blk.blocked) {
-          logActivity({ at: now, mode: 'device-blocked-signin', email, deviceId: _fp.deviceId || '', model: _fp.model || '', ip: _fp.ip || '' });
+          await logActivity({ at: now, mode: 'device-blocked-signin', email, deviceId: _fp.deviceId || '', model: _fp.model || '', ip: _fp.ip || '' });
           return sendJSON(res, 200, { ok: false, error: 'ឧបករណ៍នេះត្រូវបានប្លុក — This device has been used before · VPN is not supported. សូមទាក់ទង Admin · Please contact the Admin', deviceBlocked: true, blockedReason: _blk.reason });
         }
         // Adopt the current model as the registered model on first sight
@@ -4916,7 +5170,7 @@ function apiRoute(req, res, urlPath) {
         u.lastDeviceId = _fp.deviceId;
       }
       // Record this sighting on the device record (VPN flags, last IP).
-      deviceTouchRecord(_fp, email, now);
+      await deviceTouchRecord(_fp, email, now);
       u.lastSeen = now;
       // Known devices: record this model/device/IP. A (model + IP) pair
       // never seen before for this user is a NEW device (alerted below),
@@ -4930,9 +5184,9 @@ function apiRoute(req, res, urlPath) {
       // Count this login against the device model.
       let _modelLogins = null;
       if (_model) {
-        _modelLogins = loadModelLogins();
+        _modelLogins = await loadModelLogins();
         _modelLogins[_model] = (Number(_modelLogins[_model]) || 0) + 1;
-        saveModelLogins(_modelLogins);
+        await saveModelLogins(_modelLogins);
       }
       // GIFT — SONG credits ONLY, LOCKED once per Gmail, forever
       // (owner orders 2026-11-17 + 2026-11-18): when the website sends
@@ -4962,7 +5216,7 @@ function apiRoute(req, res, urlPath) {
           const _createdMs = Date.parse(u.createdAt || '');
           _isBrandNew = Number.isFinite(_createdMs) && (Date.now() - _createdMs) <= GIFT50_NEW_ACCOUNT_WINDOW_MS;
         } catch (e) { _isBrandNew = false; }
-        const _songTarget = (gift50Enabled() && _isBrandNew) ? GIFT50_SONG_CREDITS : FREE_SONG_CREDITS;
+        const _songTarget = (await gift50Enabled() && _isBrandNew) ? GIFT50_SONG_CREDITS : FREE_SONG_CREDITS;
         const _gm = Math.max(0, FREE_MEDIA_CREDITS - Math.floor(numOr(u.credits, 0)));
         const _gs = Math.max(0, _songTarget - Math.floor(numOr(u.songCredits, 0)));
         if (_gm > 0) u.credits = Math.floor(numOr(u.credits, 0)) + _gm;
@@ -4973,24 +5227,24 @@ function apiRoute(req, res, urlPath) {
         // gift was already locked (no credits given) — the Admin got a
         // false "Gift claimed" alert for a user who got nothing.
         if (_gm > 0 || _gs > 0) {
-          logGrant({ email, credits: _gm, songCredits: _gs, note: 'gift', at: now });
-          addNotification('gift-claimed', email, '🎁 កាដូបានទទួល · Gift claimed', (u.name || email) + ' (' + email + ') បានទទួលកាដូ Free ' + _gs + ' Song Credit');
+          await logGrant({ email, credits: _gm, songCredits: _gs, note: 'gift', at: now });
+          await addNotification('gift-claimed', email, '🎁 កាដូបានទទួល · Gift claimed', (u.name || email) + ' (' + email + ') បានទទួលកាដូ Free ' + _gs + ' Song Credit');
         }
       }
       u.credits = Math.max(0, Math.floor(numOr(u.credits, 0)));
       u.songCredits = Math.max(0, Math.floor(numOr(u.songCredits, 0)));
-      saveUsers(users);
+      await saveUsers(users);
       // Critical write: confirm users.json is on GitHub BEFORE returning
       // success, so a restart in the next second cannot lose this user
       // (new account / first sync / credit truth).
-      await ghFlushFile(USERS_FILE);
+      scheduleBackup('users.json');
       if (isNewUser) {
-        addNotification('login', email, '👤 អ្នកប្រើថ្មី · New user', (u.name || email) + ' (' + email + ') បាន log in លើកដំបូង');
+        await addNotification('login', email, '👤 អ្នកប្រើថ្មី · New user', (u.name || email) + ' (' + email + ') បាន log in លើកដំបូង');
       }
       if (_isNewDevice) {
-        addNotification('security', email, '🔐 ឧបករណ៍ថ្មី · New device login', email + ' logged in from a new device: ' + (_model || _dev || 'Unknown') + ' · IP ' + (_cip || '—'));
+        await addNotification('security', email, '🔐 ឧបករណ៍ថ្មី · New device login', email + ' logged in from a new device: ' + (_model || _dev || 'Unknown') + ' · IP ' + (_cip || '—'));
       }
-      return sendJSON(res, 200, { ok: true, user: pubUser(u, _modelLogins) });
+      return sendJSON(res, 200, { ok: true, user: await pubUser(u, _modelLogins) });
     }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
     return;
   }
@@ -5016,8 +5270,8 @@ function apiRoute(req, res, urlPath) {
       const email = g.email;
       // Blocked IP / Gmail: refuse (same as sync).
       const _cip0 = getClientIp(req);
-      if (_cip0 && loadBlockedIps().some((b) => b === _cip0)) return sendJSON(res, 200, { ok: false, error: 'គណនីនេះត្រូវបានប្លុក · This account is blocked' });
-      if (loadBlockedEmails().some((b) => b === email)) return sendJSON(res, 200, { ok: false, error: 'គណនីនេះត្រូវបានប្លុក · This account is blocked' });
+      if (_cip0 && (await loadBlockedIps()).some((b) => b === _cip0)) return sendJSON(res, 200, { ok: false, error: 'គណនីនេះត្រូវបានប្លុក · This account is blocked' });
+      if ((await loadBlockedEmails()).some((b) => b === email)) return sendJSON(res, 200, { ok: false, error: 'គណនីនេះត្រូវបានប្លុក · This account is blocked' });
       const now = new Date().toISOString();
       // Device fingerprint (same as sync). The limit is only on CREATING
       // a new account — setting/resetting a password on an existing
@@ -5026,8 +5280,8 @@ function apiRoute(req, res, urlPath) {
       const _spBodyModel = typeof body.model === 'string' ? body.model.trim().slice(0, 64) : '';
       const _spModel = (_spBodyModel && _spBodyModel !== 'K') ? _spBodyModel : modelFromUA(req.headers && req.headers['user-agent']);
       const _fp = deviceFingerprintFor(req, body, _spModel);
-      logActivity({ at: now, mode: 'set-password', email, deviceId: _fp.deviceId || '', model: _fp.model || '', ip: _fp.ip || '', vpn: !!_fp.vpn });
-      const users = loadUsers();
+      await logActivity({ at: now, mode: 'set-password', email, deviceId: _fp.deviceId || '', model: _fp.model || '', ip: _fp.ip || '', vpn: !!_fp.vpn });
+      const users = await loadUsers();
       const isNewUser = !users[email];
       let u = users[email];
       if (isNewUser) {
@@ -5055,17 +5309,17 @@ function apiRoute(req, res, urlPath) {
       if (_fp.model) u.model = _fp.model;
       if (_fp.device) u.device = _fp.device;
       if (_cip0) u.lastIp = _cip0;
-      deviceTouchRecord(_fp, email, now);
+      await deviceTouchRecord(_fp, email, now);
       // A new password revokes ALL saved (remember-me) logins — the old
       // saved Accounts must not keep working after a password change.
       revokeAllRememberTokens(u);
       u.updatedAt = now;
       // A (re)set password clears any sign-in lock for this Gmail.
       signinClear(email);
-      saveUsers(users);
-      await ghFlushFile(USERS_FILE);
-      if (isNewUser) addNotification('login', email, '👤 អ្នកប្រើថ្មី · New user', (u.name || email) + ' (' + email + ') បានចុះឈ្មោះ (Sign-up + Password)');
-      return sendJSON(res, 200, { ok: true, user: pubUser(u) });
+      await saveUsers(users);
+      scheduleBackup('users.json');
+      if (isNewUser) await addNotification('login', email, '👤 អ្នកប្រើថ្មី · New user', (u.name || email) + ' (' + email + ') បានចុះឈ្មោះ (Sign-up + Password)');
+      return sendJSON(res, 200, { ok: true, user: await pubUser(u) });
     }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
     return;
   }
@@ -5086,10 +5340,10 @@ function apiRoute(req, res, urlPath) {
       if (!email || !password) return sendJSON(res, 200, { ok: false, error: 'សូមដាក់ Gmail និង Password · Please enter Gmail and password' });
       // Blocked IP / Gmail: refuse (same as sync).
       const _cip0 = getClientIp(req);
-      if (_cip0 && loadBlockedIps().some((b) => b === _cip0)) return sendJSON(res, 200, { ok: false, error: 'គណនីនេះត្រូវបានប្លុក · This account is blocked' });
-      if (loadBlockedEmails().some((b) => b === email)) return sendJSON(res, 200, { ok: false, error: 'គណនីនេះត្រូវបានប្លុក · This account is blocked' });
+      if (_cip0 && (await loadBlockedIps()).some((b) => b === _cip0)) return sendJSON(res, 200, { ok: false, error: 'គណនីនេះត្រូវបានប្លុក · This account is blocked' });
+      if ((await loadBlockedEmails()).some((b) => b === email)) return sendJSON(res, 200, { ok: false, error: 'គណនីនេះត្រូវបានប្លុក · This account is blocked' });
       if (signinLocked(email)) return sendJSON(res, 200, { ok: false, error: 'បញ្ចូល Password ខុសច្រើនដងពេកហើយ សាកល្បងម្តងទៀត 15 នាទីក្រោយ · Too many wrong attempts, try again in 15 minutes' });
-      const users = loadUsers();
+      const users = await loadUsers();
       const u = users[email];
       const bad = () => sendJSON(res, 200, { ok: false, error: 'Gmail ឬ Password មិនត្រឹមត្រូវទេ · Wrong Gmail or password' });
       // No account yet, or the account never set a password (never did
@@ -5104,7 +5358,7 @@ function apiRoute(req, res, urlPath) {
       const _siBodyModel = typeof body.model === 'string' ? body.model.trim().slice(0, 64) : '';
       const _siModel = (_siBodyModel && _siBodyModel !== 'K') ? _siBodyModel : modelFromUA(req.headers && req.headers['user-agent']);
       const _fp = deviceFingerprintFor(req, body, _siModel);
-      const _blk = deviceIsBlocked(_fp);
+      const _blk = await deviceIsBlocked(_fp);
       if (_blk.blocked) return sendJSON(res, 200, { ok: false, error: 'ឧបករណ៍នេះត្រូវបានប្លុក — This device has been used before · VPN is not supported. សូមទាក់ទង Admin · Please contact the Admin', deviceBlocked: true, blockedReason: _blk.reason });
       const okPw = await verifyPassword(password, u.passwordSalt, u.passwordHash);
       if (!okPw) {
@@ -5117,7 +5371,7 @@ function apiRoute(req, res, urlPath) {
       }
       signinClear(email);
       const now = new Date().toISOString();
-      logActivity({ at: now, mode: 'signin', email, deviceId: _fp.deviceId || '', model: _fp.model || '', ip: _fp.ip || '', vpn: !!_fp.vpn });
+      await logActivity({ at: now, mode: 'signin', email, deviceId: _fp.deviceId || '', model: _fp.model || '', ip: _fp.ip || '', vpn: !!_fp.vpn });
       u.lastSeen = now;
       if (_cip0) u.lastIp = _cip0;
       if (_fp.deviceId) {
@@ -5128,11 +5382,11 @@ function apiRoute(req, res, urlPath) {
       if (_fp.model) u.model = _fp.model;
       if (_fp.device) u.device = _fp.device;
       trackKnownDevice(u, _fp.model || '', _fp.device || '', _cip0 || '', now, u.country || '', u.countryCode || '');
-      deviceTouchRecord(_fp, email, now);
+      await deviceTouchRecord(_fp, email, now);
       u.updatedAt = now;
-      saveUsers(users);
-      await ghFlushFile(USERS_FILE);
-      return sendJSON(res, 200, { ok: true, user: pubUser(u) });
+      await saveUsers(users);
+      scheduleBackup('users.json');
+      return sendJSON(res, 200, { ok: true, user: await pubUser(u) });
     }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
     return;
   }
@@ -5149,7 +5403,7 @@ function apiRoute(req, res, urlPath) {
       const password = body && typeof body.password === 'string' ? body.password : '';
       if (!email || !password) return sendJSON(res, 200, { ok: false, error: 'សូមដាក់ Gmail និង Password · Please enter Gmail and password' });
       if (signinLocked(email)) return sendJSON(res, 200, { ok: false, error: 'បញ្ចូល Password ខុសច្រើនដងពេកហើយ សាកល្បងម្តងទៀត 15 នាទីក្រោយ · Too many wrong attempts, try again in 15 minutes' });
-      const users = loadUsers();
+      const users = await loadUsers();
       const u = users[email];
       const bad = () => sendJSON(res, 200, { ok: false, error: 'Gmail ឬ Password មិនត្រឹមត្រូវទេ · Wrong Gmail or password' });
       if (!u || !u.passwordHash || !u.passwordSalt) { signinFail(email); return bad(); }
@@ -5164,8 +5418,8 @@ function apiRoute(req, res, urlPath) {
       signinClear(email);
       const token = issueRememberToken(u);
       u.updatedAt = new Date().toISOString();
-      saveUsers(users);
-      await ghFlushFile(USERS_FILE);
+      await saveUsers(users);
+      scheduleBackup('users.json');
       return sendJSON(res, 200, { ok: true, rememberToken: token, email });
     }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
     return;
@@ -5181,9 +5435,9 @@ function apiRoute(req, res, urlPath) {
       const token = body && typeof body.rememberToken === 'string' ? body.rememberToken.trim() : '';
       if (!email || !token) return sendJSON(res, 200, { ok: false, error: 'ការចូលដែលបានសេវផុតកំណត់ហើយ សូមចូលដោយ Password ម្តងទៀត · Saved login expired, please sign in with your password' });
       const _cip0 = getClientIp(req);
-      if (_cip0 && loadBlockedIps().some((b) => b === _cip0)) return sendJSON(res, 200, { ok: false, error: 'គណនីនេះត្រូវបានប្លុក · This account is blocked' });
-      if (loadBlockedEmails().some((b) => b === email)) return sendJSON(res, 200, { ok: false, error: 'គណនីនេះត្រូវបានប្លុក · This account is blocked' });
-      const users = loadUsers();
+      if (_cip0 && (await loadBlockedIps()).some((b) => b === _cip0)) return sendJSON(res, 200, { ok: false, error: 'គណនីនេះត្រូវបានប្លុក · This account is blocked' });
+      if ((await loadBlockedEmails()).some((b) => b === email)) return sendJSON(res, 200, { ok: false, error: 'គណនីនេះត្រូវបានប្លុក · This account is blocked' });
+      const users = await loadUsers();
       const u = users[email];
       const bad = () => sendJSON(res, 200, { ok: false, error: 'ការចូលដែលបានសេវផុតកំណត់ហើយ សូមចូលដោយ Password ម្តងទៀត · Saved login expired, please sign in with your password' });
       if (!u) return bad();
@@ -5191,12 +5445,12 @@ function apiRoute(req, res, urlPath) {
       const _rlBodyModel = typeof body.model === 'string' ? body.model.trim().slice(0, 64) : '';
       const _rlModel = (_rlBodyModel && _rlBodyModel !== 'K') ? _rlBodyModel : modelFromUA(req.headers && req.headers['user-agent']);
       const _fp = deviceFingerprintFor(req, body, _rlModel);
-      const _blk = deviceIsBlocked(_fp);
+      const _blk = await deviceIsBlocked(_fp);
       if (_blk.blocked) return sendJSON(res, 200, { ok: false, error: 'ឧបករណ៍នេះត្រូវបានប្លុក — This device has been used before · VPN is not supported. សូមទាក់ទង Admin · Please contact the Admin', deviceBlocked: true, blockedReason: _blk.reason });
       const entry = findRememberToken(u, token);
       if (!entry) return bad();
       const now = new Date().toISOString();
-      logActivity({ at: now, mode: 'remember-login', email, deviceId: _fp.deviceId || '', model: _fp.model || '', ip: _fp.ip || '', vpn: !!_fp.vpn });
+      await logActivity({ at: now, mode: 'remember-login', email, deviceId: _fp.deviceId || '', model: _fp.model || '', ip: _fp.ip || '', vpn: !!_fp.vpn });
       u.lastSeen = now;
       if (_cip0) u.lastIp = _cip0;
       if (_fp.deviceId) {
@@ -5207,11 +5461,11 @@ function apiRoute(req, res, urlPath) {
       if (_fp.model) u.model = _fp.model;
       if (_fp.device) u.device = _fp.device;
       trackKnownDevice(u, _fp.model || '', _fp.device || '', _cip0 || '', now, u.country || '', u.countryCode || '');
-      deviceTouchRecord(_fp, email, now);
+      await deviceTouchRecord(_fp, email, now);
       u.updatedAt = now;
-      saveUsers(users);
-      await ghFlushFile(USERS_FILE);
-      return sendJSON(res, 200, { ok: true, user: pubUser(u) });
+      await saveUsers(users);
+      scheduleBackup('users.json');
+      return sendJSON(res, 200, { ok: true, user: await pubUser(u) });
     }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
     return;
   }
@@ -5224,13 +5478,13 @@ function apiRoute(req, res, urlPath) {
       const email = normEmail(body && body.email);
       const token = body && typeof body.rememberToken === 'string' ? body.rememberToken.trim() : '';
       if (!email || !token) return sendJSON(res, 200, { ok: true });
-      const users = loadUsers();
+      const users = await loadUsers();
       const u = users[email];
       if (!u) return sendJSON(res, 200, { ok: true });
       if (revokeRememberToken(u, token)) {
         u.updatedAt = new Date().toISOString();
-        saveUsers(users);
-        await ghFlushFile(USERS_FILE);
+        await saveUsers(users);
+        scheduleBackup('users.json');
       }
       return sendJSON(res, 200, { ok: true });
     }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
@@ -5247,7 +5501,7 @@ function apiRoute(req, res, urlPath) {
     readJSONBody(req, 64 * 1024).then(async (body) => {
       const email = normEmail(body && body.email);
       if (!email) return sendJSON(res, 200, { ok: false, error: 'សូមដាក់ Gmail ត្រឹមត្រូវ' });
-      const users = loadUsers();
+      const users = await loadUsers();
       if (!users[email]) return sendJSON(res, 200, { ok: false, error: 'រក Gmail នេះមិនឃើញទេ — សូម Sign-up ជាមុនសិន · No account with this Gmail, please sign up first' });
       // FREE RESET LIMIT (owner order 2026-11-18): the email-code reset is
       // free only 2 times per user, ever. After that the user must use the
@@ -5255,13 +5509,13 @@ function apiRoute(req, res, urlPath) {
       // only grows when a code is actually sent.
       const _freeUsed = Math.floor(numOr(users[email].freeResetCount, 0));
       if (_freeUsed >= WALLET_FREE_RESET_LIMIT) return sendJSON(res, 200, { ok: false, error: 'លេខកូដ Free អស់ហើយ (ប្រើ ' + WALLET_FREE_RESET_LIMIT + ' ដងរួច) — សូមប្រើ Forget Password បង់ $0.10 ដើម្បី Reset ភ្លាមៗ · Free resets used up (' + WALLET_FREE_RESET_LIMIT + ' used) — please use the $0.10 instant reset', freeResetsUsedUp: true, instantResetPrice: WALLET_INSTANT_RESET_PRICE });
-      if (!verifyEmailConfigured()) return sendJSON(res, 200, { ok: false, error: 'Admin មិនទាន់ដាក់ Email (Gmail App Password) ទេ — សូមប្រាប់ Admin · Email is not set up yet, please tell the Admin' });
+      if (!await verifyEmailConfigured()) return sendJSON(res, 200, { ok: false, error: 'Admin មិនទាន់ដាក់ Email (Gmail App Password) ទេ — សូមប្រាប់ Admin · Email is not set up yet, please tell the Admin' });
       const sent = await sendVerificationEmail(email);
       if (!sent.ok) return sendJSON(res, 200, { ok: false, error: sent.error || 'ផ្ញើលេខកូដមិនបានទេ · Could not send the code' });
       users[email].freeResetCount = _freeUsed + 1;
       users[email].updatedAt = new Date().toISOString();
-      saveUsers(users);
-      await ghFlushFile(USERS_FILE);
+      await saveUsers(users);
+      scheduleBackup('users.json');
       return sendJSON(res, 200, { ok: true, sent: true, freeResetsLeft: Math.max(0, WALLET_FREE_RESET_LIMIT - (_freeUsed + 1)) });
     }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
     return;
@@ -5283,7 +5537,7 @@ function apiRoute(req, res, urlPath) {
       if (password !== passwordConfirm) return sendJSON(res, 200, { ok: false, error: 'Password ទាំងពីរមិនដូចគ្នាទេ · Passwords do not match' });
       const v = verifyCodeCheck(email, code);
       if (!v.ok) return sendJSON(res, 200, { ok: false, error: v.error });
-      const users = loadUsers();
+      const users = await loadUsers();
       const u = users[email];
       if (!u) return sendJSON(res, 200, { ok: false, error: 'រក Gmail នេះមិនឃើញទេ · No account with this Gmail' });
       const hp = await hashPassword(password);
@@ -5292,34 +5546,34 @@ function apiRoute(req, res, urlPath) {
       revokeAllRememberTokens(u);
       signinClear(email);
       const now = new Date().toISOString();
-      logActivity({ at: now, mode: 'reset-password', email });
+      await logActivity({ at: now, mode: 'reset-password', email });
       u.updatedAt = now;
-      saveUsers(users);
-      await ghFlushFile(USERS_FILE);
-      addNotification('security', email, '🔑 Password ត្រូវបានប្តូរ · Password changed', (u.name || email) + ' (' + email + ') បានប្តូរ Password តាមរយៈលេខកូដ 6 ខ្ទង់');
-      return sendJSON(res, 200, { ok: true, user: pubUser(u) });
+      await saveUsers(users);
+      scheduleBackup('users.json');
+      await addNotification('security', email, '🔑 Password ត្រូវបានប្តូរ · Password changed', (u.name || email) + ' (' + email + ') បានប្តូរ Password តាមរយៈលេខកូដ 6 ខ្ទង់');
+      return sendJSON(res, 200, { ok: true, user: await pubUser(u) });
     }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
     return;
   }
   // GET /api/admin/users — admin key required. Newest first.
   if (req.method === 'GET' && urlPath === '/api/admin/users') {
-    const a = adminKeyOk(req);
+    const a = await adminKeyOk(req);
     if (!a.ok) return sendJSON(res, 200, { ok: false, error: a.error });
-    const users = loadUsers();
-    const modelLogins = loadModelLogins();
-    const list = Object.values(users).sort((x, y) => String(y.createdAt || '').localeCompare(String(x.createdAt || ''))).map((x) => pubUser(x, modelLogins, deviceInfoForUser(users, x)));
+    const users = await loadUsers();
+    const modelLogins = await loadModelLogins();
+    const list = await Promise.all(Object.values(users).sort((x, y) => String(y.createdAt || '').localeCompare(String(x.createdAt || ''))).map(async (x) => pubUser(x, modelLogins, await deviceInfoForUser(users, x))));
     return sendJSON(res, 200, { ok: true, users: list });
   }
   // GET /api/admin/user?email=... — admin key required.
   if (req.method === 'GET' && urlPath === '/api/admin/user') {
-    const a = adminKeyOk(req);
+    const a = await adminKeyOk(req);
     if (!a.ok) return sendJSON(res, 200, { ok: false, error: a.error });
     const email = normEmail(new URL(req.url, 'http://localhost').searchParams.get('email') || '');
     if (!email) return sendJSON(res, 200, { ok: false, error: 'សូមដាក់ Gmail ត្រឹមត្រូវ' });
-    const _allUsers = loadUsers();
+    const _allUsers = await loadUsers();
     const u = _allUsers[email];
     if (!u) return sendJSON(res, 200, { ok: false, error: 'រកអ្នកប្រើនេះមិនឃើញទេ' });
-    return sendJSON(res, 200, { ok: true, user: pubUser(u, null, deviceInfoForUser(_allUsers, u)) });
+    return sendJSON(res, 200, { ok: true, user: await pubUser(u, null, await deviceInfoForUser(_allUsers, u)) });
   }
   // GET /api/admin/email-usage — admin key required. Live Brevo usage
   // for the Admin → Settings → Email panel: plan (Free), daily limit
@@ -5329,9 +5583,9 @@ function apiRoute(req, res, urlPath) {
   // dailyLimit, usedToday, remainingToday}. If no Brevo key is set,
   // returns ok:false (Gmail SMTP has no quota to show).
   if (req.method === 'GET' && urlPath === '/api/admin/email-usage') {
-    const a = adminKeyOk(req);
+    const a = await adminKeyOk(req);
     if (!a.ok) return sendJSON(res, 200, { ok: false, error: a.error });
-    const s = loadSettings();
+    const s = await loadSettings();
     const em = (s && s.email && typeof s.email === 'object') ? s.email : {};
     const apiKey = typeof em.brevoApiKey === 'string' ? em.brevoApiKey.trim() : '';
     if (!apiKey) return sendJSON(res, 200, { ok: false, error: 'Brevo API key not configured' });
@@ -5356,7 +5610,7 @@ function apiRoute(req, res, urlPath) {
         // Used today comes from the server's own send counter (see
         // brevoUsageToday) — a Restricted key cannot read Brevo's
         // statistics API, so Brevo's numbers are not used here.
-        const usedToday = brevoUsageToday().sent;
+        const usedToday = (await brevoUsageToday()).sent;
         const dailyLimit = 300;
         return sendJSON(res, 200, { ok: true, provider: 'brevo', plan: planName, dailyLimit, usedToday, remainingToday: Math.max(0, dailyLimit - usedToday), date: today });
       } catch (e) {
@@ -5371,9 +5625,9 @@ function apiRoute(req, res, urlPath) {
   // remaining, and status (green >50% left, yellow <=50%, red 0 left).
   // Keys are 1-based indexes only — key values are never returned.
   if (req.method === 'GET' && urlPath === '/api/admin/groq-usage') {
-    const a = adminKeyOk(req);
+    const a = await adminKeyOk(req);
     if (!a.ok) return sendJSON(res, 200, { ok: false, error: a.error });
-    const u = groqUsageList();
+    const u = await groqUsageList();
     return sendJSON(res, 200, { ok: true, provider: 'groq', date: u.date, dailyLimit: u.dailyLimit, keys: u.keys });
   }
   // GET /api/admin/mvsep-usage — admin key required. MVSEP separations used
@@ -5382,9 +5636,9 @@ function apiRoute(req, res, urlPath) {
   // daily limit reached). Keys are 1-based indexes only — key values are
   // never returned.
   if (req.method === 'GET' && urlPath === '/api/admin/mvsep-usage') {
-    const a = adminKeyOk(req);
+    const a = await adminKeyOk(req);
     if (!a.ok) return sendJSON(res, 200, { ok: false, error: a.error });
-    const u = mvsepUsageList();
+    const u = await mvsepUsageList();
     return sendJSON(res, 200, { ok: true, provider: 'mvsep', date: u.date, dailyLimit: u.dailyLimit, keys: u.keys });
   }
   // GET /api/admin/feature-usage — admin key required. Feature-usage
@@ -5392,9 +5646,9 @@ function apiRoute(req, res, urlPath) {
   // per-feature total + today + per-day breakdown, sorted by total
   // descending. Optional ?feature=<name> returns only that one feature.
   if (req.method === 'GET' && urlPath === '/api/admin/feature-usage') {
-    const a = adminKeyOk(req);
+    const a = await adminKeyOk(req);
     if (!a.ok) return sendJSON(res, 200, { ok: false, error: a.error });
-    const u = featureUsageList();
+    const u = await featureUsageList();
     const only = featureUsageCleanName(new URL(req.url, 'http://localhost').searchParams.get('feature') || '');
     if (only) {
       const one = u.features.find((f) => f.feature === only);
@@ -5406,16 +5660,16 @@ function apiRoute(req, res, urlPath) {
   // master toggle (default OFF). POST /api/admin/auto-catch {enabled}
   // sets it. The Admin app has a toggle button for it.
   if (req.method === 'GET' && urlPath === '/api/admin/auto-catch') {
-    const a = adminKeyOk(req);
+    const a = await adminKeyOk(req);
     if (!a.ok) return sendJSON(res, 200, { ok: false, error: a.error });
-    return sendJSON(res, 200, { ok: true, enabled: autoCatchEnabled() });
+    return sendJSON(res, 200, { ok: true, enabled: await autoCatchEnabled() });
   }
   if (req.method === 'POST' && urlPath === '/api/admin/auto-catch') {
-    const a = adminKeyOk(req);
+    const a = await adminKeyOk(req);
     if (!a.ok) return sendJSON(res, 200, { ok: false, error: a.error });
     readJSONBody(req, 64 * 1024).then(async (body) => {
       if (!body || typeof body.enabled !== 'boolean') return sendJSON(res, 200, { ok: false, error: 'សូមដាក់ enabled: true/false' });
-      const out = saveSettings(Object.assign(loadSettings(), { autoCatch: body.enabled }));
+      const out = await saveSettings(Object.assign(await loadSettings(), { autoCatch: body.enabled }));
       return sendJSON(res, 200, { ok: true, enabled: out.autoCatch === true });
     }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
     return;
@@ -5427,21 +5681,21 @@ function apiRoute(req, res, urlPath) {
   // takes effect immediately. The Admin app has a toggle + number
   // input for it.
   if (req.method === 'GET' && urlPath === '/api/admin/device-limit') {
-    const a = adminKeyOk(req);
+    const a = await adminKeyOk(req);
     if (!a.ok) return sendJSON(res, 200, { ok: false, error: a.error });
-    const dl = deviceLimitSetting();
+    const dl = await deviceLimitSetting();
     return sendJSON(res, 200, { ok: true, enabled: dl.enabled, limit: dl.limit });
   }
   if (req.method === 'POST' && urlPath === '/api/admin/device-limit') {
-    const a = adminKeyOk(req);
+    const a = await adminKeyOk(req);
     if (!a.ok) return sendJSON(res, 200, { ok: false, error: a.error });
     readJSONBody(req, 64 * 1024).then(async (body) => {
       const patch = {};
       if (body && typeof body.enabled === 'boolean') patch.deviceLimitEnabled = body.enabled;
       if (body && Number.isFinite(body.limit)) patch.deviceLimit = Math.min(100, Math.max(1, Math.floor(body.limit)));
       if (!('deviceLimitEnabled' in patch) && !('deviceLimit' in patch)) return sendJSON(res, 200, { ok: false, error: 'សូមដាក់ enabled និង/ឬ limit (1–100)' });
-      saveSettings(Object.assign(loadSettings(), patch));
-      const dl = deviceLimitSetting();
+      await saveSettings(Object.assign(await loadSettings(), patch));
+      const dl = await deviceLimitSetting();
       return sendJSON(res, 200, { ok: true, enabled: dl.enabled, limit: dl.limit });
     }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
     return;
@@ -5455,16 +5709,16 @@ function apiRoute(req, res, urlPath) {
   // used before) can get the 50; older accounts get 24. The Admin
   // app has a toggle button for it.
   if (req.method === 'GET' && urlPath === '/api/admin/gift-50') {
-    const a = adminKeyOk(req);
+    const a = await adminKeyOk(req);
     if (!a.ok) return sendJSON(res, 200, { ok: false, error: a.error });
-    return sendJSON(res, 200, { ok: true, enabled: gift50Enabled() });
+    return sendJSON(res, 200, { ok: true, enabled: await gift50Enabled() });
   }
   if (req.method === 'POST' && urlPath === '/api/admin/gift-50') {
-    const a = adminKeyOk(req);
+    const a = await adminKeyOk(req);
     if (!a.ok) return sendJSON(res, 200, { ok: false, error: a.error });
     readJSONBody(req, 64 * 1024).then(async (body) => {
       if (!body || typeof body.enabled !== 'boolean') return sendJSON(res, 200, { ok: false, error: 'សូមដាក់ enabled: true/false' });
-      const out = saveSettings(Object.assign(loadSettings(), { gift50: body.enabled }));
+      const out = await saveSettings(Object.assign(await loadSettings(), { gift50: body.enabled }));
       return sendJSON(res, 200, { ok: true, enabled: out.gift50 === true });
     }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
     return;
@@ -5474,29 +5728,29 @@ function apiRoute(req, res, urlPath) {
   // toggle (default OFF). POST /api/admin/monetization {enabled} sets it.
   // GET /api/public/monetization/enabled — PUBLIC, no auth.
   if (req.method === 'GET' && urlPath === '/api/admin/monetization') {
-    const a = adminKeyOk(req);
+    const a = await adminKeyOk(req);
     if (!a.ok) return sendJSON(res, 200, { ok: false, error: a.error });
-    return sendJSON(res, 200, { ok: true, enabled: monetizationEnabled() });
+    return sendJSON(res, 200, { ok: true, enabled: await monetizationEnabled() });
   }
   if (req.method === 'POST' && urlPath === '/api/admin/monetization') {
-    const a = adminKeyOk(req);
+    const a = await adminKeyOk(req);
     if (!a.ok) return sendJSON(res, 200, { ok: false, error: a.error });
     readJSONBody(req, 64 * 1024).then(async (body) => {
       if (!body || typeof body.enabled !== 'boolean') return sendJSON(res, 200, { ok: false, error: 'សូមដាក់ enabled: true/false' });
-      const out = saveSettings(Object.assign(loadSettings(), { monetization: body.enabled }));
+      const out = await saveSettings(Object.assign(await loadSettings(), { monetization: body.enabled }));
       return sendJSON(res, 200, { ok: true, enabled: out.monetization === true });
     }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
     return;
   }
   if (req.method === 'GET' && urlPath === '/api/public/monetization/enabled') {
-    return sendJSON(res, 200, { ok: true, enabled: monetizationEnabled() });
+    return sendJSON(res, 200, { ok: true, enabled: await monetizationEnabled() });
   }
   // GET /api/public/monetization/earnings?email=X — PUBLIC. Total earned
   // (dollars), eligible views, lifetime cashback, earnings by country.
   if (req.method === 'GET' && urlPath === '/api/public/monetization/earnings') {
     const email = normEmail(new URL(req.url, 'http://localhost').searchParams.get('email') || '');
     if (!email) return sendJSON(res, 200, { ok: false, error: 'សូមដាក់ Gmail' });
-    const got = monetizationRecord(email);
+    const got = await monetizationRecord(email);
     const rec = got ? got.rec : { views: 0, watchSeconds: 0, earnMicro: 0, pendingMicro: 0, paidOutMicro: 0, cashbackTotal: 0, byCountry: {} };
     const byCountry = [];
     const bc = (rec.byCountry && typeof rec.byCountry === 'object') ? rec.byCountry : {};
@@ -5504,7 +5758,7 @@ function apiRoute(req, res, urlPath) {
       const v = bc[c] || {};
       byCountry.push({ country: c, views: numOr(v.views, 0), earnings: numOr(v.earnMicro, 0) / 1000000 });
     }
-    const _u = loadUsers()[email];
+    const _u = (await loadUsers())[email];
     return sendJSON(res, 200, {
       ok: true, email,
       earnings: numOr(rec.earnMicro, 0) / 1000000,
@@ -5522,18 +5776,18 @@ function apiRoute(req, res, urlPath) {
   if (req.method === 'GET' && urlPath === '/api/public/monetization/status') {
     const email = normEmail(new URL(req.url, 'http://localhost').searchParams.get('email') || '');
     if (!email) return sendJSON(res, 200, { ok: false, error: 'សូមដាក់ Gmail' });
-    const got = monetizationRecord(email);
+    const got = await monetizationRecord(email);
     const rec = got ? got.rec : { views: 0, watchSeconds: 0, earnMicro: 0, pendingMicro: 0, paidOutMicro: 0, cashbackTotal: 0, byCountry: {} };
-    const followers = monetizationFollowerCount(email);
+    const followers = await monetizationFollowerCount(email);
     const watchHours = numOr(rec.watchSeconds, 0) / 3600;
-    const apps = loadMonetizationApplications();
+    const apps = await loadMonetizationApplications();
     const app = apps[email] || null;
     const applied = !!(app && (app.status === 'pending' || app.status === 'approved'));
     const approved = !!(app && app.status === 'approved');
     const eligible = followers >= MONETIZATION_FOLLOWERS_NEEDED && watchHours >= MONETIZATION_WATCH_HOURS_NEEDED;
-    const _u = loadUsers()[email];
+    const _u = (await loadUsers())[email];
     return sendJSON(res, 200, {
-      ok: true, email, enabled: monetizationEnabled(),
+      ok: true, email, enabled: await monetizationEnabled(),
       followers, followersNeeded: MONETIZATION_FOLLOWERS_NEEDED,
       watchHours: Math.round(watchHours * 100) / 100, watchHoursNeeded: MONETIZATION_WATCH_HOURS_NEEDED,
       eligible, applied, approved,
@@ -5548,26 +5802,26 @@ function apiRoute(req, res, urlPath) {
     readJSONBody(req, 64 * 1024).then(async (body) => {
       const email = normEmail(body && body.email);
       if (!email) return sendJSON(res, 200, { ok: false, error: 'សូមដាក់ Gmail ត្រឹមត្រូវ' });
-      const users = loadUsers();
+      const users = await loadUsers();
       const u = users[email];
       if (!u) return sendJSON(res, 200, { ok: false, error: 'រក Gmail នេះមិនឃើញទេ — សូម Sign-up ជាមុនសិន · No account with this Gmail, please sign up first' });
-      const got = monetizationRecord(email);
+      const got = await monetizationRecord(email);
       const rec = got ? got.rec : { views: 0, watchSeconds: 0, earnMicro: 0, pendingMicro: 0, paidOutMicro: 0, cashbackTotal: 0, byCountry: {} };
-      const followers = monetizationFollowerCount(email);
+      const followers = await monetizationFollowerCount(email);
       const watchHours = numOr(rec.watchSeconds, 0) / 3600;
       if (followers < MONETIZATION_FOLLOWERS_NEEDED || watchHours < MONETIZATION_WATCH_HOURS_NEEDED) {
         return sendJSON(res, 200, { ok: false, error: 'នៅមិនទាន់គ្រប់គោលការណ៍ទេ — ត្រូវការ Followers ' + MONETIZATION_FOLLOWERS_NEEDED + ' (មាន ' + followers + ') និង Watch hours ' + MONETIZATION_WATCH_HOURS_NEEDED + ' (មាន ' + (Math.round(watchHours * 100) / 100) + ') · Not eligible yet — need ' + MONETIZATION_FOLLOWERS_NEEDED + ' followers (have ' + followers + ') and ' + MONETIZATION_WATCH_HOURS_NEEDED + ' watch hours (have ' + (Math.round(watchHours * 100) / 100) + ')', followers, watchHours: Math.round(watchHours * 100) / 100 });
       }
-      const apps = loadMonetizationApplications();
+      const apps = await loadMonetizationApplications();
       const prev = apps[email];
       if (prev && (prev.status === 'pending' || prev.status === 'approved')) {
         return sendJSON(res, 200, { ok: false, error: prev.status === 'approved' ? 'អ្នកបានអនុម័តរួចហើយ · Already approved' : 'អ្នកបានស្នើរួចហើយ — សូមរង់ចាំ Admin · Already applied — please wait for the Admin' });
       }
       const now = new Date().toISOString();
       apps[email] = { email, name: u.name || '', followers, watchHours: Math.round(watchHours * 100) / 100, appliedAt: now, status: 'pending' };
-      saveMonetizationApplications(apps);
-      await ghFlushFile(MONETIZATION_APPLICATIONS_FILE);
-      addNotification('purchase-request', email, '💲 ស្នើ Monetization · Monetization application', (u.name || email) + ' (' + email + ') · ID: ' + (u.id || '—') + ' បានស្នើរកលុយ — Followers ' + followers + ', Watch hours ' + (Math.round(watchHours * 100) / 100), { extra: { monetizationApplication: true, email, followers, watchHours: Math.round(watchHours * 100) / 100, buyerId: u.id || '—' } });
+      await saveMonetizationApplications(apps);
+      scheduleBackup('monetization-applications.json');
+      await addNotification('purchase-request', email, '💲 ស្នើ Monetization · Monetization application', (u.name || email) + ' (' + email + ') · ID: ' + (u.id || '—') + ' បានស្នើរកលុយ — Followers ' + followers + ', Watch hours ' + (Math.round(watchHours * 100) / 100), { extra: { monetizationApplication: true, email, followers, watchHours: Math.round(watchHours * 100) / 100, buyerId: u.id || '—' } });
       return sendJSON(res, 200, { ok: true, application: apps[email] });
     }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
     return;
@@ -5575,28 +5829,28 @@ function apiRoute(req, res, urlPath) {
   // GET /api/admin/monetization/applications — admin key required.
   // Lists all monetization applications, newest first.
   if (req.method === 'GET' && urlPath === '/api/admin/monetization/applications') {
-    const a = adminKeyOk(req);
+    const a = await adminKeyOk(req);
     if (!a.ok) return sendJSON(res, 200, { ok: false, error: a.error });
-    const apps = loadMonetizationApplications();
+    const apps = await loadMonetizationApplications();
     const list = Object.values(apps).sort((x, y) => String(y.appliedAt || '').localeCompare(String(x.appliedAt || '')));
     return sendJSON(res, 200, { ok: true, applications: list });
   }
   // POST /api/admin/monetization/approve — {email} — admin key required.
   // Approves the user for monetization; notifies the user.
   if (req.method === 'POST' && urlPath === '/api/admin/monetization/approve') {
-    const a = adminKeyOk(req);
+    const a = await adminKeyOk(req);
     if (!a.ok) return sendJSON(res, 200, { ok: false, error: a.error });
     readJSONBody(req, 64 * 1024).then(async (body) => {
       const email = normEmail(body && body.email);
       if (!email) return sendJSON(res, 200, { ok: false, error: 'សូមដាក់ Gmail ត្រឹមត្រូវ' });
-      const apps = loadMonetizationApplications();
+      const apps = await loadMonetizationApplications();
       const app = apps[email];
       if (!app) return sendJSON(res, 200, { ok: false, error: 'រកសំណើនេះមិនឃើញទេ' });
       app.status = 'approved';
       app.decidedAt = new Date().toISOString();
-      saveMonetizationApplications(apps);
-      await ghFlushFile(MONETIZATION_APPLICATIONS_FILE);
-      addNotification('purchase-approved', email, '✅ Monetization បានអនុម័ត · Monetization approved', (app.name || email) + ' (' + email + ') — ឥឡូវអ្នកអាចរកលុយពី Views និង Cashback បានហើយ · You can now earn from views and cashback', { extra: { monetizationApplication: true, email, decision: 'approved' } });
+      await saveMonetizationApplications(apps);
+      scheduleBackup('monetization-applications.json');
+      await addNotification('purchase-approved', email, '✅ Monetization បានអនុម័ត · Monetization approved', (app.name || email) + ' (' + email + ') — ឥឡូវអ្នកអាចរកលុយពី Views និង Cashback បានហើយ · You can now earn from views and cashback', { extra: { monetizationApplication: true, email, decision: 'approved' } });
       return sendJSON(res, 200, { ok: true, application: app });
     }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
     return;
@@ -5604,21 +5858,21 @@ function apiRoute(req, res, urlPath) {
   // POST /api/admin/monetization/reject — {email, reason?} — admin key
   // required. Rejects the application; the user may apply again later.
   if (req.method === 'POST' && urlPath === '/api/admin/monetization/reject') {
-    const a = adminKeyOk(req);
+    const a = await adminKeyOk(req);
     if (!a.ok) return sendJSON(res, 200, { ok: false, error: a.error });
     readJSONBody(req, 64 * 1024).then(async (body) => {
       const email = normEmail(body && body.email);
       const reason = typeof body.reason === 'string' ? body.reason.trim().slice(0, 200) : '';
       if (!email) return sendJSON(res, 200, { ok: false, error: 'សូមដាក់ Gmail ត្រឹមត្រូវ' });
-      const apps = loadMonetizationApplications();
+      const apps = await loadMonetizationApplications();
       const app = apps[email];
       if (!app) return sendJSON(res, 200, { ok: false, error: 'រកសំណើនេះមិនឃើញទេ' });
       app.status = 'rejected';
       if (reason) app.reason = reason;
       app.decidedAt = new Date().toISOString();
-      saveMonetizationApplications(apps);
-      await ghFlushFile(MONETIZATION_APPLICATIONS_FILE);
-      addNotification('purchase-rejected', email, '❌ Monetization មិនបានអនុម័ត · Monetization rejected', (app.name || email) + ' (' + email + ')' + (reason ? ' — ' + reason : '') + ' · អ្នកអាចស្នើម្ដងទៀតពេលគ្រប់គោលការណ៍ · You may apply again later', { extra: { monetizationApplication: true, email, decision: 'rejected', reason } });
+      await saveMonetizationApplications(apps);
+      scheduleBackup('monetization-applications.json');
+      await addNotification('purchase-rejected', email, '❌ Monetization មិនបានអនុម័ត · Monetization rejected', (app.name || email) + ' (' + email + ')' + (reason ? ' — ' + reason : '') + ' · អ្នកអាចស្នើម្ដងទៀតពេលគ្រប់គោលការណ៍ · You may apply again later', { extra: { monetizationApplication: true, email, decision: 'rejected', reason } });
       return sendJSON(res, 200, { ok: true, application: app });
     }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
     return;
@@ -5627,10 +5881,20 @@ function apiRoute(req, res, urlPath) {
   // immediate re-pull of public.json + history.json from GitHub
   // (see §6 data-sync fix). Returns what changed.
   if (req.method === 'POST' && urlPath === '/api/admin/resync-data') {
-    const a = adminKeyOk(req);
+    const a = await adminKeyOk(req);
     if (!a.ok) return sendJSON(res, 200, { ok: false, error: a.error });
     readJSONBody(req, 64 * 1024).then(async () => {
-      const out = await ghMergePublicHistoryFromGitHub();
+      // Supabase is the source of truth — nothing to merge. Force a
+      // GitHub backup snapshot now and report live counts instead.
+      const _posts = await loadPublicPosts();
+      const _hist = await loadHistory();
+      const out = {
+        publicChanged: false, historyChanged: false,
+        publicPosts: _posts.length,
+        historyItems: Object.values(_hist).reduce((n, a) => n + (Array.isArray(a) ? a.length : 0), 0),
+        error: '',
+      };
+      await runBackupSnapshot();
       return sendJSON(res, 200, { ok: true, resync: out });
     }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
     return;
@@ -5638,12 +5902,12 @@ function apiRoute(req, res, urlPath) {
   // POST /api/admin/grant — {email, credits, songCredits, note?} — admin key required.
   // credits/songCredits are DELTAS (can be negative to deduct, balance never below 0).
   if (req.method === 'POST' && urlPath === '/api/admin/grant') {
-    const a = adminKeyOk(req);
+    const a = await adminKeyOk(req);
     if (!a.ok) return sendJSON(res, 200, { ok: false, error: a.error });
     readJSONBody(req, 64 * 1024).then(async (body) => {
       const email = normEmail(body && body.email);
       if (!email) return sendJSON(res, 200, { ok: false, error: 'សូមដាក់ Gmail ត្រឹមត្រូវ' });
-      const users = loadUsers();
+      const users = await loadUsers();
       const u = users[email];
       if (!u) return sendJSON(res, 200, { ok: false, error: 'រកអ្នកប្រើនេះមិនឃើញទេ' });
       const dMedia = Math.floor(numOr(body.credits, 0));
@@ -5652,20 +5916,20 @@ function apiRoute(req, res, urlPath) {
       u.credits = Math.max(0, Math.floor(numOr(u.credits, 0)) + dMedia);
       u.songCredits = Math.max(0, Math.floor(numOr(u.songCredits, 0)) + dSong);
       u.updatedAt = new Date().toISOString();
-      saveUsers(users);
+      await saveUsers(users);
       // Critical write: confirm the new balance is on GitHub BEFORE
       // returning success, so a restart cannot lose a granted/deducted
       // credit that the Admin app already reported as done.
-      await ghFlushFile(USERS_FILE);
-      logGrant({ email, credits: dMedia, songCredits: dSong, note: typeof body.note === 'string' ? body.note.slice(0, 200) : '', at: u.updatedAt });
+      scheduleBackup('users.json');
+      await logGrant({ email, credits: dMedia, songCredits: dSong, note: typeof body.note === 'string' ? body.note.slice(0, 200) : '', at: u.updatedAt });
       const deltaText = fmtCreditDelta(dMedia, dSong);
       const grantNote = typeof body.note === 'string' ? body.note.trim().slice(0, 200) : '';
       if (dMedia < 0 || dSong < 0) {
-        addNotification('deduct', email, '➖ កាត់ Credit · Credits deducted', 'Admin បានកាត់ ' + deltaText + ' ពី ' + email + ' · ID: ' + (u.id || '—') + (grantNote ? ' — ' + grantNote : ''));
+        await addNotification('deduct', email, '➖ កាត់ Credit · Credits deducted', 'Admin បានកាត់ ' + deltaText + ' ពី ' + email + ' · ID: ' + (u.id || '—') + (grantNote ? ' — ' + grantNote : ''));
       } else {
-        addNotification('grant', email, '➕ បន្ថែម Credit · Credits granted', 'Admin បានបន្ថែម ' + deltaText + ' ឲ្យ ' + email + ' · ID: ' + (u.id || '—') + (grantNote ? ' — ' + grantNote : ''));
+        await addNotification('grant', email, '➕ បន្ថែម Credit · Credits granted', 'Admin បានបន្ថែម ' + deltaText + ' ឲ្យ ' + email + ' · ID: ' + (u.id || '—') + (grantNote ? ' — ' + grantNote : ''));
       }
-      return sendJSON(res, 200, { ok: true, user: pubUser(u) });
+      return sendJSON(res, 200, { ok: true, user: await pubUser(u) });
     }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
     return;
   }
@@ -5681,13 +5945,13 @@ function apiRoute(req, res, urlPath) {
   // secure equivalent. All saved (remember-me) logins are revoked and
   // the sign-in lock is cleared.
   if (req.method === 'POST' && urlPath === '/api/admin/reset-password') {
-    const a = adminKeyOk(req);
+    const a = await adminKeyOk(req);
     if (!a.ok) return sendJSON(res, 200, { ok: false, error: a.error });
     readJSONBody(req, 64 * 1024).then(async (body) => {
       const email = normEmail(body && body.email);
       const newPassword = body && typeof body.newPassword === 'string' ? body.newPassword : '';
       if (!email) return sendJSON(res, 200, { ok: false, error: 'សូមដាក់ Gmail ត្រឹមត្រូវ' });
-      const users = loadUsers();
+      const users = await loadUsers();
       const u = users[email];
       if (!u) return sendJSON(res, 200, { ok: false, error: 'រកអ្នកប្រើនេះមិនឃើញទេ' });
       const now = new Date().toISOString();
@@ -5696,33 +5960,33 @@ function apiRoute(req, res, urlPath) {
         const hp = await hashPassword(newPassword);
         u.passwordSalt = hp.salt;
         u.passwordHash = hp.hash;
-        addNotification('security', email, '🔑 Admin បានប្តូរ Password · Admin reset password', 'Admin បានប្តូរ Password ឲ្យ ' + email + ' (Password ថ្មី — សូមប្រាប់អ្នកប្រើ)');
+        await addNotification('security', email, '🔑 Admin បានប្តូរ Password · Admin reset password', 'Admin បានប្តូរ Password ឲ្យ ' + email + ' (Password ថ្មី — សូមប្រាប់អ្នកប្រើ)');
       } else {
         u.passwordHash = null;
         u.passwordSalt = null;
-        addNotification('security', email, '🔑 Admin បានលុប Password · Admin cleared password', 'Admin បានលុប Password របស់ ' + email + ' — អ្នកប្រើត្រូវបង្កើត Password ថ្មី (Forgot password ឬ Google)');
+        await addNotification('security', email, '🔑 Admin បានលុប Password · Admin cleared password', 'Admin បានលុប Password របស់ ' + email + ' — អ្នកប្រើត្រូវបង្កើត Password ថ្មី (Forgot password ឬ Google)');
       }
       revokeAllRememberTokens(u);
       signinClear(email);
-      logActivity({ at: now, mode: 'admin-reset-password', email });
+      await logActivity({ at: now, mode: 'admin-reset-password', email });
       u.updatedAt = now;
-      saveUsers(users);
-      await ghFlushFile(USERS_FILE);
-      return sendJSON(res, 200, { ok: true, user: pubUser(u) });
+      await saveUsers(users);
+      scheduleBackup('users.json');
+      return sendJSON(res, 200, { ok: true, user: await pubUser(u) });
     }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
     return;
   }
   // DELETE /api/admin/user?email=... — admin key required. Removes a user
   // (used to clean up a test user; the Admin app can also use it).
   if (req.method === 'DELETE' && urlPath === '/api/admin/user') {
-    const a = adminKeyOk(req);
+    const a = await adminKeyOk(req);
     if (!a.ok) return sendJSON(res, 200, { ok: false, error: a.error });
     const email = normEmail(new URL(req.url, 'http://localhost').searchParams.get('email') || '');
     if (!email) return sendJSON(res, 200, { ok: false, error: 'សូមដាក់ Gmail ត្រឹមត្រូវ' });
-    const users = loadUsers();
+    const users = await loadUsers();
     if (!users[email]) return sendJSON(res, 200, { ok: false, error: 'រកអ្នកប្រើនេះមិនឃើញទេ' });
     delete users[email];
-    saveUsers(users);
+    await saveUsers(users);
     return sendJSON(res, 200, { ok: true, deleted: email });
   }
   // POST /api/admin/block-model — {model} — admin key required. Adds a
@@ -5730,17 +5994,17 @@ function apiRoute(req, res, urlPath) {
   // (no user created/updated, no credits granted). Comparison is
   // case-insensitive; the code is stored as sent.
   if (req.method === 'POST' && urlPath === '/api/admin/block-model') {
-    const a = adminKeyOk(req);
+    const a = await adminKeyOk(req);
     if (!a.ok) return sendJSON(res, 200, { ok: false, error: a.error });
     readJSONBody(req, 64 * 1024).then(async (body) => {
       const model = typeof body && typeof body.model === 'string' ? body.model.trim().slice(0, 64) : '';
       if (!model) return sendJSON(res, 200, { ok: false, error: 'សូមដាក់កូដម៉ូដែល' });
-      const blocked = loadBlockedModels();
+      const blocked = await loadBlockedModels();
       if (!blocked.some((b) => b.toUpperCase() === model.toUpperCase())) blocked.push(model);
-      saveBlockedModels(blocked);
+      await saveBlockedModels(blocked);
       // Critical write: confirm the block list is on GitHub BEFORE
       // returning success, so a restart cannot lose the block.
-      await ghFlushFile(BLOCKED_MODELS_FILE);
+      scheduleBackup('blocked-models.json');
       return sendJSON(res, 200, { ok: true, blocked });
     }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
     return;
@@ -5748,14 +6012,14 @@ function apiRoute(req, res, urlPath) {
   // POST /api/admin/unblock-model — {model} — admin key required. Removes
   // a device model code from the blocked list so it can sync again.
   if (req.method === 'POST' && urlPath === '/api/admin/unblock-model') {
-    const a = adminKeyOk(req);
+    const a = await adminKeyOk(req);
     if (!a.ok) return sendJSON(res, 200, { ok: false, error: a.error });
     readJSONBody(req, 64 * 1024).then(async (body) => {
       const model = typeof body && typeof body.model === 'string' ? body.model.trim().slice(0, 64) : '';
       if (!model) return sendJSON(res, 200, { ok: false, error: 'សូមដាក់កូដម៉ូដែល' });
-      const blocked = loadBlockedModels().filter((b) => b.toUpperCase() !== model.toUpperCase());
-      saveBlockedModels(blocked);
-      await ghFlushFile(BLOCKED_MODELS_FILE);
+      const blocked = (await loadBlockedModels()).filter((b) => b.toUpperCase() !== model.toUpperCase());
+      await saveBlockedModels(blocked);
+      scheduleBackup('blocked-models.json');
       return sendJSON(res, 200, { ok: true, blocked });
     }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
     return;
@@ -5763,23 +6027,23 @@ function apiRoute(req, res, urlPath) {
   // GET /api/admin/blocked-models — admin key required. Lists the blocked
   // device model codes.
   if (req.method === 'GET' && urlPath === '/api/admin/blocked-models') {
-    const a = adminKeyOk(req);
+    const a = await adminKeyOk(req);
     if (!a.ok) return sendJSON(res, 200, { ok: false, error: a.error });
-    return sendJSON(res, 200, { ok: true, blocked: loadBlockedModels() });
+    return sendJSON(res, 200, { ok: true, blocked: await loadBlockedModels() });
   }
   // POST /api/admin/block-ip — {ip} — admin key required. MANUAL block:
   // the admin reviews the Security section and decides. A blocked IP
   // cannot sync (and cannot call admin endpoints with a wrong key).
   if (req.method === 'POST' && urlPath === '/api/admin/block-ip') {
-    const a = adminKeyOk(req);
+    const a = await adminKeyOk(req);
     if (!a.ok) return sendJSON(res, 200, { ok: false, error: a.error });
     readJSONBody(req, 64 * 1024).then(async (body) => {
       const ip = typeof body && typeof body.ip === 'string' ? body.ip.trim().slice(0, 64) : '';
       if (!ip || !/^[0-9a-zA-Z:.\-]+$/.test(ip)) return sendJSON(res, 200, { ok: false, error: 'សូមដាក់ IP ត្រឹមត្រូវ' });
-      const blocked = loadBlockedIps();
+      const blocked = await loadBlockedIps();
       if (!blocked.some((b) => b === ip)) blocked.push(ip);
-      saveBlockedIps(blocked);
-      await ghFlushFile(BLOCKED_IPS_FILE);
+      await saveBlockedIps(blocked);
+      scheduleBackup('blocked-ips.json');
       return sendJSON(res, 200, { ok: true, blocked });
     }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
     return;
@@ -5787,36 +6051,36 @@ function apiRoute(req, res, urlPath) {
   // POST /api/admin/unblock-ip — {ip} — admin key required. Removes an IP
   // from the blocked list so it can sync again.
   if (req.method === 'POST' && urlPath === '/api/admin/unblock-ip') {
-    const a = adminKeyOk(req);
+    const a = await adminKeyOk(req);
     if (!a.ok) return sendJSON(res, 200, { ok: false, error: a.error });
     readJSONBody(req, 64 * 1024).then(async (body) => {
       const ip = typeof body && typeof body.ip === 'string' ? body.ip.trim().slice(0, 64) : '';
       if (!ip) return sendJSON(res, 200, { ok: false, error: 'សូមដាក់ IP ត្រឹមត្រូវ' });
-      const blocked = loadBlockedIps().filter((b) => b !== ip);
-      saveBlockedIps(blocked);
-      await ghFlushFile(BLOCKED_IPS_FILE);
+      const blocked = (await loadBlockedIps()).filter((b) => b !== ip);
+      await saveBlockedIps(blocked);
+      scheduleBackup('blocked-ips.json');
       return sendJSON(res, 200, { ok: true, blocked });
     }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
     return;
   }
   // GET /api/admin/blocked-ips — admin key required. Lists blocked IPs.
   if (req.method === 'GET' && urlPath === '/api/admin/blocked-ips') {
-    const a = adminKeyOk(req);
+    const a = await adminKeyOk(req);
     if (!a.ok) return sendJSON(res, 200, { ok: false, error: a.error });
-    return sendJSON(res, 200, { ok: true, blocked: loadBlockedIps() });
+    return sendJSON(res, 200, { ok: true, blocked: await loadBlockedIps() });
   }
   // POST /api/admin/block-email — {email} — admin key required. MANUAL
   // block: a blocked Gmail cannot sync at all.
   if (req.method === 'POST' && urlPath === '/api/admin/block-email') {
-    const a = adminKeyOk(req);
+    const a = await adminKeyOk(req);
     if (!a.ok) return sendJSON(res, 200, { ok: false, error: a.error });
     readJSONBody(req, 64 * 1024).then(async (body) => {
       const email = normEmail(body && body.email);
       if (!email) return sendJSON(res, 200, { ok: false, error: 'សូមដាក់ Gmail ត្រឹមត្រូវ' });
-      const blocked = loadBlockedEmails();
+      const blocked = await loadBlockedEmails();
       if (!blocked.some((b) => b === email)) blocked.push(email);
-      saveBlockedEmails(blocked);
-      await ghFlushFile(BLOCKED_EMAILS_FILE);
+      await saveBlockedEmails(blocked);
+      scheduleBackup('blocked-emails.json');
       return sendJSON(res, 200, { ok: true, blocked });
     }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
     return;
@@ -5824,32 +6088,32 @@ function apiRoute(req, res, urlPath) {
   // POST /api/admin/unblock-email — {email} — admin key required. Removes
   // a Gmail from the blocked list so it can sync again.
   if (req.method === 'POST' && urlPath === '/api/admin/unblock-email') {
-    const a = adminKeyOk(req);
+    const a = await adminKeyOk(req);
     if (!a.ok) return sendJSON(res, 200, { ok: false, error: a.error });
     readJSONBody(req, 64 * 1024).then(async (body) => {
       const email = normEmail(body && body.email);
       if (!email) return sendJSON(res, 200, { ok: false, error: 'សូមដាក់ Gmail ត្រឹមត្រូវ' });
-      const blocked = loadBlockedEmails().filter((b) => b !== email);
-      saveBlockedEmails(blocked);
-      await ghFlushFile(BLOCKED_EMAILS_FILE);
+      const blocked = (await loadBlockedEmails()).filter((b) => b !== email);
+      await saveBlockedEmails(blocked);
+      scheduleBackup('blocked-emails.json');
       return sendJSON(res, 200, { ok: true, blocked });
     }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
     return;
   }
   // GET /api/admin/blocked-emails — admin key required. Lists blocked Gmails.
   if (req.method === 'GET' && urlPath === '/api/admin/blocked-emails') {
-    const a = adminKeyOk(req);
+    const a = await adminKeyOk(req);
     if (!a.ok) return sendJSON(res, 200, { ok: false, error: a.error });
-    return sendJSON(res, 200, { ok: true, blocked: loadBlockedEmails() });
+    return sendJSON(res, 200, { ok: true, blocked: await loadBlockedEmails() });
   }
   // GET /api/admin/device-records — admin key required. Lists all known
   // devices (fingerprint -> slots, strikes, blocked, VPN flags, model,
   // last IP, Gmails seen from it), newest first. The Admin reviews
   // blocked devices here and unblocks them.
   if (req.method === 'GET' && urlPath === '/api/admin/device-records') {
-    const a = adminKeyOk(req);
+    const a = await adminKeyOk(req);
     if (!a.ok) return sendJSON(res, 200, { ok: false, error: a.error });
-    const all = loadDeviceRecords();
+    const all = await loadDeviceRecords();
     const list = Object.keys(all).map((k) => Object.assign({ fingerprint: k }, all[k])).sort((x, y) => String(y.lastSeen || '').localeCompare(String(x.lastSeen || '')));
     return sendJSON(res, 200, { ok: true, devices: list });
   }
@@ -5858,12 +6122,12 @@ function apiRoute(req, res, urlPath) {
   // the device can sign in and register again. Also lifts the block on
   // the Gmails that this device's strike blocked (tracked on the record).
   if (req.method === 'POST' && urlPath === '/api/admin/unblock-device') {
-    const a = adminKeyOk(req);
+    const a = await adminKeyOk(req);
     if (!a.ok) return sendJSON(res, 200, { ok: false, error: a.error });
     readJSONBody(req, 64 * 1024).then(async (body) => {
       const fingerprint = typeof body && typeof body.fingerprint === 'string' ? body.fingerprint.trim().slice(0, 128) : '';
       if (!fingerprint) return sendJSON(res, 200, { ok: false, error: 'សូមដាក់ fingerprint របស់ឧបករណ៍' });
-      const all = loadDeviceRecords();
+      const all = await loadDeviceRecords();
       const rec = all[fingerprint];
       if (!rec || typeof rec !== 'object') return sendJSON(res, 200, { ok: false, error: 'រកឧបករណ៍នេះមិនឃើញទេ' });
       rec.blocked = false;
@@ -5872,14 +6136,14 @@ function apiRoute(req, res, urlPath) {
       rec.strikes = 0;
       const cleared = Array.isArray(rec.blockedEmails) ? rec.blockedEmails.filter((e) => typeof e === 'string' && e) : [];
       rec.blockedEmails = [];
-      saveDeviceRecords(all);
-      await ghFlushFile(DEVICE_RECORDS_FILE);
+      await saveDeviceRecords(all);
+      scheduleBackup('device-records.json');
       if (cleared.length) {
-        const bem = loadBlockedEmails().filter((b) => !cleared.includes(b));
-        saveBlockedEmails(bem);
-        await ghFlushFile(BLOCKED_EMAILS_FILE);
+        const bem = (await loadBlockedEmails()).filter((b) => !cleared.includes(b));
+        await saveBlockedEmails(bem);
+        scheduleBackup('blocked-emails.json');
       }
-      addNotification('security', '', '✅ ឧបករណ៍ត្រូវបានដោះប្លុក · Device unblocked', 'Admin បានដោះប្លុកឧបករណ៍ ' + fingerprint + ' (' + (rec.model || '') + ')' + (cleared.length ? ' — Gmail ត្រូវបានដោះប្លុក៖ ' + cleared.join(', ') : ''));
+      await addNotification('security', '', '✅ ឧបករណ៍ត្រូវបានដោះប្លុក · Device unblocked', 'Admin បានដោះប្លុកឧបករណ៍ ' + fingerprint + ' (' + (rec.model || '') + ')' + (cleared.length ? ' — Gmail ត្រូវបានដោះប្លុក៖ ' + cleared.join(', ') : ''));
       return sendJSON(res, 200, { ok: true, fingerprint, unblockedEmails: cleared });
     }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
     return;
@@ -5887,19 +6151,19 @@ function apiRoute(req, res, urlPath) {
   // GET /api/admin/settings — PUBLIC (no admin key). The MovAi website reads
   // it on load to know whether the admin turned Smooth mode Auto on.
   if (req.method === 'GET' && urlPath === '/api/admin/settings') {
-    return sendJSON(res, 200, { ok: true, settings: publicSettings(loadSettings()) });
+    return sendJSON(res, 200, { ok: true, settings: publicSettings(await loadSettings()) });
   }
   // POST /api/admin/settings — {smoothModeAuto, theme, font, glassClear,
   // glassBlur, glassShine, tshadow, txtblur, bgb, brandfx, mode, payment} — admin key
   // required. Fields sent are merged over the stored settings; missing
   // fields keep their stored value. Values are validated/clamped.
   if (req.method === 'POST' && urlPath === '/api/admin/settings') {
-    const a = adminKeyOk(req);
+    const a = await adminKeyOk(req);
     if (!a.ok) return sendJSON(res, 200, { ok: false, error: a.error });
-    readJSONBody(req, 64 * 1024).then((body) => {
-      const cur = loadSettings();
+    readJSONBody(req, 64 * 1024).then(async (body) => {
+      const cur = await loadSettings();
       const merged = Object.assign({}, cur, body && typeof body === 'object' && !Array.isArray(body) ? body : {});
-      const saved = saveSettings(merged, cur);
+      const saved = await saveSettings(merged, cur);
       return sendJSON(res, 200, { ok: true, settings: publicSettings(saved) });
     }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
     return;
@@ -5910,7 +6174,7 @@ function apiRoute(req, res, urlPath) {
   // (no duplicate). The response NEVER contains the key value. endpoint
   // is only needed for Suno (its gateway URL).
   if (req.method === 'POST' && urlPath === '/api/admin/keys') {
-    const a = adminKeyOk(req);
+    const a = await adminKeyOk(req);
     if (!a.ok) return sendJSON(res, 200, { ok: false, error: a.error });
     readJSONBody(req, 64 * 1024).then(async (body) => {
       const provider = normProvider(body && body.provider);
@@ -5918,7 +6182,7 @@ function apiRoute(req, res, urlPath) {
       const key = typeof body.key === 'string' ? body.key.trim() : '';
       if (!key) return sendJSON(res, 200, { ok: false, error: 'សូមដាក់ API Key' });
       const endpoint = typeof body.endpoint === 'string' ? body.endpoint.trim().slice(0, 500) : '';
-      const keys = loadAdminKeys();
+      const keys = await loadAdminKeys();
       const rec = keys[provider] && Array.isArray(keys[provider].keys) ? keys[provider] : { keys: [], updatedAt: new Date().toISOString() };
       const now = new Date().toISOString();
       const existing = rec.keys.find((e) => e && e.key === key);
@@ -5929,8 +6193,8 @@ function apiRoute(req, res, urlPath) {
       }
       rec.updatedAt = now;
       keys[provider] = rec;
-      saveAdminKeys(keys);
-      await ghFlushFile(ADMIN_KEYS_FILE);
+      await saveAdminKeys(keys);
+      scheduleBackup('admin-keys.json');
       return sendJSON(res, 200, { ok: true, provider, keyCount: rec.keys.length, hasKey: true, hasEndpoint: rec.keys.some((e) => e && e.endpoint && e.endpoint.trim()) });
     }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
     return;
@@ -5938,20 +6202,20 @@ function apiRoute(req, res, urlPath) {
   // DELETE /api/admin/keys — {provider, index} — admin key required.
   // Removes the key at that index from the provider's list.
   if (req.method === 'DELETE' && urlPath === '/api/admin/keys') {
-    const a = adminKeyOk(req);
+    const a = await adminKeyOk(req);
     if (!a.ok) return sendJSON(res, 200, { ok: false, error: a.error });
     readJSONBody(req, 64 * 1024).then(async (body) => {
       const provider = normProvider(body && body.provider);
       if (!KNOWN_KEY_PROVIDERS.includes(provider)) return sendJSON(res, 200, { ok: false, error: 'Provider មិនស្គាល់ទេ' });
       const idx = Number(body && body.index);
-      const keys = loadAdminKeys();
+      const keys = await loadAdminKeys();
       const rec = keys[provider];
       const list = rec && Array.isArray(rec.keys) ? rec.keys : [];
       if (!Number.isInteger(idx) || idx < 0 || idx >= list.length) return sendJSON(res, 200, { ok: false, error: 'Index មិនត្រឹមត្រូវទេ' });
       list.splice(idx, 1);
       rec.updatedAt = new Date().toISOString();
-      saveAdminKeys(keys);
-      await ghFlushFile(ADMIN_KEYS_FILE);
+      await saveAdminKeys(keys);
+      scheduleBackup('admin-keys.json');
       return sendJSON(res, 200, { ok: true, provider, keyCount: list.length, hasKey: list.length > 0, hasEndpoint: list.some((e) => e && e.endpoint && e.endpoint.trim()) });
     }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
     return;
@@ -5960,9 +6224,9 @@ function apiRoute(req, res, urlPath) {
   // keys stored, HOW MANY per provider (keyCount), and whether an endpoint
   // is set. Key values are NEVER returned.
   if (req.method === 'GET' && urlPath === '/api/admin/keys') {
-    const a = adminKeyOk(req);
+    const a = await adminKeyOk(req);
     if (!a.ok) return sendJSON(res, 200, { ok: false, error: a.error });
-    const keys = loadAdminKeys();
+    const keys = await loadAdminKeys();
     const list = Object.keys(keys).sort().map((p) => {
       const arr = keys[p] && Array.isArray(keys[p].keys) ? keys[p].keys : [];
       return { provider: p, hasKey: arr.length > 0, keyCount: arr.length, hasEndpoint: arr.some((e) => e && e.endpoint && e.endpoint.trim()) };
@@ -5974,11 +6238,11 @@ function apiRoute(req, res, urlPath) {
   // and copy them. Only the admin-key holder (the owner) can call this —
   // the public GET /api/admin/keys never returns values.
   if (req.method === 'GET' && urlPath === '/api/admin/keys/values') {
-    const a = adminKeyOk(req);
+    const a = await adminKeyOk(req);
     if (!a.ok) return sendJSON(res, 200, { ok: false, error: a.error });
     const provider = normProvider(new URL(req.url, 'http://localhost').searchParams.get('provider') || '');
     if (!KNOWN_KEY_PROVIDERS.includes(provider)) return sendJSON(res, 200, { ok: false, error: 'Provider មិនស្គាល់ទេ' });
-    const rec = loadAdminKeys()[provider];
+    const rec = (await loadAdminKeys())[provider];
     const list = rec && Array.isArray(rec.keys) ? rec.keys : [];
     return sendJSON(res, 200, { ok: true, provider, keys: list.map((e) => ({ key: e.key || '', endpoint: e.endpoint || '', addedAt: e.addedAt || '' })) });
   }
@@ -6020,7 +6284,7 @@ function apiRoute(req, res, urlPath) {
     const s = adminKeySessionFromReq(req);
     if (!s) return sendJSON(res, 200, { ok: false, error: 'Session ផុតកំណត់ហើយ សូមចូល Google ម្តងទៀត · Session expired, please sign in with Google again' });
     if (!adminKeyRateOk(s.email, 'reveal')) return sendJSON(res, 200, { ok: false, error: 'មើល key ច្រើនដងពេកហើយ សាកល្បងម្តងទៀត 1 ម៉ោងក្រោយ · Too many reveals, try again in 1 hour' });
-    const k = currentAdminKey();
+    const k = await currentAdminKey();
     if (!k) return sendJSON(res, 200, { ok: false, error: 'Admin key មិនទាន់បានកំណត់ទេ · Admin key is not configured' });
     return sendJSON(res, 200, { ok: true, key: k });
   }
@@ -6036,10 +6300,10 @@ function apiRoute(req, res, urlPath) {
       const newKey = body && typeof body.newKey === 'string' ? body.newKey.trim() : '';
       if (newKey.length < 8 || newKey.length > 64) return sendJSON(res, 200, { ok: false, error: 'Key ថ្មីត្រូវមាន 8–64 តួអក្សរ · New key must be 8–64 characters' });
       if (!adminKeyRateOk(s.email, 'reset')) return sendJSON(res, 200, { ok: false, error: 'ប្តូរ key ច្រើនដងពេកហើយ សាកល្បងម្តងទៀត 1 ម៉ោងក្រោយ · Too many resets, try again in 1 hour' });
-      saveAdminKeyFile(newKey);
-      await ghFlushFile(ADMIN_KEY_FILE);
-      try { clearAdminLockout(getClientIp(req)); } catch (e) {}
-      addNotification('security', s.email, '🗝️ Admin Key ត្រូវបានប្តូរ · Admin Key changed', 'Admin Key ត្រូវបានប្តូរដោយ ' + s.email + ' (តាមរយៈ Google sign-in)');
+      await saveAdminKeyFile(newKey);
+      scheduleBackup('admin-key.json');
+      try { await clearAdminLockout(getClientIp(req)); } catch (e) {}
+      await addNotification('security', s.email, '🗝️ Admin Key ត្រូវបានប្តូរ · Admin Key changed', 'Admin Key ត្រូវបានប្តូរដោយ ' + s.email + ' (តាមរយៈ Google sign-in)');
       return sendJSON(res, 200, { ok: true });
     }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
     return;
@@ -6110,11 +6374,11 @@ function apiRoute(req, res, urlPath) {
   // every stored key for one provider and returns per-key status
   // (ok/blocked/error/unknown) for the Admin app's green/red/yellow dots.
   if (req.method === 'GET' && urlPath === '/api/admin/keys/status') {
-    const a = adminKeyOk(req);
+    const a = await adminKeyOk(req);
     if (!a.ok) return sendJSON(res, 200, { ok: false, error: a.error });
     const provider = normProvider(new URL(req.url, 'http://localhost').searchParams.get('provider') || '');
     if (!KNOWN_KEY_PROVIDERS.includes(provider)) return sendJSON(res, 200, { ok: false, error: 'Provider មិនស្គាល់ទេ' });
-    const rec = loadAdminKeys()[provider];
+    const rec = (await loadAdminKeys())[provider];
     const list = rec && Array.isArray(rec.keys) ? rec.keys : [];
     (async () => {
       const results = [];
@@ -6129,17 +6393,17 @@ function apiRoute(req, res, urlPath) {
   // POST /api/admin/providers — {mode:'image'|'video'|'song', provider, model}
   // — admin key required. Sets the active provider/model for one mode.
   if (req.method === 'POST' && urlPath === '/api/admin/providers') {
-    const a = adminKeyOk(req);
+    const a = await adminKeyOk(req);
     if (!a.ok) return sendJSON(res, 200, { ok: false, error: a.error });
-    readJSONBody(req, 64 * 1024).then((body) => {
+    readJSONBody(req, 64 * 1024).then(async (body) => {
       const mode = typeof body.mode === 'string' ? body.mode.trim().toLowerCase() : '';
       if (!['image', 'video', 'song'].includes(mode)) return sendJSON(res, 200, { ok: false, error: 'Mode មិនត្រឹមត្រូវទេ' });
       const provider = normProvider(body && body.provider);
       if (!provider) return sendJSON(res, 200, { ok: false, error: 'សូមជ្រើស provider' });
       const model = typeof body.model === 'string' ? body.model.trim().slice(0, 100) : '';
-      const cur = loadSettings();
+      const cur = await loadSettings();
       cur.providers[mode] = { provider, model };
-      const saved = saveSettings(cur, cur);
+      const saved = await saveSettings(cur, cur);
       return sendJSON(res, 200, { ok: true, providers: saved.providers });
     }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
     return;
@@ -6148,7 +6412,7 @@ function apiRoute(req, res, urlPath) {
   // reads it to know which provider/model the admin set for each mode.
   // A mode is null when the admin has not set it yet.
   if (req.method === 'GET' && urlPath === '/api/admin/providers') {
-    const s = loadSettings();
+    const s = await loadSettings();
     return sendJSON(res, 200, { ok: true, providers: s.providers || { image: null, video: null, song: null } });
   }
   // GET /api/public/credit-history?email=... — PUBLIC. The user's own
@@ -6157,8 +6421,7 @@ function apiRoute(req, res, urlPath) {
   if (req.method === 'GET' && urlPath === '/api/public/credit-history') {
     const email = normEmail(new URL(req.url, 'http://localhost').searchParams.get('email') || '');
     if (!email) return sendJSON(res, 200, { ok: false, error: 'សូមដាក់ Gmail' });
-    let arr = [];
-    try { const j = JSON.parse(fs.readFileSync(GRANTS_FILE, 'utf8')); if (Array.isArray(j)) arr = j; } catch (e) {}
+    const arr = await loadGrants();
     const mine = arr.filter((g) => g && typeof g.email === 'string' && g.email.toLowerCase() === email).slice(-100).reverse();
     return sendJSON(res, 200, { ok: true, email, history: mine.map((g) => ({ credits: numOr(g.credits, 0), songCredits: numOr(g.songCredits, 0), note: typeof g.note === 'string' ? g.note : '', at: g.at || '' })) });
   }
@@ -6168,8 +6431,8 @@ function apiRoute(req, res, urlPath) {
   if (req.method === 'GET' && urlPath === '/api/public/history') {
     const email = normEmail(new URL(req.url, 'http://localhost').searchParams.get('email') || '');
     if (!email) return sendJSON(res, 200, { ok: false, error: 'សូមដាក់ Gmail' });
-    const h = loadHistory();
-    const tombs = loadDeletedItems();
+    const h = await loadHistory();
+    const tombs = await loadDeletedItems();
     const arr = (Array.isArray(h[email]) ? h[email] : []).filter((it) => { const k = histKey(it); return k && !tombs.history[k]; });
     return sendJSON(res, 200, { ok: true, email, items: arr.slice(0, 300) });
   }
@@ -6182,15 +6445,12 @@ function apiRoute(req, res, urlPath) {
       const email = normEmail(body && body.email);
       if (!email) return sendJSON(res, 200, { ok: false, error: 'សូមដាក់ Gmail' });
       if (!body || !Array.isArray(body.items)) return sendJSON(res, 200, { ok: false, error: 'ទិន្នន័យមិនត្រឹមត្រូវទេ' });
-      // Unthrottled merge (tombstone fix 2026-11-18): the throttled merge
-      // is skipped when it ran <60s ago, so a sync could re-save STALE
-      // local history (still holding GitHub-deleted items) back to GitHub
-      // and undo the deletion before the merge ever runs. Await the full
-      // merge here so local is fresh from GitHub before the union below.
-      await ghMergePublicHistoryFromGitHub();
-      const tombs = loadDeletedItems();
+      // Supabase is the source of truth: loadHistory() below already
+      // reads fresh state, so no merge is needed before the union.
+      // Tombstones still guard against resurrecting deleted items.
+      const tombs = await loadDeletedItems();
       let tombsChanged = false;
-      const h = loadHistory();
+      const h = await loadHistory();
       const byKey = {};
       const stored = Array.isArray(h[email]) ? h[email] : [];
       for (const it of stored) {
@@ -6237,16 +6497,13 @@ function apiRoute(req, res, urlPath) {
         delete clean.thumb;
         const prev = byKey[k];
         if (!prev) {
-          // Resurrection guard (tombstone fix 2026-11-18): the merge only
-          // tombstones items it OBSERVES being dropped from local storage.
-          // After a restart, ghRestoreAll already makes local == GitHub,
-          // so the merge never sees the deleted items — they live only on
-          // the phone. An incoming item NOT already stored whose timestamp
-          // is older than the 5-minute grace was deleted on GitHub (or
-          // never existed there): a genuinely new item is synced within
-          // minutes of creation. Refuse it and tombstone it so it can
-          // never come back (and so the save below cannot push it back
-          // to GitHub and undo the deletion).
+          // Resurrection guard (tombstone fix 2026-11-18): a deleted
+          // item lives only on the phone now — Supabase is the source of
+          // truth, so a deletion there is final. An incoming item NOT
+          // already stored whose timestamp is older than the 5-minute
+          // grace was deleted (or never existed there): a genuinely new
+          // item is synced within minutes of creation. Refuse it and
+          // tombstone it so it can never come back.
           const ts = numOr(clean.ts, 0);
           const graceMs = 5 * 60 * 1000;
           if (!Number.isFinite(ts) || ts <= 0 || Date.now() - ts >= graceMs) {
@@ -6258,12 +6515,12 @@ function apiRoute(req, res, urlPath) {
       }
       const merged = Object.values(byKey).sort((a, b) => numOr(b.ts, 0) - numOr(a.ts, 0)).slice(0, 300);
       h[email] = merged;
-      saveHistory(h);
+      await saveHistory(h);
       // Critical write: confirm history.json is on GitHub BEFORE
       // returning success, so a restart cannot lose History already
       // reported as saved.
-      await ghFlushFile(HISTORY_FILE);
-      if (tombsChanged) { saveDeletedItems(tombs); await ghFlushFile(DELETED_ITEMS_FILE); }
+      scheduleBackup('history.json');
+      if (tombsChanged) { await saveDeletedItems(tombs); scheduleBackup('deleted-items.json'); }
       return sendJSON(res, 200, { ok: true, email, items: merged });
     }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
     return;
@@ -6272,14 +6529,14 @@ function apiRoute(req, res, urlPath) {
   // ---- Auto Update Version New (endpoints) ----
   // GET /api/admin/updates — admin key required. Lists updates + settings.
   if (req.method === 'GET' && urlPath === '/api/admin/updates') {
-    const a = adminKeyOk(req);
+    const a = await adminKeyOk(req);
     if (!a.ok) return sendJSON(res, 200, { ok: false, error: a.error });
-    const u = loadUpdates();
+    const u = await loadUpdates();
     return sendJSON(res, 200, { ok: true, updates: u.updates, settings: u.settings, lastCheckAt: u.lastCheckAt, lastCheckResult: u.lastCheckResult, approvedModels: u.approvedModels, blockedModels: u.blockedModels });
   }
   // POST /api/admin/updates/check — admin key required. Run a check now.
   if (req.method === 'POST' && urlPath === '/api/admin/updates/check') {
-    const a = adminKeyOk(req);
+    const a = await adminKeyOk(req);
     if (!a.ok) return sendJSON(res, 200, { ok: false, error: a.error });
     (async () => {
       const n = await autoUpdateCheckModels();
@@ -6289,26 +6546,26 @@ function apiRoute(req, res, urlPath) {
   }
   // POST /api/admin/updates/approve — {updateId} — admin key required.
   if (req.method === 'POST' && urlPath === '/api/admin/updates/approve') {
-    const a = adminKeyOk(req);
+    const a = await adminKeyOk(req);
     if (!a.ok) return sendJSON(res, 200, { ok: false, error: a.error });
     readJSONBody(req, 64 * 1024).then(async (body) => {
       const id = typeof body.updateId === 'string' ? body.updateId.trim() : '';
-      const u = loadUpdates();
+      const u = await loadUpdates();
       const rec = u.updates.find((x) => x.id === id);
       if (!rec) return sendJSON(res, 200, { ok: false, error: 'រក update នេះមិនឃើញទេ' });
       const ok2 = await autoUpdateApplyUpdate(rec, 'admin');
-      return sendJSON(res, 200, { ok: ok2, updates: loadUpdates().updates });
+      return sendJSON(res, 200, { ok: ok2, updates: (await loadUpdates()).updates });
     }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
     return;
   }
   // POST /api/admin/updates/reject — {updateId} — admin key required.
   // "Don't update": blocks the model so it is never re-detected.
   if (req.method === 'POST' && urlPath === '/api/admin/updates/reject') {
-    const a = adminKeyOk(req);
+    const a = await adminKeyOk(req);
     if (!a.ok) return sendJSON(res, 200, { ok: false, error: a.error });
     readJSONBody(req, 64 * 1024).then(async (body) => {
       const id = typeof body.updateId === 'string' ? body.updateId.trim() : '';
-      const u = loadUpdates();
+      const u = await loadUpdates();
       const rec = u.updates.find((x) => x.id === id);
       if (!rec) return sendJSON(res, 200, { ok: false, error: 'រក update នេះមិនឃើញទេ' });
       if (rec.status === 'pending') {
@@ -6317,25 +6574,25 @@ function apiRoute(req, res, urlPath) {
         rec.decidedBy = 'admin';
         const key = rec.provider + ':' + rec.model;
         if (!u.blockedModels.includes(key)) u.blockedModels.push(key);
-        saveUpdates(u);
-        await ghFlushFile(UPDATES_FILE);
-        addNotification('update', '', '🚫 មិន Update · ' + rec.provider + ' — ' + rec.model, 'Admin ដាក់ "មិនចាំបាច់ Update" សម្រាប់ model ' + rec.model + '។ វានឹងមិនលេចឡើងម្តងទៀតទេ។');
+        await saveUpdates(u);
+        scheduleBackup('updates.json');
+        await addNotification('update', '', '🚫 មិន Update · ' + rec.provider + ' — ' + rec.model, 'Admin ដាក់ "មិនចាំបាច់ Update" សម្រាប់ model ' + rec.model + '។ វានឹងមិនលេចឡើងម្តងទៀតទេ។');
       }
-      return sendJSON(res, 200, { ok: true, updates: loadUpdates().updates });
+      return sendJSON(res, 200, { ok: true, updates: (await loadUpdates()).updates });
     }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
     return;
   }
   // POST /api/admin/updates/settings — {autoApply, autoApplyHours, checkIntervalHours} — admin key required.
   if (req.method === 'POST' && urlPath === '/api/admin/updates/settings') {
-    const a = adminKeyOk(req);
+    const a = await adminKeyOk(req);
     if (!a.ok) return sendJSON(res, 200, { ok: false, error: a.error });
     readJSONBody(req, 64 * 1024).then(async (body) => {
-      const u = loadUpdates();
+      const u = await loadUpdates();
       if (typeof body.autoApply === 'boolean') u.settings.autoApply = body.autoApply;
       if (typeof body.autoApplyHours === 'number' && body.autoApplyHours >= 1 && body.autoApplyHours <= 720) u.settings.autoApplyHours = Math.round(body.autoApplyHours);
       if (typeof body.checkIntervalHours === 'number' && body.checkIntervalHours >= 1 && body.checkIntervalHours <= 168) u.settings.checkIntervalHours = Math.round(body.checkIntervalHours);
-      saveUpdates(u);
-      await ghFlushFile(UPDATES_FILE);
+      await saveUpdates(u);
+      scheduleBackup('updates.json');
       return sendJSON(res, 200, { ok: true, settings: u.settings });
     }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
     return;
@@ -6344,22 +6601,22 @@ function apiRoute(req, res, urlPath) {
   // required. Manually register a new model (e.g. Suno v6.5 announced on
   // their blog — no API to detect it). Creates a pending update.
   if (req.method === 'POST' && urlPath === '/api/admin/updates/add') {
-    const a = adminKeyOk(req);
+    const a = await adminKeyOk(req);
     if (!a.ok) return sendJSON(res, 200, { ok: false, error: a.error });
     readJSONBody(req, 64 * 1024).then(async (body) => {
       const provider = normProvider(body && body.provider);
       const model = typeof body.model === 'string' ? body.model.trim().slice(0, 100) : '';
       if (!provider || !model) return sendJSON(res, 200, { ok: false, error: 'សូមដាក់ provider និង model' });
-      const u = loadUpdates();
+      const u = await loadUpdates();
       if (!Array.isArray(u.knownModels[provider])) u.knownModels[provider] = [];
       if (!u.knownModels[provider].includes(model)) u.knownModels[provider].push(model);
       const dup = u.updates.find((x) => x.provider === provider && x.model === model && x.status === 'pending');
       if (dup) return sendJSON(res, 200, { ok: false, error: 'Model នេះមានក្នុងបញ្ជីរង់ចាំហើយ' });
       const rec = { id: newUpdateId(), provider, model, status: 'pending', source: 'manual', detectedAt: new Date().toISOString(), decidedAt: null, decidedBy: '', note: typeof body.note === 'string' ? body.note.slice(0, 200) : '' };
       u.updates.unshift(rec);
-      saveUpdates(u);
-      await ghFlushFile(UPDATES_FILE);
-      addNotification('update', '', '🆕 Model ថ្មី (Manual) · ' + provider + ' — ' + model, 'Admin បន្ថែម model ថ្មី៖ ' + model + '។ សូម Approve ឬដាក់ "មិនចាំបាច់ Update"។');
+      await saveUpdates(u);
+      scheduleBackup('updates.json');
+      await addNotification('update', '', '🆕 Model ថ្មី (Manual) · ' + provider + ' — ' + model, 'Admin បន្ថែម model ថ្មី៖ ' + model + '។ សូម Approve ឬដាក់ "មិនចាំបាច់ Update"។');
       return sendJSON(res, 200, { ok: true, updates: u.updates });
     }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
     return;
@@ -6368,7 +6625,7 @@ function apiRoute(req, res, urlPath) {
   // reads it to show the approved model list; models approved within the
   // last 7 days are flagged "new" so the website can show a New badge.
   if (req.method === 'GET' && urlPath === '/api/public/models') {
-    const u = loadUpdates();
+    const u = await loadUpdates();
     const weekAgo = Date.now() - 7 * 24 * 3600 * 1000;
     const newModels = [];
     for (const r of u.updates) {
@@ -6415,20 +6672,18 @@ function apiRoute(req, res, urlPath) {
     }
     return out;
   }
-  function loadPackages() {
-    try { const j = JSON.parse(fs.readFileSync(PACKAGES_FILE, 'utf8')); return cleanPackages(j); } catch (e) {}
-    return cleanPackages(null);
+  async function loadPackages() {
+    try { const j = await loadKvDoc('packages', null); return cleanPackages(j); } catch (e) {}
+      return cleanPackages(null);
   }
-  function savePackages(map) {
-    try { fs.mkdirSync(DATA_DIR, { recursive: true }); } catch (e) {}
+  async function savePackages(map) {
     const out = cleanPackages(map);
-    fs.writeFileSync(PACKAGES_FILE, JSON.stringify(out, null, 2));
-    ghPersistFile(PACKAGES_FILE);
-    return out;
+      await saveKvDoc('packages', out, 'packages.json');
+      return out;
   }
   // Public view: credits/durations exposed as mediaCredits/songCredits/durationDays.
-  function pubPackages() {
-    const map = loadPackages();
+  async function pubPackages() {
+    const map = await loadPackages();
     return PACKAGE_ORDER.map((id) => {
       const p = map[id];
       return { id: p.id, price: p.price, originalPrice: p.originalPrice, mediaCredits: p.credits, songCredits: p.songCredits, durationDays: p.days };
@@ -6438,19 +6693,19 @@ function apiRoute(req, res, urlPath) {
   // from here (discount % = round((originalPrice-price)/originalPrice*100)
   // when price < originalPrice, computed by the client).
   if (req.method === 'GET' && urlPath === '/api/public/packages') {
-    return sendJSON(res, 200, { ok: true, packages: pubPackages() });
+    return sendJSON(res, 200, { ok: true, packages: await pubPackages() });
   }
   // POST /api/admin/packages — {packages:[{id, price, originalPrice?}]}
   // — admin key required. Edits price and/or originalPrice per package id.
   // Unknown ids are rejected; price/originalPrice must be >= 0. Returns the
   // full updated list.
   if (req.method === 'POST' && urlPath === '/api/admin/packages') {
-    const a = adminKeyOk(req);
+    const a = await adminKeyOk(req);
     if (!a.ok) return sendJSON(res, 200, { ok: false, error: a.error });
-    readJSONBody(req, 64 * 1024).then((body) => {
+    readJSONBody(req, 64 * 1024).then(async (body) => {
       const list = body && Array.isArray(body.packages) ? body.packages : null;
       if (!list || !list.length) return sendJSON(res, 200, { ok: false, error: 'សូមដាក់កញ្ចប់ដែលចង់កែ' });
-      const map = loadPackages();
+      const map = await loadPackages();
       for (const item of list) {
         const id = item && typeof item.id === 'string' ? item.id.trim() : '';
         if (!PACKAGE_ORDER.includes(id)) return sendJSON(res, 200, { ok: false, error: 'កញ្ចប់នេះមិនស្គាល់ទេ: ' + (id || '?') });
@@ -6465,20 +6720,18 @@ function apiRoute(req, res, urlPath) {
           map[id].originalPrice = op;
         }
       }
-      savePackages(map);
-      return sendJSON(res, 200, { ok: true, packages: pubPackages() });
+      await savePackages(map);
+      return sendJSON(res, 200, { ok: true, packages: await pubPackages() });
     }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
     return;
   }
   const PURCHASE_REQUESTS_FILE = path.join(DATA_DIR, 'purchase-requests.json');
-  function loadPurchaseRequests() {
-    try { const j = JSON.parse(fs.readFileSync(PURCHASE_REQUESTS_FILE, 'utf8')); if (Array.isArray(j)) return j; } catch (e) {}
-    return [];
+  async function loadPurchaseRequests() {
+    const j = await loadKvDoc('purchase-requests', []);
+      return Array.isArray(j) ? j : [];
   }
-  function savePurchaseRequests(arr) {
-    try { fs.mkdirSync(DATA_DIR, { recursive: true }); } catch (e) {}
-    fs.writeFileSync(PURCHASE_REQUESTS_FILE, JSON.stringify(arr, null, 2));
-    ghPersistFile(PURCHASE_REQUESTS_FILE);
+  async function savePurchaseRequests(arr) {
+    await saveKvDoc('purchase-requests', arr, 'purchase-requests.json');
   }
   function newPurchaseId() {
     return 'pr_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
@@ -6486,14 +6739,14 @@ function apiRoute(req, res, urlPath) {
   // POST /api/admin/purchase-request — PUBLIC (no admin key). The website
   // sends a buy request; credits are granted ONLY after the admin approves.
   if (req.method === 'POST' && urlPath === '/api/admin/purchase-request') {
-    readJSONBody(req, 64 * 1024).then((body) => {
+    readJSONBody(req, 64 * 1024).then(async (body) => {
       const email = normEmail(body && body.email);
       if (!email) return sendJSON(res, 200, { ok: false, error: 'សូមដាក់ Gmail ត្រឹមត្រូវ' });
       const packageId = typeof body.packageId === 'string' ? body.packageId.trim() : '';
-      const pkg = loadPackages()[packageId];
+      const pkg = (await loadPackages())[packageId];
       if (!pkg) return sendJSON(res, 200, { ok: false, error: 'កញ្ចប់នេះមិនស្គាល់ទេ' });
       const now = new Date().toISOString();
-      const reqs = loadPurchaseRequests();
+      const reqs = await loadPurchaseRequests();
       const r = {
         id: newPurchaseId(), email, packageId,
         plan: typeof body.plan === 'string' ? body.plan.slice(0, 50) : packageId,
@@ -6503,11 +6756,11 @@ function apiRoute(req, res, urlPath) {
         status: 'pending', createdAt: now, updatedAt: now,
       };
       reqs.push(r);
-      savePurchaseRequests(reqs);
-      const _pu = loadUsers()[email];
+      await savePurchaseRequests(reqs);
+      const _pu = (await loadUsers())[email];
       const _puid = _pu && _pu.id ? _pu.id : '—';
       const _pd = pkgDisplay(pkg);
-      addNotification('purchase-request', email, '🛒 សំណើទិញកញ្ចប់ · Purchase request', pkgNotifText(pkg, email, _puid), { extra: { pkg: packageId, pkgName: _pd.pkgName, priceText: _pd.priceText, creditText: _pd.creditText, buyerId: _puid }, telegramHtml: pkgNotifTelegram('🛒 សំណើទិញកញ្ចប់ · Purchase request', pkg, email, _puid) });
+      await addNotification('purchase-request', email, '🛒 សំណើទិញកញ្ចប់ · Purchase request', pkgNotifText(pkg, email, _puid), { extra: { pkg: packageId, pkgName: _pd.pkgName, priceText: _pd.priceText, creditText: _pd.creditText, buyerId: _puid }, telegramHtml: pkgNotifTelegram('🛒 សំណើទិញកញ្ចប់ · Purchase request', pkg, email, _puid) });
       return sendJSON(res, 200, { ok: true, request: r });
     }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
     return;
@@ -6515,12 +6768,12 @@ function apiRoute(req, res, urlPath) {
   // GET /api/admin/purchase-requests?status=pending|approved|rejected|all
   // — admin key required. Pending first, then newest first.
   if (req.method === 'GET' && urlPath === '/api/admin/purchase-requests') {
-    const a = adminKeyOk(req);
+    const a = await adminKeyOk(req);
     if (!a.ok) return sendJSON(res, 200, { ok: false, error: a.error });
     const status = (new URL(req.url, 'http://localhost').searchParams.get('status') || 'all').trim().toLowerCase();
-    const reqs = loadPurchaseRequests();
+    const reqs = await loadPurchaseRequests();
     const order = { pending: 0, approved: 1, rejected: 2 };
-    const _users = loadUsers();
+    const _users = await loadUsers();
     const list = reqs
       .filter((r) => status === 'all' || r.status === status)
       .sort((x, y) => ((order[x.status] ?? 3) - (order[y.status] ?? 3)) || String(y.createdAt || '').localeCompare(String(x.createdAt || '')))
@@ -6533,17 +6786,17 @@ function apiRoute(req, res, urlPath) {
   // POST /api/admin/purchase-request/approve — {id} — admin key required.
   // Grants the package credits to the user and marks the request approved.
   if (req.method === 'POST' && urlPath === '/api/admin/purchase-request/approve') {
-    const a = adminKeyOk(req);
+    const a = await adminKeyOk(req);
     if (!a.ok) return sendJSON(res, 200, { ok: false, error: a.error });
     readJSONBody(req, 64 * 1024).then(async (body) => {
       const id = typeof body.id === 'string' ? body.id.trim() : '';
-      const reqs = loadPurchaseRequests();
+      const reqs = await loadPurchaseRequests();
       const r = reqs.find((x) => x.id === id);
       if (!r) return sendJSON(res, 200, { ok: false, error: 'រកសំណើនេះមិនឃើញទេ' });
       if (r.status !== 'pending') return sendJSON(res, 200, { ok: false, error: 'សំណើនេះបានសម្រេចរួចហើយ' });
-      const pkg = loadPackages()[r.packageId];
+      const pkg = (await loadPackages())[r.packageId];
       if (!pkg) return sendJSON(res, 200, { ok: false, error: 'កញ្ចប់នេះមិនស្គាល់ទេ' });
-      const users = loadUsers();
+      const users = await loadUsers();
       const u = users[r.email];
       if (!u) return sendJSON(res, 200, { ok: false, error: 'រកអ្នកប្រើនេះមិនឃើញទេ' });
       const now = new Date().toISOString();
@@ -6556,41 +6809,41 @@ function apiRoute(req, res, urlPath) {
       // balance immediately, by package price tier. Earn money is NOT
       // spendable — withdraw-only, it accumulates.
       let _cb = 0;
-      if (monetizationEnabled()) {
+      if (await monetizationEnabled()) {
         _cb = monetizationCashbackForPrice(pkg.price);
         if (_cb > 0) {
           u.earnBalance = walletMoney(walletEarnBalance(u) + _cb);
-          monetizationRecordCashback(r.email, _cb);
+          await monetizationRecordCashback(r.email, _cb);
         }
       }
       u.updatedAt = now;
-      saveUsers(users);
-      logGrant({ email: r.email, credits: pkg.credits, songCredits: pkg.songCredits, note: 'purchase:' + r.packageId, at: now });
+      await saveUsers(users);
+      await logGrant({ email: r.email, credits: pkg.credits, songCredits: pkg.songCredits, note: 'purchase:' + r.packageId, at: now });
       r.status = 'approved';
       r.decidedAt = now;
       r.updatedAt = now;
-      savePurchaseRequests(reqs);
+      await savePurchaseRequests(reqs);
       // Critical writes: confirm BOTH the granted credits and the
       // approved request are on GitHub BEFORE returning success, so a
       // restart cannot lose a purchase the Admin app already approved.
-      await ghFlushFile(USERS_FILE);
-      await ghFlushFile(PURCHASE_REQUESTS_FILE);
+      scheduleBackup('users.json');
+      scheduleBackup('purchase-requests.json');
       const _pd2 = pkgDisplay(pkg);
-      addNotification('purchase-approved', r.email, '✅ បានអនុម័ត · Purchase approved', pkgNotifText(pkg, r.email, u.id || '—'), { extra: { pkg: r.packageId, pkgName: _pd2.pkgName, priceText: _pd2.priceText, creditText: _pd2.creditText, buyerId: u.id || '—', decision: 'approved' }, telegramHtml: pkgNotifTelegram('✅ បានអនុម័ត · Purchase approved', pkg, r.email, u.id || '—') });
-      if (_cb > 0) addNotification('grant', r.email, '💰 Cashback · បានលុយត្រឡប់វិញ', 'ទិញកញ្ចប់ ' + r.packageId + ' ($' + walletMoney(pkg.price).toFixed(2) + ') បាន Cashback $' + _cb.toFixed(2) + ' ចូល Earn Balance (នៅសល់ $' + u.earnBalance.toFixed(2) + ')', { extra: { cashback: _cb, pkg: r.packageId, balance: u.balance, earnBalance: u.earnBalance, buyerId: u.id || '—' } });
-      markPurchaseRequestDecided(r.email, r.packageId, 'approved', now);
-      return sendJSON(res, 200, { ok: true, request: r, user: pubUser(u), cashback: _cb });
+      await addNotification('purchase-approved', r.email, '✅ បានអនុម័ត · Purchase approved', pkgNotifText(pkg, r.email, u.id || '—'), { extra: { pkg: r.packageId, pkgName: _pd2.pkgName, priceText: _pd2.priceText, creditText: _pd2.creditText, buyerId: u.id || '—', decision: 'approved' }, telegramHtml: pkgNotifTelegram('✅ បានអនុម័ត · Purchase approved', pkg, r.email, u.id || '—') });
+      if (_cb > 0) await addNotification('grant', r.email, '💰 Cashback · បានលុយត្រឡប់វិញ', 'ទិញកញ្ចប់ ' + r.packageId + ' ($' + walletMoney(pkg.price).toFixed(2) + ') បាន Cashback $' + _cb.toFixed(2) + ' ចូល Earn Balance (នៅសល់ $' + u.earnBalance.toFixed(2) + ')', { extra: { cashback: _cb, pkg: r.packageId, balance: u.balance, earnBalance: u.earnBalance, buyerId: u.id || '—' } });
+      await markPurchaseRequestDecided(r.email, r.packageId, 'approved', now);
+      return sendJSON(res, 200, { ok: true, request: r, user: await pubUser(u), cashback: _cb });
     }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
     return;
   }
   // POST /api/admin/purchase-request/reject — {id} — admin key required.
   // Marks the request rejected; no credits are granted.
   if (req.method === 'POST' && urlPath === '/api/admin/purchase-request/reject') {
-    const a = adminKeyOk(req);
+    const a = await adminKeyOk(req);
     if (!a.ok) return sendJSON(res, 200, { ok: false, error: a.error });
-    readJSONBody(req, 64 * 1024).then((body) => {
+    readJSONBody(req, 64 * 1024).then(async (body) => {
       const id = typeof body.id === 'string' ? body.id.trim() : '';
-      const reqs = loadPurchaseRequests();
+      const reqs = await loadPurchaseRequests();
       const r = reqs.find((x) => x.id === id);
       if (!r) return sendJSON(res, 200, { ok: false, error: 'រកសំណើនេះមិនឃើញទេ' });
       if (r.status !== 'pending') return sendJSON(res, 200, { ok: false, error: 'សំណើនេះបានសម្រេចរួចហើយ' });
@@ -6598,13 +6851,13 @@ function apiRoute(req, res, urlPath) {
       r.status = 'rejected';
       r.decidedAt = now;
       r.updatedAt = now;
-      savePurchaseRequests(reqs);
-      const _ru = loadUsers()[r.email];
+      await savePurchaseRequests(reqs);
+      const _ru = (await loadUsers())[r.email];
       const _ruid = _ru && _ru.id ? _ru.id : '—';
-      const _pkgR = loadPackages()[r.packageId];
+      const _pkgR = (await loadPackages())[r.packageId];
       const _pd3 = pkgDisplay(_pkgR);
-      addNotification('purchase-rejected', r.email, '❌ បដិសេធ · Purchase rejected', pkgNotifText(_pkgR, r.email, _ruid), { extra: { pkg: r.packageId, pkgName: _pd3.pkgName, priceText: _pd3.priceText, creditText: _pd3.creditText, buyerId: _ruid, decision: 'rejected' }, telegramHtml: pkgNotifTelegram('❌ បដិសេធ · Purchase rejected', _pkgR, r.email, _ruid) });
-      markPurchaseRequestDecided(r.email, r.packageId, 'rejected', now);
+      await addNotification('purchase-rejected', r.email, '❌ បដិសេធ · Purchase rejected', pkgNotifText(_pkgR, r.email, _ruid), { extra: { pkg: r.packageId, pkgName: _pd3.pkgName, priceText: _pd3.priceText, creditText: _pd3.creditText, buyerId: _ruid, decision: 'rejected' }, telegramHtml: pkgNotifTelegram('❌ បដិសេធ · Purchase rejected', _pkgR, r.email, _ruid) });
+      await markPurchaseRequestDecided(r.email, r.packageId, 'rejected', now);
       return sendJSON(res, 200, { ok: true, request: r });
     }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
     return;
@@ -6615,7 +6868,7 @@ function apiRoute(req, res, urlPath) {
   if (req.method === 'GET' && urlPath === '/api/public/wallet/balance') {
     const email = normEmail(new URL(req.url, 'http://localhost').searchParams.get('email') || '');
     if (!email) return sendJSON(res, 200, { ok: false, error: 'សូមដាក់ Gmail ត្រឹមត្រូវ' });
-    const u = loadUsers()[email];
+    const u = (await loadUsers())[email];
     if (!u) return sendJSON(res, 200, { ok: false, error: 'រក Gmail នេះមិនឃើញទេ · No account with this Gmail' });
     return sendJSON(res, 200, { ok: true, email, balance: walletBalance(u), earnBalance: walletEarnBalance(u) });
   }
@@ -6627,23 +6880,23 @@ function apiRoute(req, res, urlPath) {
     readJSONBody(req, 64 * 1024).then(async (body) => {
       const email = normEmail(body && body.email);
       if (!email) return sendJSON(res, 200, { ok: false, error: 'សូមដាក់ Gmail ត្រឹមត្រូវ' });
-      const users = loadUsers();
+      const users = await loadUsers();
       const u = users[email];
       if (!u) return sendJSON(res, 200, { ok: false, error: 'រក Gmail នេះមិនឃើញទេ — សូម Sign-up ជាមុនសិន · No account with this Gmail, please sign up first' });
       const amount = walletMoney(body && body.amount);
       if (!Number.isFinite(amount) || amount < WALLET_MIN_TOPUP) return sendJSON(res, 200, { ok: false, error: 'ចំនួនបញ្ចូលយ៉ាងហោចណាស់ $' + WALLET_MIN_TOPUP.toFixed(2) + ' · Minimum top-up is $' + WALLET_MIN_TOPUP.toFixed(2) });
       const method = (body && typeof body.method === 'string' && body.method.trim().toLowerCase() === 'foreign') ? 'foreign' : 'khmer';
       const now = new Date().toISOString();
-      const reqs = loadWalletRequests();
+      const reqs = await loadWalletRequests();
       const r = {
         id: newWalletRequestId(), type: 'topup', email, amount, method,
         receiptUrl: typeof body.receiptUrl === 'string' ? body.receiptUrl.trim().slice(0, 500) : '',
         status: 'pending', createdAt: now, updatedAt: now,
       };
       reqs.push(r);
-      saveWalletRequests(reqs);
-      await ghFlushFile(WALLET_REQUESTS_FILE);
-      addNotification('purchase-request', email, '💰 សំណើបញ្ចូលលុយ · Wallet top-up request', (u.name || email) + ' (' + email + ') · ID: ' + (u.id || '—') + ' ស្នើបញ្ចូល $' + amount.toFixed(2) + ' (' + (method === 'foreign' ? 'បរទេស · Foreign' : 'ខ្មែរ · Khmer') + ')', { extra: { walletRequestId: r.id, type: 'topup', amount, method, buyerId: u.id || '—' } });
+      await saveWalletRequests(reqs);
+      scheduleBackup('wallet-requests.json');
+      await addNotification('purchase-request', email, '💰 សំណើបញ្ចូលលុយ · Wallet top-up request', (u.name || email) + ' (' + email + ') · ID: ' + (u.id || '—') + ' ស្នើបញ្ចូល $' + amount.toFixed(2) + ' (' + (method === 'foreign' ? 'បរទេស · Foreign' : 'ខ្មែរ · Khmer') + ')', { extra: { walletRequestId: r.id, type: 'topup', amount, method, buyerId: u.id || '—' } });
       return sendJSON(res, 200, { ok: true, request: walletRequestPublic(r, users) });
     }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
     return;
@@ -6657,7 +6910,7 @@ function apiRoute(req, res, urlPath) {
     readJSONBody(req, 64 * 1024).then(async (body) => {
       const email = normEmail(body && body.email);
       if (!email) return sendJSON(res, 200, { ok: false, error: 'សូមដាក់ Gmail ត្រឹមត្រូវ' });
-      const users = loadUsers();
+      const users = await loadUsers();
       const u = users[email];
       if (!u) return sendJSON(res, 200, { ok: false, error: 'រក Gmail នេះមិនឃើញទេ — សូម Sign-up ជាមុនសិន · No account with this Gmail, please sign up first' });
       const amount = walletMoney(body && body.amount);
@@ -6670,7 +6923,7 @@ function apiRoute(req, res, urlPath) {
       const balName = source === 'earnings' ? 'Earn Balance' : 'Wallet';
       if (amount > bal) return sendJSON(res, 200, { ok: false, error: 'លុយក្នុង ' + balName + ' មិនគ្រប់ទេ (នៅសល់ $' + bal.toFixed(2) + ') · Insufficient ' + balName + ' balance ($' + bal.toFixed(2) + ' left)', balance: bal, earnBalance: walletEarnBalance(u) });
       const now = new Date().toISOString();
-      const reqs = loadWalletRequests();
+      const reqs = await loadWalletRequests();
       // userId (owner order 2026-11-18): stored on the request so the
       // Admin sees WHO asked, even if the Gmail is ever renamed. The
       // website sends its account userId; when it is missing, fall back
@@ -6685,13 +6938,13 @@ function apiRoute(req, res, urlPath) {
         status: 'pending', createdAt: now, updatedAt: now,
       };
       reqs.push(r);
-      saveWalletRequests(reqs);
-      await ghFlushFile(WALLET_REQUESTS_FILE);
+      await saveWalletRequests(reqs);
+      scheduleBackup('wallet-requests.json');
       // Bell + Telegram (addNotification kind 'purchase-request' sends
       // both, same path as top-up/purchase requests): amount, Gmail,
       // User ID, fee, net amount. Nothing is deducted yet — the Admin
       // deducts (amount + fee) only when approving.
-      addNotification('purchase-request', email, '💸 សំណើដកលុយ · Wallet withdraw request', (u.name || email) + ' (' + email + ') · User ID: ' + (r.userId || '—') + ' ស្នើដក $' + amount.toFixed(2) + ' ពី ' + balName + ' (ថ្លៃសេវា $' + fee.toFixed(2) + ' — ទទួលបាន $' + r.net.toFixed(2) + ' — សរុបកាត់ $' + r.total.toFixed(2) + ')', { extra: { walletRequestId: r.id, type: 'withdraw', amount, fee, total: r.total, net: r.net, source, buyerId: r.userId || '—', userId: r.userId || '' } });
+      await addNotification('purchase-request', email, '💸 សំណើដកលុយ · Wallet withdraw request', (u.name || email) + ' (' + email + ') · User ID: ' + (r.userId || '—') + ' ស្នើដក $' + amount.toFixed(2) + ' ពី ' + balName + ' (ថ្លៃសេវា $' + fee.toFixed(2) + ' — ទទួលបាន $' + r.net.toFixed(2) + ' — សរុបកាត់ $' + r.total.toFixed(2) + ')', { extra: { walletRequestId: r.id, type: 'withdraw', amount, fee, total: r.total, net: r.net, source, buyerId: r.userId || '—', userId: r.userId || '' } });
       return sendJSON(res, 200, { ok: true, request: walletRequestPublic(r, users), fee, net: r.net });
     }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹমត្រូវទេ', 'Bad request')));
     return;
@@ -6705,9 +6958,9 @@ function apiRoute(req, res, urlPath) {
       const email = normEmail(body && body.email);
       if (!email) return sendJSON(res, 200, { ok: false, error: 'សូមដាក់ Gmail ត្រឹមត្រូវ' });
       const packageId = typeof body.packageId === 'string' ? body.packageId.trim() : '';
-      const pkg = loadPackages()[packageId];
+      const pkg = (await loadPackages())[packageId];
       if (!pkg) return sendJSON(res, 200, { ok: false, error: 'កញ្ចប់នេះមិនស្គាល់ទេ' });
-      const users = loadUsers();
+      const users = await loadUsers();
       const u = users[email];
       if (!u) return sendJSON(res, 200, { ok: false, error: 'រក Gmail នេះមិនឃើញទេ — សូម Sign-up ជាមុនសិន · No account with this Gmail, please sign up first' });
       const price = walletMoney(pkg.price);
@@ -6724,21 +6977,21 @@ function apiRoute(req, res, urlPath) {
       // EARN balance immediately, by package price tier. Earn money is
       // NOT spendable — withdraw-only, it accumulates.
       let _cb = 0;
-      if (monetizationEnabled()) {
+      if (await monetizationEnabled()) {
         _cb = monetizationCashbackForPrice(price);
         if (_cb > 0) {
           u.earnBalance = walletMoney(walletEarnBalance(u) + _cb);
-          monetizationRecordCashback(email, _cb);
+          await monetizationRecordCashback(email, _cb);
         }
       }
       u.updatedAt = now;
-      saveUsers(users);
-      logGrant({ email, credits: pkg.credits, songCredits: pkg.songCredits, note: 'wallet-buy:' + packageId, at: now });
-      await ghFlushFile(USERS_FILE);
+      await saveUsers(users);
+      await logGrant({ email, credits: pkg.credits, songCredits: pkg.songCredits, note: 'wallet-buy:' + packageId, at: now });
+      scheduleBackup('users.json');
       const _pdw = pkgDisplay(pkg);
-      addNotification('purchase-approved', email, '✅ បានទិញកញ្ចប់ដោយ Wallet · Package bought with Wallet', pkgNotifText(pkg, email, u.id || '—') + ' — បង់ដោយ Wallet $' + price.toFixed(2) + ' (នៅសល់ $' + u.balance.toFixed(2) + ')', { extra: { pkg: packageId, pkgName: _pdw.pkgName, priceText: _pdw.priceText, creditText: _pdw.creditText, buyerId: u.id || '—', decision: 'approved', paidBy: 'wallet', price }, telegramHtml: pkgNotifTelegram('✅ បានទិញកញ្ចប់ដោយ Wallet · Package bought with Wallet', pkg, email, u.id || '—') });
-      if (_cb > 0) addNotification('grant', email, '💰 Cashback · បានលុយត្រឡប់វិញ', 'ទិញកញ្ចប់ ' + packageId + ' ($' + price.toFixed(2) + ') បាន Cashback $' + _cb.toFixed(2) + ' ចូល Earn Balance (នៅសល់ $' + u.earnBalance.toFixed(2) + ')', { extra: { cashback: _cb, pkg: packageId, balance: u.balance, earnBalance: u.earnBalance, buyerId: u.id || '—' } });
-      return sendJSON(res, 200, { ok: true, user: pubUser(u), package: packageId, price, balance: u.balance, cashback: _cb });
+      await addNotification('purchase-approved', email, '✅ បានទិញកញ្ចប់ដោយ Wallet · Package bought with Wallet', pkgNotifText(pkg, email, u.id || '—') + ' — បង់ដោយ Wallet $' + price.toFixed(2) + ' (នៅសល់ $' + u.balance.toFixed(2) + ')', { extra: { pkg: packageId, pkgName: _pdw.pkgName, priceText: _pdw.priceText, creditText: _pdw.creditText, buyerId: u.id || '—', decision: 'approved', paidBy: 'wallet', price }, telegramHtml: pkgNotifTelegram('✅ បានទិញកញ្ចប់ដោយ Wallet · Package bought with Wallet', pkg, email, u.id || '—') });
+      if (_cb > 0) await addNotification('grant', email, '💰 Cashback · បានលុយត្រឡប់វិញ', 'ទិញកញ្ចប់ ' + packageId + ' ($' + price.toFixed(2) + ') បាន Cashback $' + _cb.toFixed(2) + ' ចូល Earn Balance (នៅសល់ $' + u.earnBalance.toFixed(2) + ')', { extra: { cashback: _cb, pkg: packageId, balance: u.balance, earnBalance: u.earnBalance, buyerId: u.id || '—' } });
+      return sendJSON(res, 200, { ok: true, user: await pubUser(u), package: packageId, price, balance: u.balance, cashback: _cb });
     }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
     return;
   }
@@ -6755,13 +7008,13 @@ function apiRoute(req, res, urlPath) {
       if (!email) return sendJSON(res, 200, { ok: false, error: 'សូមដាក់ Gmail ត្រឹមត្រូវ' });
       const count = Math.floor(numOr(body && body.count, 0));
       if (count < 1 || count > 100) return sendJSON(res, 200, { ok: false, error: 'សូមដាក់ចំនួន Slot 1–100 · Please enter 1–100 slots' });
-      const users = loadUsers();
+      const users = await loadUsers();
       const u = users[email];
       if (!u) return sendJSON(res, 200, { ok: false, error: 'រក Gmail នេះមិនឃើញទេ — សូម Sign-up ជាមុនសិន · No account with this Gmail, please sign up first' });
       const _bsBodyModel = typeof body.model === 'string' ? body.model.trim().slice(0, 64) : '';
       const _bsModel = (_bsBodyModel && _bsBodyModel !== 'K') ? _bsBodyModel : modelFromUA(req.headers && req.headers['user-agent']);
       const _fp = deviceFingerprintFor(req, body, _bsModel);
-      const got = getDeviceRecord(_fp, true);
+      const got = await getDeviceRecord(_fp, true);
       const rec = got.rec;
       if (!rec) return sendJSON(res, 200, { ok: false, error: 'មិនអាចកំណត់អត្តសញ្ញាណឧបករណ៍បានទេ · Cannot identify this device' });
       if (rec.blocked) return sendJSON(res, 200, { ok: false, error: 'ឧបករណ៍នេះត្រូវបានប្លុក — សូមទាក់ទង Admin ដើម្បីដោះប្លុកជាមុនសិន · This device is blocked — please contact the Admin to unblock first', deviceBlocked: true, blockedReason: rec.blockedReason || 'device-blocked' });
@@ -6772,7 +7025,7 @@ function apiRoute(req, res, urlPath) {
       u.balance = walletMoney(bal - price);
       if (_fp.deviceId) u.lastDeviceId = _fp.deviceId;
       u.updatedAt = now;
-      saveUsers(users);
+      await saveUsers(users);
       rec.slots = Math.floor(numOr(rec.slots, 0)) + count;
       rec.strikes = 0; // paid → compliant again
       rec.lastSeen = now;
@@ -6784,12 +7037,12 @@ function apiRoute(req, res, urlPath) {
         rec.emails.unshift(email);
         if (rec.emails.length > 10) rec.emails.length = 10;
       }
-      saveDeviceRecords(got.all);
-      await ghFlushFile(USERS_FILE);
-      await ghFlushFile(DEVICE_RECORDS_FILE);
-      const deviceLimit = deviceLimitSetting().limit + rec.slots;
-      logActivity({ at: now, mode: 'device-buy-slot', email, count, price, slots: rec.slots, deviceLimit, deviceId: _fp.deviceId || '', model: _fp.model || '', ip: _fp.ip || '' });
-      addNotification('deduct', email, '➕ បានទិញ Slot អាខោន · Extra account slots bought', (u.name || email) + ' (' + email + ') បានទិញ ' + count + ' Slot ($' + price.toFixed(2) + ') សម្រាប់ឧបករណ៍ ' + (_fp.model || _fp.deviceId || 'Unknown') + ' — ឥឡូវចុះឈ្មោះបាន ' + deviceLimit + ' គណនី (នៅសល់ $' + u.balance.toFixed(2) + ')');
+      await saveDeviceRecords(got.all);
+      scheduleBackup('users.json');
+      scheduleBackup('device-records.json');
+      const deviceLimit = (await deviceLimitSetting()).limit + rec.slots;
+      await logActivity({ at: now, mode: 'device-buy-slot', email, count, price, slots: rec.slots, deviceLimit, deviceId: _fp.deviceId || '', model: _fp.model || '', ip: _fp.ip || '' });
+      await addNotification('deduct', email, '➕ បានទិញ Slot អាខោន · Extra account slots bought', (u.name || email) + ' (' + email + ') បានទិញ ' + count + ' Slot ($' + price.toFixed(2) + ') សម្រាប់ឧបករណ៍ ' + (_fp.model || _fp.deviceId || 'Unknown') + ' — ឥឡូវចុះឈ្មោះបាន ' + deviceLimit + ' គណនី (នៅសល់ $' + u.balance.toFixed(2) + ')');
       return sendJSON(res, 200, { ok: true, slots: rec.slots, balance: u.balance, deviceLimit, price, count });
     }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
     return;
@@ -6803,7 +7056,7 @@ function apiRoute(req, res, urlPath) {
     readJSONBody(req, 64 * 1024).then(async (body) => {
       const email = normEmail(body && body.email);
       if (!email) return sendJSON(res, 200, { ok: false, error: 'សូមដាក់ Gmail ត្រឹមត្រូវ' });
-      const users = loadUsers();
+      const users = await loadUsers();
       const u = users[email];
       if (!u) return sendJSON(res, 200, { ok: false, error: 'រក Gmail នេះមិនឃើញទេ — សូម Sign-up ជាមុនសិន · No account with this Gmail, please sign up first' });
       const bal = walletBalance(u);
@@ -6811,10 +7064,10 @@ function apiRoute(req, res, urlPath) {
       const now = new Date().toISOString();
       u.balance = walletMoney(bal - WALLET_INSTANT_RESET_PRICE);
       u.updatedAt = now;
-      saveUsers(users);
-      await ghFlushFile(USERS_FILE);
-      logActivity({ at: now, mode: 'wallet-instant-reset', email });
-      addNotification('deduct', email, '➖ កាត់ $' + WALLET_INSTANT_RESET_PRICE.toFixed(2) + ' · Instant reset fee', (u.name || email) + ' (' + email + ') បានកាត់ $' + WALLET_INSTANT_RESET_PRICE.toFixed(2) + ' ពី Wallet សម្រាប់ Forget Password ភ្លាមៗ (នៅសល់ $' + u.balance.toFixed(2) + ')');
+      await saveUsers(users);
+      scheduleBackup('users.json');
+      await logActivity({ at: now, mode: 'wallet-instant-reset', email });
+      await addNotification('deduct', email, '➖ កាត់ $' + WALLET_INSTANT_RESET_PRICE.toFixed(2) + ' · Instant reset fee', (u.name || email) + ' (' + email + ') បានកាត់ $' + WALLET_INSTANT_RESET_PRICE.toFixed(2) + ' ពី Wallet សម្រាប់ Forget Password ភ្លាមៗ (នៅសល់ $' + u.balance.toFixed(2) + ')');
       const token = crypto.randomBytes(16).toString('hex');
       instantResetTokens.set(email, { token, expiresAt: Date.now() + INSTANT_RESET_TTL_MS });
       return sendJSON(res, 200, { ok: true, token, expiresIn: Math.floor(INSTANT_RESET_TTL_MS / 1000), balance: u.balance });
@@ -6839,7 +7092,7 @@ function apiRoute(req, res, urlPath) {
       const rec = instantResetTokens.get(email);
       if (!rec || rec.token !== token) return sendJSON(res, 200, { ok: false, error: 'Token មិនត្រឹមត្រូវទេ — សូមស្នើសុំ Reset ភ្លាមៗម្តងទៀត · Invalid reset token — please request the instant reset again' });
       if (Date.now() > rec.expiresAt) { instantResetTokens.delete(email); return sendJSON(res, 200, { ok: false, error: 'Token ផុតកំណត់ហើយ — សូមស្នើសុំ Reset ភ្លាមៗម្តងទៀត · Token expired — please request the instant reset again' }); }
-      const users = loadUsers();
+      const users = await loadUsers();
       const u = users[email];
       if (!u) return sendJSON(res, 200, { ok: false, error: 'រក Gmail នេះមិនឃើញទេ · No account with this Gmail' });
       const hp = await hashPassword(password);
@@ -6848,13 +7101,13 @@ function apiRoute(req, res, urlPath) {
       revokeAllRememberTokens(u);
       signinClear(email);
       const now = new Date().toISOString();
-      logActivity({ at: now, mode: 'reset-password', email });
+      await logActivity({ at: now, mode: 'reset-password', email });
       u.updatedAt = now;
-      saveUsers(users);
-      await ghFlushFile(USERS_FILE);
+      await saveUsers(users);
+      scheduleBackup('users.json');
       instantResetTokens.delete(email);
-      addNotification('security', email, '🔑 Password ត្រូវបានប្តូរ · Password changed', (u.name || email) + ' (' + email + ') បានប្តូរ Password តាមរយៈ Forget Password ភ្លាមៗ ($0.10)');
-      return sendJSON(res, 200, { ok: true, user: pubUser(u) });
+      await addNotification('security', email, '🔑 Password ត្រូវបានប្តូរ · Password changed', (u.name || email) + ' (' + email + ') បានប្តូរ Password តាមរយៈ Forget Password ភ្លាមៗ ($0.10)');
+      return sendJSON(res, 200, { ok: true, user: await pubUser(u) });
     }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
     return;
   }
@@ -6862,13 +7115,13 @@ function apiRoute(req, res, urlPath) {
   // requests, pending first, then newest first. ?status=pending|approved|
   // rejected|all (default all) and ?type=topup|withdraw|all (default all).
   if (req.method === 'GET' && urlPath === '/api/admin/wallet/requests') {
-    const a = adminKeyOk(req);
+    const a = await adminKeyOk(req);
     if (!a.ok) return sendJSON(res, 200, { ok: false, error: a.error });
     const q = new URL(req.url, 'http://localhost').searchParams;
     const status = (q.get('status') || 'all').trim().toLowerCase();
     const type = (q.get('type') || 'all').trim().toLowerCase();
-    const reqs = loadWalletRequests();
-    const users = loadUsers();
+    const reqs = await loadWalletRequests();
+    const users = await loadUsers();
     const order = { pending: 0, approved: 1, rejected: 2 };
     const list = reqs
       .filter((r) => (status === 'all' || r.status === status) && (type === 'all' || r.type === type))
@@ -6879,11 +7132,11 @@ function apiRoute(req, res, urlPath) {
   // GET /api/admin/wallet/balance?email=... — admin key required. Reads one
   // user's Wallet balance for the Admin display.
   if (req.method === 'GET' && urlPath === '/api/admin/wallet/balance') {
-    const a = adminKeyOk(req);
+    const a = await adminKeyOk(req);
     if (!a.ok) return sendJSON(res, 200, { ok: false, error: a.error });
     const email = normEmail(new URL(req.url, 'http://localhost').searchParams.get('email') || '');
     if (!email) return sendJSON(res, 200, { ok: false, error: 'សូមដាក់ Gmail ត្រឹមត្រូវ' });
-    const u = loadUsers()[email];
+    const u = (await loadUsers())[email];
     if (!u) return sendJSON(res, 200, { ok: false, error: 'រកអ្នកប្រើនេះមិនឃើញទេ' });
     return sendJSON(res, 200, { ok: true, email, balance: walletBalance(u), earnBalance: walletEarnBalance(u) });
   }
@@ -6892,24 +7145,24 @@ function apiRoute(req, res, urlPath) {
   // (amount + fee) from the balance (only if sufficient). Marks the
   // request approved and notifies the user.
   if (req.method === 'POST' && urlPath === '/api/admin/wallet/approve') {
-    const a = adminKeyOk(req);
+    const a = await adminKeyOk(req);
     if (!a.ok) return sendJSON(res, 200, { ok: false, error: a.error });
     readJSONBody(req, 64 * 1024).then(async (body) => {
       const requestId = typeof body.requestId === 'string' ? body.requestId.trim() : (typeof body.id === 'string' ? body.id.trim() : '');
-      const reqs = loadWalletRequests();
+      const reqs = await loadWalletRequests();
       const r = reqs.find((x) => x.id === requestId);
       if (!r) return sendJSON(res, 200, { ok: false, error: 'រកសំណើនេះមិនឃើញទេ' });
       if (r.status !== 'pending') return sendJSON(res, 200, { ok: false, error: 'សំណើនេះបានសម្រេចរួចហើយ' });
-      const users = loadUsers();
+      const users = await loadUsers();
       const u = users[r.email];
       if (!u) return sendJSON(res, 200, { ok: false, error: 'រកអ្នកប្រើនេះមិនឃើញទេ' });
       const now = new Date().toISOString();
       if (r.type === 'topup') {
         u.balance = walletMoney(walletBalance(u) + walletMoney(r.amount));
         u.updatedAt = now;
-        saveUsers(users);
-        await ghFlushFile(USERS_FILE);
-        addNotification('grant', r.email, '✅ បញ្ចូលលុយបានអនុម័ត · Top-up approved', '$' + walletMoney(r.amount).toFixed(2) + ' បានបញ្ចូលទៅ Wallet របស់ ' + r.email + ' (នៅសល់ $' + u.balance.toFixed(2) + ')', { extra: { walletRequestId: r.id, type: 'topup', amount: walletMoney(r.amount), balance: u.balance, buyerId: u.id || '—' } });
+        await saveUsers(users);
+        scheduleBackup('users.json');
+        await addNotification('grant', r.email, '✅ បញ្ចូលលុយបានអនុម័ត · Top-up approved', '$' + walletMoney(r.amount).toFixed(2) + ' បានបញ្ចូលទៅ Wallet របស់ ' + r.email + ' (នៅសល់ $' + u.balance.toFixed(2) + ')', { extra: { walletRequestId: r.id, type: 'topup', amount: walletMoney(r.amount), balance: u.balance, buyerId: u.id || '—' } });
       } else if (r.type === 'withdraw') {
         // Fee tier: use the fee stored on the request (set at request
         // time); older requests without a stored fee recompute it.
@@ -6925,30 +7178,30 @@ function apiRoute(req, res, urlPath) {
         if (total > bal) return sendJSON(res, 200, { ok: false, error: 'លុយក្នុង ' + balName + ' មិនគ្រប់ទេ (ត្រូវការ $' + total.toFixed(2) + ', នៅសល់ $' + bal.toFixed(2) + ') · Insufficient ' + balName + ' balance', balance: bal, earnBalance: walletEarnBalance(u) });
         if (source === 'earnings') { u.earnBalance = walletMoney(bal - total); } else { u.balance = walletMoney(bal - total); }
         u.updatedAt = now;
-        saveUsers(users);
-        await ghFlushFile(USERS_FILE);
-        addNotification('deduct', r.email, '✅ ដកលុយបានអនុម័ត · Withdraw approved', '$' + walletMoney(r.amount).toFixed(2) + ' (+ថ្លៃសេវា $' + fee.toFixed(2) + ' = $' + total.toFixed(2) + ') បានកាត់ពី ' + balName + ' របស់ ' + r.email + ' (នៅសល់ $' + bal.toFixed(2) + ') — Admin នឹងផ្ញើលុយតាម KHQR របស់អ្នក', { extra: { walletRequestId: r.id, type: 'withdraw', amount: walletMoney(r.amount), fee, total, balance: u.balance, earnBalance: u.earnBalance, source, buyerId: u.id || '—' } });
+        await saveUsers(users);
+        scheduleBackup('users.json');
+        await addNotification('deduct', r.email, '✅ ដកលុយបានអនុម័ត · Withdraw approved', '$' + walletMoney(r.amount).toFixed(2) + ' (+ថ្លៃសេវា $' + fee.toFixed(2) + ' = $' + total.toFixed(2) + ') បានកាត់ពី ' + balName + ' របស់ ' + r.email + ' (នៅសល់ $' + bal.toFixed(2) + ') — Admin នឹងផ្ញើលុយតាម KHQR របស់អ្នក', { extra: { walletRequestId: r.id, type: 'withdraw', amount: walletMoney(r.amount), fee, total, balance: u.balance, earnBalance: u.earnBalance, source, buyerId: u.id || '—' } });
       } else {
         return sendJSON(res, 200, { ok: false, error: 'ប្រភេទសំណើនេះមិនស្គាល់ទេ' });
       }
       r.status = 'approved';
       r.decidedAt = now;
       r.updatedAt = now;
-      saveWalletRequests(reqs);
-      await ghFlushFile(WALLET_REQUESTS_FILE);
-      return sendJSON(res, 200, { ok: true, request: walletRequestPublic(r, users), user: pubUser(u), balance: u.balance, earnBalance: u.earnBalance });
+      await saveWalletRequests(reqs);
+      scheduleBackup('wallet-requests.json');
+      return sendJSON(res, 200, { ok: true, request: walletRequestPublic(r, users), user: await pubUser(u), balance: u.balance, earnBalance: u.earnBalance });
     }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
     return;
   }
   // POST /api/admin/wallet/reject — {requestId, reason?} — admin key
   // required. Marks the request rejected; no money moves.
   if (req.method === 'POST' && urlPath === '/api/admin/wallet/reject') {
-    const a = adminKeyOk(req);
+    const a = await adminKeyOk(req);
     if (!a.ok) return sendJSON(res, 200, { ok: false, error: a.error });
     readJSONBody(req, 64 * 1024).then(async (body) => {
       const requestId = typeof body.requestId === 'string' ? body.requestId.trim() : (typeof body.id === 'string' ? body.id.trim() : '');
       const reason = typeof body.reason === 'string' ? body.reason.trim().slice(0, 200) : '';
-      const reqs = loadWalletRequests();
+      const reqs = await loadWalletRequests();
       const r = reqs.find((x) => x.id === requestId);
       if (!r) return sendJSON(res, 200, { ok: false, error: 'រកសំណើនេះមិនឃើញទេ' });
       if (r.status !== 'pending') return sendJSON(res, 200, { ok: false, error: 'សំណើនេះបានសម្រេចរួចហើយ' });
@@ -6957,11 +7210,11 @@ function apiRoute(req, res, urlPath) {
       r.decidedAt = now;
       r.updatedAt = now;
       if (reason) r.reason = reason;
-      saveWalletRequests(reqs);
-      await ghFlushFile(WALLET_REQUESTS_FILE);
-      const _wu = loadUsers()[r.email];
-      addNotification('purchase-rejected', r.email, '❌ សំណើ Wallet ត្រូវបានបដិសេធ · Wallet request rejected', (r.type === 'withdraw' ? 'សំណើដកលុយ $' + walletMoney(r.amount).toFixed(2) : 'សំណើបញ្ចូលលុយ $' + walletMoney(r.amount).toFixed(2)) + ' របស់ ' + r.email + ' ត្រូវបានបដិសេធ' + (reason ? ' — ' + reason : ''), { extra: { walletRequestId: r.id, type: r.type, amount: walletMoney(r.amount), buyerId: _wu && _wu.id ? _wu.id : '', decision: 'rejected' } });
-      return sendJSON(res, 200, { ok: true, request: walletRequestPublic(r, loadUsers()) });
+      await saveWalletRequests(reqs);
+      scheduleBackup('wallet-requests.json');
+      const _wu = (await loadUsers())[r.email];
+      await addNotification('purchase-rejected', r.email, '❌ សំណើ Wallet ត្រូវបានបដិសេធ · Wallet request rejected', (r.type === 'withdraw' ? 'សំណើដកលុយ $' + walletMoney(r.amount).toFixed(2) : 'សំណើបញ្ចូលលុយ $' + walletMoney(r.amount).toFixed(2)) + ' របស់ ' + r.email + ' ត្រូវបានបដិសេធ' + (reason ? ' — ' + reason : ''), { extra: { walletRequestId: r.id, type: r.type, amount: walletMoney(r.amount), buyerId: _wu && _wu.id ? _wu.id : '', decision: 'rejected' } });
+      return sendJSON(res, 200, { ok: true, request: walletRequestPublic(r, await loadUsers()) });
     }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
     return;
   }
@@ -6970,13 +7223,13 @@ function apiRoute(req, res, urlPath) {
   // successful generations by mode, today's failures, and recent errors.
   // Never throws on empty data.
   if (req.method === 'GET' && urlPath === '/api/admin/stats') {
-    const a = adminKeyOk(req);
+    const a = await adminKeyOk(req);
     if (!a.ok) return sendJSON(res, 200, { ok: false, error: a.error });
     try {
       const nowMs = Date.now();
       const DAY = 24 * 60 * 60 * 1000;
-      const act = loadActivity();
-      const users = loadUsers();
+      const act = await loadActivity();
+      const users = await loadUsers();
       function distinctSyncUsers(days) {
         const since = nowMs - days * DAY;
         const set = new Set();
@@ -7021,13 +7274,13 @@ function apiRoute(req, res, urlPath) {
       }
       // Public totals (from the real public feed) + recent activity so the
       // Admin tracking page shows real numbers everywhere, immediately.
-      // NOTE: read public.json directly — loadPublicPosts()/PUBLIC_FILE are
-      // declared later in this handler, so calling them here throws a TDZ
-      // ReferenceError and the catch below would return all zeros.
+      // Public totals come from Supabase via loadPublicPosts() (a hoisted
+      // function declaration, so it is safe to call here even though it
+      // is declared later in apiRoute; the old direct file read existed
+      // only because PUBLIC_FILE is a later-declared const).
       let pubPosts = [];
       try {
-        const _pj = JSON.parse(fs.readFileSync(path.join(DATA_DIR, 'public.json'), 'utf8'));
-        if (Array.isArray(_pj)) pubPosts = _pj.filter((p) => p && p.visibility === 'public');
+        pubPosts = (await loadPublicPosts()).filter((p) => p && p.visibility === 'public');
       } catch (e) {}
       let publicPosts = pubPosts.length, publicViews = 0, publicLikes = 0, publicDownloads = 0, songsTotal = 0, mediaTotal = 0;
       for (const p of pubPosts) {
@@ -7058,9 +7311,9 @@ function apiRoute(req, res, urlPath) {
   // GET /api/admin/notifications — admin key required. All notifications,
   // newest first, limit 100. The Admin app polls this for its bell/feed.
   if (req.method === 'GET' && urlPath === '/api/admin/notifications') {
-    const a = adminKeyOk(req);
+    const a = await adminKeyOk(req);
     if (!a.ok) return sendJSON(res, 200, { ok: false, error: a.error });
-    const list = loadNotifications().slice(0, 100);
+    const list = (await loadNotifications()).slice(0, 100);
     return sendJSON(res, 200, { ok: true, notifications: list });
   }
   // GET /api/admin/security — admin key required. Security-kind
@@ -7068,18 +7321,18 @@ function apiRoute(req, res, urlPath) {
   // attempts), newest first, limit 100. Read/mark-read reuse the
   // existing notifications flow (POST /api/admin/notifications/read).
   if (req.method === 'GET' && urlPath === '/api/admin/security') {
-    const a = adminKeyOk(req);
+    const a = await adminKeyOk(req);
     if (!a.ok) return sendJSON(res, 200, { ok: false, error: a.error });
-    const events = loadNotifications().filter((n) => n && n.kind === 'security').slice(0, 100);
+    const events = (await loadNotifications()).filter((n) => n && n.kind === 'security').slice(0, 100);
     return sendJSON(res, 200, { ok: true, events });
   }
   // POST /api/admin/notifications/read — {id} or {all:true} — admin key
   // required. Marks one notification (or all) as read.
   if (req.method === 'POST' && urlPath === '/api/admin/notifications/read') {
-    const a = adminKeyOk(req);
+    const a = await adminKeyOk(req);
     if (!a.ok) return sendJSON(res, 200, { ok: false, error: a.error });
-    readJSONBody(req, 64 * 1024).then((body) => {
-      const arr = loadNotifications();
+    readJSONBody(req, 64 * 1024).then(async (body) => {
+      const arr = await loadNotifications();
       let marked = 0;
       if (body && body.all === true) {
         for (const n of arr) { if (n && !n.read) { n.read = true; marked++; } }
@@ -7088,7 +7341,7 @@ function apiRoute(req, res, urlPath) {
         const n = arr.find((x) => x && x.id === id);
         if (n && !n.read) { n.read = true; marked = 1; }
       }
-      if (marked) saveNotifications(arr);
+      if (marked) await saveNotifications(arr);
       return sendJSON(res, 200, { ok: true, marked });
     }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
     return;
@@ -7102,7 +7355,7 @@ function apiRoute(req, res, urlPath) {
     if (rawEmail === 'guest') return sendJSON(res, 200, { ok: true, notifications: [] });
     const email = normEmail(rawEmail);
     if (!email) return sendJSON(res, 200, { ok: false, error: 'សូមដាក់ Gmail ត្រឹមត្រូវ' });
-    const list = loadNotifications().filter((n) => n && (n.email === email || n.email === '*')).slice(0, 50);
+    const list = (await loadNotifications()).filter((n) => n && (n.email === email || n.email === '*')).slice(0, 50);
     return sendJSON(res, 200, { ok: true, notifications: list });
   }
   // ---- Follow the Public page ----
@@ -7112,28 +7365,28 @@ function apiRoute(req, res, urlPath) {
   //   (b) {email, targetEmail} — monetization: follow a creator
   //       (per-creator follows). Returns {ok, count, following}.
   if (req.method === 'POST' && urlPath === '/api/public/follow') {
-    readJSONBody(req, 64 * 1024).then((body) => {
+    readJSONBody(req, 64 * 1024).then(async (body) => {
       const email = normEmail(body && body.email);
       if (!email) return sendJSON(res, 200, { ok: false, error: 'សូមដាក់ Gmail ត្រឹមត្រូវ' });
       const target = normEmail(body && body.targetEmail);
       if (target) {
         if (target === email) return sendJSON(res, 200, { ok: false, error: 'មិនអាច Follow ខ្លួនឯងបានទេ · You cannot follow yourself' });
-        const f = loadCreatorFollows();
+        const f = await loadCreatorFollows();
         if (!Array.isArray(f[target])) f[target] = [];
         if (!f[target].includes(email)) f[target].push(email);
         if (f[target].length > 10000) f[target] = f[target].slice(-10000);
-        saveCreatorFollows(f);
+        await saveCreatorFollows(f);
         return sendJSON(res, 200, { ok: true, count: f[target].length, following: true, followers: f[target].length });
       }
       const want = !!(body && body.follow);
-      let arr = loadFollowers();
+      let arr = await loadFollowers();
       if (want) {
         if (!arr.includes(email)) arr.push(email);
       } else {
         arr = arr.filter((e) => e !== email);
       }
       if (arr.length > FOLLOWERS_MAX) arr = arr.slice(-FOLLOWERS_MAX);
-      saveFollowers(arr);
+      await saveFollowers(arr);
       return sendJSON(res, 200, { ok: true, following: want, followers: arr.length });
     }).catch((e) => sendJSON(res, 200, { ok: false, error: String(e && e.message ? e.message : e) }));
     return;
@@ -7141,14 +7394,14 @@ function apiRoute(req, res, urlPath) {
   // POST /api/public/unfollow — PUBLIC. {email, targetEmail}.
   // Monetization: unfollow a creator. Returns {ok, count, following:false}.
   if (req.method === 'POST' && urlPath === '/api/public/unfollow') {
-    readJSONBody(req, 64 * 1024).then((body) => {
+    readJSONBody(req, 64 * 1024).then(async (body) => {
       const email = normEmail(body && body.email);
       const target = normEmail(body && body.targetEmail);
       if (!email || !target) return sendJSON(res, 200, { ok: false, error: 'សូមដាក់ Gmail និង targetEmail ត្រឹមត្រូវ' });
-      const f = loadCreatorFollows();
+      const f = await loadCreatorFollows();
       if (Array.isArray(f[target])) {
         f[target] = f[target].filter((e) => e !== email);
-        saveCreatorFollows(f);
+        await saveCreatorFollows(f);
       }
       const count = Array.isArray(f[target]) ? f[target].length : 0;
       return sendJSON(res, 200, { ok: true, count, following: false, followers: count });
@@ -7163,7 +7416,7 @@ function apiRoute(req, res, urlPath) {
     const target = normEmail(q.get('email') || '');
     const by = normEmail(q.get('by') || '');
     if (!target) return sendJSON(res, 200, { ok: false, error: 'សូមដាក់ Gmail' });
-    const f = loadCreatorFollows();
+    const f = await loadCreatorFollows();
     const arr = Array.isArray(f[target]) ? f[target] : [];
     return sendJSON(res, 200, { ok: true, count: arr.length, following: !!(by && arr.includes(by)), followers: arr.length });
   }
@@ -7171,7 +7424,7 @@ function apiRoute(req, res, urlPath) {
   if (req.method === 'GET' && urlPath === '/api/public/follow') {
     const rawEmail = (new URL(req.url, 'http://localhost').searchParams.get('email') || '').trim().toLowerCase();
     const email = normEmail(rawEmail);
-    const arr = loadFollowers();
+    const arr = await loadFollowers();
     return sendJSON(res, 200, { ok: true, following: !!(email && arr.includes(email)), followers: arr.length });
   }
   // ---- Email verification (login) — PUBLIC ----
@@ -7207,14 +7460,14 @@ function apiRoute(req, res, urlPath) {
   // configured (App Password set). The website uses it to decide whether
   // to show the verification step.
   if (req.method === 'GET' && urlPath === '/api/auth/email-status') {
-    return sendJSON(res, 200, { ok: true, configured: verifyEmailConfigured() });
+    return sendJSON(res, 200, { ok: true, configured: await verifyEmailConfigured() });
   }
   // ---- Web Push (phone-native push, from the phone itself) ----
   // GET /api/public/vapid-key — PUBLIC. Returns the public VAPID key the
   // website/Admin app needs to subscribe for Web Push. The private key is
   // never exposed. The key pair is created on first use (./data/vapid.json).
   if (req.method === 'GET' && urlPath === '/api/public/vapid-key') {
-    const pub = getVapidPublicKey();
+    const pub = await getVapidPublicKey();
     if (!pub) return sendJSON(res, 200, { ok: false, error: 'Web Push មិនទាន់បើកទេ' });
     return sendJSON(res, 200, { ok: true, publicKey: pub });
   }
@@ -7230,19 +7483,19 @@ function apiRoute(req, res, urlPath) {
   // auth}}. Stored/overwritten by endpoint+email. role 'admin' marks an
   // admin device (the Admin app subscribes with its admin Gmail + role).
   if (req.method === 'POST' && urlPath === '/api/public/push-subscribe') {
-    readJSONBody(req, 64 * 1024).then((body) => {
+    readJSONBody(req, 64 * 1024).then(async (body) => {
       const email = normEmail(body && body.email);
       if (!email) return sendJSON(res, 200, { ok: false, error: 'សូមដាក់ Gmail ត្រឹមត្រូវ' });
       const sub = cleanPushSub(body && body.subscription);
       if (!sub) return sendJSON(res, 200, { ok: false, error: 'subscription មិនត្រឹមត្រូវទេ' });
       const role = body && body.role === 'admin' ? 'admin' : '';
-      const arr = loadPushSubs();
+      const arr = await loadPushSubs();
       const now = new Date().toISOString();
       const idx = arr.findIndex((s) => s && s.endpoint === sub.endpoint && String(s.email || '').toLowerCase() === email);
       const rec = { email, endpoint: sub.endpoint, keys: sub.keys, role, createdAt: idx >= 0 && arr[idx].createdAt ? arr[idx].createdAt : now, updatedAt: now };
       if (idx >= 0) arr[idx] = rec; else arr.push(rec);
       if (arr.length > PUSH_SUBS_MAX) arr.splice(0, arr.length - PUSH_SUBS_MAX);
-      savePushSubs(arr);
+      await savePushSubs(arr);
       return sendJSON(res, 200, { ok: true, subscribed: true });
     }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
     return;
@@ -7250,14 +7503,14 @@ function apiRoute(req, res, urlPath) {
   // POST /api/public/push-unsubscribe — PUBLIC. {email, endpoint} — removes
   // the matching subscription(s). email is optional (endpoint alone matches).
   if (req.method === 'POST' && urlPath === '/api/public/push-unsubscribe') {
-    readJSONBody(req, 64 * 1024).then((body) => {
+    readJSONBody(req, 64 * 1024).then(async (body) => {
       const endpoint = body && typeof body.endpoint === 'string' ? body.endpoint.trim() : '';
       if (!endpoint) return sendJSON(res, 200, { ok: false, error: 'សូមដាក់ endpoint' });
       const email = normEmail(body && body.email);
-      const arr = loadPushSubs();
+      const arr = await loadPushSubs();
       const kept = arr.filter((s) => !(s && s.endpoint === endpoint && (!email || String(s.email || '').toLowerCase() === email)));
       const removed = arr.length - kept.length;
-      if (removed) savePushSubs(kept);
+      if (removed) await savePushSubs(kept);
       return sendJSON(res, 200, { ok: true, removed });
     }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
     return;
@@ -7270,14 +7523,19 @@ function apiRoute(req, res, urlPath) {
   const PUBLIC_FILE = path.join(DATA_DIR, 'public.json');
   const PUBLIC_MAX = 5000;
   const PUBLIC_MODES = ['song', 'image', 'video', '3d'];
-  function loadPublicPosts() {
-    try { const j = JSON.parse(fs.readFileSync(PUBLIC_FILE, 'utf8')); if (Array.isArray(j)) return j; } catch (e) {}
-    return [];
+  async function loadPublicPosts() {
+    const rows = await sbSelect('public_posts', 'select=id,data');
+      if (!rows) return [];
+      const arr = rows.map((r) => r.data).filter(Boolean);
+      arr.sort((a, b) => String(b.createdAt || b.at || '').localeCompare(String(a.createdAt || a.at || '')));
+      return arr;
   }
-  function savePublicPosts(arr) {
-    try { fs.mkdirSync(DATA_DIR, { recursive: true }); } catch (e) {}
-    fs.writeFileSync(PUBLIC_FILE, JSON.stringify(arr, null, 2));
-    ghPersistFile(PUBLIC_FILE);
+  async function savePublicPosts(arr) {
+    const list = Array.isArray(arr) ? arr : [];
+      for (const p of list) { if (p && !p.id) p.id = newPublicId(); }
+      const rows = list.filter((p) => p && typeof p.id === 'string' && p.id).map((p) => ({ id: p.id, data: p }));
+      await sbSyncTable('public_posts', 'id', rows, 'id');
+      scheduleBackup('public.json');
   }
   function newPublicId() {
     return 'pub_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
@@ -7357,21 +7615,27 @@ function apiRoute(req, res, urlPath) {
   }
   // ---- MP3 cache (converted once, served instantly afterwards) ----
   const MP3_CACHE_FILE = path.join(DATA_DIR, 'mp3cache.json');
-  let _mp3Cache = {};
-  try { const _mc = JSON.parse(fs.readFileSync(MP3_CACHE_FILE, 'utf8')); if (_mc && typeof _mc === 'object') _mp3Cache = _mc; } catch (e) {}
-  function mp3CacheSave() {
-    try { fs.mkdirSync(DATA_DIR, { recursive: true }); fs.writeFileSync(MP3_CACHE_FILE, JSON.stringify(_mp3Cache, null, 2)); ghPersistFile(MP3_CACHE_FILE); } catch (e) {}
+  let _mp3Cache = null; // lazy-loaded from Supabase (kv_docs 'mp3cache') on first use
+  async function mp3CacheEnsure() {
+    if (_mp3Cache && typeof _mp3Cache === 'object') return _mp3Cache;
+    const j = await loadKvDoc('mp3cache', null);
+    _mp3Cache = (j && typeof j === 'object' && !Array.isArray(j)) ? j : {};
+    return _mp3Cache;
+  }
+  async function mp3CacheSave() {
+    try { await mp3CacheEnsure(); await saveKvDoc('mp3cache', _mp3Cache, 'mp3cache.json'); } catch (e) {}
   }
   function mp3CacheKey(u) {
     return require('crypto').createHash('sha1').update(String(u)).digest('hex').slice(0, 16);
   }
-  function mp3CacheGet(u) {
-    const k = mp3CacheKey(u);
-    const f = _mp3Cache[k];
-    if (!f) return null;
-    const fp = path.join(DATA_DIR, 'uploads', f);
-    try { if (fs.existsSync(fp) && fs.statSync(fp).size > 1000) return fp; } catch (e) {}
-    return null;
+  async function mp3CacheGet(u) {
+    const c = await mp3CacheEnsure();
+      const k = mp3CacheKey(u);
+      const f = c[k];
+      if (!f) return null;
+      const fp = path.join(DATA_DIR, 'uploads', f);
+      try { if (fs.existsSync(fp) && fs.statSync(fp).size > 1000) return fp; } catch (e) {}
+      return null;
   }
   // MP3 pre-warm REMOVED (owner order 2026-11-16 ~22:00): NO background
   // conversion. The MP3 is converted ONLY when the user taps Download on
@@ -7412,14 +7676,12 @@ function apiRoute(req, res, urlPath) {
   // the private movai-data repo — same as the other admin data). The
   // Admin API NEVER returns a full API secret (masked). ----
   const CLOUDINARY_ACCOUNTS_FILE = path.join(DATA_DIR, 'cloudinary-accounts.json');
-  function loadCloudinaryAccounts() {
-    try { const j = JSON.parse(fs.readFileSync(CLOUDINARY_ACCOUNTS_FILE, 'utf8')); if (Array.isArray(j)) return j.filter((x) => x && typeof x === 'object'); } catch (e) {}
-    return [];
+  async function loadCloudinaryAccounts() {
+    const j = await loadKvDoc('cloudinary-accounts', []);
+      return Array.isArray(j) ? j.filter((x) => x && typeof x === 'object') : [];
   }
-  function saveCloudinaryAccounts(arr) {
-    try { fs.mkdirSync(DATA_DIR, { recursive: true }); } catch (e) {}
-    fs.writeFileSync(CLOUDINARY_ACCOUNTS_FILE, JSON.stringify(arr, null, 2));
-    ghPersistFile(CLOUDINARY_ACCOUNTS_FILE);
+  async function saveCloudinaryAccounts(arr) {
+    await saveKvDoc('cloudinary-accounts', arr, 'cloudinary-accounts.json');
   }
   function cloudinaryAccountId() {
     return 'cld-' + require('crypto').randomBytes(6).toString('hex');
@@ -7451,18 +7713,18 @@ function apiRoute(req, res, urlPath) {
   // Ordered rotation candidates: env account first, then enabled admin
   // accounts in the order added. Exhausted-this-month accounts are
   // skipped (they get a fresh chance next month).
-  function cloudinaryCandidates() {
+  async function cloudinaryCandidates() {
     const list = [];
     const env = cloudinaryEnvAccount();
     if (env) list.push(env);
-    for (const a of loadCloudinaryAccounts()) {
+    for (const a of await loadCloudinaryAccounts()) {
       if (!a || a.enabled === false) continue;
       if (cloudinaryAccountExhaustedNow(a)) continue;
       list.push(a);
     }
     return list;
   }
-  function cloudinaryConfigured() { return cloudinaryCandidates().length > 0; }
+  async function cloudinaryConfigured() { return (await cloudinaryCandidates()).length > 0; }
   // ROUND-ROBIN pointer (owner order 2026-11-17): each NEW upload uses the
   // next enabled account in turn (upload 1 -> account 1, upload 2 ->
   // account 2, ... cycling), instead of draining one account until it
@@ -7470,15 +7732,13 @@ function apiRoute(req, res, urlPath) {
   // is persisted to GitHub like the other admin data, so it survives
   // Render restarts. Advanced ONLY on a successful store.
   const CLOUDINARY_ROTATION_FILE = path.join(DATA_DIR, 'cloudinary-rotation.json');
-  function loadCloudinaryRotation() {
-    try { const j = JSON.parse(fs.readFileSync(CLOUDINARY_ROTATION_FILE, 'utf8'));
-      if (j && typeof j === 'object') return j; } catch (e) {}
-    return { lastAccountId: null };
+  async function loadCloudinaryRotation() {
+    const j = await loadKvDoc('cloudinary-rotation', null);
+      if (j && typeof j === 'object') return j;
+      return { lastAccountId: null };
   }
-  function saveCloudinaryRotation(obj) {
-    try { fs.mkdirSync(DATA_DIR, { recursive: true }); } catch (e) {}
-    fs.writeFileSync(CLOUDINARY_ROTATION_FILE, JSON.stringify(obj, null, 2));
-    ghPersistFile(CLOUDINARY_ROTATION_FILE); // fire-and-forget, same as saveCloudinaryAccounts()
+  async function saveCloudinaryRotation(obj) {
+    await saveKvDoc('cloudinary-rotation', obj, 'cloudinary-rotation.json');
   }
   // The Cloudinary SDK is a global singleton: config() mutates it.
   // Uploads run ONE AT A TIME through _cloudQueue, so setting the
@@ -7671,32 +7931,32 @@ function apiRoute(req, res, urlPath) {
   }
   // Mark an admin account exhausted/invalid in the data file (the env
   // account is not stored, so it is only logged). Never throws.
-  function cloudinaryMarkAccount(a, kind, msg) {
+  async function cloudinaryMarkAccount(a, kind, msg) {
     if (!a || a.source === 'env') { console.error('[cloudinary] env account ' + kind + ':', String(msg || '').slice(0, 160)); return; }
     try {
       const now = new Date().toISOString();
-      const arr = loadCloudinaryAccounts();
+      const arr = await loadCloudinaryAccounts();
       const it = arr.find((x) => x && x.id === a.id);
       if (!it) return;
       it.lastError = String(msg || kind).slice(0, 200);
       it.lastErrorAt = now;
       if (kind === 'quota') { it.exhausted = true; it.exhaustedAt = now; }
       it.updatedAt = now;
-      saveCloudinaryAccounts(arr);
+      await saveCloudinaryAccounts(arr);
     } catch (e) {}
   }
   // Clear an admin account's exhausted/invalid marks after a success
   // (so it is tried first again next time). Never throws.
-  function cloudinaryClearAccountMarks(a) {
+  async function cloudinaryClearAccountMarks(a) {
     if (!a || a.source === 'env') return;
     try {
-      const arr = loadCloudinaryAccounts();
+      const arr = await loadCloudinaryAccounts();
       const it = arr.find((x) => x && x.id === a.id);
       if (!it) return;
       if (it.exhausted || it.lastError) {
         it.exhausted = false; it.exhaustedAt = null; it.lastError = ''; it.lastErrorAt = null;
         it.updatedAt = new Date().toISOString();
-        saveCloudinaryAccounts(arr);
+        await saveCloudinaryAccounts(arr);
       }
     } catch (e) {}
   }
@@ -7708,13 +7968,13 @@ function apiRoute(req, res, urlPath) {
   // when Cloudinary could not fetch the source (expired provider URL),
   // or null when every account failed (caller falls back to local).
   async function cloudinaryStoreSong(u, title) {
-    const candidates = cloudinaryCandidates();
+    const candidates = await cloudinaryCandidates();
     if (!candidates.length) return null;
     // Round-robin: start from the account AFTER the one that stored the
     // last upload, so new uploads cycle through all enabled accounts
     // instead of draining the first one. (Inside _cloudQueue below, so
     // the read+advance is atomic — no two uploads can interleave it.)
-    const rot = loadCloudinaryRotation();
+    const rot = await loadCloudinaryRotation();
     let start = 0;
     if (rot.lastAccountId) {
       const li = candidates.findIndex((x) => x.id === rot.lastAccountId);
@@ -7734,8 +7994,8 @@ function apiRoute(req, res, urlPath) {
             if (!publicId) continue;
             const mp3Url = cloudinaryMp3UrlFor(a, publicId, title);
             memLog('cloudinary-upload ok ' + publicId + ' via ' + (a.label || a.cloudName));
-            cloudinaryClearAccountMarks(a);
-            saveCloudinaryRotation({ lastAccountId: a.id, updatedAt: new Date().toISOString() });
+            await cloudinaryClearAccountMarks(a);
+            await saveCloudinaryRotation({ lastAccountId: a.id, updatedAt: new Date().toISOString() });
             return { publicId, mp3Url, accountId: a.id, accountLabel: a.label || a.cloudName };
           } catch (e) {
             const msg = String((e && e.message) || e);
@@ -7744,7 +8004,7 @@ function apiRoute(req, res, urlPath) {
             if (kind === 'exists') {
               // Asset already stored under our deterministic public_id.
               const mp3Url = cloudinaryMp3UrlFor(a, cloudinaryPublicIdForUrl(u), title);
-              if (mp3Url) { cloudinaryClearAccountMarks(a); saveCloudinaryRotation({ lastAccountId: a.id, updatedAt: new Date().toISOString() }); return { publicId: cloudinaryPublicIdForUrl(u), mp3Url, accountId: a.id, accountLabel: a.label || a.cloudName }; }
+              if (mp3Url) { await cloudinaryClearAccountMarks(a); await saveCloudinaryRotation({ lastAccountId: a.id, updatedAt: new Date().toISOString() }); return { publicId: cloudinaryPublicIdForUrl(u), mp3Url, accountId: a.id, accountLabel: a.label || a.cloudName }; }
             }
             if (kind === 'async') {
               // Background processing: wait for the asset, with the wait
@@ -7760,12 +8020,12 @@ function apiRoute(req, res, urlPath) {
               const ready = await cloudinaryWaitForAsset(c, detId, waitMs);
               if (!ready) { memLog('cloudinary-async timeout ' + detId); return null; }
               const mp3Url = cloudinaryMp3UrlFor(a, detId, title);
-              if (mp3Url) { cloudinaryClearAccountMarks(a); saveCloudinaryRotation({ lastAccountId: a.id, updatedAt: new Date().toISOString() }); return { publicId: detId, mp3Url, accountId: a.id, accountLabel: a.label || a.cloudName }; }
+              if (mp3Url) { await cloudinaryClearAccountMarks(a); await saveCloudinaryRotation({ lastAccountId: a.id, updatedAt: new Date().toISOString() }); return { publicId: detId, mp3Url, accountId: a.id, accountLabel: a.label || a.cloudName }; }
             }
             if (kind === 'gone') return 'gone';
-            if (kind === 'quota') { cloudinaryMarkAccount(a, 'quota', msg); break; }
-            if (kind === 'auth') { cloudinaryMarkAccount(a, 'auth', msg); break; }
-            if (attempt === 2) { cloudinaryMarkAccount(a, 'other', msg); break; }
+            if (kind === 'quota') { await cloudinaryMarkAccount(a, 'quota', msg); break; }
+            if (kind === 'auth') { await cloudinaryMarkAccount(a, 'auth', msg); break; }
+            if (attempt === 2) { await cloudinaryMarkAccount(a, 'other', msg); break; }
             await new Promise((r) => setTimeout(r, 2000 * attempt));
           }
         }
@@ -7803,8 +8063,8 @@ function apiRoute(req, res, urlPath) {
   // the permanent mp3Url, or null. No upload — just HEAD requests.
   async function cloudinaryExistingMp3Url(sourceUrl, title) {
     try {
-      if (!cloudinaryConfigured()) return null;
-      const cands = cloudinaryCandidates();
+      if (!await cloudinaryConfigured()) return null;
+      const cands = await cloudinaryCandidates();
       if (!cands.length) return null;
       const detId = cloudinaryPublicIdForUrl(sourceUrl);
       for (const a of cands) {
@@ -7829,7 +8089,7 @@ function apiRoute(req, res, urlPath) {
     const u = String(url || '').trim();
     if (!u) return null;
     if (isCloudinaryUrl(u)) return u;
-    if (!cloudinaryConfigured()) return null;
+    if (!await cloudinaryConfigured()) return null;
     const existing = await cloudinaryExistingMp3Url(u, title);
     if (existing) return existing;
     try {
@@ -7849,11 +8109,10 @@ function apiRoute(req, res, urlPath) {
   // never blocks startup or any request.
   async function healDeadSongUrls() {
     try {
-      const pubPath = path.join(DATA_DIR, 'public.json');
       let changedPublic = false;
       try {
         let posts = [];
-        try { const j = JSON.parse(fs.readFileSync(pubPath, 'utf8')); if (Array.isArray(j)) posts = j; } catch (e) { posts = []; }
+        posts = await loadPublicPosts();
         for (const p of posts) {
           if (!p || typeof p.url !== 'string') continue;
           const u = p.url;
@@ -7872,15 +8131,12 @@ function apiRoute(req, res, urlPath) {
           }
         }
         if (changedPublic) {
-          try { fs.mkdirSync(DATA_DIR, { recursive: true }); } catch (e) {}
-          fs.writeFileSync(pubPath, JSON.stringify(posts, null, 2));
-          ghPersistFile(pubPath);
-          await ghFlushFile(pubPath);
+          await savePublicPosts(posts);
         }
       } catch (e) { console.log('[heal] public posts skipped: ' + (e && e.message ? e.message : e)); }
       let changedHistory = false;
       try {
-        const h = loadHistory();
+        const h = await loadHistory();
         for (const email of Object.keys(h)) {
           const items = Array.isArray(h[email]) ? h[email] : [];
           for (const it of items) {
@@ -7893,147 +8149,17 @@ function apiRoute(req, res, urlPath) {
             }
           }
         }
-        if (changedHistory) { saveHistory(h); await ghFlushFile(HISTORY_FILE); }
+        if (changedHistory) { await saveHistory(h); scheduleBackup('history.json'); }
       } catch (e) { console.log('[heal] history skipped: ' + (e && e.message ? e.message : e)); }
     } catch (e) { console.log('[heal] skipped: ' + (e && e.message ? e.message : e)); }
   }
-  // ---- GitHub data resync (§6 data-sync fix, owner order 2026-11-18) ----
-  // ROOT CAUSE (verified 2026-11-18): the live server only re-pulls
-  // GitHub data at STARTUP (ghRestoreAll). A running server keeps
-  // serving its local ./data/ files forever, so an external edit to
-  // movai-data (e.g. deleting broken songs from public.json /
-  // history.json on GitHub) never takes effect until the next restart.
-  // Worse, the next local WRITE (a history sync, a view, a like)
-  // re-pushes the STALE local file to GitHub and silently UNDOES the
-  // external edit — GitHub history.json was reverted from the fixed 2
-  // items back to the old 11 items this way, while public.json survived
-  // only because no public.json write happened in the window.
-  // FIX: (1) before any handler writes public.json / history.json, the
-  // throttled merge below re-pulls GitHub and merges it into the local
-  // file, so a write is always based on fresh GitHub state and can never
-  // resurrect a deletion; (2) any request also triggers a periodic
-  // merge (every 5 min) so a running server picks up external edits
-  // even with no write traffic; (3) POST /api/admin/resync-data forces
-  // an immediate merge. GitHub is authoritative for WHICH posts/items
-  // exist; local counters (views/likes/downloads) are preserved by
-  // taking the max; a local-only item created within the last 5 minutes
-  // is kept (its GitHub PUT may still be in flight — post/history
-  // writes are awaited, so this is only a safety grace).
-  // NOTE: public.json is read/written here with a direct file path
-  // (NOT loadPublicPosts/savePublicPosts), because PUBLIC_FILE is a
-  // const declared later in apiRoute — using it from the apiRoute top
-  // or from early handlers would hit its temporal dead zone.
-  async function ghMergePublicHistoryFromGitHub() {
-    const out = { publicChanged: false, historyChanged: false, publicPosts: 0, historyItems: 0, error: '' };
-    // Tombstones (resurrection bug 2026-11-18): anything this merge drops
-    // as a GitHub deletion is recorded here so a later client sync can
-    // never resurrect it. Loaded once, saved at the end if it changed.
-    const tombs = loadDeletedItems();
-    let tombsChanged = false;
-    const pubPath = path.join(DATA_DIR, 'public.json');
-    const readPub = () => { try { const j = JSON.parse(fs.readFileSync(pubPath, 'utf8')); return Array.isArray(j) ? j : []; } catch (e) { return []; } };
-    const writePub = (arr) => { try { fs.mkdirSync(DATA_DIR, { recursive: true }); } catch (e) {} fs.writeFileSync(pubPath, JSON.stringify(arr, null, 2)); ghPersistFile(pubPath); };
-    try {
-      // --- public.json ---
-      try {
-        const gh = await ghGetFile('public.json');
-        if (gh && gh.text) {
-          const ghPosts = JSON.parse(gh.text);
-          if (Array.isArray(ghPosts)) {
-            const local = readPub();
-            const ghById = {};
-            for (const p of ghPosts) { if (p && typeof p.id === 'string') ghById[p.id] = p; }
-            const merged = [];
-            let changed = false;
-            for (const gp of ghPosts) {
-              if (!gp || typeof gp.id !== 'string') continue;
-              if (tombs.posts[gp.id]) { changed = true; continue; } // tombstoned: deleted for good, drop it from GitHub too
-              const lp = local.find((x) => x && x.id === gp.id);
-              if (!lp) { merged.push(gp); changed = true; continue; }
-              const m = Object.assign({}, gp);
-              m.views = Math.max(numOr(lp.views, 0), numOr(gp.views, 0));
-              m.likes = Math.max(numOr(lp.likes, 0), numOr(gp.likes, 0));
-              m.downloads = Math.max(numOr(lp.downloads, 0), numOr(gp.downloads, 0));
-              if (Array.isArray(lp.likedBy) && lp.likedBy.length > (Array.isArray(gp.likedBy) ? gp.likedBy.length : 0)) m.likedBy = lp.likedBy;
-              if (m.views !== numOr(gp.views, 0) || m.likes !== numOr(gp.likes, 0) || m.downloads !== numOr(gp.downloads, 0)) changed = true;
-              merged.push(m);
-            }
-            const graceMs = 5 * 60 * 1000;
-            for (const lp of local) {
-              if (!lp || typeof lp.id !== 'string') continue;
-              if (ghById[lp.id]) continue;
-              const created = Date.parse(lp.createdAt || '');
-              if (Number.isFinite(created) && Date.now() - created < graceMs) { merged.push(lp); continue; }
-              // Absent from GitHub and past the 5-minute grace: this is a
-              // real deletion, not a new local post — tombstone the id so
-              // it can never be re-posted or re-added.
-              if (!tombs.posts[lp.id]) { tombs.posts[lp.id] = new Date().toISOString(); tombsChanged = true; }
-              changed = true;
-            }
-            if (changed || merged.length !== local.length) { writePub(merged); out.publicChanged = true; }
-            out.publicPosts = merged.length;
-          }
-        }
-      } catch (e) { out.error = 'public: ' + (e && e.message ? e.message : e); }
-      // --- history.json ---
-      try {
-        const gh = await ghGetFile('history.json');
-        if (gh && gh.text) {
-          const ghH = JSON.parse(gh.text);
-          if (ghH && typeof ghH === 'object' && !Array.isArray(ghH)) {
-            const local = loadHistory();
-            const merged = {};
-            let changed = false;
-            const graceMs = 5 * 60 * 1000;
-            const emails = new Set(Object.keys(ghH).concat(Object.keys(local)));
-            for (const em of emails) {
-              const ghItems = Array.isArray(ghH[em]) ? ghH[em] : [];
-              const loItems = Array.isArray(local[em]) ? local[em] : [];
-              const ghByKey = {};
-              for (const it of ghItems) { const k = histKey(it); if (k) ghByKey[k] = it; }
-              const outItems = [];
-              for (const it of ghItems) {
-                if (!it || typeof it !== 'object') continue;
-                const k = histKey(it);
-                if (k && tombs.history[k]) { changed = true; continue; } // tombstoned: deleted for good, drop it from GitHub too
-                const li = k ? loItems.find((x) => histKey(x) === k) : null;
-                if (li && numOr(li.ts, 0) > numOr(it.ts, 0)) { outItems.push(li); changed = true; }
-                else outItems.push(it);
-              }
-              for (const li of loItems) {
-                if (!li || typeof li !== 'object') continue;
-                const k = histKey(li);
-                if (!k || ghByKey[k]) continue;
-                if (Number.isFinite(numOr(li.ts, 0)) && numOr(li.ts, 0) > 0 && Date.now() - numOr(li.ts, 0) < graceMs) { outItems.push(li); continue; }
-                // Absent from GitHub and past the 5-minute grace: this is
-                // a real deletion, not a new local item — tombstone the
-                // key so a client sync can never resurrect it.
-                if (k && !tombs.history[k]) { tombs.history[k] = new Date().toISOString(); tombsChanged = true; }
-                changed = true;
-              }
-              if (outItems.length) merged[em] = outItems.sort((a, b) => numOr(b.ts, 0) - numOr(a.ts, 0)).slice(0, 300);
-            }
-            if (changed || JSON.stringify(local) !== JSON.stringify(merged)) { saveHistory(merged); out.historyChanged = true; }
-            out.historyItems = Object.values(merged).reduce((n, a) => n + (Array.isArray(a) ? a.length : 0), 0);
-          }
-        }
-      } catch (e) { out.error = (out.error ? out.error + '; ' : '') + 'history: ' + (e && e.message ? e.message : e); }
-    } catch (e) { out.error = String(e && e.message ? e.message : e); }
-    // Persist any tombstones this merge recorded (awaited: a restart in
-    // the next second must not lose the record that blocks resurrection).
-    if (tombsChanged) { saveDeletedItems(tombs); await ghFlushFile(DELETED_ITEMS_FILE); }
-    return out;
-  }
-  // Throttled merge: at most one GitHub re-pull per minute, so the
-  // refresh-before-write in the hot handlers (view/like/sync) does not
-  // add a GitHub GET to every request. Returns the merge summary or null.
-  async function ghResyncPublicHistoryThrottled() {
-    try {
-      if (Date.now() - _ghResyncLastAt < 60 * 1000) return null;
-      _ghResyncLastAt = Date.now();
-      return await ghMergePublicHistoryFromGitHub();
-    } catch (e) { return null; }
-  }
+  // ---- GitHub data resync REMOVED (Supabase migration) ----
+  // The old throttled merge re-pulled public.json + history.json from
+  // GitHub because GitHub was authoritative. Supabase is now the single
+  // source of truth, so there is nothing to merge: every handler reads
+  // fresh state from Supabase, and tombstones (deleted-items) still
+  // guard against resurrection in the sync / post handlers below.
+
   // ---- LOCAL MP3 CONVERSION PERMANENTLY REMOVED (owner order 2026-11-17 ~11:16): ----
   // The local WAV->MP3 converter (convertAndCacheMp3, ~420 MB RSS) OOM-crashed the
   // 512 MB Render instance, so it is DELETED — not disabled, not dormant. Render
@@ -8060,7 +8186,7 @@ function apiRoute(req, res, urlPath) {
         // Cached MP3? Serve it instantly (no re-fetch, no re-encode).
         // STREAMING: pipe the file to the response — never load the
         // whole MP3 into memory (Hercules fix 2026-11-17).
-        const cachedFp = mp3CacheGet(u);
+        const cachedFp = await mp3CacheGet(u);
         if (cachedFp) {
           const st = fs.statSync(cachedFp);
           res.writeHead(200, { 'Content-Type': 'audio/mpeg', 'Content-Disposition': disp, 'Content-Length': st.size, 'Cache-Control': 'public, max-age=86400', 'Access-Control-Allow-Origin': '*' });
@@ -8087,7 +8213,7 @@ function apiRoute(req, res, urlPath) {
           res.end();
           return;
         }
-        if (!cloudinaryConfigured()) return sendJSON(res, 503, { ok: false, error: 'MP3 download unavailable — Cloudinary not configured' });
+        if (!await cloudinaryConfigured()) return sendJSON(res, 503, { ok: false, error: 'MP3 download unavailable — Cloudinary not configured' });
         const cl = await cloudinaryStoreSong(u, name.replace(/\.mp3$/i, ''));
         if (cl === 'gone') return sendJSON(res, 410, { ok: false, error: 'gone', message: 'This song is no longer available' });
         if (cl && cl.mp3Url) {
@@ -8401,7 +8527,7 @@ function apiRoute(req, res, urlPath) {
         if (l.ok) return mvLyricsWhisperSingle(l.buf, 'song.mp3');
         // Low-bitrate variant unfetchable or still too large — chunking below.
       }
-    } else if (cloudinaryConfigured()) {
+    } else if (await cloudinaryConfigured()) {
       const stored = await mvLyricsCloudinaryStoreMp3(audioUrl);
       if (stored === 'gone') {
         return { ok: false, error: 'ទាញយកបទចម្រៀងមិនបាន · Could not download the song audio' };
@@ -8437,7 +8563,7 @@ function apiRoute(req, res, urlPath) {
   }
   if (req.method === 'POST' && urlPath === '/api/mv/lyrics') {
     readJSONBody(req, 64 * 1024).then(async (body) => {
-      logActivity({ at: new Date().toISOString(), mode: 'mv-lyrics' });
+      await logActivity({ at: new Date().toISOString(), mode: 'mv-lyrics' });
       const audioUrl = body && typeof body.audioUrl === 'string' ? body.audioUrl.trim() : '';
       const translateTo = body && typeof body.translateTo === 'string' ? body.translateTo.trim().slice(0, 50) : '';
       let u;
@@ -8520,7 +8646,7 @@ function apiRoute(req, res, urlPath) {
         // if Cloudinary is not configured or its upload fails, return a
         // clear error instead of crashing the server. The website keeps
         // the provider URL in that case (temporary) and retries later.
-        if (!cloudinaryConfigured()) return sendJSON(res, 200, { ok: false, error: 'cloudinary not configured', url });
+        if (!await cloudinaryConfigured()) return sendJSON(res, 200, { ok: false, error: 'cloudinary not configured', url });
         const cl = await cloudinaryStoreSong(url, title);
         if (cl === 'gone') return sendJSON(res, 200, { ok: false, error: 'gone', url });
         if (cl && cl.mp3Url) {
@@ -8549,14 +8675,14 @@ function apiRoute(req, res, urlPath) {
   // GET /api/admin/cloudinary-accounts — admin key required. Lists the
   // env account (read-only) + admin accounts, each with its status.
   if (req.method === 'GET' && urlPath === '/api/admin/cloudinary-accounts') {
-    const a = adminKeyOk(req);
+    const a = await adminKeyOk(req);
     if (!a.ok) return sendJSON(res, 200, { ok: false, error: a.error });
     (async () => {
       try {
         const all = [];
         const env = cloudinaryEnvAccount();
         if (env) all.push(env);
-        for (const x of loadCloudinaryAccounts()) all.push(x);
+        for (const x of await loadCloudinaryAccounts()) all.push(x);
         const list = await Promise.all(all.map(async (x) => {
           const st = await cloudinaryAccountStatus(x);
           return cloudinaryPublicAccount(x, st);
@@ -8572,14 +8698,14 @@ function apiRoute(req, res, urlPath) {
   // — admin key required. Verifies the pair with a Cloudinary ping
   // BEFORE saving, so a wrong key/secret is reported immediately.
   if (req.method === 'POST' && urlPath === '/api/admin/cloudinary-accounts') {
-    const a = adminKeyOk(req);
+    const a = await adminKeyOk(req);
     if (!a.ok) return sendJSON(res, 200, { ok: false, error: a.error });
     readJSONBody(req, 64 * 1024).then(async (body) => {
       const cloudName = String((body && body.cloudName) || '').trim();
       const apiKey = String((body && body.apiKey) || '').trim();
       const apiSecret = String((body && body.apiSecret) || '').trim();
       if (!cloudName || !apiKey || !apiSecret) return sendJSON(res, 200, { ok: false, error: 'សូមដាក់ Cloud Name, API Key និង API Secret ទាំងបី' });
-      const arr = loadCloudinaryAccounts();
+      const arr = await loadCloudinaryAccounts();
       const dup = arr.find((x) => x && String(x.cloudName || '').trim().toLowerCase() === cloudName.toLowerCase());
       const cand = { id: dup ? dup.id : cloudinaryAccountId(), source: 'admin', readonly: false, label: cloudName, cloudName, apiKey, apiSecret, enabled: dup ? dup.enabled !== false : true, exhausted: false, exhaustedAt: null, lastError: '', lastErrorAt: null, createdAt: dup ? (dup.createdAt || new Date().toISOString()) : new Date().toISOString(), updatedAt: new Date().toISOString() };
       try {
@@ -8590,8 +8716,8 @@ function apiRoute(req, res, urlPath) {
       }
       if (dup) { const i = arr.findIndex((x) => x && x.id === dup.id); if (i >= 0) arr[i] = cand; }
       else arr.push(cand);
-      saveCloudinaryAccounts(arr);
-      await ghFlushFile(CLOUDINARY_ACCOUNTS_FILE);
+      await saveCloudinaryAccounts(arr);
+      scheduleBackup('cloudinary-accounts.json');
       const st = await cloudinaryAccountStatus(cand);
       return sendJSON(res, 200, { ok: true, account: cloudinaryPublicAccount(cand, st), updated: !!dup });
     }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹমត្រូវទេ', 'Bad request')));
@@ -8600,32 +8726,32 @@ function apiRoute(req, res, urlPath) {
   // DELETE /api/admin/cloudinary-accounts?id=... — admin key required.
   // Removes an admin account. The env (Main) account cannot be deleted.
   if (req.method === 'DELETE' && urlPath === '/api/admin/cloudinary-accounts') {
-    const a = adminKeyOk(req);
+    const a = await adminKeyOk(req);
     if (!a.ok) return sendJSON(res, 200, { ok: false, error: a.error });
     const id = String(new URL(req.url, 'http://localhost').searchParams.get('id') || '').trim();
     if (!id || id === 'env') return sendJSON(res, 200, { ok: false, error: 'មិនអាចលុបគណនី Main នេះបានទេ' });
-    const arr = loadCloudinaryAccounts();
+    const arr = await loadCloudinaryAccounts();
     const i = arr.findIndex((x) => x && x.id === id);
     if (i < 0) return sendJSON(res, 200, { ok: false, error: 'រកគណនីនេះមិនឃើញទេ' });
     arr.splice(i, 1);
-    saveCloudinaryAccounts(arr);
+    await saveCloudinaryAccounts(arr);
     return sendJSON(res, 200, { ok: true, deleted: id });
   }
   // POST /api/admin/cloudinary-accounts/toggle — {id, enabled} — admin
   // key required. Enables or disables an admin account.
   if (req.method === 'POST' && urlPath === '/api/admin/cloudinary-accounts/toggle') {
-    const a = adminKeyOk(req);
+    const a = await adminKeyOk(req);
     if (!a.ok) return sendJSON(res, 200, { ok: false, error: a.error });
     readJSONBody(req, 64 * 1024).then(async (body) => {
       const id = String((body && body.id) || '').trim();
       const enabled = !!(body && body.enabled);
       if (!id || id === 'env') return sendJSON(res, 200, { ok: false, error: 'មិនអាចបិទគណនី Main នេះបានទេ' });
-      const arr = loadCloudinaryAccounts();
+      const arr = await loadCloudinaryAccounts();
       const it = arr.find((x) => x && x.id === id);
       if (!it) return sendJSON(res, 200, { ok: false, error: 'រកគណនីនេះមិនឃើញទេ' });
       it.enabled = enabled;
       it.updatedAt = new Date().toISOString();
-      saveCloudinaryAccounts(arr);
+      await saveCloudinaryAccounts(arr);
       const st = await cloudinaryAccountStatus(it);
       return sendJSON(res, 200, { ok: true, account: cloudinaryPublicAccount(it, st) });
     }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
@@ -8636,17 +8762,17 @@ function apiRoute(req, res, urlPath) {
   // tried again (credits renew monthly; use this after topping up or
   // fixing a key).
   if (req.method === 'POST' && urlPath === '/api/admin/cloudinary-accounts/reset') {
-    const a = adminKeyOk(req);
+    const a = await adminKeyOk(req);
     if (!a.ok) return sendJSON(res, 200, { ok: false, error: a.error });
     readJSONBody(req, 64 * 1024).then(async (body) => {
       const id = String((body && body.id) || '').trim();
       if (!id || id === 'env') return sendJSON(res, 200, { ok: false, error: 'គណនី Main មិនមានស្ថានភាពត្រូវសម្អាតទេ' });
-      const arr = loadCloudinaryAccounts();
+      const arr = await loadCloudinaryAccounts();
       const it = arr.find((x) => x && x.id === id);
       if (!it) return sendJSON(res, 200, { ok: false, error: 'រកគណនីនេះមិនឃើញទេ' });
       it.exhausted = false; it.exhaustedAt = null; it.lastError = ''; it.lastErrorAt = null;
       it.updatedAt = new Date().toISOString();
-      saveCloudinaryAccounts(arr);
+      await saveCloudinaryAccounts(arr);
       const st = await cloudinaryAccountStatus(it);
       return sendJSON(res, 200, { ok: true, account: cloudinaryPublicAccount(it, st) });
     }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
@@ -8659,7 +8785,7 @@ function apiRoute(req, res, urlPath) {
   // red = exhausted (out of credits/quota/auth failed), unknown = not
   // used yet. Key values are never exposed — only index + status.
   if (req.method === 'GET' && urlPath === '/api/public/provider-status') {
-    return sendJSON(res, 200, { ok: true, providers: keyHealthList() });
+    return sendJSON(res, 200, { ok: true, providers: await keyHealthList() });
   }
   // POST /api/public/upload — ADMIN KEY required. JSON {kind: 'audio'|'image',
   // filename, data: base64}. Saves under ./data/uploads/ and returns the
@@ -8768,7 +8894,7 @@ function apiRoute(req, res, urlPath) {
     }));
   }
   if (req.method === 'POST' && urlPath === '/api/public/upload') {
-    const a = adminKeyOk(req);
+    const a = await adminKeyOk(req);
     if (!a.ok) return sendJSON(res, 200, { ok: false, error: a.error });
     readJSONBody(req, 30 * 1024 * 1024).then(async (body) => {
       const kind = typeof body.kind === 'string' ? body.kind.trim().toLowerCase() : '';
@@ -8924,14 +9050,13 @@ function apiRoute(req, res, urlPath) {
       const youtubeChannel = typeof body.youtubeChannel === 'string' ? body.youtubeChannel.trim().slice(0, 2000) : '';
       const avatar = typeof body.avatar === 'string' ? body.avatar.trim().slice(0, 500) : '';
       const now = new Date().toISOString();
-      await ghResyncPublicHistoryThrottled();
-      const posts = loadPublicPosts();
+      const posts = await loadPublicPosts();
       // Optional client-provided id (idempotent re-post from the phone).
       // A tombstoned id (deleted post) can never be re-posted, and an id
       // that already exists cannot be reused.
       const clientId = typeof body.id === 'string' ? body.id.trim().slice(0, 100) : '';
       if (clientId) {
-        if (loadDeletedItems().posts[clientId]) return sendJSON(res, 200, { ok: false, error: 'Post នេះត្រូវបានលុបហើយ · This post was deleted and cannot be re-posted' });
+        if ((await loadDeletedItems()).posts[clientId]) return sendJSON(res, 200, { ok: false, error: 'Post នេះត្រូវបានលុបហើយ · This post was deleted and cannot be re-posted' });
         if (posts.some((x) => x && x.id === clientId)) return sendJSON(res, 200, { ok: false, error: 'Post នេះមានរួចហើយ · This post already exists' });
         // Resurrection guard (tombstone fix 2026-11-18): a client-provided
         // id embeds its creation time (pub_<base36 ms><6 random chars>).
@@ -8943,8 +9068,8 @@ function apiRoute(req, res, urlPath) {
         if (/^pub_[0-9a-z]+$/.test(clientId) && clientId.length >= 11) {
           const idTs = parseInt(clientId.slice(4, -6), 36);
           if (Number.isFinite(idTs) && idTs > 1577836800000 && idTs < 1893456000000 && Date.now() - idTs >= 5 * 60 * 1000) {
-            tombstonePostIdNow(clientId);
-            await ghFlushFile(DELETED_ITEMS_FILE).catch(() => {});
+            await tombstonePostIdNow(clientId);
+            scheduleBackup('deleted-items.json');
             return sendJSON(res, 200, { ok: false, error: 'Post នេះត្រូវបានលុបហើយ · This post was deleted and cannot be re-posted' });
           }
         }
@@ -8959,17 +9084,17 @@ function apiRoute(req, res, urlPath) {
       };
       posts.push(p);
       if (posts.length > PUBLIC_MAX) posts.splice(0, posts.length - PUBLIC_MAX);
-      savePublicPosts(posts);
+      await savePublicPosts(posts);
       // Critical write: confirm public.json is on GitHub BEFORE returning
       // success, so a restart in the next second cannot lose a post that
       // the Admin app already reported as posted.
-      await ghFlushFile(PUBLIC_FILE);
+      scheduleBackup('public.json');
       // New public post -> notify FOLLOWERS only (one 'post' notification
       // per follower, in-app + Web Push to their phones immediately).
       // Private posts never notify anyone.
       if (visibility === 'public') {
-        for (const f of loadFollowers()) {
-          addNotification('post', f, '📢 បានផុសថ្មី · New post', p.title + ' (' + mode + ') — ' + (p.name || email));
+        for (const f of await loadFollowers()) {
+          await addNotification('post', f, '📢 បានផុសថ្មី · New post', p.title + ' (' + mode + ') — ' + (p.name || email));
         }
       }
       return sendJSON(res, 200, { ok: true, post: pubPost(p) });
@@ -8982,25 +9107,24 @@ function apiRoute(req, res, urlPath) {
   // before success is returned, so the deletion survives a restart
   // (same pattern as POST /api/public/post).
   if (req.method === 'DELETE' && urlPath === '/api/public/post') {
-    const a = adminKeyOk(req);
+    const a = await adminKeyOk(req);
     if (!a.ok) return sendJSON(res, 200, { ok: false, error: a.error });
     readJSONBody(req, 64 * 1024).then(async (body) => {
       const id = typeof body.id === 'string' ? body.id.trim() : '';
       if (!id) return sendJSON(res, 200, { ok: false, error: 'សូមដាក់ post id' });
-      await ghResyncPublicHistoryThrottled();
-      const posts = loadPublicPosts();
+      const posts = await loadPublicPosts();
       const idx = posts.findIndex((x) => x && x.id === id);
       if (idx < 0) return sendJSON(res, 200, { ok: false, error: 'រកមិនឃើញ post នេះទេ' });
       posts.splice(idx, 1);
-      savePublicPosts(posts);
+      await savePublicPosts(posts);
       // Critical write: confirm public.json is on GitHub BEFORE returning
       // success, so a restart in the next second cannot resurrect a post
       // the Admin app already reported as deleted.
-      await ghFlushFile(PUBLIC_FILE);
+      scheduleBackup('public.json');
       // Tombstone the id so the deleted post can never be re-posted or
       // re-added by a client sync (resurrection bug 2026-11-18).
-      tombstonePostIdNow(id);
-      await ghFlushFile(DELETED_ITEMS_FILE);
+      await tombstonePostIdNow(id);
+      scheduleBackup('deleted-items.json');
       return sendJSON(res, 200, { ok: true, deletedId: id });
     }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
     return;
@@ -9010,8 +9134,8 @@ function apiRoute(req, res, urlPath) {
   // createdAt. rank is 1-based; tier 1 = rank 1–50, tier 2 = 51–200,
   // tier 3 = the rest.
   if (req.method === 'GET' && urlPath === '/api/public/feed') {
-    const tombs = loadDeletedItems();
-    const posts = loadPublicPosts().filter((p) => p && p.visibility === 'public' && !tombs.posts[p.id]);
+    const tombs = await loadDeletedItems();
+    const posts = (await loadPublicPosts()).filter((p) => p && p.visibility === 'public' && !tombs.posts[p.id]);
     posts.sort((a, b) => ((b.views || 0) - (a.views || 0)) || ((b.likes || 0) - (a.likes || 0)) || String(a.createdAt || '').localeCompare(String(b.createdAt || '')));
     const out = posts.map((p, i) => {
       const rank = i + 1;
@@ -9030,16 +9154,15 @@ function apiRoute(req, res, urlPath) {
       const email = normEmail(body && body.email) || (typeof body.email === 'string' ? body.email.trim().toLowerCase().slice(0, 200) : '');
       if (!postId) return sendJSON(res, 200, { ok: false, error: 'សូមដាក់ postId' });
       if (!email) return sendJSON(res, 200, { ok: false, error: 'សូមដាក់ Gmail ត្រឹមត្រូវ' });
-      await ghResyncPublicHistoryThrottled();
-      const posts = loadPublicPosts();
+      const posts = await loadPublicPosts();
       const p = posts.find((x) => x.id === postId);
       if (!p) return sendJSON(res, 404, { ok: false, error: 'រក post នេះមិនឃើញទេ' });
       if (!Array.isArray(p.likedBy)) p.likedBy = [];
       if (!p.likedBy.includes(email)) {
         p.likedBy.push(email);
         p.likes = p.likedBy.length;
-        savePublicPosts(posts);
-        await ghFlushFile(PUBLIC_FILE);
+        await savePublicPosts(posts);
+        scheduleBackup('public.json');
       }
       return sendJSON(res, 200, { ok: true, likes: p.likes || 0 });
     }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
@@ -9054,13 +9177,12 @@ function apiRoute(req, res, urlPath) {
     readJSONBody(req, 64 * 1024).then(async (body) => {
       const postId = typeof body.postId === 'string' ? body.postId.trim() : '';
       if (!postId) return sendJSON(res, 200, { ok: false, error: 'សូមដាក់ postId' });
-      await ghResyncPublicHistoryThrottled();
-      const posts = loadPublicPosts();
+      const posts = await loadPublicPosts();
       const p = posts.find((x) => x.id === postId);
       if (!p) return sendJSON(res, 404, { ok: false, error: 'រក post នេះមិនឃើញទេ' });
       p.views = (p.views || 0) + 1;
-      savePublicPosts(posts);
-      await ghFlushFile(PUBLIC_FILE);
+      await savePublicPosts(posts);
+      scheduleBackup('public.json');
       // Monetization: a logged-in view accrues watch time + (when ON and
       // the owner is approved) the view earning. Never blocks the view
       // count — a monetization failure must not lose the view.
@@ -9083,13 +9205,12 @@ function apiRoute(req, res, urlPath) {
     readJSONBody(req, 64 * 1024).then(async (body) => {
       const postId = typeof body.postId === 'string' ? body.postId.trim() : '';
       if (!postId) return sendJSON(res, 200, { ok: false, error: 'សូមដាក់ postId' });
-      await ghResyncPublicHistoryThrottled();
-      const posts = loadPublicPosts();
+      const posts = await loadPublicPosts();
       const p = posts.find((x) => x.id === postId);
       if (!p) return sendJSON(res, 404, { ok: false, error: 'រក post នេះមិនឃើញទេ' });
       p.downloads = (p.downloads || 0) + 1;
-      savePublicPosts(posts);
-      await ghFlushFile(PUBLIC_FILE);
+      await savePublicPosts(posts);
+      scheduleBackup('public.json');
       return sendJSON(res, 200, { ok: true, downloads: p.downloads });
     }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
     return;
@@ -9104,9 +9225,9 @@ function apiRoute(req, res, urlPath) {
   // lost on restart.
   if (req.method === 'POST' && urlPath === '/api/public/feature-usage') {
     readJSONBody(req, 64 * 1024).then(async (body) => {
-      const r = featureUsageRecord(body && body.feature);
+      const r = await featureUsageRecord(body && body.feature);
       if (!r) return sendJSON(res, 200, { ok: false, error: 'សូមដាក់ feature ត្រឹមត្រូវ' });
-      await ghFlushFile(FEATURE_USAGE_FILE);
+      scheduleBackup('feature-usage.json');
       return sendJSON(res, 200, { ok: true, feature: r.feature, total: r.total, today: r.today });
     }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
     return;
@@ -9123,19 +9244,17 @@ function apiRoute(req, res, urlPath) {
   const PKG_EVENTS_FILE = path.join(DATA_DIR, 'package-events.json');
   const PKG_EVENTS_MAX = 5000;
   const PKG_EVENT_ACTIONS = ['view', 'buy', 'cancel', 'request'];
-  function loadPkgEvents() {
-    try { const j = JSON.parse(fs.readFileSync(PKG_EVENTS_FILE, 'utf8')); if (Array.isArray(j)) return j; } catch (e) {}
-    return [];
+  async function loadPkgEvents() {
+    const j = await loadKvDoc('package-events', []);
+      return Array.isArray(j) ? j : [];
   }
-  function savePkgEvents(arr) {
-    try { fs.mkdirSync(DATA_DIR, { recursive: true }); } catch (e) {}
-    fs.writeFileSync(PKG_EVENTS_FILE, JSON.stringify(arr, null, 2));
-    ghPersistFile(PKG_EVENTS_FILE);
+  async function savePkgEvents(arr) {
+    await saveKvDoc('package-events', arr, 'package-events.json');
   }
   // POST /api/public/package-event — PUBLIC. {email, packageId, action}
   // email may be 'guest' for visitors who are not signed in.
   if (req.method === 'POST' && urlPath === '/api/public/package-event') {
-    readJSONBody(req, 64 * 1024).then((body) => {
+    readJSONBody(req, 64 * 1024).then(async (body) => {
       const rawEmail = typeof body.email === 'string' ? body.email.trim().toLowerCase() : '';
       const email = rawEmail === 'guest' ? 'guest' : normEmail(rawEmail);
       if (!email) return sendJSON(res, 200, { ok: false, error: 'សូមដាក់ Gmail ត្រឹមត្រូវ' });
@@ -9143,10 +9262,10 @@ function apiRoute(req, res, urlPath) {
       if (!packageId) return sendJSON(res, 200, { ok: false, error: 'សូមដាក់ packageId' });
       const action = typeof body.action === 'string' ? body.action.trim().toLowerCase() : '';
       if (!PKG_EVENT_ACTIONS.includes(action)) return sendJSON(res, 200, { ok: false, error: 'action មិនត្រឹមត្រូវទេ' });
-      const events = loadPkgEvents();
+      const events = await loadPkgEvents();
       events.push({ at: new Date().toISOString(), email, packageId, action });
       if (events.length > PKG_EVENTS_MAX) events.splice(0, events.length - PKG_EVENTS_MAX);
-      savePkgEvents(events);
+      await savePkgEvents(events);
       return sendJSON(res, 200, { ok: true });
     }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
     return;
@@ -9154,13 +9273,13 @@ function apiRoute(req, res, urlPath) {
   // GET /api/admin/package-events?email=&packageId=&action= — admin key
   // required. Newest first, limit 500.
   if (req.method === 'GET' && urlPath === '/api/admin/package-events') {
-    const a = adminKeyOk(req);
+    const a = await adminKeyOk(req);
     if (!a.ok) return sendJSON(res, 200, { ok: false, error: a.error });
     const q = new URL(req.url, 'http://localhost').searchParams;
     const fEmail = (q.get('email') || '').trim().toLowerCase();
     const fPkg = (q.get('packageId') || '').trim();
     const fAction = (q.get('action') || '').trim().toLowerCase();
-    const list = loadPkgEvents()
+    const list = (await loadPkgEvents())
       .filter((e) => e && (!fEmail || e.email === fEmail) && (!fPkg || e.packageId === fPkg) && (!fAction || e.action === fAction))
       .sort((x, y) => String(y.at || '').localeCompare(String(x.at || '')))
       .slice(0, 500);
@@ -9198,9 +9317,9 @@ const server = http.createServer((req, res) => {
 // the Admin once per expiry (bell + Telegram via 'plan-expired'), so the
 // Admin can follow up. A renewal (new approve) stores a new expiry date,
 // so the next expiry notifies again. Runs hourly + once after startup.
-function checkPlanExpiries() {
+async function checkPlanExpiries() {
   try {
-    const users = loadUsers();
+    const users = await loadUsers();
     const now = Date.now();
     let changed = false;
     for (const em of Object.keys(users)) {
@@ -9216,29 +9335,34 @@ function checkPlanExpiries() {
         if (!expMs || expMs > now) continue;
         if (pl.notified && pl.notified === pl.exp) continue;
         const uid = u.id || '—';
-        addNotification('plan-expired', em, '⏰ កញ្ចប់ផុតកំណត់ · Package expired', (u.name || em) + ' · ' + em + ' · ID: ' + uid + ' — កញ្ចប់ ' + pl.label + ' បានផុតកំណត់ (' + String(pl.exp).slice(0, 10) + ')');
+        await addNotification('plan-expired', em, '⏰ កញ្ចប់ផុតកំណត់ · Package expired', (u.name || em) + ' · ' + em + ' · ID: ' + uid + ' — កញ្ចប់ ' + pl.label + ' បានផុតកំណត់ (' + String(pl.exp).slice(0, 10) + ')');
         u[pl.field] = pl.exp;
         u.updatedAt = new Date().toISOString();
         changed = true;
       }
     }
-    if (changed) { saveUsers(users); ghFlushFile(USERS_FILE).catch(() => {}); }
+    if (changed) { await saveUsers(users); scheduleBackup('users.json'); }
   } catch (e) {}
 }
 
 if (require.main === module) {
-  // Restore persistent data from GitHub first (no-op without a token),
-  // so the server starts with the true data, then listen.
-  ghRestoreAll().catch(() => {}).finally(() => {
-    server.listen(PORT, () => {
-      console.log('MovAi Gen live on port ' + PORT);
-      // Auto Update Version New: hourly sweep (auto-apply due updates +
-      // model check when due) + a first sweep 5 min after startup.
-      // Plan-expiry sweep runs on the same schedule: when a bought package
-      // reaches its expiry date, notify the Admin once (bell + Telegram).
-      setTimeout(() => { autoUpdateSweep(); checkPlanExpiries(); }, 5 * 60 * 1000);
-      setInterval(() => { autoUpdateSweep(); checkPlanExpiries(); }, 60 * 60 * 1000);
-    });
+  // Supabase is REQUIRED: without its env vars the server cannot serve
+  // live data (there is no local-file fallback). Fail loudly at startup.
+  if (!sbEnabled()) {
+    console.error('[supabase] SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are required — set them in the environment (Render movai-proxy) and restart.');
+    process.exit(1);
+  }
+  // Supabase is the single source of truth — no GitHub restore. The
+  // first request heals dead song URLs (see apiRoute top); backup
+  // snapshots run on their own timer (scheduleBackup / runBackupSnapshot).
+  server.listen(PORT, () => {
+    console.log('MovAi Gen live on port ' + PORT);
+    // Auto Update Version New: hourly sweep (auto-apply due updates +
+    // model check when due) + a first sweep 5 min after startup.
+    // Plan-expiry sweep runs on the same schedule: when a bought package
+    // reaches its expiry date, notify the Admin once (bell + Telegram).
+    setTimeout(() => { autoUpdateSweep(); checkPlanExpiries(); }, 5 * 60 * 1000);
+    setInterval(() => { autoUpdateSweep(); checkPlanExpiries(); }, 60 * 60 * 1000);
   });
 }
 module.exports = { server };
