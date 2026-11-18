@@ -240,11 +240,24 @@ main{max-width:720px;margin:0 auto;padding:calc(4rem + env(safe-area-inset-top,0
 .fl-field{position:relative}
 .fl-label{position:absolute;top:8px;left:14px;font-size:0.6875rem;font-weight:700;letter-spacing:.03em;color:var(--label);pointer-events:none;z-index:1}
 /* AI Lyrics controls at the Title field's top-right corner (owner
-   order 2026-11-18): [language select][AI button] sit in the label
+   order 2026-11-18): [language button][AI button] sit in the label
    band at the top-right; the Title input's right padding keeps typed
-   text clear of them. The status line sits just under the Title. */
+   text clear of them. The status line sits just under the Title.
+   Language is a SMALL custom dropdown with flags (owner order
+   2026-11-18 19:59 — the native <select> opened a big full-screen
+   phone picker). The popup opens just below the whole Title field
+   (so it never covers the typed title), shows ~4 rows, scrolls. */
 .ai-titlebar{position:absolute;top:8px;right:10px;display:flex;gap:6px;align-items:center;z-index:2}
-.ai-titlebar #aiLyricsLang{min-height:30px;height:30px;padding:4px 6px;font-size:0.75rem;width:auto;max-width:110px;border-radius:8px}
+.ai-lang-btn{flex:0 0 auto;display:inline-flex;align-items:center;gap:5px;min-height:30px;height:30px;padding:4px 8px;font-family:inherit;font-size:0.75rem;font-weight:700;max-width:116px;white-space:nowrap;overflow:hidden;border:1px solid var(--line2);border-radius:8px;background:var(--field);color:var(--text);cursor:pointer}
+.ai-lang-btn .ai-lang-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+.ai-lang-btn .ai-lang-chev{flex:0 0 auto;font-size:0.625rem;color:var(--muted)}
+.ai-lang-pop{position:absolute;top:calc(100% + 4px);right:10px;width:200px;max-width:calc(100vw - 20px);max-height:192px;overflow-y:auto;background:var(--card);border:1px solid var(--line2);border-radius:12px;box-shadow:0 12px 32px rgba(0,0,0,.55);z-index:60}
+.ai-lang-row{display:flex;align-items:center;gap:10px;height:48px;padding:0 12px;font-size:0.9375rem;color:var(--text);cursor:pointer;border-bottom:1px solid var(--line)}
+.ai-lang-row:last-child{border-bottom:none}
+.ai-lang-row.sel{background:rgba(163,230,53,.14);color:var(--accent-text);font-weight:700}
+.ai-lang-row .ai-lang-flag{flex:0 0 auto;font-size:1.125rem;line-height:1}
+.ai-lang-row .ai-lang-rowname{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ai-lang-row .ai-lang-check{flex:0 0 auto;color:var(--accent-text);font-weight:800}
 .ai-lyrics-mini{flex:0 0 auto;min-height:30px;height:30px;padding:4px 12px;border:none;border-radius:8px;background:var(--accent-fill);color:#0d1005;font-family:inherit;font-size:0.8125rem;font-weight:800;cursor:pointer}
 .ai-lyrics-mini:disabled{opacity:.45;cursor:not-allowed}
 /* Song voice row (owner order 2026-11-17): the Male/Female/Random
@@ -3126,12 +3139,14 @@ input[type=range].st-range{accent-color:var(--accent);min-height:32px;cursor:poi
               <span class="fl-label" data-i18n="lblSongTitle">ចំណងជើង</span>
               <input type="text" class="input" id="songTitle" data-i18n-ph="songTitlePh" placeholder="ឧ. ឈ្មោះបទចម្រៀងរបស់អ្នក..." maxlength="200" style="min-height:56px;padding:24px 172px 8px 14px">
               <div class="ai-titlebar">
-                <select id="aiLyricsLang" class="input" aria-label="ភាសាអត្ថបទ">
-                  <option value="kh">ខ្មែរ</option>
-                  <option value="en">English</option>
-                </select>
+                <button type="button" class="ai-lang-btn" id="aiLyricsLangBtn" onclick="aiLyricsLangToggle(event)" aria-label="ភាសាអត្ថបទ">🇰🇭 <span class="ai-lang-name">ខ្មែរ</span> <span class="ai-lang-chev">▾</span></button>
                 <button type="button" class="ai-lyrics-mini" id="aiLyricsBtn" onclick="aiLyricsGenerate()">AI</button>
               </div>
+              <select id="aiLyricsLang" style="display:none" aria-hidden="true">
+                <option value="kh">ខ្មែរ</option>
+                <option value="en">English</option>
+              </select>
+              <div class="ai-lang-pop" id="aiLyricsLangPop" style="display:none"></div>
             </div>
             <div id="aiLyricsStatus" style="font-size:0.8125rem;color:var(--muted);margin-top:4px"></div>
             <div class="fl-field">
@@ -9115,23 +9130,26 @@ function songStyleAdd(){
    on failure the error shows there and tapping the button retries. */
 /* ---- AI Lyrics language list (owner order 2026-11-18) ----
    ALL languages, not just Khmer/English. Each entry is
-   [code, Khmer label, English label]. Labels are always in the
-   SITE language (Khmer site → Khmer labels; English site →
-   English labels) — never mixed. Rebuilt on every language pass;
+   [code, Khmer label, English label, flag emoji]. Labels are always
+   in the SITE language (Khmer site → Khmer labels; English site →
+   English labels) — never mixed. Flags are language-neutral.
+   The list drives a SMALL custom dropdown with flags (owner order
+   2026-11-18 19:59); the native <select id="aiLyricsLang"> stays
+   hidden and only holds the value. Rebuilt on every language pass;
    the selected value is preserved, default = the site language. */
 var AI_LYRICS_LANGS=[
- ['kh','ខ្មែរ','Khmer'],['en','អង់គ្លេស','English'],['th','ថៃ','Thai'],
- ['vi','វៀតណាម','Vietnamese'],['lo','ឡាវ','Lao'],['zh','ចិន','Chinese'],
- ['ja','ជប៉ុន','Japanese'],['ko','កូរ៉េ','Korean'],['es','អេស្ប៉ាញ','Spanish'],
- ['fr','បារាំង','French'],['de','អាល្លឺម៉ង់','German'],['pt','ព័រទុយហ្គាល់','Portuguese'],
- ['ru','រុស្ស៊ី','Russian'],['ar','អារ៉ាប់','Arabic'],['hi','ហិណ្ឌូ','Hindi'],
- ['id','ឥណ្ឌូនេស៊ី','Indonesian'],['ms','ម៉ាឡេ','Malay'],['fil','ហ្វីលីពីន','Filipino'],
- ['it','អ៊ីតាលី','Italian'],['nl','ហូឡង់','Dutch'],['tr','ទួរគី','Turkish'],
- ['my','ភូមា','Burmese'],['bn','បេងហ្គាល់','Bengali'],['ur','អ៊ូឌូ','Urdu'],
- ['fa','ពែរ្ស','Persian'],['uk','អ៊ុយក្រែន','Ukrainian'],['pl','ប៉ូឡូញ','Polish'],
- ['sv','ស៊ុយអែដ','Swedish'],['da','ដាណឺម៉ាក','Danish'],['fi','ហ្វាំងឡង់','Finnish'],
- ['no','ន័រវែស','Norwegian'],['cs','ឆេក','Czech'],['hu','ហុងគ្រី','Hungarian'],
- ['el','ក្រិក','Greek'],['he','ហេប្រឺ','Hebrew']
+ ['kh','ខ្មែរ','Khmer','🇰🇭'],['en','អង់គ្លេស','English','🇬🇧'],['th','ថៃ','Thai','🇹🇭'],
+ ['vi','វៀតណាម','Vietnamese','🇻🇳'],['lo','ឡាវ','Lao','🇱🇦'],['zh','ចិន','Chinese','🇨🇳'],
+ ['ja','ជប៉ុន','Japanese','🇯🇵'],['ko','កូរ៉េ','Korean','🇰🇷'],['es','អេស្ប៉ាញ','Spanish','🇪🇸'],
+ ['fr','បារាំង','French','🇫🇷'],['de','អាល្លឺម៉ង់','German','🇩🇪'],['pt','ព័រទុយហ្គាល់','Portuguese','🇵🇹'],
+ ['ru','រុស្ស៊ី','Russian','🇷🇺'],['ar','អារ៉ាប់','Arabic','🇸🇦'],['hi','ហិណ្ឌូ','Hindi','🇮🇳'],
+ ['id','ឥណ្ឌូនេស៊ី','Indonesian','🇮🇩'],['ms','ម៉ាឡេ','Malay','🇲🇾'],['fil','ហ្វីលីពីន','Filipino','🇵🇭'],
+ ['it','អ៊ីតាលី','Italian','🇮🇹'],['nl','ហូឡង់','Dutch','🇳🇱'],['tr','ទួរគី','Turkish','🇹🇷'],
+ ['my','ភូមា','Burmese','🇲🇲'],['bn','បេងហ្គាល់','Bengali','🇧🇩'],['ur','អ៊ូឌូ','Urdu','🇵🇰'],
+ ['fa','ពែរ្ស','Persian','🇮🇷'],['uk','អ៊ុយក្រែន','Ukrainian','🇺🇦'],['pl','ប៉ូឡូញ','Polish','🇵🇱'],
+ ['sv','ស៊ុយអែដ','Swedish','🇸🇪'],['da','ដាណឺម៉ាក','Danish','🇩🇰'],['fi','ហ្វាំងឡង់','Finnish','🇫🇮'],
+ ['no','ន័រវែស','Norwegian','🇳🇴'],['cs','ឆេក','Czech','🇨🇿'],['hu','ហុងគ្រី','Hungarian','🇭🇺'],
+ ['el','ក្រិក','Greek','🇬🇷'],['he','ហេប្រឺ','Hebrew','🇮🇱']
 ];
 function aiLyricsLangRender(){
   var sel=document.getElementById('aiLyricsLang');if(!sel)return;
@@ -9146,6 +9164,38 @@ function aiLyricsLangRender(){
   sel.innerHTML=html;
   sel.value=cur;
   sel.setAttribute('aria-label',tx('aiLyricsLangLabel'));
+  /* Custom dropdown (small, with flags): button label + popup rows. */
+  var curL=null;
+  for(var k=0;k<AI_LYRICS_LANGS.length;k++)if(AI_LYRICS_LANGS[k][0]===cur){curL=AI_LYRICS_LANGS[k];break;}
+  var btn=document.getElementById('aiLyricsLangBtn');
+  if(btn&&curL){
+    btn.innerHTML=escHtml(curL[3])+' <span class="ai-lang-name">'+escHtml(LANG==='en'?curL[2]:curL[1])+'</span> <span class="ai-lang-chev">▾</span>';
+    btn.setAttribute('aria-label',tx('aiLyricsLangLabel'));
+  }
+  var pop=document.getElementById('aiLyricsLangPop');
+  if(pop){
+    var ph='';
+    for(var m=0;m<AI_LYRICS_LANGS.length;m++){
+      var M=AI_LYRICS_LANGS[m];
+      ph+='<div class="ai-lang-row'+(M[0]===cur?' sel':'')+'" data-lang="'+M[0]+'" onclick="aiLyricsLangPick(\''+M[0]+'\')"><span class="ai-lang-flag">'+escHtml(M[3])+'</span><span class="ai-lang-rowname">'+escHtml(LANG==='en'?M[2]:M[1])+'</span>'+(M[0]===cur?'<span class="ai-lang-check">✓</span>':'')+'</div>';
+    }
+    pop.innerHTML=ph;
+  }
+}
+function aiLyricsLangClose(){var p=document.getElementById('aiLyricsLangPop');if(p)p.style.display='none';}
+function aiLyricsLangToggle(ev){
+  if(ev){try{ev.stopPropagation();}catch(e){}}
+  var p=document.getElementById('aiLyricsLangPop');if(!p)return;
+  if(p.style.display==='block'){p.style.display='none';return;}
+  aiLyricsLangRender();
+  p.style.display='block';
+}
+function aiLyricsLangPick(code){
+  var sel=document.getElementById('aiLyricsLang');if(!sel)return;
+  sel.value=code;
+  try{sel.dispatchEvent(new Event('change',{bubbles:true}));}catch(e){}
+  aiLyricsLangRender();
+  aiLyricsLangClose();
 }
 var aiLyricsBusy=false,aiLyricsTimer=null,aiLyricsSec=0;
 function aiLyricsSetStatus(t,err){
@@ -19094,8 +19144,11 @@ function genInit(){
     if(nw&&nd&&!nw.contains(e.target))nd.style.display='none';
     var pw=document.getElementById('songStylePresetWrap');
     if(pw&&!pw.contains(e.target))songStyleClosePicker();
+    var lb=document.getElementById('aiLyricsLangBtn');
+    var lp=document.getElementById('aiLyricsLangPop');
+    if(lp&&lp.style.display==='block'&&lb&&!lb.contains(e.target)&&!lp.contains(e.target))lp.style.display='none';
   });
-  document.addEventListener('keydown',function(e){if(e.key==='Escape'){closeMenu();profileClose();loginSheetClose();pubSheetClose();notifSheetClose();packagesHide();try{walletTopupClose();}catch(e){}try{walletWithdrawClose();}catch(e){}try{monetClose();}catch(e){}}});
+  document.addEventListener('keydown',function(e){if(e.key==='Escape'){try{aiLyricsLangClose();}catch(e){}closeMenu();profileClose();loginSheetClose();pubSheetClose();notifSheetClose();packagesHide();try{walletTopupClose();}catch(e){}try{walletWithdrawClose();}catch(e){}try{monetClose();}catch(e){}}});
 }
 
 (function(){ try{genInit()}catch(e){} })();
