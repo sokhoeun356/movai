@@ -1601,6 +1601,11 @@ html[data-mode="light"] .btn-free{color:#63910c}
 .wallet-bal-card{border:1px solid rgba(var(--accent-rgb),.45);border-radius:14px;padding:16px 14px;background:var(--card2);text-align:center}
 .wallet-bal-label{font-size:0.8125rem;font-weight:800;color:var(--muted)}
 .wallet-bal-amt{font-size:2.25rem;font-weight:900;line-height:1.15;margin-top:4px;color:var(--accent-text);font-variant-numeric:tabular-nums}
+/* Small side-by-side Wallet + Earn cards in My Profile (owner order 2026-11-18): two small columns, name + amount only. The Earn breakdown (cashback / views) lives in the Monetization sheet. */
+.wallet-bal-duo{display:flex;gap:10px;margin-top:10px}
+.wallet-bal-duo .wallet-bal-card{flex:1 1 0;min-width:0;padding:12px 10px}
+.wallet-bal-duo .wallet-bal-amt{font-size:1.375rem;margin-top:2px}
+.wallet-bal-duo .wallet-bal-label{font-size:0.75rem}
 .wallet-earn-card{border-color:var(--line2)}
 .wallet-earn-breakdown{margin-top:10px;border-top:1px solid var(--line);padding-top:8px;text-align:left}
 .wallet-earn-row{display:flex;justify-content:space-between;gap:10px;padding:5px 0;font-size:0.8125rem;color:var(--muted)}
@@ -3410,33 +3415,10 @@ input[type=range].st-range{accent-color:var(--accent);min-height:32px;cursor:poi
       <h3 style="font-size:1rem;font-weight:800" data-i18n="profileTitle">ប្រូហ្វាល់របស់ខ្ញុំ</h3>
       <button type="button" class="drawer-close" style="background:var(--card2);color:var(--text);border-color:var(--line2)" onclick="profileClose()" aria-label="Close">✕</button>
     </div>
-    <!-- Wallet (owner correction): My Profile shows ONLY the
-         Wallet Balance card plus two tappable rows — «Top up»
-         and «Withdraw». The full forms are NOT inline here:
-         each row opens its own SMALL sheet (walletTopupSheet /
-         walletWithdrawSheet, right after this Profile sheet)
-         containing the form. Static markup (NOT rebuilt by
-         profileRender); the balances + credits are refreshed
-         FRESH by profileFreshRefresh() on every open, after
-         every purchase/action, and on a 30-second poll. -->
-    <div id="walletBox" style="margin-top:10px">
-      <div class="wallet-bal-card" id="walletBalanceCard">
-        <div class="wallet-bal-label" data-i18n="walletBalanceTitle">សមតុល្យ Wallet · Wallet Balance</div>
-        <div class="wallet-bal-amt" id="walletBalance">$0.00</div>
-        <p class="wallet-note" style="text-align:center;margin-top:4px" data-i18n="walletSpendableNote">លុយបញ្ចូល — អាចចាយ / ទិញកញ្ចប់បាន · Top-up money — can be spent / buy packages</p>
-      </div>
-      <div class="wallet-bal-card wallet-earn-card" id="earnBalanceCard" style="margin-top:10px">
-        <div class="wallet-bal-label" data-i18n="earnMoneyTitle">លុយរកបាន · Earn Money</div>
-        <div class="wallet-bal-amt" id="earnBalance">$0.00</div>
-        <div class="wallet-earn-breakdown" id="earnBreakdown">
-          <div class="wallet-earn-row"><span data-i18n="earnCashbackLbl">Cashback ពីកញ្ចប់ · Package cashback</span><b id="earnCashback" class="js-earn-cashback">$0.00</b></div>
-          <div class="wallet-earn-row"><span data-i18n="earnViewsLbl">ចំណូលពីការមើល · View earnings</span><b id="earnViews" class="js-earn-views">$0.00</b></div>
-        </div>
-        <p class="wallet-note" style="text-align:center;margin-top:6px" data-i18n="earnWithdrawOnlyNote">ដកបានតែប៉ុណ្ណោះ — ទិញអ្វីមិនបានទេ · Withdraw only — cannot be used to buy anything</p>
-      </div>
-      <button type="button" class="wallet-action-row" id="walletTopupOpenBtn" onclick="walletTopupOpen()"><span data-i18n="walletTopupTitle">បញ្ចូលលុយ · Top up</span><span class="war-arrow" aria-hidden="true">›</span></button>
-      <button type="button" class="wallet-action-row" id="walletWithdrawOpenBtn" onclick="walletWithdrawOpen()"><span data-i18n="walletWithdrawTitle">ដកលុយ · Withdraw</span><span class="war-arrow" aria-hidden="true">›</span></button>
-    </div>
+    <!-- My Profile body (built by profileRender): header, User ID,
+         Credit balance, Packages / Monetization / Followers rows,
+         the SMALL side-by-side Wallet + Earn cards, the Top up /
+         Withdraw rows, Day/Night, Log out, contact rows. -->
     <div id="profileBody" style="margin-top:8px"></div>
   </div>
 </div>
@@ -17220,46 +17202,28 @@ function profileRender(){
   var h='';
   var pic=acctPicture(u);
   h+='<div style="display:flex;align-items:center;gap:10px">';
-  h+='<span class="prof-pic-wrap"><span class="avatar-orb avatar-lg">'+(pic?'<img src="'+escHtml(pic)+'" alt="" referrerpolicy="no-referrer" style="width:100%;height:100%;border-radius:50%;object-fit:cover;display:block">':acctAvatarFaceHtml())+'</span><button type="button" class="prof-pic-cam" onclick="profPicPick()" aria-label="'+escHtml(tx(pic?'profPicChange':'profPicUpload'))+'"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg></button></span>';
+  h+='<span class="prof-pic-wrap"><span class="avatar-orb avatar-lg">'+(pic?'<img src="'+escHtml(pic)+'" alt="" referrerpolicy="no-referrer" style="width:100%;height:100%;border-radius:50%;object-fit:cover;display:block">':acctAvatarFaceHtml())+'</span></span>';
   h+='<div style="min-width:0"><div style="font-size:1rem;font-weight:900;overflow-wrap:break-word">'+acctNameHtml(u)+'</div>';
   h+='<div style="font-size:0.75rem;color:var(--muted);overflow-wrap:break-word;margin-top:1px">'+escHtml(u.email)+'</div></div></div>';
-  /* Profile picture: the Google photo arrives automatically; with
-     no Google photo the user picks one from their phone here. A
-     self-picked photo can be changed any time, and removed to go
-     back to the Google photo. The long explanatory
-     paragraph is GONE (owner order 2026-11-17) — only the small
-     «Change profile photo» button stays. */
-  h+='<div class="prof-pic-btns"><button type="button" class="kbtn kbtn-white" onclick="profPicPick()">'+escHtml(tx(pic?'profPicChange':'profPicUpload'))+'</button>';
-  if(u.customPicture)h+='<button type="button" class="kbtn kbtn-white" onclick="profPicRemove()">'+escHtml(tx('profPicRemove'))+'</button>';
-  h+='</div>';
-  h+='<p id="profPicMsg" style="font-size:0.75rem;margin-top:4px;line-height:1.5"></p>';
+  /* Photo-change button + avatar camera REMOVED from My Profile (owner order 2026-11-18) — no photo-change UI here. */
   h+=profileIdRow(u);
   h+='<div style="margin-top:12px;border-top:1px solid var(--line);padding-top:10px">';
   h+='<div style="font-size:0.75rem;font-weight:800;color:var(--muted)">'+escHtml(tx('profileBalance'))+'</div>';
   h+=profileBalRow('song',tx('acctSongCredit'),u.songCredits);
   h+=profileBalRow('media',tx('acctMediaCredit'),u.credits);
   h+='</div>';
-  /* Credit history (owner rule): every real movement on this
-     account — generation charges, the welcome gift, Admin
-     top-ups / package approvals, Admin deductions — with the
-     amount, the date and the balance after it. It belongs to the
-     account, so it is here on log in, every time. */
-  h+='<div style="margin-top:12px;border-top:1px solid var(--line);padding-top:10px">';
-  h+='<div style="font-size:0.75rem;font-weight:800;color:var(--muted)">'+escHtml(tx('histTitle'))+'</div>';
-  h+=creditHistHtml(u.email);
-  h+='</div>';
-  h+='<div style="margin-top:12px;border-top:1px solid var(--line);padding-top:4px">';
-  h+=profileInfoRowHtml(tx('profileAccount'),acctNameHtml(u));
-  h+=profileInfoRow(tx('profileEmail'),u.email);
-  var plan=pkgGet();var pp=plan?pkgPlanById(plan.id):null;
-  h+=profileInfoRow(tx('profilePlan'),plan?(pp?loc(pp.name):String(plan.id)):tx('profileFree'));
-  if(plan)h+=profileInfoRow(tx('pkgExpires'),pkgExpiryStr(plan.until));
-  var splan=songPkgGet();var spp=splan?songPkgPlanById(splan.id):null;
-  h+=profileInfoRow(tx('profileSongPlan'),splan?(spp?loc(spp.name):String(splan.id)):tx('profileFree'));
-  if(splan)h+=profileInfoRow(tx('pkgExpires'),pkgExpiryStr(splan.until));
-  h+=profileInfoRow(tx('mhTitle'),u.mhConnected?tx('mhDone'):tx('mhNotYet'));
-  if(u.created)h+=profileInfoRow(tx('profileSince'),new Date(u.created).toLocaleDateString());
-  h+='</div>';
+  /* Credit transaction history list REMOVED from My Profile (owner order 2026-11-18). */
+  /* Account details block REMOVED from My Profile (owner order 2026-11-18). */
+  h+='<button type="button" class="prof-pkg-open" onclick="profileGoPackages()"><span>'+escHtml(tx('navPackages'))+'</span><span class="ppo-sub">'+escHtml(tx('navPackagesSub'))+'</span><span class="ppo-arrow" aria-hidden="true">›</span></button>';
+  /* Monetization entry in My Profile (same grey-disabled rule as
+     the drawer entry while the Admin toggle is OFF) + this user's
+     follower count from GET /api/public/followers?email=&by=. */
+  h+='<button type="button" class="prof-pkg-open monet-entry monet-disabled" id="profileMonetBtn" onclick="monetOpen()"><span>Monetization 💲</span><span class="ppo-sub">រកលុយ · Earn</span><span class="ppo-arrow" aria-hidden="true">›</span></button>';
+  h+='<div style="display:flex;justify-content:space-between;gap:10px;padding:10px 0 0;font-size:0.875rem"><span style="color:var(--muted)">'+escHtml(tx('pubFollowers'))+'</span><b id="profileFollowersCount">—</b></div>';
+  /* Wallet + Earn — SMALL side-by-side cards (owner order 2026-11-18): name + amount only. The Earn breakdown (cashback / views) lives in the Monetization sheet. Balances paint live via walletPaintBalance (#walletBalance / #earnBalance). */
+  h+='<div class="wallet-bal-duo"><div class="wallet-bal-card" id="walletBalanceCard"><div class="wallet-bal-label">'+escHtml(tx('walletBalanceTitle'))+'</div><div class="wallet-bal-amt" id="walletBalance">'+escHtml(walletFmt(WALLET.balance||0))+'</div></div><div class="wallet-bal-card wallet-earn-card" id="earnBalanceCard"><div class="wallet-bal-label">'+escHtml(tx('earnMoneyTitle'))+'</div><div class="wallet-bal-amt" id="earnBalance">'+escHtml(walletFmt(WALLET.earnBalance||0))+'</div></div></div>';
+  h+='<button type="button" class="wallet-action-row" id="walletTopupOpenBtn" onclick="walletTopupOpen()"><span>'+escHtml(tx('walletTopupTitle'))+'</span><span class="war-arrow" aria-hidden="true">›</span></button>';
+  h+='<button type="button" class="wallet-action-row" id="walletWithdrawOpenBtn" onclick="walletWithdrawOpen()"><span>'+escHtml(tx('walletWithdrawTitle'))+'</span><span class="war-arrow" aria-hidden="true">›</span></button>';
   /* Day / Night / Auto switch (owner order 2026-11-17): the SAME
      control as in the ☰ drawer — both call setMode(), both are
      kept in sync by syncModeBtns(), and the choice persists in
@@ -17270,12 +17234,6 @@ function profileRender(){
   h+='<button type="button" id="profModeBtnDark" onclick="setMode(\'dark\')" style="display:flex;align-items:center;justify-content:center;gap:6px"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>'+escHtml(tx('modeDark'))+'</button>';
   h+='<button type="button" id="profModeBtnAuto" onclick="setMode(\'auto\')" style="display:flex;align-items:center;justify-content:center;gap:6px"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 1 0 18z" fill="currentColor" stroke="none"/></svg>'+escHtml(tx('modeAuto'))+'</button>';
   h+='</div></div>';
-  h+='<button type="button" class="prof-pkg-open" onclick="profileGoPackages()"><span>'+escHtml(tx('navPackages'))+'</span><span class="ppo-sub">'+escHtml(tx('navPackagesSub'))+'</span><span class="ppo-arrow" aria-hidden="true">›</span></button>';
-  /* Monetization entry in My Profile (same grey-disabled rule as
-     the drawer entry while the Admin toggle is OFF) + this user's
-     follower count from GET /api/public/followers?email=&by=. */
-  h+='<button type="button" class="prof-pkg-open monet-entry monet-disabled" id="profileMonetBtn" onclick="monetOpen()"><span>Monetization 💲</span><span class="ppo-sub">រកលុយ · Earn</span><span class="ppo-arrow" aria-hidden="true">›</span></button>';
-  h+='<div style="display:flex;justify-content:space-between;gap:10px;padding:10px 0 0;font-size:0.875rem"><span style="color:var(--muted)">'+escHtml(tx('pubFollowers'))+'</span><b id="profileFollowersCount">—</b></div>';
   h+='<button type="button" class="kbtn" style="margin-top:14px;width:100%;background:rgba(248,113,113,.10);color:#f87171;border:1px solid rgba(248,113,113,.45)" onclick="acctLogout()">'+escHtml(tx('acctLogout'))+'</button>';
   /* Contact block (owner order 2026-11-17): directly under the
      red button — tappable phone rows (tel:) and masked Gmail
