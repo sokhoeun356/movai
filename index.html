@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#0A0B0D">
+<link rel="manifest" href="/manifest.json">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -40,7 +41,7 @@ html{background:#0A0B0D;background:var(--bg);min-height:100vh;min-height:100dvh}
 body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;background:#0A0B0D;background-color:var(--bg);background-image:radial-gradient(130% 55% at 50% -10%,var(--bg-glow,rgba(255,255,255,.05)),rgba(0,0,0,0) 60%),linear-gradient(180deg,var(--bg1) 0%,var(--bg) 45%,var(--bg2) 100%);color:var(--text);min-height:100vh;min-height:100dvh;text-shadow:var(--tshadow,none);-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
 button{font-family:inherit;cursor:pointer}
 main{max-width:720px;margin:0 auto;padding:calc(4rem + env(safe-area-inset-top,0px)) 18px calc(106px + env(safe-area-inset-bottom,0px))}
-.menuwrap{position:fixed;top:env(safe-area-inset-top,0px);left:max(18px,calc(50% - 342px));z-index:30;display:flex}
+.menuwrap{position:fixed;top:calc(env(safe-area-inset-top,0px) + 10px);left:max(18px,calc(50% - 342px));z-index:30;display:flex}
 /* ===== Header: NO backing strip =====
    The header has no solid strip behind it — the ☰ + MovAi brand
    frame (top-left) and the top-right account cluster float directly
@@ -79,7 +80,7 @@ main{max-width:720px;margin:0 auto;padding:calc(4rem + env(safe-area-inset-top,0
    them there as clear balance rows. After log in, the Log in
    button is replaced by a glossy 3D profile avatar in the same
    corner. */
-.topbar-right{position:fixed;top:env(safe-area-inset-top,0px);right:max(18px,calc(50% - 342px));z-index:30;display:flex;flex-direction:row;align-items:center;gap:10px}
+.topbar-right{position:fixed;top:calc(env(safe-area-inset-top,0px) + 10px);right:max(18px,calc(50% - 342px));z-index:30;display:flex;flex-direction:row;align-items:center;gap:10px}
 /* The header row is one short row for guests and signed-in users
    alike (bell left + Log in / avatar right), so the page top
    padding is one value for everyone — see the main rule and the
