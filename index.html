@@ -14381,6 +14381,7 @@ function pubDoPostSend(vis,coverUrl){
     picture:myPic,
     title:item.title||'',
     type:item.type,
+    mode:item.type,
     url:item.url,
     image:item.image||(item.type==='image'?item.url:''),
     visibility:vis
@@ -14745,7 +14746,7 @@ async function postFlowSubmit(){
     /* Same one-photo rule: the poster's real profile photo (the
        header / Profile photo) rides with the post as `avatar`. */
     var myPic2='';try{myPic2=acctPicture(u)||'';}catch(e){myPic2=u.picture||'';}
-    var payload={email:u.email,userId:acctValidUserId(u.id)?u.id:'',name:u.name||'',firstName:u.firstName||'',lastName:u.lastName||'',avatar:myPic2,picture:myPic2,title:title,type:'song',url:url,image:image,visibility:'public'};
+    var payload={email:u.email,userId:acctValidUserId(u.id)?u.id:'',name:u.name||'',firstName:u.firstName||'',lastName:u.lastName||'',avatar:myPic2,picture:myPic2,title:title,type:'song',mode:'song',url:url,image:image,visibility:'public'};
     if(postFlow.kind==='song')payload.genre=postFlow.genre;
     else payload.kind=postFlow.kind;
     if(postFlow.histItem&&postFlow.histItem.provider)payload.provider=postFlow.histItem.provider;
