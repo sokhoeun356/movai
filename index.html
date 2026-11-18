@@ -29,8 +29,8 @@ html{background:#0A0B0D;background:var(--bg);min-height:100vh;min-height:100dvh}
    behind the content, never colour splashed over it. */
 body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;background:#0A0B0D;background-color:var(--bg);background-image:radial-gradient(130% 55% at 50% -10%,var(--bg-glow,rgba(255,255,255,.05)),rgba(0,0,0,0) 60%),linear-gradient(180deg,var(--bg1) 0%,var(--bg) 45%,var(--bg2) 100%);color:var(--text);min-height:100vh;min-height:100dvh;text-shadow:var(--tshadow,none);-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
 button{font-family:inherit;cursor:pointer}
-main{max-width:720px;margin:0 auto;padding:calc(4.75rem + env(safe-area-inset-top,0px)) 18px calc(106px + env(safe-area-inset-bottom,0px))}
-.menuwrap{position:fixed;top:calc(12px + env(safe-area-inset-top,0px));left:max(18px,calc(50% - 342px));z-index:30;display:flex}
+main{max-width:720px;margin:0 auto;padding:calc(4rem + env(safe-area-inset-top,0px)) 18px calc(106px + env(safe-area-inset-bottom,0px))}
+.menuwrap{position:fixed;top:env(safe-area-inset-top,0px);left:max(18px,calc(50% - 342px));z-index:30;display:flex}
 /* ===== Header: NO backing strip =====
    The header has no solid strip behind it — the ☰ + MovAi brand
    frame (top-left) and the top-right account cluster float directly
@@ -68,7 +68,7 @@ main{max-width:720px;margin:0 auto;padding:calc(4.75rem + env(safe-area-inset-to
    them there as clear balance rows. After log in, the Log in
    button is replaced by a glossy 3D profile avatar in the same
    corner. */
-.topbar-right{position:fixed;top:calc(12px + env(safe-area-inset-top,0px));right:max(18px,calc(50% - 342px));z-index:30;display:flex;flex-direction:row;align-items:center;gap:10px}
+.topbar-right{position:fixed;top:env(safe-area-inset-top,0px);right:max(18px,calc(50% - 342px));z-index:30;display:flex;flex-direction:row;align-items:center;gap:10px}
 /* The header row is one short row for guests and signed-in users
    alike (bell left + Log in / avatar right), so the page top
    padding is one value for everyone — see the main rule and the
@@ -207,7 +207,7 @@ main{max-width:720px;margin:0 auto;padding:calc(4.75rem + env(safe-area-inset-to
     frame and never sits on top of the MovAi wordmark. The page top
     padding clears the single (short) row. */
  .topbar-right{flex-direction:row;align-items:center;gap:8px}
- main{padding-top:calc(4.75rem + env(safe-area-inset-top,0px))}
+ main{padding-top:calc(4rem + env(safe-area-inset-top,0px))}
 }
 .hero{padding:18px 2px 6px}
 .hero h1{font-size:2.3125rem;font-weight:900;line-height:1.15;letter-spacing:-.01em}
@@ -1933,7 +1933,7 @@ html[data-mode="light"] .wake-pill{background:#ffffff;color:#17181c}
 .dl-fail-toast.blur-in{animation:netReadyBlurIn .3s ease-out both}
 .dl-fail-toast.blur-out{animation:netReadyBlurOut .25s ease-in both}
 @media (prefers-reduced-motion: reduce){.dl-fail-toast.blur-in,.dl-fail-toast.blur-out{animation:none}}
-footer{text-align:center;color:var(--faint);font-size:0.8125rem;padding:32px 16px 104px;line-height:1.7}
+footer{text-align:center;color:var(--faint);font-size:0.8125rem;padding:32px 16px calc(104px + env(safe-area-inset-bottom,0px));line-height:1.7}
 .legal-links{display:flex;align-items:center;justify-content:center;gap:10px;font-size:0.8125rem}
 .legal-links a{color:var(--muted);font-weight:600;text-decoration:none}
 .legal-links a:hover{color:var(--text);text-decoration:underline}
@@ -2004,7 +2004,7 @@ img,video{max-width:100%}
    lifts its bottom edge clear above the dock (see #page-packages
    .panel). Main content carries extra bottom padding so the dock
    never covers the end of the page. */
-.dock{position:fixed;bottom:calc(12px + env(safe-area-inset-bottom,0px));left:max(12px,calc(50% - 430px));right:max(12px,calc(50% - 430px));z-index:35;display:flex;align-items:stretch;justify-content:space-between;gap:2px;padding:9px 10px;border-radius:28px;background:linear-gradient(160deg,rgba(255,255,255,calc(.03 + var(--glass-shine,.55)*.32)),rgba(255,255,255,calc(var(--glass-shine,.55)*.08)) 36%,rgba(190,198,212,calc(var(--glass-frost,.65)*.22)) 74%,rgba(var(--glass-tint),.42));background-color:rgba(var(--glass-tint),var(--glass-alpha,.5));-webkit-backdrop-filter:blur(var(--glass-blur,18px)) saturate(170%);backdrop-filter:blur(var(--glass-blur,18px)) saturate(170%);border:1px solid rgba(var(--glass-text-rgb),calc(.14 + var(--glass-shine,.55)*.2));box-shadow:0 16px 38px rgba(0,0,0,.4),inset 0 1px 0 rgba(255,255,255,calc(.08 + var(--glass-shine,.55)*.5)),0 0 14px rgba(181,55,242,.13),0 0 22px rgba(0,229,255,.07);color:var(--glass-text)}
+.dock{position:fixed;bottom:env(safe-area-inset-bottom,0px);left:max(12px,calc(50% - 430px));right:max(12px,calc(50% - 430px));z-index:35;display:flex;align-items:stretch;justify-content:space-between;gap:2px;padding:9px 10px;border-radius:28px;background:linear-gradient(160deg,rgba(255,255,255,calc(.03 + var(--glass-shine,.55)*.32)),rgba(255,255,255,calc(var(--glass-shine,.55)*.08)) 36%,rgba(190,198,212,calc(var(--glass-frost,.65)*.22)) 74%,rgba(var(--glass-tint),.42));background-color:rgba(var(--glass-tint),var(--glass-alpha,.5));-webkit-backdrop-filter:blur(var(--glass-blur,18px)) saturate(170%);backdrop-filter:blur(var(--glass-blur,18px)) saturate(170%);border:1px solid rgba(var(--glass-text-rgb),calc(.14 + var(--glass-shine,.55)*.2));box-shadow:0 16px 38px rgba(0,0,0,.4),inset 0 1px 0 rgba(255,255,255,calc(.08 + var(--glass-shine,.55)*.5)),0 0 14px rgba(181,55,242,.13),0 0 22px rgba(0,229,255,.07);color:var(--glass-text)}
 .dock-item{flex:1 1 0;min-width:0;display:flex;align-items:center;justify-content:center;height:50px;border:none;background:transparent;color:inherit;border-radius:18px;cursor:pointer;padding:0;position:relative;-webkit-tap-highlight-color:transparent;font-family:inherit}
 .dock-item svg{width:27px;height:27px;display:block}
 .dock-item.on{background:rgba(var(--accent-rgb),.25);color:var(--accent-text)}
@@ -2032,7 +2032,7 @@ html[data-smooth="1"] .dock{background-color:rgba(var(--glass-tint),.96)}
    Chat is login-only: guests are sent to the log-in sheet instead
    (see aiChatOpen in the script). Every reply comes live from the
    MovAi proxy server (POST /api/chat) — nothing is pre-written. */
-.chat-fab{position:fixed;left:16px;bottom:calc(16px + env(safe-area-inset-bottom,0px));z-index:35;transform:translateZ(0);width:58px;height:58px;border-radius:50%;border:1px solid rgba(0,0,0,.18);background:var(--accent-fill);color:#0d1005;display:flex;align-items:center;justify-content:center;cursor:pointer;padding:0;box-shadow:0 10px 26px rgba(0,0,0,.4),inset 0 1px 0 rgba(255,255,255,.35);-webkit-tap-highlight-color:transparent;transition:opacity .2s ease,visibility .2s ease}
+.chat-fab{position:fixed;left:16px;bottom:calc(4px + env(safe-area-inset-bottom,0px));z-index:35;transform:translateZ(0);width:58px;height:58px;border-radius:50%;border:1px solid rgba(0,0,0,.18);background:var(--accent-fill);color:#0d1005;display:flex;align-items:center;justify-content:center;cursor:pointer;padding:0;box-shadow:0 10px 26px rgba(0,0,0,.4),inset 0 1px 0 rgba(255,255,255,.35);-webkit-tap-highlight-color:transparent;transition:opacity .2s ease,visibility .2s ease}
 .chat-fab.chat-fab-hidden{opacity:0;visibility:hidden;pointer-events:none}
 .chat-fab svg{width:32px;height:32px;display:block}
 .chat-fab:active{filter:brightness(.93)}
@@ -2440,7 +2440,7 @@ html[data-smooth="1"] .brand-frame,html[data-smooth="1"] .acct-chip,html[data-sm
 .acct-chip b{color:#fff}
 /* Top-bar search bar: opens under the top pill; typing filters
    the Public feed already on the page (see topSearchApply). */
-#topSearchBar{position:fixed;top:calc(68px + env(safe-area-inset-top,0px));left:max(18px,calc(50% - 342px));right:max(18px,calc(50% - 342px));z-index:29;display:none;align-items:center;gap:9px;padding:8px 8px 8px 16px;border-radius:999px;background:rgba(13,17,23,.93);-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);border:1px solid rgba(255,255,255,.22);box-shadow:0 14px 30px rgba(0,0,0,.4);color:#fff}
+#topSearchBar{position:fixed;top:calc(56px + env(safe-area-inset-top,0px));left:max(18px,calc(50% - 342px));right:max(18px,calc(50% - 342px));z-index:29;display:none;align-items:center;gap:9px;padding:8px 8px 8px 16px;border-radius:999px;background:rgba(13,17,23,.93);-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);border:1px solid rgba(255,255,255,.22);box-shadow:0 14px 30px rgba(0,0,0,.4);color:#fff}
 #topSearchBar.open{display:flex;animation:movaiBlurIn .25s ease-out both}
 #topSearchBar>svg{flex:0 0 auto;opacity:.75}
 #topSearchInput{flex:1 1 auto;min-width:0;background:transparent;border:none;outline:none;color:#fff;font-family:inherit;font-size:0.9375rem;font-weight:600}
@@ -2520,7 +2520,7 @@ html[data-smooth="1"] .brand-frame,html[data-smooth="1"] .acct-chip,html[data-sm
 .brand-frame{gap:7px;padding:4px 14px 4px 4px;border-radius:999px}
 .brand-frame .brand-name{font-size:1.0625rem}
 .brand-frame .menu-btn{width:34px;height:34px;padding:0 8px;gap:4px}
-main{padding-top:calc(3.75rem + env(safe-area-inset-top,0px))}
+main{padding-top:calc(3rem + env(safe-area-inset-top,0px))}
 /* ===== Song cover on EVERY card + Play at the CENTRE of the cover,
    translucent (owner order 2026-11-17) =====
    Every song surface — the big feed card, the compact numbered feed
