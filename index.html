@@ -1601,6 +1601,11 @@ html[data-mode="light"] .btn-free{color:#63910c}
 .wallet-bal-card{border:1px solid rgba(var(--accent-rgb),.45);border-radius:14px;padding:16px 14px;background:var(--card2);text-align:center}
 .wallet-bal-label{font-size:0.8125rem;font-weight:800;color:var(--muted)}
 .wallet-bal-amt{font-size:2.25rem;font-weight:900;line-height:1.15;margin-top:4px;color:var(--accent-text);font-variant-numeric:tabular-nums}
+.wallet-earn-card{border-color:var(--line2)}
+.wallet-earn-breakdown{margin-top:10px;border-top:1px solid var(--line);padding-top:8px;text-align:left}
+.wallet-earn-row{display:flex;justify-content:space-between;gap:10px;padding:5px 0;font-size:0.8125rem;color:var(--muted)}
+.wallet-earn-row b{color:var(--text);font-variant-numeric:tabular-nums;white-space:nowrap}
+.monet-earn-amt{font-size:2rem;font-weight:900;line-height:1.15;margin-top:4px;color:var(--accent-text);font-variant-numeric:tabular-nums;text-align:center}
 .wallet-sec{border:1px solid var(--line2);border-radius:14px;padding:14px;margin-top:12px;background:var(--card2);text-align:left}
 .wallet-sec-head{font-size:0.9375rem;font-weight:900}
 .wallet-note{font-size:0.8125rem;color:var(--muted);line-height:1.7;margin-top:8px}
@@ -3414,9 +3419,19 @@ input[type=range].st-range{accent-color:var(--accent);min-height:32px;cursor:poi
          profileRender); the balance is refreshed by
          walletLoadBalance() on open and after every action. -->
     <div id="walletBox" style="margin-top:10px">
-      <div class="wallet-bal-card">
-        <div class="wallet-bal-label" data-i18n="walletTitle">កាបូបលុយ · Wallet</div>
+      <div class="wallet-bal-card" id="walletBalanceCard">
+        <div class="wallet-bal-label" data-i18n="walletBalanceTitle">សមតុល្យ Wallet · Wallet Balance</div>
         <div class="wallet-bal-amt" id="walletBalance">$0.00</div>
+        <p class="wallet-note" style="text-align:center;margin-top:4px" data-i18n="walletSpendableNote">លុយបញ្ចូល — អាចចាយ / ទិញកញ្ចប់បាន · Top-up money — can be spent / buy packages</p>
+      </div>
+      <div class="wallet-bal-card wallet-earn-card" id="earnBalanceCard" style="margin-top:10px">
+        <div class="wallet-bal-label" data-i18n="earnMoneyTitle">លុយរកបាន · Earn Money</div>
+        <div class="wallet-bal-amt" id="earnBalance">$0.00</div>
+        <div class="wallet-earn-breakdown" id="earnBreakdown">
+          <div class="wallet-earn-row"><span data-i18n="earnCashbackLbl">Cashback ពីកញ្ចប់ · Package cashback</span><b id="earnCashback" class="js-earn-cashback">$0.00</b></div>
+          <div class="wallet-earn-row"><span data-i18n="earnViewsLbl">ចំណូលពីការមើល · View earnings</span><b id="earnViews" class="js-earn-views">$0.00</b></div>
+        </div>
+        <p class="wallet-note" style="text-align:center;margin-top:6px" data-i18n="earnWithdrawOnlyNote">ដកបានតែប៉ុណ្ណោះ — ទិញអ្វីមិនបានទេ · Withdraw only — cannot be used to buy anything</p>
       </div>
       <button type="button" class="wallet-action-row" id="walletTopupOpenBtn" onclick="walletTopupOpen()"><span data-i18n="walletTopupTitle">បញ្ចូលលុយ · Top up</span><span class="war-arrow" aria-hidden="true">›</span></button>
       <button type="button" class="wallet-action-row" id="walletWithdrawOpenBtn" onclick="walletWithdrawOpen()"><span data-i18n="walletWithdrawTitle">ដកលុយ · Withdraw</span><span class="war-arrow" aria-hidden="true">›</span></button>
@@ -3466,6 +3481,14 @@ input[type=range].st-range{accent-color:var(--accent);min-height:32px;cursor:poi
       <button type="button" class="drawer-close" style="background:var(--card2);color:var(--text);border-color:var(--line2)" onclick="walletWithdrawClose()" aria-label="Close">✕</button>
     </div>
     <div class="wallet-sec">
+      <div class="auth-field" style="margin-top:0">
+        <label data-i18n="walletWithdrawFrom">ដកពី · Withdraw from</label>
+        <div class="wallet-methods" role="group" aria-label="Withdraw from" style="margin-top:6px">
+          <button type="button" class="wallet-method on" id="walletSourceEarnings" onclick="walletSetSource('earnings')" data-i18n="walletSourceEarn">Earn Money · លុយរកបាន</button>
+          <button type="button" class="wallet-method" id="walletSourceWallet" onclick="walletSetSource('wallet')" data-i18n="walletSourceWallet">Wallet Balance · សមតុល្យ Wallet</button>
+        </div>
+        <p class="wallet-note" id="walletWithdrawSourceBal" style="font-weight:800;color:var(--text)">Earn Money: $0.00</p>
+      </div>
       <div class="auth-field">
         <label for="walletWithdrawAmount" data-i18n="walletAmount">ចំនួនលុយ (USD) · Amount (USD)</label>
         <input class="input" id="walletWithdrawAmount" type="number" inputmode="decimal" min="5" step="0.01" placeholder="5.00" oninput="walletWithdrawTotal()">
@@ -3499,6 +3522,15 @@ input[type=range].st-range{accent-color:var(--accent);min-height:32px;cursor:poi
       <h3 style="font-size:1.0625rem;font-weight:800">Monetization 💲</h3>
       <button type="button" class="drawer-close" style="background:var(--card2);color:var(--text);border-color:var(--line2)" onclick="monetClose()" aria-label="Close">✕</button>
     </div>
+    <div class="monet-sec" id="monetEarnCard">
+      <div class="monet-sec-head" style="text-align:center" data-i18n="earnMoneyTitle">លុយរកបាន · Earn Money</div>
+      <div class="monet-earn-amt" id="monetEarnBalance">$0.00</div>
+      <div class="wallet-earn-breakdown" id="monetEarnBreakdown">
+        <div class="wallet-earn-row"><span data-i18n="earnCashbackLbl">Cashback ពីកញ្ចប់ · Package cashback</span><b id="monetEarnCashback" class="js-earn-cashback">$0.00</b></div>
+        <div class="wallet-earn-row"><span data-i18n="earnViewsLbl">ចំណូលពីការមើល · View earnings</span><b id="monetEarnViews" class="js-earn-views">$0.00</b></div>
+      </div>
+      <p class="monet-note" style="text-align:center" data-i18n="earnWithdrawOnlyNote">ដកបានតែប៉ុណ្ណោះ — ទិញអ្វីមិនបានទេ · Withdraw only — cannot be used to buy anything</p>
+    </div>
     <div class="monet-sec">
       <div class="monet-sec-head">គោលការណ៍ · Rules / Policy</div>
       <p class="monet-note">មានសិទ្ធិរកលុយ (Eligible) នៅពេលមាន៖ <b>1000 followers</b> និង <b>2000 watch hours</b> · Eligible at 1000 followers + 2000 watch hours.</p>
@@ -3509,7 +3541,7 @@ input[type=range].st-range{accent-color:var(--accent);min-height:32px;cursor:poi
       <div class="monet-row"><span>$15 package</span><b>+$0.05</b></div>
       <div class="monet-row"><span>$22 package</span><b>+$0.10</b></div>
       <div class="monet-row"><span>$25 package</span><b>+$0.10</b></div>
-      <p class="monet-note">Cashback ចូល Balance ភ្លាមៗពេលទិញកញ្ចប់ · Cashback is added to your Balance instantly when you buy a package.</p>
+      <p class="monet-note">Cashback ចូល Earn Money ភ្លាមៗពេលទិញកញ្ចប់ · Cashback is added to your Earn Money instantly when you buy a package.</p>
       <p class="monet-note">ដកលុយ · Withdraw: min <b>$5</b>; fee <b>$0.50 under $50</b> and <b>5% at $50+</b> (e.g. $100 → fee $5.00, net $95.00).</p>
     </div>
     <div class="monet-sec">
@@ -4001,6 +4033,7 @@ km:{
  forgotResetting:'កំពុងកំណត់លេខសម្ងាត់ថ្មី…',
  forgotErrReset:'កំណត់លេខសម្ងាត់ថ្មីមិនបានទេ — សូមព្យាយាមម្ដងទៀត',
  walletTitle:'កាបូបលុយ · Wallet',walletBalanceLbl:'សមតុល្យ Wallet · Wallet balance',
+ walletBalanceTitle:'សមតុល្យ Wallet · Wallet Balance',earnMoneyTitle:'លុយរកបាន · Earn Money',earnCashbackLbl:'Cashback ពីកញ្ចប់ · Package cashback',earnViewsLbl:'ចំណូលពីការមើល · View earnings',earnWithdrawOnlyNote:'ដកបានតែប៉ុណ្ណោះ — ទិញអ្វីមិនបានទេ · Withdraw only — cannot be used to buy anything',walletSpendableNote:'លុយបញ្ចូល — អាចចាយ / ទិញកញ្ចប់បាន · Top-up money — can be spent / buy packages',walletWithdrawFrom:'ដកពី · Withdraw from',walletSourceEarn:'Earn Money · លុយរកបាន',walletSourceWallet:'Wallet Balance · សមតុល្យ Wallet',
  walletTopupTitle:'បញ្ចូលលុយ · Top up',walletWithdrawTitle:'ដកលុយ · Withdraw',
  walletMethodKhmer:'ខ្មែរ · Khmer',walletMethodForeign:'បរទេស · Foreign',
  walletAmount:'ចំនួនលុយ (USD) · Amount (USD)',walletMinNote:'អប្បបរមា $5.00 · Minimum $5.00',
@@ -4303,6 +4336,7 @@ en:{
  forgotResetting:'Resetting your password…',
  forgotErrReset:'Could not reset the password — please try again',
  walletTitle:'Wallet · កាបូបលុយ',walletBalanceLbl:'Wallet balance · សមតុល្យ Wallet',
+ walletBalanceTitle:'Wallet Balance · សមតុល្យ Wallet',earnMoneyTitle:'Earn Money · លុយរកបាន',earnCashbackLbl:'Package cashback · Cashback ពីកញ្ចប់',earnViewsLbl:'View earnings · ចំណូលពីការមើល',earnWithdrawOnlyNote:'Withdraw only — cannot be used to buy anything · ដកបានតែប៉ុណ្ណោះ — ទិញអ្វីមិនបានទេ',walletSpendableNote:'Top-up money — can be spent / buy packages · លុយបញ្ចូល — អាចចាយ / ទិញកញ្ចប់បាន',walletWithdrawFrom:'Withdraw from · ដកពី',walletSourceEarn:'Earn Money · លុយរកបាន',walletSourceWallet:'Wallet Balance · សមតុល្យ Wallet',
  walletTopupTitle:'Top up · បញ្ចូលលុយ',walletWithdrawTitle:'Withdraw · ដកលុយ',
  walletMethodKhmer:'Khmer · ខ្មែរ',walletMethodForeign:'Foreign · បរទេស',
  walletAmount:'Amount (USD) · ចំនួនលុយ (USD)',walletMinNote:'Minimum $5.00 · អប្បបរមា $5.00',
@@ -4858,6 +4892,7 @@ function applyLang(){
   /* The Withdraw button carries the live net label (no data-i18n),
      so re-sync it after a language pass. */
   try{walletWithdrawTotal();}catch(e){}
+  try{walletPaintBalance();}catch(e){}
 }
 function uiInit(){
   renderSwatches();
@@ -6003,24 +6038,32 @@ function pkgShowReqFail(){
 }
 /* ================= Wallet (owner order) =================
    The server wallet already exists; this is its website UI.
+   TWO separate balances (owner correction): (1) Wallet Balance
+   — top-up money, CAN be spent / buy packages; (2) Earn Money
+   — cashback + view earnings, CANNOT be spent, withdraw-only.
    Balance: GET  /api/public/wallet/balance?email=
+            -> {ok, balance, earnBalance}
    Top-up:  POST /api/public/wallet/topup-request
             {email, amount, method:'khmer'|'foreign', receiptUrl?}
             — a request only; the Admin approves before money lands.
    Withdraw: POST /api/public/wallet/withdraw-request
-            {email, userId, amount, khqrImageUrl?} — the form's 4
-            fields are Amount (min $5.00), Gmail and User ID
-            (pre-filled from the account, editable) and the KHQR
-            image. Fee tiers: under $50 flat $0.50, at $50+ 5%
-            of the amount: the button and the line above it show
-            the net live as «Withdraw 💲<net>».
+            {email, userId, amount, khqrImageUrl?, source} —
+            source is 'earnings' (Earn Money, the default) or
+            'wallet' (Wallet Balance), chosen by the sheet's
+            «Withdraw from» selector, which shows the selected
+            balance. The form's 4 fields are Amount (min $5.00),
+            Gmail and User ID (pre-filled from the account,
+            editable) and the KHQR image. Fee tiers: under $50
+            flat $0.50, at $50+ 5% of the amount: the button and
+            the line above it show the net live as «Withdraw 💲<net>».
    Buy:     POST /api/public/wallet/buy-package {email, packageId}
-            — pays a package straight from the balance.
+            — pays a package straight from the Wallet Balance
+            ONLY (never the Earn Money).
    Attached images (receipt / KHQR) upload FIRST through the same
    receipt endpoint the package buy flow uses; only the returned
    URL rides along with the wallet request. All wallet state is
    in-memory only (one page session). */
-var WALLET={balance:null,method:'khmer',topup:null,withdraw:null};
+var WALLET={balance:null,earnBalance:null,earnCashback:null,earnViews:null,method:'khmer',withdrawSource:'earnings',topup:null,withdraw:null};
 function walletFmt(n){
   var v=Number(n);if(!isFinite(v))v=0;
   return '$'+v.toFixed(2);
@@ -6050,17 +6093,67 @@ function walletPickBalance(d){
   }
   return null;
 }
+/* Earn Money helpers: the balance endpoint now returns
+   {ok, balance, earnBalance}; the monetization status/earnings
+   endpoints also return earnBalance. The Earn breakdown rides as
+   cashback / view-earnings fields under several possible names. */
+function walletPickNum(d,keys){
+  if(!d||typeof d!=='object')return null;
+  var scopes=[d];
+  if(d.data&&typeof d.data==='object')scopes.push(d.data);
+  if(d.wallet&&typeof d.wallet==='object')scopes.push(d.wallet);
+  if(d.earnings&&typeof d.earnings==='object')scopes.push(d.earnings);
+  if(d.status&&typeof d.status==='object')scopes.push(d.status);
+  if(d.monetization&&typeof d.monetization==='object')scopes.push(d.monetization);
+  if(d.data&&typeof d.data==='object'){
+    if(d.data.wallet&&typeof d.data.wallet==='object')scopes.push(d.data.wallet);
+    if(d.data.earnings&&typeof d.data.earnings==='object')scopes.push(d.data.earnings);
+  }
+  for(var s=0;s<scopes.length;s++){
+    var o=scopes[s];
+    for(var i=0;i<keys.length;i++){
+      var v=o[keys[i]];
+      if(typeof v==='number'&&isFinite(v))return v;
+      if(typeof v==='string'&&v.trim()!==''&&!isNaN(parseFloat(v)))return parseFloat(v);
+    }
+  }
+  return null;
+}
+function walletPickEarnBalance(d){return walletPickNum(d,['earnBalance','earningsBalance','earnMoneyBalance','earnMoney','earn']); }
+function walletApplyBalances(d){
+  if(!d||typeof d!=='object')return;
+  var b=walletPickBalance(d);if(b!==null)WALLET.balance=b;
+  var e=walletPickEarnBalance(d);if(e!==null)WALLET.earnBalance=e;
+  var cb=walletPickNum(d,['cashback','cashbackTotal','cashbackEarned','earnCashback','cashbackBalance','cashbackEarnings']);
+  if(cb!==null)WALLET.earnCashback=cb;
+  var vw=walletPickNum(d,['viewEarnings','viewsEarnings','viewEarned','viewsEarned','earnViews','watchEarnings','viewEarningsTotal']);
+  if(vw!==null)WALLET.earnViews=vw;
+  if(WALLET.earnBalance===null&&WALLET.earnCashback!==null&&WALLET.earnViews!==null)WALLET.earnBalance=Math.round((WALLET.earnCashback+WALLET.earnViews)*100)/100;
+  walletPaintBalance();
+}
 function walletPaintBalance(){
   var f=walletFmt(WALLET.balance||0);
   var el=document.getElementById('walletBalance');if(el)el.textContent=f;
   var els=document.querySelectorAll('.js-wallet-bal');
   for(var i=0;i<els.length;i++)els[i].textContent=f;
+  var ef=walletFmt(WALLET.earnBalance||0);
+  var eEl=document.getElementById('earnBalance');if(eEl)eEl.textContent=ef;
+  var mEl=document.getElementById('monetEarnBalance');if(mEl)mEl.textContent=ef;
+  var eEls=document.querySelectorAll('.js-earn-bal');
+  for(var j=0;j<eEls.length;j++)eEls[j].textContent=ef;
+  var cf=walletFmt(WALLET.earnCashback||0);
+  var cEls=document.querySelectorAll('.js-earn-cashback');
+  for(var k=0;k<cEls.length;k++)cEls[k].textContent=cf;
+  var vf=walletFmt(WALLET.earnViews||0);
+  var vEls=document.querySelectorAll('.js-earn-views');
+  for(var m=0;m<vEls.length;m++)vEls[m].textContent=vf;
+  try{walletWithdrawSourcePaint();}catch(e){}
 }
 function walletFetchBalance(email){
   if(!email)return Promise.resolve(null);
   return authFetchJson('/api/public/wallet/balance?email='+encodeURIComponent(email),'GET',null,20000).then(function(d){
     var b=walletPickBalance(d);
-    if(b!==null){WALLET.balance=b;walletPaintBalance();}
+    if(d)walletApplyBalances(d);
     return b;
   });
 }
@@ -6164,8 +6257,8 @@ function walletTopupSubmit(){
     if(data.ok!==true){walletSetMsg('walletTopupMsg',authErrText(data,'walletErrFail'),false);return;}
     walletSetMsg('walletTopupMsg',tx('walletTopupSent'),true);
     walletClearForm('topup');
-    var b=walletPickBalance(data);
-    if(b!==null){WALLET.balance=b;walletPaintBalance();}else walletLoadBalance();
+    walletApplyBalances(data);
+    if(walletPickBalance(data)===null&&walletPickEarnBalance(data)===null)walletLoadBalance();
   }).catch(function(){
     if(btn)btn.disabled=false;
     walletSetMsg('walletTopupMsg',tx('walletErrFail'),false);
@@ -6183,8 +6276,31 @@ function walletTopupOpen(){
 function walletTopupClose(){var s=document.getElementById('walletTopupSheet');sheetHideAnim(s);}
 function walletWithdrawOpen(){
   if(!walletEmail()){loginSheetOpen();return;}
+  WALLET.withdrawSource='earnings';
   try{walletWithdrawPrefill();}catch(e){}
+  try{walletWithdrawSourcePaint();}catch(e){}
   var s=document.getElementById('walletWithdrawSheet');if(s)sheetShowAnim(s);
+}
+/* Withdraw-from selector: 'earnings' (Earn Money, the default)
+   or 'wallet' (Wallet Balance). The sheet shows the SELECTED
+   balance; Submit sends source:'earnings'|'wallet'. */
+function walletWithdrawSourcePaint(){
+  var isWallet=(WALLET.withdrawSource==='wallet');
+  var bE=document.getElementById('walletSourceEarnings');
+  var bW=document.getElementById('walletSourceWallet');
+  if(bE)bE.classList.toggle('on',!isWallet);
+  if(bW)bW.classList.toggle('on',isWallet);
+  var line=document.getElementById('walletWithdrawSourceBal');
+  if(line){
+    var bal=isWallet?(WALLET.balance||0):(WALLET.earnBalance||0);
+    var lbl=isWallet?tx('walletSourceWallet'):tx('walletSourceEarn');
+    line.textContent=lbl+': '+walletFmt(bal);
+  }
+}
+function walletSetSource(s){
+  WALLET.withdrawSource=(s==='wallet')?'wallet':'earnings';
+  walletWithdrawSourcePaint();
+  try{walletWithdrawTotal();}catch(e){}
 }
 function walletWithdrawClose(){var s=document.getElementById('walletWithdrawSheet');sheetHideAnim(s);}
 /* Pre-fill the withdraw Gmail + User ID fields from the signed-in
@@ -6194,6 +6310,7 @@ function walletWithdrawPrefill(){
   var u=(typeof acctCurrent==='function')?acctCurrent():null;if(!u)return;
   var em=document.getElementById('walletWithdrawEmail');if(em)em.value=u.email||'';
   var id=document.getElementById('walletWithdrawUserId');if(id)id.value=u.id||'';
+  try{walletWithdrawSourcePaint();}catch(e){}
   walletWithdrawTotal();
 }
 /* Withdraw fee tiers (owner spec): amount < $50 -> fee flat $0.50;
@@ -6233,7 +6350,7 @@ function walletWithdrawSubmit(){
   var btn=document.getElementById('walletWithdrawBtn');if(btn)btn.disabled=true;
   walletSetMsg('walletWithdrawMsg',tx('walletSending'),true);
   walletUploadFile('withdraw').then(function(url){
-    var payload={email:em,userId:uid,amount:amt};
+    var payload={email:em,userId:uid,amount:amt,source:(WALLET.withdrawSource==='wallet'?'wallet':'earnings')};
     if(url)payload.khqrImageUrl=url;
     return authFetchJson('/api/public/wallet/withdraw-request','POST',payload,30000);
   }).then(function(data){
@@ -6242,8 +6359,8 @@ function walletWithdrawSubmit(){
     if(data.ok!==true){walletSetMsg('walletWithdrawMsg',authErrText(data,'walletErrFail'),false);return;}
     walletSetMsg('walletWithdrawMsg',tx('walletWithdrawSent'),true);
     walletClearForm('withdraw');
-    var b=walletPickBalance(data);
-    if(b!==null){WALLET.balance=b;walletPaintBalance();}else walletLoadBalance();
+    walletApplyBalances(data);
+    if(walletPickBalance(data)===null&&walletPickEarnBalance(data)===null)walletLoadBalance();
   }).catch(function(){
     if(btn)btn.disabled=false;
     walletSetMsg('walletWithdrawMsg',tx('walletErrFail'),false);
@@ -6315,8 +6432,8 @@ function monetClose(){var s=document.getElementById('monetSheet');sheetHideAnim(
 function monetLoadData(){
   var em=walletEmail();if(!em)return;
   monetSetMsg(tx('monetLoading'),true);
-  var p1=authFetchJson('/api/public/monetization/status?email='+encodeURIComponent(em),'GET',null,20000).then(function(d){if(d)MONET.status=d;});
-  var p2=authFetchJson('/api/public/monetization/earnings?email='+encodeURIComponent(em),'GET',null,20000).then(function(d){if(d)MONET.earnings=d;});
+  var p1=authFetchJson('/api/public/monetization/status?email='+encodeURIComponent(em),'GET',null,20000).then(function(d){if(d){MONET.status=d;try{walletApplyBalances(d);}catch(e){}}});
+  var p2=authFetchJson('/api/public/monetization/earnings?email='+encodeURIComponent(em),'GET',null,20000).then(function(d){if(d){MONET.earnings=d;try{walletApplyBalances(d);}catch(e){}}});
   Promise.all([p1,p2]).then(function(){monetRender();monetSetMsg('',true);}).catch(function(){monetRender();});
 }
 function monetRender(){
@@ -6335,7 +6452,27 @@ function monetRender(){
   var eEl=document.getElementById('monetEligible');if(eEl)eEl.textContent=eligibleVal===null?'—':(eligibleVal?tx('monetEligibleYes'):tx('monetEligibleNo'));
   var total=monetPick(ea,['totalEarned','total','earnings','totalEarnings']);
   if(total===null)total=monetPick(st,['totalEarned','totalEarnings']);
-  var tEl=document.getElementById('monetTotalEarned');if(tEl)tEl.textContent='$'+(total===null?0:total).toFixed(2);
+  /* Earn Money (prominent): prefer the explicit earnBalance from
+     either endpoint, then the cached wallet earn balance, then
+     total earned. Breakdown = cashback + view earnings. */
+  var earnTotal=monetPick(ea,['earnBalance','earningsBalance','earnMoneyBalance','earnMoney']);
+  if(earnTotal===null)earnTotal=monetPick(st,['earnBalance','earningsBalance','earnMoneyBalance','earnMoney']);
+  if(earnTotal===null&&WALLET.earnBalance!==null)earnTotal=WALLET.earnBalance;
+  if(earnTotal===null)earnTotal=total;
+  var cbAmt=monetPick(ea,['cashback','cashbackTotal','cashbackEarned','earnCashback','cashbackBalance','cashbackEarnings']);
+  if(cbAmt===null)cbAmt=monetPick(st,['cashback','cashbackTotal','cashbackEarned','earnCashback']);
+  if(cbAmt===null&&WALLET.earnCashback!==null)cbAmt=WALLET.earnCashback;
+  var vwAmt=monetPick(ea,['viewEarnings','viewsEarnings','viewEarned','viewsEarned','earnViews','watchEarnings','viewEarningsTotal']);
+  if(vwAmt===null)vwAmt=monetPick(st,['viewEarnings','viewsEarnings','viewEarned','earnViews']);
+  if(vwAmt===null&&WALLET.earnViews!==null)vwAmt=WALLET.earnViews;
+  if(earnTotal!==null)WALLET.earnBalance=earnTotal;
+  if(cbAmt!==null)WALLET.earnCashback=cbAmt;
+  if(vwAmt!==null)WALLET.earnViews=vwAmt;
+  try{walletPaintBalance();}catch(e){}
+  var meEl=document.getElementById('monetEarnBalance');if(meEl)meEl.textContent='$'+(earnTotal===null?0:earnTotal).toFixed(2);
+  var mcEl=document.getElementById('monetEarnCashback');if(mcEl)mcEl.textContent='$'+(cbAmt===null?0:cbAmt).toFixed(2);
+  var mvEl=document.getElementById('monetEarnViews');if(mvEl)mvEl.textContent='$'+(vwAmt===null?0:vwAmt).toFixed(2);
+  var tEl=document.getElementById('monetTotalEarned');if(tEl)tEl.textContent='$'+(earnTotal!==null?earnTotal:(total===null?0:total)).toFixed(2);
   var views=monetPick(ea,['eligibleViews','views','eligible_views']);
   var vEl=document.getElementById('monetEligibleViews');if(vEl)vEl.textContent=(views===null?'0':Math.floor(views));
   var bc=document.getElementById('monetByCountry');
@@ -6419,7 +6556,7 @@ function userFollowToggle(targetEmail){
    songPkgBuyAsk): current balance + a Buy with Wallet button, in
    addition to the existing payment flow. */
 function walletSheetBoxHtml(){
-  return '<div class="wallet-sec"><div class="wallet-sec-head">'+escHtml(tx('walletTitle'))+'</div>'
+  return '<div class="wallet-sec"><div class="wallet-sec-head">'+escHtml(tx('walletBalanceTitle'))+'</div>'
     +'<p class="wallet-note" style="margin-top:6px">'+escHtml(tx('walletBalanceLbl'))+': <b class="js-wallet-bal" style="color:var(--text)">'+escHtml(walletFmt(WALLET.balance||0))+'</b></p>'
     +'<button type="button" class="btn btn-green btn-block" style="margin-top:10px" onclick="walletBuyFromSheet()">'+escHtml(tx('walletBuyBtn'))+'</button>'
     +'<p class="wallet-msg" id="pkgWalletMsg"></p></div>';
@@ -6443,7 +6580,7 @@ function walletBuyAsk(id){
   h+='<div style="display:flex;justify-content:space-between;gap:10px;padding:8px 0;border-top:1px solid var(--line)"><span>'+escHtml(tx('pkgCreditsLbl'))+'</span><b style="color:'+(isSong?'#ADDC29':'var(--accent-text)')+'">'+pkgFmtNum(pl.credits)+' Credit</b></div>';
   h+='<div style="display:flex;justify-content:space-between;gap:10px;padding:8px 0;border-top:1px solid var(--line)"><span>'+escHtml(tx('pkgTotal'))+'</span><b>$'+pkgFmtPrice(pkgCurPrice(pl))+'</b></div>';
   if(u){
-    h+='<div class="wallet-sec"><div class="wallet-sec-head">'+escHtml(tx('walletTitle'))+'</div>'
+    h+='<div class="wallet-sec"><div class="wallet-sec-head">'+escHtml(tx('walletBalanceTitle'))+'</div>'
       +'<p class="wallet-note" style="margin-top:6px">'+escHtml(tx('walletBalanceLbl'))+': <b class="js-wallet-bal" style="color:var(--text)">'+escHtml(walletFmt(WALLET.balance||0))+'</b></p>'
       +'<button type="button" class="btn btn-green btn-block" id="walletAskBtn" style="margin-top:10px" onclick="walletBuyPackage(\''+pl.id+'\',\'walletAskMsg\',\'walletAskBtn\')">'+escHtml(tx('walletBuyBtn'))+'</button>'
       +'<p class="wallet-msg" id="walletAskMsg"></p></div>';
@@ -6471,11 +6608,11 @@ function walletBuyPackage(id,msgId,btnId){
       return;
     }
     var b=walletPickBalance(data);
-    if(b!==null){WALLET.balance=b;walletPaintBalance();}
+    walletApplyBalances(data);
     var done=tx('walletBuyDone');
     if(b!==null)done+=' · '+tx('walletNewBalFmt').replace('{b}',walletFmt(b));
     walletSetMsg(msgId,done,true);
-    if(b===null)walletLoadBalance();
+    if(b===null&&walletPickEarnBalance(data)===null)walletLoadBalance();
     /* The package activates server-side; pull the fresh account
        (plan + credits) through the normal sync, then repaint the
        package cards so the bought plan shows as active. */

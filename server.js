@@ -155,6 +155,7 @@ const GH_DATA_FILES = [
   'cloudinary-accounts.json', 'cloudinary-rotation.json', 'admin-key.json', 'mvsep-cache.json',
   'feature-usage.json', 'wallet-requests.json', 'device-records.json',
   'monetization-earnings.json', 'monetization-applications.json', 'creator-follows.json',
+  'deleted-items.json',
 ];
 const ghShaCache = {}; // filename -> GitHub blob sha (for PUT updates)
 function ghEnabled() { return !!GH_TOKEN; }
@@ -464,6 +465,41 @@ function histKey(it) {
   const u = (typeof it.src === 'string' && it.src.trim()) ? it.src.trim() : (typeof it.url === 'string' ? it.url.trim() : '');
   return u ? 'url:' + u : '';
 }
+// ---- Deleted-item tombstones (2026-11-18, resurrection bug) ----
+// A History item / public post deleted on GitHub must NEVER come back:
+// the phone still has it locally and its next history-sync (union by id)
+// would re-add it. Tombstones are permanent (never expire) and
+// GitHub-backed (deleted-items.json is in GH_DATA_FILES, so it is
+// restored on startup and persisted on every write). The merge
+// tombstones anything it drops as a GitHub deletion; the sync and post
+// handlers refuse anything whose key/id is tombstoned.
+const DELETED_ITEMS_FILE = path.join(DATA_DIR, 'deleted-items.json');
+function loadDeletedItems() {
+  try {
+    const j = JSON.parse(fs.readFileSync(DELETED_ITEMS_FILE, 'utf8'));
+    if (j && typeof j === 'object' && !Array.isArray(j)) {
+      return {
+        history: (j.history && typeof j.history === 'object' && !Array.isArray(j.history)) ? j.history : {},
+        posts: (j.posts && typeof j.posts === 'object' && !Array.isArray(j.posts)) ? j.posts : {},
+      };
+    }
+  } catch (e) {}
+  return { history: {}, posts: {} };
+}
+function saveDeletedItems(t) {
+  try { fs.mkdirSync(DATA_DIR, { recursive: true }); } catch (e) {}
+  fs.writeFileSync(DELETED_ITEMS_FILE, JSON.stringify(t, null, 2));
+  ghPersistFile(DELETED_ITEMS_FILE);
+}
+// Tombstone one public post id immediately (load, add, save). Idempotent.
+function tombstonePostIdNow(id) {
+  if (typeof id !== 'string' || !id.trim()) return false;
+  const t = loadDeletedItems();
+  if (t.posts[id]) return false;
+  t.posts[id] = new Date().toISOString();
+  saveDeletedItems(t);
+  return true;
+}
 // User IDs: 10 chars, uppercase letters + digits, no confusing chars
 // (0/O and 1/I excluded). Auto-generated once on first sync; once assigned
 // it NEVER changes. Used in the user's Profile (with a Copy button) and in
@@ -666,7 +702,7 @@ function pubUser(u, modelLogins, deviceInfo) {
   const map = modelLogins || loadModelLogins();
   const model = u.model || '';
   const count = model && map && typeof map === 'object' ? (Number(map[model]) || 0) : 0;
-  const out = { id: u.id || '', email: u.email, name: u.name || '', firstName: u.firstName || '', lastName: u.lastName || '', credits: u.credits, songCredits: u.songCredits, balance: Math.round(numOr(u.balance, 0) * 100) / 100, plan: u.plan || '', songPlan: u.songPlan || '', createdAt: u.createdAt, updatedAt: u.updatedAt, lastIp: u.lastIp || '', country: u.country || '', countryCode: u.countryCode || '', device: u.device || '', model, modelLogins: count, lastSeen: u.lastSeen || '', knownDevices: Array.isArray(u.knownDevices) ? u.knownDevices : [], hasPassword: !!(u.passwordHash && u.passwordSalt),
+  const out = { id: u.id || '', email: u.email, name: u.name || '', firstName: u.firstName || '', lastName: u.lastName || '', credits: u.credits, songCredits: u.songCredits, balance: Math.round(numOr(u.balance, 0) * 100) / 100, earnBalance: Math.round(numOr(u.earnBalance, 0) * 100) / 100, plan: u.plan || '', songPlan: u.songPlan || '', createdAt: u.createdAt, updatedAt: u.updatedAt, lastIp: u.lastIp || '', country: u.country || '', countryCode: u.countryCode || '', device: u.device || '', model, modelLogins: count, lastSeen: u.lastSeen || '', knownDevices: Array.isArray(u.knownDevices) ? u.knownDevices : [], hasPassword: !!(u.passwordHash && u.passwordSalt),
     // Device fingerprint (anti-abuse): the device the account was
     // registered on (deviceId, never overwritten by later sign-ins from
     // other devices), the most recent device seen, and the model the
@@ -2033,6 +2069,10 @@ const WALLET_REQUESTS_FILE = path.join(DATA_DIR, 'wallet-requests.json');
 const instantResetTokens = new Map();
 function walletMoney(n) { return Math.round(numOr(n, 0) * 100) / 100; }
 function walletBalance(u) { return walletMoney(u && u.balance); }
+// Earn balance (owner order 2026-11-18): cashback + view earnings.
+// NOT spendable (cannot buy packages or slots) — withdraw-only, it just
+// accumulates. Separate from the spendable top-up `balance`.
+function walletEarnBalance(u) { return walletMoney(u && u.earnBalance); }
 // Withdraw fee tier (owner order 2026-11-18): under $50 the fee is a
 // flat $0.50; $50 and over it is 5% of the amount ($50 -> $2.50 fee,
 // net $47.50; $100 -> $5.00 fee, net $95.00). total = amount + fee
@@ -2058,7 +2098,7 @@ function newWalletRequestId() {
 }
 function walletRequestPublic(r, users) {
   const u = users && r && users[r.email];
-  return Object.assign({}, r, { buyerId: u && u.id ? u.id : '', balance: u ? walletBalance(u) : 0 });
+  return Object.assign({}, r, { buyerId: u && u.id ? u.id : '', balance: u ? walletBalance(u) : 0, earnBalance: u ? walletEarnBalance(u) : 0 });
 }
 // ---- Monetization (owner order 2026-11-18) ----
 // The website can earn money for its users: package cashback + view
@@ -2158,7 +2198,7 @@ function monetizationFollowerCount(email) {
 // owner (eligibility progress, even before approval / while the toggle
 // is OFF); when monetization is ON and the owner is approved it also
 // accrues the $0.000001 view earning and moves whole cents into the
-// owner's wallet balance (fractional remainder stays pending).
+// owner's Earn balance (fractional remainder stays pending).
 // Returns the owner's earnings record (or null for a guest view).
 // Async because a whole-cent payout awaits the users GitHub flush.
 async function monetizationOnView(ownerEmail, viewerEmail, country, durationSec) {
@@ -2179,15 +2219,16 @@ async function monetizationOnView(ownerEmail, viewerEmail, country, durationSec)
     if (!rec.byCountry[cc] || typeof rec.byCountry[cc] !== 'object') rec.byCountry[cc] = { views: 0, earnMicro: 0 };
     rec.byCountry[cc].views = numOr(rec.byCountry[cc].views, 0) + 1;
     rec.byCountry[cc].earnMicro = numOr(rec.byCountry[cc].earnMicro, 0) + MONETIZATION_VIEW_EARN_MICRO;
-    // Move whole cents to the wallet balance (fractional remainder
-    // stays pending). $0.01 = 10,000 micro-dollars.
+    // Move whole cents to the EARN balance (fractional remainder stays
+    // pending). $0.01 = 10,000 micro-dollars. Earn money is NOT
+    // spendable (cannot buy packages) — withdraw-only, it accumulates.
     const wholeMicro = Math.floor(numOr(rec.pendingMicro, 0) / MONETIZATION_MICRO_PER_CENT) * MONETIZATION_MICRO_PER_CENT;
     if (wholeMicro > 0) {
       const dollars = walletMoney(wholeMicro / 1000000);
       const users = loadUsers();
       const u = users[owner];
       if (u) {
-        u.balance = walletMoney(walletBalance(u) + dollars);
+        u.earnBalance = walletMoney(walletEarnBalance(u) + dollars);
         u.updatedAt = new Date().toISOString();
         saveUsers(users);
         await ghFlushFile(USERS_FILE);
@@ -4824,6 +4865,7 @@ function apiRoute(req, res, urlPath) {
           credits: 0,
           songCredits: 0,
           balance: 0,
+          earnBalance: 0,
           giftClaimed: false,
           plan: typeof body.plan === 'string' ? body.plan.slice(0, 50) : '',
           songPlan: typeof body.songPlan === 'string' ? body.songPlan.slice(0, 50) : '',
@@ -4994,7 +5036,7 @@ function apiRoute(req, res, urlPath) {
       }
       if (!u) {
         const takenIds = new Set(Object.values(users).map((x) => x.id).filter(Boolean));
-        u = { id: genUserId(takenIds), email, name: g.name || '', credits: 0, songCredits: 0, balance: 0, giftClaimed: false, plan: '', songPlan: '', createdAt: now, updatedAt: now };
+        u = { id: genUserId(takenIds), email, name: g.name || '', credits: 0, songCredits: 0, balance: 0, earnBalance: 0, giftClaimed: false, plan: '', songPlan: '', createdAt: now, updatedAt: now };
         users[email] = u;
       } else {
         if (!u.id) { const takenIds = new Set(Object.values(users).map((x) => x.id).filter(Boolean)); u.id = genUserId(takenIds); }
@@ -5462,6 +5504,7 @@ function apiRoute(req, res, urlPath) {
       const v = bc[c] || {};
       byCountry.push({ country: c, views: numOr(v.views, 0), earnings: numOr(v.earnMicro, 0) / 1000000 });
     }
+    const _u = loadUsers()[email];
     return sendJSON(res, 200, {
       ok: true, email,
       earnings: numOr(rec.earnMicro, 0) / 1000000,
@@ -5471,6 +5514,7 @@ function apiRoute(req, res, urlPath) {
       paidOut: numOr(rec.paidOutMicro, 0) / 1000000,
       watchSeconds: numOr(rec.watchSeconds, 0),
       byCountry,
+      earnBalance: _u ? walletEarnBalance(_u) : 0,
     });
   }
   // GET /api/public/monetization/status?email=X — PUBLIC. Eligibility
@@ -5487,12 +5531,14 @@ function apiRoute(req, res, urlPath) {
     const applied = !!(app && (app.status === 'pending' || app.status === 'approved'));
     const approved = !!(app && app.status === 'approved');
     const eligible = followers >= MONETIZATION_FOLLOWERS_NEEDED && watchHours >= MONETIZATION_WATCH_HOURS_NEEDED;
+    const _u = loadUsers()[email];
     return sendJSON(res, 200, {
       ok: true, email, enabled: monetizationEnabled(),
       followers, followersNeeded: MONETIZATION_FOLLOWERS_NEEDED,
       watchHours: Math.round(watchHours * 100) / 100, watchHoursNeeded: MONETIZATION_WATCH_HOURS_NEEDED,
       eligible, applied, approved,
       earnings: numOr(rec.earnMicro, 0) / 1000000, views: numOr(rec.views, 0),
+      earnBalance: _u ? walletEarnBalance(_u) : 0,
     });
   }
   // POST /api/public/monetization/apply — {email} — PUBLIC. Applies for
@@ -6123,7 +6169,8 @@ function apiRoute(req, res, urlPath) {
     const email = normEmail(new URL(req.url, 'http://localhost').searchParams.get('email') || '');
     if (!email) return sendJSON(res, 200, { ok: false, error: 'សូមដាក់ Gmail' });
     const h = loadHistory();
-    const arr = Array.isArray(h[email]) ? h[email] : [];
+    const tombs = loadDeletedItems();
+    const arr = (Array.isArray(h[email]) ? h[email] : []).filter((it) => { const k = histKey(it); return k && !tombs.history[k]; });
     return sendJSON(res, 200, { ok: true, email, items: arr.slice(0, 300) });
   }
   // POST /api/public/history — PUBLIC. {email, items:[...]}. Merges the
@@ -6136,13 +6183,18 @@ function apiRoute(req, res, urlPath) {
       if (!email) return sendJSON(res, 200, { ok: false, error: 'សូមដាក់ Gmail' });
       if (!body || !Array.isArray(body.items)) return sendJSON(res, 200, { ok: false, error: 'ទិន្នន័យមិនត្រឹមត្រូវទេ' });
       await ghResyncPublicHistoryThrottled();
+      const tombs = loadDeletedItems();
       const h = loadHistory();
       const byKey = {};
       const stored = Array.isArray(h[email]) ? h[email] : [];
       for (const it of stored) {
         if (!it || typeof it !== 'object') continue;
         const k = histKey(it);
-        if (k) byKey[k] = it;
+        if (!k) continue;
+        // A tombstoned item must never survive in storage, even if the
+        // throttled merge has not run yet to remove it.
+        if (tombs.history[k]) continue;
+        byKey[k] = it;
       }
       // PERMANENT URL (owner order 2026-11-18): History items must store
       // a permanent Cloudinary URL, never a Magic Hour signed URL (dead
@@ -6150,7 +6202,17 @@ function apiRoute(req, res, urlPath) {
       // first, upload only when the copy does not exist yet). A URL that
       // cannot be made permanent is kept as-is (the startup heal retries
       // it later) so a History sync never loses the user's song.
-      const converted = await Promise.all(body.items.map(async (it) => {
+      // Tombstone check (resurrection bug 2026-11-18): the phone still
+      // holds items the owner deleted; the union below must NOT resurrect
+      // them. Drop any incoming item whose id is already tombstoned
+      // before converting (a conversion would only waste the work).
+      const liveIncoming = body.items.filter((it) => {
+        if (!it || typeof it !== 'object') return false;
+        const id = typeof it.id === 'string' ? it.id.trim() : '';
+        if (id && tombs.history['id:' + id]) return false;
+        return true;
+      });
+      const converted = await Promise.all(liveIncoming.map(async (it) => {
         if (!it || typeof it !== 'object') return it;
         const u = typeof it.url === 'string' ? it.url : '';
         if (!u || !isMagicHourUrl(u)) return it;
@@ -6164,6 +6226,7 @@ function apiRoute(req, res, urlPath) {
         if (!it || typeof it !== 'object') continue;
         const k = histKey(it);
         if (!k) continue;
+        if (tombs.history[k]) continue; // tombstoned by key (id or final permanent URL) — never re-add
         const clean = Object.assign({}, it);
         delete clean.thumb;
         const prev = byKey[k];
@@ -6464,14 +6527,14 @@ function apiRoute(req, res, urlPath) {
       if (pkg.credits) { u.plan = r.packageId; u.planExpiresAt = new Date(Date.now() + Math.max(1, pkg.days || 30) * 86400000).toISOString(); }
       if (pkg.songCredits) { u.songPlan = r.packageId; u.songPlanExpiresAt = new Date(Date.now() + Math.max(1, pkg.days || 30) * 86400000).toISOString(); }
       // Monetization cashback (owner order 2026-11-18): when monetization
-      // is ON, an approved package purchase adds cashback to the wallet
-      // balance immediately, by package price tier. The balance is the
-      // single source of truth — cashback is real wallet money.
+      // is ON, an approved package purchase adds cashback to the EARN
+      // balance immediately, by package price tier. Earn money is NOT
+      // spendable — withdraw-only, it accumulates.
       let _cb = 0;
       if (monetizationEnabled()) {
         _cb = monetizationCashbackForPrice(pkg.price);
         if (_cb > 0) {
-          u.balance = walletMoney(walletBalance(u) + _cb);
+          u.earnBalance = walletMoney(walletEarnBalance(u) + _cb);
           monetizationRecordCashback(r.email, _cb);
         }
       }
@@ -6489,7 +6552,7 @@ function apiRoute(req, res, urlPath) {
       await ghFlushFile(PURCHASE_REQUESTS_FILE);
       const _pd2 = pkgDisplay(pkg);
       addNotification('purchase-approved', r.email, '✅ បានអនុម័ត · Purchase approved', pkgNotifText(pkg, r.email, u.id || '—'), { extra: { pkg: r.packageId, pkgName: _pd2.pkgName, priceText: _pd2.priceText, creditText: _pd2.creditText, buyerId: u.id || '—', decision: 'approved' }, telegramHtml: pkgNotifTelegram('✅ បានអនុម័ត · Purchase approved', pkg, r.email, u.id || '—') });
-      if (_cb > 0) addNotification('grant', r.email, '💰 Cashback · បានលុយត្រឡប់វិញ', 'ទិញកញ្ចប់ ' + r.packageId + ' ($' + walletMoney(pkg.price).toFixed(2) + ') បាន Cashback $' + _cb.toFixed(2) + ' ចូល Wallet (នៅសល់ $' + u.balance.toFixed(2) + ')', { extra: { cashback: _cb, pkg: r.packageId, balance: u.balance, buyerId: u.id || '—' } });
+      if (_cb > 0) addNotification('grant', r.email, '💰 Cashback · បានលុយត្រឡប់វិញ', 'ទិញកញ្ចប់ ' + r.packageId + ' ($' + walletMoney(pkg.price).toFixed(2) + ') បាន Cashback $' + _cb.toFixed(2) + ' ចូល Earn Balance (នៅសល់ $' + u.earnBalance.toFixed(2) + ')', { extra: { cashback: _cb, pkg: r.packageId, balance: u.balance, earnBalance: u.earnBalance, buyerId: u.id || '—' } });
       markPurchaseRequestDecided(r.email, r.packageId, 'approved', now);
       return sendJSON(res, 200, { ok: true, request: r, user: pubUser(u), cashback: _cb });
     }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
@@ -6529,7 +6592,7 @@ function apiRoute(req, res, urlPath) {
     if (!email) return sendJSON(res, 200, { ok: false, error: 'សូមដាក់ Gmail ត្រឹមត្រូវ' });
     const u = loadUsers()[email];
     if (!u) return sendJSON(res, 200, { ok: false, error: 'រក Gmail នេះមិនឃើញទេ · No account with this Gmail' });
-    return sendJSON(res, 200, { ok: true, email, balance: walletBalance(u) });
+    return sendJSON(res, 200, { ok: true, email, balance: walletBalance(u), earnBalance: walletEarnBalance(u) });
   }
   // POST /api/public/wallet/topup-request — {email, amount, method, receipt?}
   // — PUBLIC. Asks to top up the Wallet. amount >= $5.00. method is
@@ -6574,8 +6637,13 @@ function apiRoute(req, res, urlPath) {
       if (!u) return sendJSON(res, 200, { ok: false, error: 'រក Gmail នេះមិនឃើញទេ — សូម Sign-up ជាមុនសិន · No account with this Gmail, please sign up first' });
       const amount = walletMoney(body && body.amount);
       if (!Number.isFinite(amount) || amount < WALLET_MIN_WITHDRAW) return sendJSON(res, 200, { ok: false, error: 'ចំនួនដកយ៉ាងហោចណាស់ $' + WALLET_MIN_WITHDRAW.toFixed(2) + ' · Minimum withdrawal is $' + WALLET_MIN_WITHDRAW.toFixed(2) });
-      const bal = walletBalance(u);
-      if (amount > bal) return sendJSON(res, 200, { ok: false, error: 'លុយក្នុង Wallet មិនគ្រប់ទេ (នៅសល់ $' + bal.toFixed(2) + ') · Insufficient wallet balance ($' + bal.toFixed(2) + ' left)', balance: bal });
+      // Withdraw source (owner order 2026-11-18): 'wallet' (top-up money,
+      // default) or 'earnings' (Earn Balance — cashback + view earnings).
+      // Funds are checked against the SELECTED balance only.
+      const source = (body && body.source === 'earnings') ? 'earnings' : 'wallet';
+      const bal = source === 'earnings' ? walletEarnBalance(u) : walletBalance(u);
+      const balName = source === 'earnings' ? 'Earn Balance' : 'Wallet';
+      if (amount > bal) return sendJSON(res, 200, { ok: false, error: 'លុយក្នុង ' + balName + ' មិនគ្រប់ទេ (នៅសល់ $' + bal.toFixed(2) + ') · Insufficient ' + balName + ' balance ($' + bal.toFixed(2) + ' left)', balance: bal, earnBalance: walletEarnBalance(u) });
       const now = new Date().toISOString();
       const reqs = loadWalletRequests();
       // userId (owner order 2026-11-18): stored on the request so the
@@ -6587,7 +6655,7 @@ function apiRoute(req, res, urlPath) {
       const userId = (typeof body.userId === 'string' && body.userId.trim()) ? body.userId.trim().slice(0, 50) : (u.id || '');
       const fee = walletWithdrawFee(amount);
       const r = {
-        id: newWalletRequestId(), type: 'withdraw', email, userId, amount, fee, total: walletMoney(amount + fee), net: walletMoney(amount - fee),
+        id: newWalletRequestId(), type: 'withdraw', email, userId, amount, fee, total: walletMoney(amount + fee), net: walletMoney(amount - fee), source,
         khqrImageUrl: typeof body.khqrImageUrl === 'string' ? body.khqrImageUrl.trim().slice(0, 500) : '',
         status: 'pending', createdAt: now, updatedAt: now,
       };
@@ -6598,7 +6666,7 @@ function apiRoute(req, res, urlPath) {
       // both, same path as top-up/purchase requests): amount, Gmail,
       // User ID, fee, net amount. Nothing is deducted yet — the Admin
       // deducts (amount + fee) only when approving.
-      addNotification('purchase-request', email, '💸 សំណើដកលុយ · Wallet withdraw request', (u.name || email) + ' (' + email + ') · User ID: ' + (r.userId || '—') + ' ស្នើដក $' + amount.toFixed(2) + ' (ថ្លៃសេវា $' + fee.toFixed(2) + ' — ទទួលបាន $' + r.net.toFixed(2) + ' — សរុបកាត់ $' + r.total.toFixed(2) + ')', { extra: { walletRequestId: r.id, type: 'withdraw', amount, fee, total: r.total, net: r.net, buyerId: r.userId || '—', userId: r.userId || '' } });
+      addNotification('purchase-request', email, '💸 សំណើដកលុយ · Wallet withdraw request', (u.name || email) + ' (' + email + ') · User ID: ' + (r.userId || '—') + ' ស្នើដក $' + amount.toFixed(2) + ' ពី ' + balName + ' (ថ្លៃសេវា $' + fee.toFixed(2) + ' — ទទួលបាន $' + r.net.toFixed(2) + ' — សរុបកាត់ $' + r.total.toFixed(2) + ')', { extra: { walletRequestId: r.id, type: 'withdraw', amount, fee, total: r.total, net: r.net, source, buyerId: r.userId || '—', userId: r.userId || '' } });
       return sendJSON(res, 200, { ok: true, request: walletRequestPublic(r, users), fee, net: r.net });
     }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹমត្រូវទេ', 'Bad request')));
     return;
@@ -6628,12 +6696,13 @@ function apiRoute(req, res, urlPath) {
       if (pkg.songCredits) { u.songPlan = packageId; u.songPlanExpiresAt = new Date(Date.now() + Math.max(1, pkg.days || 30) * 86400000).toISOString(); }
       // Monetization cashback (owner order 2026-11-18): when monetization
       // is ON, buying a package with the Wallet adds cashback to the
-      // balance immediately, by package price tier.
+      // EARN balance immediately, by package price tier. Earn money is
+      // NOT spendable — withdraw-only, it accumulates.
       let _cb = 0;
       if (monetizationEnabled()) {
         _cb = monetizationCashbackForPrice(price);
         if (_cb > 0) {
-          u.balance = walletMoney(u.balance + _cb);
+          u.earnBalance = walletMoney(walletEarnBalance(u) + _cb);
           monetizationRecordCashback(email, _cb);
         }
       }
@@ -6643,7 +6712,7 @@ function apiRoute(req, res, urlPath) {
       await ghFlushFile(USERS_FILE);
       const _pdw = pkgDisplay(pkg);
       addNotification('purchase-approved', email, '✅ បានទិញកញ្ចប់ដោយ Wallet · Package bought with Wallet', pkgNotifText(pkg, email, u.id || '—') + ' — បង់ដោយ Wallet $' + price.toFixed(2) + ' (នៅសល់ $' + u.balance.toFixed(2) + ')', { extra: { pkg: packageId, pkgName: _pdw.pkgName, priceText: _pdw.priceText, creditText: _pdw.creditText, buyerId: u.id || '—', decision: 'approved', paidBy: 'wallet', price }, telegramHtml: pkgNotifTelegram('✅ បានទិញកញ្ចប់ដោយ Wallet · Package bought with Wallet', pkg, email, u.id || '—') });
-      if (_cb > 0) addNotification('grant', email, '💰 Cashback · បានលុយត្រឡប់វិញ', 'ទិញកញ្ចប់ ' + packageId + ' ($' + price.toFixed(2) + ') បាន Cashback $' + _cb.toFixed(2) + ' ចូល Wallet (នៅសល់ $' + u.balance.toFixed(2) + ')', { extra: { cashback: _cb, pkg: packageId, balance: u.balance, buyerId: u.id || '—' } });
+      if (_cb > 0) addNotification('grant', email, '💰 Cashback · បានលុយត្រឡប់វិញ', 'ទិញកញ្ចប់ ' + packageId + ' ($' + price.toFixed(2) + ') បាន Cashback $' + _cb.toFixed(2) + ' ចូល Earn Balance (នៅសល់ $' + u.earnBalance.toFixed(2) + ')', { extra: { cashback: _cb, pkg: packageId, balance: u.balance, earnBalance: u.earnBalance, buyerId: u.id || '—' } });
       return sendJSON(res, 200, { ok: true, user: pubUser(u), package: packageId, price, balance: u.balance, cashback: _cb });
     }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
     return;
@@ -6791,7 +6860,7 @@ function apiRoute(req, res, urlPath) {
     if (!email) return sendJSON(res, 200, { ok: false, error: 'សូមដាក់ Gmail ត្រឹមត្រូវ' });
     const u = loadUsers()[email];
     if (!u) return sendJSON(res, 200, { ok: false, error: 'រកអ្នកប្រើនេះមិនឃើញទេ' });
-    return sendJSON(res, 200, { ok: true, email, balance: walletBalance(u) });
+    return sendJSON(res, 200, { ok: true, email, balance: walletBalance(u), earnBalance: walletEarnBalance(u) });
   }
   // POST /api/admin/wallet/approve — {requestId} — admin key required.
   // Top-up: adds the amount to the user's balance. Withdraw: deducts
@@ -6821,13 +6890,19 @@ function apiRoute(req, res, urlPath) {
         // time); older requests without a stored fee recompute it.
         const fee = (Number.isFinite(r.fee) && r.fee >= 0) ? walletMoney(r.fee) : walletWithdrawFee(r.amount);
         const total = (Number.isFinite(r.total) && r.total > 0) ? walletMoney(r.total) : walletMoney(walletMoney(r.amount) + fee);
-        const bal = walletBalance(u);
-        if (total > bal) return sendJSON(res, 200, { ok: false, error: 'លុយក្នុង Wallet មិនគ្រប់ទេ (ត្រូវការ $' + total.toFixed(2) + ', នៅសល់ $' + bal.toFixed(2) + ') · Insufficient wallet balance', balance: bal });
-        u.balance = walletMoney(bal - total);
+        // Withdraw source (owner order 2026-11-18): deduct from the
+        // balance the request was made against ('earnings' = Earn
+        // Balance, anything else = spendable Wallet). Old requests
+        // without a stored source default to 'wallet'.
+        const source = (r.source === 'earnings') ? 'earnings' : 'wallet';
+        const bal = source === 'earnings' ? walletEarnBalance(u) : walletBalance(u);
+        const balName = source === 'earnings' ? 'Earn Balance' : 'Wallet';
+        if (total > bal) return sendJSON(res, 200, { ok: false, error: 'លុយក្នុង ' + balName + ' មិនគ្រប់ទេ (ត្រូវការ $' + total.toFixed(2) + ', នៅសល់ $' + bal.toFixed(2) + ') · Insufficient ' + balName + ' balance', balance: bal, earnBalance: walletEarnBalance(u) });
+        if (source === 'earnings') { u.earnBalance = walletMoney(bal - total); } else { u.balance = walletMoney(bal - total); }
         u.updatedAt = now;
         saveUsers(users);
         await ghFlushFile(USERS_FILE);
-        addNotification('deduct', r.email, '✅ ដកលុយបានអនុម័ត · Withdraw approved', '$' + walletMoney(r.amount).toFixed(2) + ' (+ថ្លៃសេវា $' + fee.toFixed(2) + ' = $' + total.toFixed(2) + ') បានកាត់ពី Wallet របស់ ' + r.email + ' (នៅសល់ $' + u.balance.toFixed(2) + ') — Admin នឹងផ្ញើលុយតាម KHQR របស់អ្នក', { extra: { walletRequestId: r.id, type: 'withdraw', amount: walletMoney(r.amount), fee, total, balance: u.balance, buyerId: u.id || '—' } });
+        addNotification('deduct', r.email, '✅ ដកលុយបានអនុម័ត · Withdraw approved', '$' + walletMoney(r.amount).toFixed(2) + ' (+ថ្លៃសេវា $' + fee.toFixed(2) + ' = $' + total.toFixed(2) + ') បានកាត់ពី ' + balName + ' របស់ ' + r.email + ' (នៅសល់ $' + bal.toFixed(2) + ') — Admin នឹងផ្ញើលុយតាម KHQR របស់អ្នក', { extra: { walletRequestId: r.id, type: 'withdraw', amount: walletMoney(r.amount), fee, total, balance: u.balance, earnBalance: u.earnBalance, source, buyerId: u.id || '—' } });
       } else {
         return sendJSON(res, 200, { ok: false, error: 'ប្រភេទសំណើនេះមិនស្គាល់ទេ' });
       }
@@ -6836,7 +6911,7 @@ function apiRoute(req, res, urlPath) {
       r.updatedAt = now;
       saveWalletRequests(reqs);
       await ghFlushFile(WALLET_REQUESTS_FILE);
-      return sendJSON(res, 200, { ok: true, request: walletRequestPublic(r, users), user: pubUser(u), balance: u.balance });
+      return sendJSON(res, 200, { ok: true, request: walletRequestPublic(r, users), user: pubUser(u), balance: u.balance, earnBalance: u.earnBalance });
     }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
     return;
   }
@@ -7825,6 +7900,11 @@ function apiRoute(req, res, urlPath) {
   // or from early handlers would hit its temporal dead zone.
   async function ghMergePublicHistoryFromGitHub() {
     const out = { publicChanged: false, historyChanged: false, publicPosts: 0, historyItems: 0, error: '' };
+    // Tombstones (resurrection bug 2026-11-18): anything this merge drops
+    // as a GitHub deletion is recorded here so a later client sync can
+    // never resurrect it. Loaded once, saved at the end if it changed.
+    const tombs = loadDeletedItems();
+    let tombsChanged = false;
     const pubPath = path.join(DATA_DIR, 'public.json');
     const readPub = () => { try { const j = JSON.parse(fs.readFileSync(pubPath, 'utf8')); return Array.isArray(j) ? j : []; } catch (e) { return []; } };
     const writePub = (arr) => { try { fs.mkdirSync(DATA_DIR, { recursive: true }); } catch (e) {} fs.writeFileSync(pubPath, JSON.stringify(arr, null, 2)); ghPersistFile(pubPath); };
@@ -7842,6 +7922,7 @@ function apiRoute(req, res, urlPath) {
             let changed = false;
             for (const gp of ghPosts) {
               if (!gp || typeof gp.id !== 'string') continue;
+              if (tombs.posts[gp.id]) { changed = true; continue; } // tombstoned: deleted for good, drop it from GitHub too
               const lp = local.find((x) => x && x.id === gp.id);
               if (!lp) { merged.push(gp); changed = true; continue; }
               const m = Object.assign({}, gp);
@@ -7858,6 +7939,10 @@ function apiRoute(req, res, urlPath) {
               if (ghById[lp.id]) continue;
               const created = Date.parse(lp.createdAt || '');
               if (Number.isFinite(created) && Date.now() - created < graceMs) { merged.push(lp); continue; }
+              // Absent from GitHub and past the 5-minute grace: this is a
+              // real deletion, not a new local post — tombstone the id so
+              // it can never be re-posted or re-added.
+              if (!tombs.posts[lp.id]) { tombs.posts[lp.id] = new Date().toISOString(); tombsChanged = true; }
               changed = true;
             }
             if (changed || merged.length !== local.length) { writePub(merged); out.publicChanged = true; }
@@ -7885,6 +7970,7 @@ function apiRoute(req, res, urlPath) {
               for (const it of ghItems) {
                 if (!it || typeof it !== 'object') continue;
                 const k = histKey(it);
+                if (k && tombs.history[k]) { changed = true; continue; } // tombstoned: deleted for good, drop it from GitHub too
                 const li = k ? loItems.find((x) => histKey(x) === k) : null;
                 if (li && numOr(li.ts, 0) > numOr(it.ts, 0)) { outItems.push(li); changed = true; }
                 else outItems.push(it);
@@ -7894,6 +7980,10 @@ function apiRoute(req, res, urlPath) {
                 const k = histKey(li);
                 if (!k || ghByKey[k]) continue;
                 if (Number.isFinite(numOr(li.ts, 0)) && numOr(li.ts, 0) > 0 && Date.now() - numOr(li.ts, 0) < graceMs) { outItems.push(li); continue; }
+                // Absent from GitHub and past the 5-minute grace: this is
+                // a real deletion, not a new local item — tombstone the
+                // key so a client sync can never resurrect it.
+                if (k && !tombs.history[k]) { tombs.history[k] = new Date().toISOString(); tombsChanged = true; }
                 changed = true;
               }
               if (outItems.length) merged[em] = outItems.sort((a, b) => numOr(b.ts, 0) - numOr(a.ts, 0)).slice(0, 300);
@@ -7904,6 +7994,9 @@ function apiRoute(req, res, urlPath) {
         }
       } catch (e) { out.error = (out.error ? out.error + '; ' : '') + 'history: ' + (e && e.message ? e.message : e); }
     } catch (e) { out.error = String(e && e.message ? e.message : e); }
+    // Persist any tombstones this merge recorded (awaited: a restart in
+    // the next second must not lose the record that blocks resurrection).
+    if (tombsChanged) { saveDeletedItems(tombs); await ghFlushFile(DELETED_ITEMS_FILE); }
     return out;
   }
   // Throttled merge: at most one GitHub re-pull per minute, so the
@@ -8808,8 +8901,16 @@ function apiRoute(req, res, urlPath) {
       const now = new Date().toISOString();
       await ghResyncPublicHistoryThrottled();
       const posts = loadPublicPosts();
+      // Optional client-provided id (idempotent re-post from the phone).
+      // A tombstoned id (deleted post) can never be re-posted, and an id
+      // that already exists cannot be reused.
+      const clientId = typeof body.id === 'string' ? body.id.trim().slice(0, 100) : '';
+      if (clientId) {
+        if (loadDeletedItems().posts[clientId]) return sendJSON(res, 200, { ok: false, error: 'Post នេះត្រូវបានលុបហើយ · This post was deleted and cannot be re-posted' });
+        if (posts.some((x) => x && x.id === clientId)) return sendJSON(res, 200, { ok: false, error: 'Post នេះមានរួចហើយ · This post already exists' });
+      }
       const p = {
-        id: newPublicId(), email,
+        id: clientId || newPublicId(), email,
         name: typeof body.name === 'string' ? body.name.trim().slice(0, 100) : '',
         userId: typeof body.userId === 'string' ? body.userId.trim().slice(0, 50) : '',
         mode, title, url,
@@ -8856,6 +8957,10 @@ function apiRoute(req, res, urlPath) {
       // success, so a restart in the next second cannot resurrect a post
       // the Admin app already reported as deleted.
       await ghFlushFile(PUBLIC_FILE);
+      // Tombstone the id so the deleted post can never be re-posted or
+      // re-added by a client sync (resurrection bug 2026-11-18).
+      tombstonePostIdNow(id);
+      await ghFlushFile(DELETED_ITEMS_FILE);
       return sendJSON(res, 200, { ok: true, deletedId: id });
     }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
     return;
@@ -8865,7 +8970,8 @@ function apiRoute(req, res, urlPath) {
   // createdAt. rank is 1-based; tier 1 = rank 1–50, tier 2 = 51–200,
   // tier 3 = the rest.
   if (req.method === 'GET' && urlPath === '/api/public/feed') {
-    const posts = loadPublicPosts().filter((p) => p && p.visibility === 'public');
+    const tombs = loadDeletedItems();
+    const posts = loadPublicPosts().filter((p) => p && p.visibility === 'public' && !tombs.posts[p.id]);
     posts.sort((a, b) => ((b.views || 0) - (a.views || 0)) || ((b.likes || 0) - (a.likes || 0)) || String(a.createdAt || '').localeCompare(String(b.createdAt || '')));
     const out = posts.map((p, i) => {
       const rank = i + 1;
