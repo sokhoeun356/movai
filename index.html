@@ -3416,8 +3416,9 @@ input[type=range].st-range{accent-color:var(--accent);min-height:32px;cursor:poi
          each row opens its own SMALL sheet (walletTopupSheet /
          walletWithdrawSheet, right after this Profile sheet)
          containing the form. Static markup (NOT rebuilt by
-         profileRender); the balance is refreshed by
-         walletLoadBalance() on open and after every action. -->
+         profileRender); the balances + credits are refreshed
+         FRESH by profileFreshRefresh() on every open, after
+         every purchase/action, and on a 30-second poll. -->
     <div id="walletBox" style="margin-top:10px">
       <div class="wallet-bal-card" id="walletBalanceCard">
         <div class="wallet-bal-label" data-i18n="walletBalanceTitle">សមតុល្យ Wallet · Wallet Balance</div>
@@ -5980,7 +5981,7 @@ function pkgConfirmFlow(pl,confirmFnName){
     var b2=document.getElementById('pkgSheetBody');
     if(b2)b2.innerHTML='<p style="font-size:0.875rem;color:var(--muted);line-height:1.7">'+escHtml(tx('pkgReqSending'))+'</p>';
     return pkgSendPurchaseRequest(pl,url);
-  }).then(function(){pkgShowWaiting();}).catch(function(err){
+  }).then(function(){/* POST-PURCHASE-REFETCH: the purchase request landed — re-fetch balance + credits fresh at once. */try{postPurchaseRefetch();}catch(e){}pkgShowWaiting();}).catch(function(err){
     clearInterval(timer);
     if(err&&err.receiptFail){
       var b3=document.getElementById('pkgSheetBody');
@@ -6151,13 +6152,66 @@ function walletPaintBalance(){
 }
 function walletFetchBalance(email){
   if(!email)return Promise.resolve(null);
-  return authFetchJson('/api/public/wallet/balance?email='+encodeURIComponent(email),'GET',null,20000).then(function(d){
+  /* Cache-busting timestamp: the balance is ALWAYS read fresh
+     from the server — a cached GET must never repaint a stale
+     Wallet Balance / Earn Money (delay fix). */
+  return authFetchJson('/api/public/wallet/balance?email='+encodeURIComponent(email)+'&_fresh='+Date.now(),'GET',null,20000).then(function(d){
     var b=walletPickBalance(d);
     if(d)walletApplyBalances(d);
     return b;
   });
 }
 function walletLoadBalance(){return walletFetchBalance(walletEmail());}
+/* ===== Fresh balance + credits refresh — DELAY FIX =====
+   User-reported delay: after the Admin granted credits or a
+   user bought a package, the new amounts took 5–20 minutes to
+   appear in My Profile, because the Profile only painted the
+   locally cached numbers and nothing re-fetched promptly.
+   profileFreshRefresh() is the ONE hub that fixes it — it
+   re-fetches BOTH money balances AND both credit amounts fresh
+   from the server and repaints every surface at once:
+   (1) Wallet Balance + Earn Money via
+       GET /api/public/wallet/balance?email= (walletLoadBalance,
+       cache-busted above) -> walletApplyBalances ->
+       walletPaintBalance repaints #walletBalance / #earnBalance.
+   (2) Song Credit + Image.Video Credit via the user/credits
+       sync (acctAdminSync — POST /api/admin/sync returns the
+       server's credits / songCredits) -> acctApplyServerData ->
+       balRenderAll repaints the Profile credit rows, the drawer
+       and the Packages status. If a sync is already in flight
+       its fresh answer is about to land, and one more sync is
+       queued just behind it so a grant made during that flight
+       is still picked up at once.
+   Callers (markers): PROFILE-OPEN-REFETCH — profileOpen() calls
+   it on EVERY open; POST-PURCHASE-REFETCH — postPurchaseRefetch()
+   is called the moment a purchase / top-up / withdraw / package
+   activation / wallet deduction completes; BALANCE-POLL-30S —
+   genInit polls it every 30 s and on visibility / focus.
+   Ambient triggers (poll / visible / focus) are coalesced to at
+   most one fetch per 8 s so a focus+visibility pair never fires
+   two fetches; explicit user actions (profile open, purchase)
+   are NEVER skipped. Guests (no account) do nothing. */
+var profileFreshLast=0;
+function profileFreshRefresh(reason){
+  var u=null;try{u=acctCurrent();}catch(e){}
+  if(!u||!u.email)return;
+  var now=Date.now();
+  var ambient=(reason==='poll-30s'||reason==='visible'||reason==='focus');
+  if(ambient&&now-profileFreshLast<8000)return;
+  profileFreshLast=now;
+  try{walletLoadBalance();}catch(e){}
+  try{
+    if(typeof acctSyncBusy!=='undefined'&&acctSyncBusy){
+      setTimeout(function(){try{acctAdminSync();}catch(e){}},1500);
+    }else{acctAdminSync();}
+  }catch(e){}
+  try{walletPaintBalance();}catch(e){}
+}
+/* POST-PURCHASE-REFETCH: called immediately after any purchase,
+   grant, top-up / withdraw request, package activation or wallet
+   deduction completes, so the new balance + credits repaint at
+   once instead of minutes later. */
+function postPurchaseRefetch(){try{profileFreshRefresh('post-purchase');}catch(e){}}
 function walletSetMethod(m){
   WALLET.method=(m==='foreign')?'foreign':'khmer';
   var k=document.getElementById('walletMethodKhmer');
@@ -6259,6 +6313,8 @@ function walletTopupSubmit(){
     walletClearForm('topup');
     walletApplyBalances(data);
     if(walletPickBalance(data)===null&&walletPickEarnBalance(data)===null)walletLoadBalance();
+    /* POST-PURCHASE-REFETCH: fresh balance + credits at once. */
+    try{postPurchaseRefetch();}catch(e){}
   }).catch(function(){
     if(btn)btn.disabled=false;
     walletSetMsg('walletTopupMsg',tx('walletErrFail'),false);
@@ -6279,6 +6335,9 @@ function walletWithdrawOpen(){
   WALLET.withdrawSource='earnings';
   try{walletWithdrawPrefill();}catch(e){}
   try{walletWithdrawSourcePaint();}catch(e){}
+  /* Fresh balances before the user picks an amount, so the
+     «Withdraw from» line never shows a stale balance. */
+  try{profileFreshRefresh('wallet-sheet');}catch(e){}
   var s=document.getElementById('walletWithdrawSheet');if(s)sheetShowAnim(s);
 }
 /* Withdraw-from selector: 'earnings' (Earn Money, the default)
@@ -6361,6 +6420,8 @@ function walletWithdrawSubmit(){
     walletClearForm('withdraw');
     walletApplyBalances(data);
     if(walletPickBalance(data)===null&&walletPickEarnBalance(data)===null)walletLoadBalance();
+    /* POST-PURCHASE-REFETCH: fresh balance + credits at once. */
+    try{postPurchaseRefetch();}catch(e){}
   }).catch(function(){
     if(btn)btn.disabled=false;
     walletSetMsg('walletWithdrawMsg',tx('walletErrFail'),false);
@@ -6613,10 +6674,11 @@ function walletBuyPackage(id,msgId,btnId){
     if(b!==null)done+=' · '+tx('walletNewBalFmt').replace('{b}',walletFmt(b));
     walletSetMsg(msgId,done,true);
     if(b===null&&walletPickEarnBalance(data)===null)walletLoadBalance();
-    /* The package activates server-side; pull the fresh account
-       (plan + credits) through the normal sync, then repaint the
-       package cards so the bought plan shows as active. */
-    try{acctAdminSync();}catch(e){}
+    /* The package activates server-side; POST-PURCHASE-REFETCH:
+       pull the fresh account (plan + credits) AND the fresh
+       wallet balances at once, then repaint the package cards so
+       the bought plan shows as active. */
+    try{postPurchaseRefetch();}catch(e){}
     setTimeout(function(){try{pkgRender();}catch(e){}try{songPkgRender();}catch(e){}},1500);
   });
 }
@@ -15197,6 +15259,9 @@ function deviceBuySlots(){
     if(!data){deviceBuyMsg(tx('authErrNet'),false);return;}
     if(data.ok!==true){deviceBuyMsg(authErrText(data,'deviceLimitFail'),false);return;}
     deviceLimitClear();
+    /* POST-PURCHASE-REFETCH: the slot was paid from the wallet —
+       repaint the fresh balance + credits at once. */
+    try{postPurchaseRefetch();}catch(e){}
     var m=document.getElementById('authFormMsg');
     if(m){m.textContent=tx('deviceLimitOk');m.style.color='var(--accent-text)';}
   });
@@ -15707,6 +15772,9 @@ function forgotInstantStart(){
     instantCtx={email:email,token:String(data.token||data.resetToken||'')};
     var b=walletPickBalance(data);
     if(b!==null){WALLET.balance=b;walletPaintBalance();}
+    /* POST-PURCHASE-REFETCH: the $0.10 deduction just completed —
+       re-fetch the fresh balance + credits at once. */
+    try{postPurchaseRefetch();}catch(e){}
     forgotStopCountdown();
     var s=document.getElementById('forgotSheet');if(s)sheetHideAnim(s);
     instantSheetShow(email);
@@ -17236,9 +17304,14 @@ function profileOpen(){
   var u=acctCurrent();if(!u){loginSheetOpen();return;}
   try{monetCheckEnabled();}catch(e){}
   profileRender();
-  /* Wallet balance refreshes every time the Profile opens (and
-     after every wallet action — see the wallet submit handlers). */
-  try{walletLoadBalance();}catch(e){}
+  /* PROFILE-OPEN-REFETCH: EVERY time My Profile opens, the Wallet
+     Balance, the Earn Money AND both credit amounts (Song +
+     Image.Video) are re-fetched FRESH from the server and
+     repainted — the Profile never sits on a cached/stale balance
+     (delay fix). profileRender above paints the last known
+     numbers instantly; the fresh server numbers replace them the
+     moment they land. */
+  try{profileFreshRefresh('profile-open');}catch(e){}
   /* Withdraw Gmail + User ID pre-fill from this account (editable). */
   try{walletWithdrawPrefill();}catch(e){}
   var s=document.getElementById('profileSheet');if(s)sheetShowAnim(s);
@@ -18008,6 +18081,14 @@ function genInit(){
      enforces it — session cleared + blocked sheet — instead of
      the block only landing on the next app open. */
   setInterval(function(){try{acctAdminSync();}catch(e){}},60000);
+  /* BALANCE-POLL-30S (delay fix): while the app is open, poll the
+     Wallet Balance + Earn Money + both credit amounts every
+     30 seconds, and re-fetch the moment the app/tab becomes
+     visible or regains focus — an Admin grant or a bought
+     package appears within seconds, not 5–20 minutes. */
+  setInterval(function(){try{profileFreshRefresh('poll-30s');}catch(e){}},30000);
+  document.addEventListener('visibilitychange',function(){if(document.visibilityState==='visible'){try{profileFreshRefresh('visible');}catch(e){}}});
+  window.addEventListener('focus',function(){try{profileFreshRefresh('focus');}catch(e){}});
   /* Plan-expiry sweep: once on open, then every 30 s — the moment
      a bought plan passes its plan.until / songPlan.until, the
      account falls back to Free on every surface by itself. */
