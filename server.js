@@ -3937,32 +3937,88 @@ function sunoCreditFrom(j) {
   return null;
 }
 // ---- Free image generations (owner order 2026-11-18) ----
-// Every user gets 10 FREE image generations per day (NovAI + Agnes +
-// thumbnails — all through POST /api/gen/image). 0 MovAi credits; a
+// Every user gets 10 FREE image generations per 3-day window, and
+// 10 FREE thumbnails per 3-day window — SEPARATE counters (owner
+// order 2026-11-18 20:20; was 10/day shared). 0 MovAi credits; a
 // COUNT cap, not a charge. Stored on the user record as
-// imgDaily:{date:'YYYY-MM-DD', used:N}; the date is Phnom Penh time
-// and rolls over at midnight. A failed provider call refunds the slot.
-const IMG_FREE_DAILY_LIMIT = 10;
+// imgFree3:{start:'YYYY-MM-DD', used:N} (images) and
+// thumbFree3:{start:'YYYY-MM-DD', used:N} (thumbnails); start is the
+// Phnom Penh date the window began, and the window renews when
+// today >= start + 3 days. A failed provider call refunds the slot.
+// The old imgDaily:{date, used} counter is still maintained (and
+// returned by GET /api/public/image-free) for display/back-compat,
+// but it is NOT enforced anymore.
+const IMG_FREE_DAILY_LIMIT = 10; // legacy daily counter (display only)
+const IMG_FREE_3DAY_LIMIT = 10;
+const IMG_FREE_3DAY_DAYS = 3;
 function imgFreeTodayDate() {
   return new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Phnom_Penh' });
 }
-// Give one free-image slot back (provider call failed before any
-// image was produced). Never lets the count go below 0.
-async function imgFreeRefund(email) {
+function _free3DateAdd(dateStr, days) {
+  const p = String(dateStr || '').split('-').map(Number);
+  if (p.length !== 3 || !p[0] || !p[1] || !p[2]) return imgFreeTodayDate();
+  const d = new Date(Date.UTC(p[0], p[1] - 1, p[2]) + days * 86400000);
+  return d.toISOString().slice(0, 10);
+}
+// Normalize a stored {start, used} 3-day window against today.
+// Returns {start, used, resetDate}; a window that already ended
+// comes back fresh (start = today, used = 0).
+function _free3Window(rec) {
+  const today = imgFreeTodayDate();
+  let start = (rec && typeof rec === 'object' && typeof rec.start === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(rec.start)) ? rec.start : today;
+  let used = (rec && typeof rec === 'object') ? Math.max(0, Math.floor(Number(rec.used) || 0)) : 0;
+  if (today >= _free3DateAdd(start, IMG_FREE_3DAY_DAYS)) { start = today; used = 0; }
+  return { start, used, resetDate: _free3DateAdd(start, IMG_FREE_3DAY_DAYS) };
+}
+// Give one free-image/thumbnail slot back (provider call failed
+// before any image was produced). Never lets the count go below 0.
+// isThumbnail=true refunds the thumbnail counter, else the image one;
+// the legacy daily counter is refunded too.
+async function imgFreeRefund(email, isThumbnail) {
   try {
     const em = normEmail(email);
     if (!em) return;
     const users = await loadUsers();
     const u = users[em];
-    if (!u || !u.imgDaily || typeof u.imgDaily !== 'object') return;
+    if (!u) return;
+    const key = isThumbnail ? 'thumbFree3' : 'imgFree3';
+    const win = _free3Window(u[key]);
+    if (win.used > 0) u[key] = { start: win.start, used: win.used - 1 };
     const today = imgFreeTodayDate();
-    if (u.imgDaily.date !== today) return;
-    const used = Math.max(0, Math.floor(Number(u.imgDaily.used) || 0));
-    if (used <= 0) return;
-    u.imgDaily = { date: today, used: used - 1 };
+    if (u.imgDaily && typeof u.imgDaily === 'object' && u.imgDaily.date === today) {
+      const used = Math.max(0, Math.floor(Number(u.imgDaily.used) || 0));
+      if (used > 0) u.imgDaily = { date: today, used: used - 1 };
+    }
     users[em] = u;
     await saveUsers(users);
   } catch (e) {}
+}
+// Translate a non-English image prompt to English via Groq (free).
+// The image models (NovAI cogview, Agnes) understand English far
+// better than Khmer, so a Khmer prompt sent as-is renders a generic
+// scene instead of the requested content (owner report 2026-11-18:
+// "ទេសភាព ស្រស់ស្អាត មានមនុស្សអង្គុយយំ" came back a generic sad man
+// with no crying). Only called when the prompt contains non-ASCII
+// text; English prompts pass through untouched. Returns the English
+// prompt, or null on any failure (the original prompt is then used
+// — a failed translation never blocks the image).
+async function translateImgPromptToEnglish(text) {
+  const sys = 'You are an image-prompt translator. Translate the following image description to English. Translate any non-English text; keep any English text exactly as it is. Preserve every subject, action, emotion, setting and detail exactly — do not add, remove or reinterpret anything. Reply with ONLY the English description, no explanations, no quotes, no markdown.';
+  try {
+    const out = await withProviderKeyRotation('groq', async (k) => {
+      const r = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+        method: 'POST',
+        headers: { 'Authorization': 'Bearer ' + k, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ model: 'openai/gpt-oss-120b', temperature: 0.2, max_tokens: 600, messages: [{ role: 'system', content: sys }, { role: 'user', content: text }] }),
+        signal: AbortSignal.timeout(20000)
+      });
+      const j = await r.json().catch(() => null);
+      const c = j && j.choices && j.choices[0] && j.choices[0].message && typeof j.choices[0].message.content === 'string' ? j.choices[0].message.content.trim() : '';
+      if (!c) throw rotErr('Groq translate: empty reply', r.status);
+      return c;
+    });
+    return out;
+  } catch (e) { return null; }
 }
 // Extract playable songs from a record-info / callback data object.
 function sunoSongsFromData(d) {
@@ -4104,32 +4160,49 @@ async function apiRoute(req, res, urlPath) {
         if (_gateErr) return sendJSON(res, 200, { ok: false, error: _gateErr });
         const _blkErr = await genBlockedCheck(normEmail(body.email), req);
         if (_blkErr) return sendJSON(res, 200, { ok: false, error: _blkErr });
-        // Free 10 images/day (owner order 2026-11-18): NovAI + Agnes
-        // (0 MovAi credits) — and thumbnails, which use this same
-        // endpoint. A COUNT cap, not a credit charge. Paid/own-key
-        // paths (magichour, cloudflare, gemini, hf) are NOT capped
-        // here — media credits / the user's own key already govern
-        // them. The slot is taken BEFORE the provider call and given
-        // back if the provider fails (see imgFreeRefund in the
-        // novai/agnes catch blocks below).
+        // Free 10 images AND 10 thumbnails per 3-day window, SEPARATE
+        // counters (owner order 2026-11-18 20:20; was 10/day shared).
+        // NovAI + Agnes only (0 MovAi credits) — a COUNT cap, not a
+        // charge. Paid/own-key paths (magichour, cloudflare, gemini,
+        // hf) are NOT capped here — media credits / the user's own key
+        // already govern them. The slot is taken BEFORE the provider
+        // call and given back if the provider fails (see
+        // imgFreeRefund in the novai/agnes catch blocks below).
+        // The website passes isThumbnail:true for thumbnails so the
+        // thumbnail counter is used; regular images use the image one.
         let _imgFree = null;
         if (provider === 'novai' || provider === 'agnes') {
           const _freeEm = normEmail(body.email);
           const _freeUsers = await loadUsers();
           const _freeU = _freeUsers[_freeEm];
           if (!_freeU) return sendJSON(res, 200, { ok: false, error: 'សូមចូលគណនេយ្យជាមុនសិន · Please sign in first', needLogin: true });
-          const _freeToday = imgFreeTodayDate();
-          const _freeUsed = (_freeU.imgDaily && typeof _freeU.imgDaily === 'object' && _freeU.imgDaily.date === _freeToday) ? Math.max(0, Math.floor(Number(_freeU.imgDaily.used) || 0)) : 0;
-          if (_freeUsed >= IMG_FREE_DAILY_LIMIT) {
-            return sendJSON(res, 200, { ok: false, error: 'រូប Free អស់ហើយថ្ងៃនេះ (10/10) — សូមត្រឡប់មកវិញថ្ងៃស្អែក · Free images used up for today (10/10). Come back tomorrow.', code: 'image_free_daily_limit', imgFree: { date: _freeToday, limit: IMG_FREE_DAILY_LIMIT, used: _freeUsed, left: 0 } });
+          const _isThumb = body.isThumbnail === true;
+          const _freeKey = _isThumb ? 'thumbFree3' : 'imgFree3';
+          const _win = _free3Window(_freeU[_freeKey]);
+          if (_win.used >= IMG_FREE_3DAY_LIMIT) {
+            return sendJSON(res, 200, { ok: false, error: (_isThumb ? 'Thumbnail Free អស់ហើយ (10/10) — នឹងបាន Free ម្ដងទៀតនៅថ្ងៃ ' + _win.resetDate + ' · Free thumbnails used up (10/10) — free again on ' + _win.resetDate : 'រូប Free អស់ហើយ (10/10) — នឹងបាន Free ម្ដងទៀតនៅថ្ងៃ ' + _win.resetDate + ' · Free images used up (10/10) — free again on ' + _win.resetDate), code: 'image_free_daily_limit', imgFree: { date: _win.start, limit: IMG_FREE_3DAY_LIMIT, used: _win.used, left: 0, resetDate: _win.resetDate, kind: _isThumb ? 'thumbnail' : 'image' } });
           }
-          _freeU.imgDaily = { date: _freeToday, used: _freeUsed + 1 };
+          _freeU[_freeKey] = { start: _win.start, used: _win.used + 1 };
+          // Keep the legacy daily counter in sync (display/back-compat
+          // only — it is NOT enforced anymore).
+          const _freeToday = imgFreeTodayDate();
+          const _dailyUsed = (_freeU.imgDaily && typeof _freeU.imgDaily === 'object' && _freeU.imgDaily.date === _freeToday) ? Math.max(0, Math.floor(Number(_freeU.imgDaily.used) || 0)) : 0;
+          _freeU.imgDaily = { date: _freeToday, used: _dailyUsed + 1 };
           _freeUsers[_freeEm] = _freeU;
           await saveUsers(_freeUsers);
-          _imgFree = { date: _freeToday, limit: IMG_FREE_DAILY_LIMIT, used: _freeUsed + 1, left: Math.max(0, IMG_FREE_DAILY_LIMIT - _freeUsed - 1) };
+          _imgFree = { date: _win.start, limit: IMG_FREE_3DAY_LIMIT, used: _win.used + 1, left: Math.max(0, IMG_FREE_3DAY_LIMIT - _win.used - 1), resetDate: _win.resetDate, kind: _isThumb ? 'thumbnail' : 'image' };
         }
         const key = typeof body.key === 'string' ? body.key : '';
-        const prompt = body.prompt.trim().slice(0, 2000);
+        let prompt = body.prompt.trim().slice(0, 2000);
+        // Translate a non-English (e.g. Khmer) prompt to English first:
+        // the image models understand English far better than Khmer,
+        // so a Khmer prompt sent as-is renders a generic scene instead
+        // of the requested content. English prompts pass through
+        // untouched; a failed translation never blocks the image.
+        if (/[^\x00-\x7F]/.test(prompt)) {
+          const _en = await translateImgPromptToEnglish(prompt);
+          if (_en) prompt = _en.slice(0, 2000);
+        }
         const width = Math.max(64, Math.min(2048, Number(body.width) || 768));
         const height = Math.max(64, Math.min(2048, Number(body.height) || 768));
         // Server-side credit check (image): Magic Hour costs by model
@@ -4193,7 +4266,7 @@ async function apiRoute(req, res, urlPath) {
               throw rotErr('NovAI: ' + genErrText(j, 'HTTP ' + r.status), r.status);
             }, key);
           } catch (e) {
-            if (_imgFree) await imgFreeRefund(body.email);
+            if (_imgFree) await imgFreeRefund(body.email, _imgFree.kind === 'thumbnail');
             if (e && e.noKey) return sendJSON(res, 200, { ok: false, error: 'Admin មិនទាន់ដាក់ NovAI Key ទេ' });
             return sendJSON(res, 200, { ok: false, error: (e && e.message) || 'NovAI: request failed' });
           }
@@ -4232,7 +4305,7 @@ async function apiRoute(req, res, urlPath) {
               throw rotErr('Agnes: ' + genErrText(j, 'HTTP ' + r.status), r.status);
             }, key);
           } catch (e) {
-            if (_imgFree) await imgFreeRefund(body.email);
+            if (_imgFree) await imgFreeRefund(body.email, _imgFree.kind === 'thumbnail');
             if (e && e.noKey) return sendJSON(res, 200, { ok: false, error: 'Admin មិនទាន់ដាក់ Agnes Key ទេ' });
             return sendJSON(res, 200, { ok: false, error: (e && e.message) || 'Agnes: request failed' });
           }
@@ -9798,18 +9871,29 @@ async function apiRoute(req, res, urlPath) {
   }
   // ---- "Free 2 + package allowance" limits (Download MP3, MV, Vocal Studio, Post to Public) ----
   // GET /api/public/image-free?email= — PUBLIC. Read-only; never
-  // creates a user. Free image allowance today for one user (owner
-  // order 2026-11-18 — 10 free NovAI/Agnes images per day):
-  // {ok:true, date, limit:10, used, left}. Unknown email ->
-  // {ok:false, error:'no_account'}.
+  // creates a user. Free allowances per 3-day window (owner order
+  // 2026-11-18 20:20 — 10 free images AND 10 free thumbnails per
+  // 3 days, SEPARATE counters):
+  // {ok:true, date, images:{limit:10, used, left, start, resetDate},
+  //  thumbnails:{limit:10, used, left, start, resetDate}}.
+  // The top-level limit/used/left fields are the legacy daily image
+  // counter, kept for backward compatibility (display only).
+  // Unknown email -> {ok:false, error:'no_account'}.
   if (req.method === 'GET' && urlPath === '/api/public/image-free') {
     const email = normEmail(new URL(req.url, 'http://localhost').searchParams.get('email') || '');
     if (!email) return sendJSON(res, 200, { ok: false, error: 'no_account' });
     const u = (await loadUsers())[email];
     if (!u) return sendJSON(res, 200, { ok: false, error: 'no_account' });
     const today = imgFreeTodayDate();
-    const used = (u.imgDaily && typeof u.imgDaily === 'object' && u.imgDaily.date === today) ? Math.max(0, Math.floor(Number(u.imgDaily.used) || 0)) : 0;
-    return sendJSON(res, 200, { ok: true, date: today, limit: IMG_FREE_DAILY_LIMIT, used, left: Math.max(0, IMG_FREE_DAILY_LIMIT - used) });
+    const imgWin = _free3Window(u.imgFree3);
+    const thumbWin = _free3Window(u.thumbFree3);
+    const dailyUsed = (u.imgDaily && typeof u.imgDaily === 'object' && u.imgDaily.date === today) ? Math.max(0, Math.floor(Number(u.imgDaily.used) || 0)) : 0;
+    return sendJSON(res, 200, {
+      ok: true, date: today,
+      limit: IMG_FREE_3DAY_LIMIT, used: dailyUsed, left: Math.max(0, IMG_FREE_3DAY_LIMIT - dailyUsed),
+      images: { limit: IMG_FREE_3DAY_LIMIT, used: imgWin.used, left: Math.max(0, IMG_FREE_3DAY_LIMIT - imgWin.used), start: imgWin.start, resetDate: imgWin.resetDate },
+      thumbnails: { limit: IMG_FREE_3DAY_LIMIT, used: thumbWin.used, left: Math.max(0, IMG_FREE_3DAY_LIMIT - thumbWin.used), start: thumbWin.start, resetDate: thumbWin.resetDate }
+    });
   }
   // GET /api/public/feature-limits?email= — PUBLIC. Read-only; never
   // creates a user. Returns the Free-2 + package-allowance state:
