@@ -336,13 +336,15 @@ textarea.input{resize:vertical}
 .prov-combo{display:flex;gap:8px;align-items:flex-start;margin-bottom:12px}
 .prov-combo #genProviderWrap{position:relative;flex:1 1 auto;min-width:0}
 .prov-combo #genSongModelWrap{position:relative;flex:0 0 auto}
+.prov-combo #genImgModelWrap{position:relative;flex:0 0 auto}
 .prov-combo #genMhModelWrap,.prov-combo #genMhVidModelWrap,.prov-combo #genNovaiModelWrap,.prov-combo #genSunoModelWrap,.prov-combo #genMhSongVerWrap{position:relative;flex:0 1 46%;min-width:0}
 .prov-combo .input{min-height:38px;padding:8px 12px;font-size:0.84375rem;border-radius:999px;background:var(--card)}
 .prov-combo .kbtn{padding:8px 14px;font-size:0.8125rem;min-height:38px;border-radius:999px}
-.prov-combo #genProviderFieldName,.prov-combo #genMhModelFieldName,.prov-combo #genMhVidModelFieldName,.prov-combo #genNovaiModelFieldName,.prov-combo #genSunoModelFieldName,.prov-combo #genSongModelFieldName{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.prov-combo #genProviderFieldName,.prov-combo #genMhModelFieldName,.prov-combo #genMhVidModelFieldName,.prov-combo #genNovaiModelFieldName,.prov-combo #genSunoModelFieldName,.prov-combo #genSongModelFieldName,.prov-combo #genImgModelFieldName{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .prov-combo #genSunoModelFieldTag,.prov-combo #genMhModelFieldCost,.prov-combo #genMhVidModelFieldTag{display:none}
 .prov-combo #genProviderDrop{left:0!important;right:auto!important;width:min(86vw,340px)}
 .prov-combo #genSongModelDrop{left:0!important;right:auto!important;width:min(86vw,300px)}
+.prov-combo #genImgModelDrop{left:0!important;right:auto!important;width:min(86vw,300px)}
 .prov-combo #genMhModelDrop,.prov-combo #genMhVidModelDrop,.prov-combo #genNovaiModelDrop,.prov-combo #genSunoModelDrop{left:auto!important;right:0;width:min(86vw,340px)}
 .prov-combo .mh-ver-chip{display:flex;justify-content:space-between;align-items:center;gap:8px;width:100%;min-height:38px;padding:8px 12px;border:1px solid var(--line2);border-radius:999px;background:var(--card);font-size:0.84375rem;color:var(--text)}
 .prov-combo .mh-ver-chip .mh-ver-auto{font-size:0.75rem;color:#9a9ea6;white-space:nowrap}
@@ -2251,7 +2253,7 @@ html[data-mode="light"] .chat-bubble.err{color:#b91c1c;background:rgba(220,38,38
 .chat-send:disabled{opacity:.45;cursor:not-allowed}
 /* ===== Light mode surfaces ===== */
 html[data-mode="light"] .drawer-backdrop{background:rgba(20,22,40,.35)}
-html[data-mode="light"] #genProviderDrop,html[data-mode="light"] #genMhModelDrop,html[data-mode="light"] #genMhVidModelDrop,html[data-mode="light"] #genSongModelDrop{background:#ffffff !important;border-color:rgba(20,22,30,.12) !important;box-shadow:0 16px 40px rgba(20,22,40,.16)}
+html[data-mode="light"] #genProviderDrop,html[data-mode="light"] #genMhModelDrop,html[data-mode="light"] #genMhVidModelDrop,html[data-mode="light"] #genSongModelDrop,html[data-mode="light"] #genImgModelDrop{background:#ffffff !important;border-color:rgba(20,22,30,.12) !important;box-shadow:0 16px 40px rgba(20,22,40,.16)}
 html[data-mode="light"] [style*="color:#9a9ea6"]{color:#5f646e !important}
 html[data-mode="light"] [style*="background:rgba(255,255,255,.1)"]{background:rgba(20,22,30,.12) !important}
 html[data-mode="light"] [style*="border-top:1px solid rgba(255,255,255,.08)"]{border-top-color:rgba(20,22,30,.1) !important}
@@ -2355,7 +2357,7 @@ html[data-mode="light"] .mv-a{color:var(--accent-text)}
 .hist-carousel{transform:translateZ(0)}
 .drawer{will-change:transform}
 .pkg-sheet-card{transform:translateZ(0)}
-#genProviderDrop,#genMhModelDrop,#genMhVidModelDrop,#genSunoModelDrop,#genSongModelDrop{transform:translateZ(0)}
+#genProviderDrop,#genMhModelDrop,#genMhVidModelDrop,#genSunoModelDrop,#genSongModelDrop,#genImgModelDrop{transform:translateZ(0)}
 /* Looping animations paused by the smart-activation observer while
    their element is off-screen (see animWatch in the script). */
 .anim-off{animation-play-state:paused !important}
@@ -2393,7 +2395,7 @@ html[data-smooth="1"] .brand-frame,html[data-smooth="1"] .acct-chip,html[data-sm
 @keyframes movaiBlurIn{from{opacity:0;filter:blur(14px)}to{opacity:1;filter:blur(0)}}
 .drawer{filter:blur(14px);opacity:0;transition:transform .28s ease,filter .28s ease,opacity .28s ease}
 .drawer.shown{filter:blur(0);opacity:1}
-#genProviderDrop[style*="display: block"],#genMhModelDrop[style*="display: block"],#genMhVidModelDrop[style*="display: block"],#genNovaiModelDrop[style*="display: block"],#genSunoModelDrop[style*="display: block"],#genSongModelDrop[style*="display: block"],#songStylePresetDrop[style*="display: block"],#genErrBox[style*="display: block"]{animation:movaiBlurIn .25s ease-out both}
+#genProviderDrop[style*="display: block"],#genMhModelDrop[style*="display: block"],#genMhVidModelDrop[style*="display: block"],#genNovaiModelDrop[style*="display: block"],#genSunoModelDrop[style*="display: block"],#genSongModelDrop[style*="display: block"],#genImgModelDrop[style*="display: block"],#songStylePresetDrop[style*="display: block"],#genErrBox[style*="display: block"]{animation:movaiBlurIn .25s ease-out both}
 /* ===== SONAR style (owner order 2026-11-17) =====
    STYLE ONLY — no MovAi content or function changes. The
    owner pointed at the SONAR screenshot and asked for its
@@ -3020,6 +3022,13 @@ input[type=range].st-range{accent-color:var(--accent);min-height:32px;cursor:poi
             <span style="font-size:0.75rem;color:#9a9ea6">▼</span>
           </button>
           <div id="genSongModelDrop" style="display:none;position:absolute;left:0;right:0;top:100%;z-index:30;background:#1a1c21;border:1px solid rgba(255,255,255,.12);border-radius:12px;margin-top:6px;overflow-y:auto;max-height:11.25rem;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;touch-action:pan-y;box-shadow:0 16px 40px rgba(0,0,0,.5)"></div>
+        </div>
+        <div id="genImgModelWrap" style="display:none">
+          <button type="button" class="input" id="genImgModelField" onclick="genToggleImgModels()" style="display:none;justify-content:space-between;align-items:center;gap:10px;cursor:pointer;text-align:left;width:100%" aria-label="Image model">
+            <span style="display:flex;align-items:center;gap:8px;min-width:0"><span id="genImgModelFieldName" style="font-weight:700">NovAI</span></span>
+            <span style="font-size:0.75rem;color:#9a9ea6">▼</span>
+          </button>
+          <div id="genImgModelDrop" style="display:none;position:absolute;left:0;right:0;top:100%;z-index:30;background:#1a1c21;border:1px solid rgba(255,255,255,.12);border-radius:12px;margin-top:6px;overflow-y:auto;max-height:11.25rem;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;touch-action:pan-y;box-shadow:0 16px 40px rgba(0,0,0,.5)"></div>
         </div>
         <div id="genMhModelWrap" style="display:none">
           <button type="button" class="input" id="genMhModelField" onclick="genToggleMhModels()" style="display:none;justify-content:space-between;align-items:center;gap:10px;cursor:pointer;text-align:left;width:100%" aria-label="Magic Hour image model">
@@ -5551,6 +5560,60 @@ function genSetSongModel(key){
   genRenderProviders();genCloseProviders();genRenderOptions();
   if(gen.mode==='song')songRenderOpts();
 }
+/* ===== Image model selector (owner order 2026-11-18: ADD Agnes
+   alongside NovAI) =====
+   Image mode shows ONE compact dropdown with exactly TWO models —
+   NovAI and Agnes. Picking a model selects its provider
+   automatically (NovAI → cogview-3-flash, Agnes →
+   agnes-image-2.5-flash); both are free ($0, no MovAi credits).
+   NovAI is the pinned default and the last pick is remembered in
+   localStorage ('movai-img-model'). The Admin providers.image
+   setting is not used for the generate path, except when it names
+   Magic Hour (the paid image path) — that keeps working exactly
+   as before. */
+var IMG_MODELS=[
+ {key:'novai',label:'NovAI',provider:'novai',model:'cogview-3-flash'},
+ {key:'agnes',label:'Agnes',provider:'agnes',model:'agnes-image-2.5-flash'}
+];
+function imgModelByKey(k){for(var i=0;i<IMG_MODELS.length;i++)if(IMG_MODELS[i].key===k)return IMG_MODELS[i];return null;}
+function imgModelCurKey(){
+  var k=null;try{k=localStorage.getItem('movai-img-model');}catch(e){}
+  return imgModelByKey(k)?k:'novai';
+}
+function imgModelApplyKey(k){
+  var m=imgModelByKey(k)||IMG_MODELS[0];
+  try{localStorage.setItem('movai-img-model',m.key);}catch(e){}
+  return m;
+}
+function genRenderImgModels(){
+  var wrap=document.getElementById('genImgModelWrap');if(!wrap)return;
+  var show=gen.mode==='image';
+  wrap.style.display=show?'block':'none';
+  if(!show){genCloseImgModels();return;}
+  var cur=imgModelByKey(imgModelCurKey())||IMG_MODELS[0];
+  var f=document.getElementById('genImgModelField');if(f)f.style.display='flex';
+  var nm=document.getElementById('genImgModelFieldName');if(nm)nm.textContent=cur.label;
+  var drop=document.getElementById('genImgModelDrop');
+  if(drop){
+    drop.innerHTML=IMG_MODELS.map(function(m){
+      var h='<button type="button" class="dd-opt'+(m.key===cur.key?' on':'')+'" onclick="genSetImgModel(\''+m.key+'\')">';
+      h+='<span class="dd-opt-main"><span>'+escHtml(m.label)+'</span></span>';
+      h+='<span class="dd-opt-right">'+(m.key===cur.key?'✓':'')+'</span></button>';
+      return h;
+    }).join('');
+  }
+}
+function genToggleImgModels(){
+  var d=document.getElementById('genImgModelDrop');if(!d)return;
+  d.style.display=d.style.display==='block'?'none':'block';
+}
+function genCloseImgModels(){
+  var d=document.getElementById('genImgModelDrop');if(d)d.style.display='none';
+}
+function genSetImgModel(key){
+  imgModelApplyKey(key);
+  genRenderImgModels();genCloseImgModels();
+}
 /* Magic Hour SONG version slot in the provider+version combo
    (owner order 2026-11-17): Magic Hour's music API takes NO
    model — the provider runs its own version and sets it itself
@@ -7451,6 +7514,7 @@ function genRenderOptions(){
   genRenderNovaiModels();
   genRenderMhSongVer();
   genRenderSongModels();
+  genRenderImgModels();
   storyUpdateTotal();
 }
 function genSetAspect(a){gen.aspect=a;genRenderOptions();}
@@ -7668,6 +7732,18 @@ async function genGenerate(){
          used for the generate path. */
       var sm=songModelByKey(songModelCurKey())||SONG_MODELS[0];
       cfg={provider:sm.provider, model:sm.sunoModel||''};
+    }
+    if(gen.mode==='image'){
+      /* Image: the MODEL picks the provider (owner order 2026-11-18 —
+         ADD Agnes alongside NovAI): NovAI → cogview-3-flash,
+         Agnes → agnes-image-2.5-flash. Both are free ($0). The
+         Admin providers.image setting is not used for the generate
+         path, except when it names Magic Hour (the paid image
+         path) — that keeps working exactly as before. */
+      var imgM=imgModelByKey(imgModelCurKey())||IMG_MODELS[0];
+      if(!cfg||cfg.provider==='novai'||cfg.provider==='agnes'||cfg.provider==='pollinations'){
+        cfg={provider:imgM.provider, model:imgM.model};
+      }
     }
     var doneNote='',creditBlocked=false;
     if(!cfg||!cfg.provider){
