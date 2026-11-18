@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#0A0B0D">
+<meta name="theme-color" content="#000000">
 <link rel="manifest" href="/manifest.json">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -25,12 +25,12 @@
 <script src="https://js.puter.com/v2/" defer></script>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <script src="https://cdn.jsdelivr.net/npm/lamejs@1.2.1/lame.min.js" defer></script>
-<script>try{var _de=document.documentElement;var _th=[['#addc29','173,220,41','#63910c'],['#ff2e88','255,46,136','#d6006d'],['#ff6a00','255,106,0','#cf5200'],['#ffe600','255,230,0','#857200'],['#00e5ff','0,229,255','#007d99'],['#b537f2','181,55,242','#8f27c9']];var _ti=parseInt(localStorage.getItem('movai-theme')||'0',10)||0;if(_ti<0||_ti>6)_ti=0;var _md=localStorage.getItem('movai-mode')||'dark';var _dark=_md==='dark'||(_md==='auto'&&window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches);_de.setAttribute('data-mode',_dark?'dark':'light');if(_ti===6){_de.style.setProperty('--accent','#b537f2');_de.style.setProperty('--accent-rgb','181,55,242');_de.style.setProperty('--accent-fill','linear-gradient(100deg,#ff2e88,#b537f2 52%,#00e5ff)');_de.style.setProperty('--accent-text',_dark?'#b537f2':'#8f27c9');}else{var _tt=_th[_ti];_de.style.setProperty('--accent',_tt[0]);_de.style.setProperty('--accent-rgb',_tt[1]);_de.style.setProperty('--accent-text',_dark?_tt[0]:_tt[2]);}function _gv(k,d){var x=parseInt(localStorage.getItem(k),10);if(isNaN(x))return d;if(x<0)x=0;if(x>100)x=100;return x;}var _leg=null;['movai-glass-fab','movai-glass-drawer','movai-glass-brand','movai-glass'].forEach(function(k){if(_leg===null){var t=parseInt(localStorage.getItem(k),10);if(!isNaN(t))_leg=t;}});var _gc=_gv('movai-glass-clear',_leg===null?45:100-_leg);var _gb=_gv('movai-glass-blur',_leg===null?65:_leg);var _gsh=_gv('movai-glass-shine',55);_de.style.setProperty('--glass-alpha',(0.75+((100-_gc)/100)*0.23).toFixed(3));_de.style.setProperty('--glass-blur',((_gb/100)*28).toFixed(1)+'px');_de.style.setProperty('--glass-shine',(_gsh/100).toFixed(3));_de.style.setProperty('--glass-frost',(_gb/100).toFixed(3));var _tbv=_gv('movai-txtblur',0);_de.style.setProperty('--txtblur',((_tbv/100)*16).toFixed(1)+'px');var _bgv=_gv('movai-bgb',50);var _base=_dark?[10,11,13]:[231,234,238];var _bc;if(_bgv<=50){var _f1=1-((50-_bgv)/50)*0.9;_bc=_base.map(function(c){return Math.round(c*_f1);});}else{var _f2=(_bgv-50)/50;_bc=_base.map(function(c){return Math.round(c+(255-c)*_f2*0.95);});}var _top=_bc.map(function(c){return Math.round(c+(255-c)*(_dark?0.05:0.3));});var _bot=_bc.map(function(c){return Math.round(c*(_dark?0.55:0.93));});_de.style.setProperty('--bg','rgb('+_bc.join(',')+')');_de.style.setProperty('--bg1','rgb('+_top.join(',')+')');_de.style.setProperty('--bg2','rgb('+_bot.join(',')+')');var _tsv=localStorage.getItem('movai-tshadow');if(_tsv&&_tsv!=='none')_de.style.setProperty('--tshadow',_tsv);var _bfx=localStorage.getItem('movai-brandfx');if(_bfx)_de.setAttribute('data-brandfx',_bfx);var _smv=localStorage.getItem('movai-smooth');if(_smv==='1')_de.setAttribute('data-smooth','1');var _fv=parseInt(localStorage.getItem('movai-font')||'50',10);if(isNaN(_fv))_fv=50;if(_fv<0)_fv=0;if(_fv>100)_fv=100;var _ff=_fv<=50?0.6+(_fv/50)*0.4:1+((_fv-50)/50)*1.2;_de.style.fontSize=(16*_ff)+'px';}catch(e){}</script>
+<script>try{var _de=document.documentElement;if(localStorage.getItem('movai-theme-ver')!=='2'){try{localStorage.setItem('movai-theme-ver','2');localStorage.setItem('movai-mode','dark');localStorage.setItem('movai-bgb','50');}catch(e){}}var _th=[['#addc29','173,220,41','#63910c'],['#ff2e88','255,46,136','#d6006d'],['#ff6a00','255,106,0','#cf5200'],['#ffe600','255,230,0','#857200'],['#00e5ff','0,229,255','#007d99'],['#b537f2','181,55,242','#8f27c9']];var _ti=parseInt(localStorage.getItem('movai-theme')||'0',10)||0;if(_ti<0||_ti>6)_ti=0;var _md=localStorage.getItem('movai-mode')||'dark';var _dark=_md==='dark'||(_md==='auto'&&window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches);_de.setAttribute('data-mode',_dark?'dark':'light');if(_ti===6){_de.style.setProperty('--accent','#b537f2');_de.style.setProperty('--accent-rgb','181,55,242');_de.style.setProperty('--accent-fill','linear-gradient(100deg,#ff2e88,#b537f2 52%,#00e5ff)');_de.style.setProperty('--accent-text',_dark?'#b537f2':'#8f27c9');}else{var _tt=_th[_ti];_de.style.setProperty('--accent',_tt[0]);_de.style.setProperty('--accent-rgb',_tt[1]);_de.style.setProperty('--accent-text',_dark?_tt[0]:_tt[2]);}function _gv(k,d){var x=parseInt(localStorage.getItem(k),10);if(isNaN(x))return d;if(x<0)x=0;if(x>100)x=100;return x;}var _leg=null;['movai-glass-fab','movai-glass-drawer','movai-glass-brand','movai-glass'].forEach(function(k){if(_leg===null){var t=parseInt(localStorage.getItem(k),10);if(!isNaN(t))_leg=t;}});var _gc=_gv('movai-glass-clear',_leg===null?45:100-_leg);var _gb=_gv('movai-glass-blur',_leg===null?65:_leg);var _gsh=_gv('movai-glass-shine',55);_de.style.setProperty('--glass-alpha',(0.75+((100-_gc)/100)*0.23).toFixed(3));_de.style.setProperty('--glass-blur',((_gb/100)*28).toFixed(1)+'px');_de.style.setProperty('--glass-shine',(_gsh/100).toFixed(3));_de.style.setProperty('--glass-frost',(_gb/100).toFixed(3));var _tbv=_gv('movai-txtblur',0);_de.style.setProperty('--txtblur',((_tbv/100)*16).toFixed(1)+'px');var _bgv=_gv('movai-bgb',50);var _base=_dark?[0,0,0]:[231,234,238];var _bc;if(_bgv<=50){var _f1=1-((50-_bgv)/50)*0.9;_bc=_base.map(function(c){return Math.round(c*_f1);});}else{var _f2=(_bgv-50)/50;_bc=_base.map(function(c){return Math.round(c+(255-c)*_f2*0.95);});}var _top=_bc.map(function(c){return Math.round(c+(255-c)*(_dark?0.05:0.3));});var _bot=_bc.map(function(c){return Math.round(c*(_dark?0.55:0.93));});_de.style.setProperty('--bg','rgb('+_bc.join(',')+')');_de.style.setProperty('--bg1','rgb('+_top.join(',')+')');_de.style.setProperty('--bg2','rgb('+_bot.join(',')+')');var _tsv=localStorage.getItem('movai-tshadow');if(_tsv&&_tsv!=='none')_de.style.setProperty('--tshadow',_tsv);var _bfx=localStorage.getItem('movai-brandfx');if(_bfx)_de.setAttribute('data-brandfx',_bfx);var _smv=localStorage.getItem('movai-smooth');if(_smv==='1')_de.setAttribute('data-smooth','1');var _fv=parseInt(localStorage.getItem('movai-font')||'50',10);if(isNaN(_fv))_fv=50;if(_fv<0)_fv=0;if(_fv>100)_fv=100;var _ff=_fv<=50?0.6+(_fv/50)*0.4:1+((_fv-50)/50)*1.2;_de.style.fontSize=(16*_ff)+'px';}catch(e){}</script>
 <style>
-:root{color-scheme:dark;--accent:#addc29;--accent-rgb:173,220,41;--accent-fill:var(--accent);--accent-text:var(--accent);--accent2:var(--accent);--accent-soft:#1c1e22;--accent-light:#23252a;--bg:#0a0b0d;--bg1:#15171c;--bg2:#050607;--bg-glow:rgba(255,255,255,.05);--card:#14161a;--card2:#16181d;--field:#0d0f11;--composer:#0d0f11;--text:#f4f5f0;--text2:#c9ccd1;--label:#d6d8dc;--muted:#9a9ea6;--faint:#62666e;--movai:var(--accent);--movai-light:var(--accent);--line:rgba(255,255,255,.08);--line2:rgba(255,255,255,.12);--line3:rgba(255,255,255,.16);--shadow:none;--tshadow:none;--glass-alpha:.877;--glass-blur:18.2px;--glass-shine:.55;--glass-frost:.65;--txtblur:0px;--glass-tint:20,22,26;--glass-text:#f4f5f0;--glass-text2:#e8eaee;--glass-muted:#9a9ea6;--glass-faint:rgba(255,255,255,.45);--glass-line:rgba(255,255,255,.16);--glass-line2:rgba(255,255,255,.26);--glass-text-rgb:244,245,240;--glass-shadow-rgb:0,0,0}
+:root{color-scheme:dark;--accent:#addc29;--accent-rgb:173,220,41;--accent-fill:var(--accent);--accent-text:var(--accent);--accent2:var(--accent);--accent-soft:#151515;--accent-light:#23252a;--bg:#000000;--bg1:#0d0d0d;--bg2:#000000;--bg-glow:rgba(255,255,255,.05);--card:#0e0e0e;--card2:#111111;--field:#0a0a0a;--composer:#0a0a0a;--text:#f4f5f0;--text2:#c9ccd1;--label:#d6d8dc;--muted:#9a9ea6;--faint:#62666e;--movai:var(--accent);--movai-light:var(--accent);--line:rgba(255,255,255,.08);--line2:rgba(255,255,255,.12);--line3:rgba(255,255,255,.16);--shadow:none;--tshadow:none;--glass-alpha:.877;--glass-blur:18.2px;--glass-shine:.55;--glass-frost:.65;--txtblur:0px;--glass-tint:12,12,12;--glass-text:#f4f5f0;--glass-text2:#e8eaee;--glass-muted:#9a9ea6;--glass-faint:rgba(255,255,255,.45);--glass-line:rgba(255,255,255,.16);--glass-line2:rgba(255,255,255,.26);--glass-text-rgb:244,245,240;--glass-shadow-rgb:0,0,0}
 html[data-mode="light"]{color-scheme:light;--accent-soft:rgba(20,22,30,.07);--bg:#e7eaee;--bg1:#eff1f4;--bg2:#d9dde3;--bg-glow:rgba(255,255,255,.6);--card:#ffffff;--card2:#ffffff;--field:#ffffff;--composer:#ffffff;--text:#17181c;--text2:#33363d;--label:#2c2f36;--muted:#5f646e;--faint:#8b9099;--line:rgba(20,22,30,.1);--line2:rgba(20,22,30,.16);--line3:rgba(20,22,30,.22);--glass-tint:255,255,255;--glass-text:#17181c;--glass-text2:#33363d;--glass-muted:#5f646e;--glass-faint:rgba(20,22,30,.5);--glass-line:rgba(20,22,30,.15);--glass-line2:rgba(20,22,30,.24);--glass-text-rgb:23,24,28;--glass-shadow-rgb:255,255,255}
 *{margin:0;padding:0;box-sizing:border-box}
-html{background:#0A0B0D;background:var(--bg);min-height:100vh;min-height:100dvh}
+html{background:#000000;background:var(--bg);min-height:100vh;min-height:100dvh}
 /* Page background — subtle 3D depth in BOTH themes: a faint light
    glow at the very top over a soft vertical gradient (--bg1 lifted
    top → --bg mid → --bg2 shaded bottom), computed from the user's
@@ -38,7 +38,7 @@ html{background:#0A0B0D;background:var(--bg);min-height:100vh;min-height:100dvh}
    Day is a moderate, soft white-grey (never glaring); night is the
    same gentle depth in dark tones. Kept quiet on purpose — depth
    behind the content, never colour splashed over it. */
-body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;background:#0A0B0D;background-color:var(--bg);background-image:radial-gradient(130% 55% at 50% -10%,var(--bg-glow,rgba(255,255,255,.05)),rgba(0,0,0,0) 60%),linear-gradient(180deg,var(--bg1) 0%,var(--bg) 45%,var(--bg2) 100%);color:var(--text);min-height:100vh;min-height:100dvh;text-shadow:var(--tshadow,none);-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;background:#000000;background-color:var(--bg);background-image:radial-gradient(130% 55% at 50% -10%,var(--bg-glow,rgba(255,255,255,.05)),rgba(0,0,0,0) 60%),linear-gradient(180deg,var(--bg1) 0%,var(--bg) 45%,var(--bg2) 100%);color:var(--text);min-height:100vh;min-height:100dvh;text-shadow:var(--tshadow,none);-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
 button{font-family:inherit;cursor:pointer}
 main{max-width:720px;margin:0 auto;padding:calc(4rem + env(safe-area-inset-top,0px)) 18px calc(106px + env(safe-area-inset-bottom,0px))}
 .menuwrap{position:fixed;top:calc(env(safe-area-inset-top,0px) + 10px);left:max(18px,calc(50% - 342px));z-index:30;display:flex}
@@ -2948,6 +2948,15 @@ body::before{display:none}
 .dock-item{background:var(--card);border:1px solid var(--line2);box-shadow:0 4px 14px rgba(0,0,0,.35);color:inherit}
 .dock-item:hover{background:var(--card);filter:brightness(1.2)}
 .dock-item.on{background:var(--card2);color:var(--accent-text);box-shadow:inset 0 0 0 1.5px var(--accent),0 4px 14px rgba(0,0,0,.35)}
+/* ===== Pitch black background + black 3D (owner order 2026-11-18) =====
+   Night theme is PURE BLACK (#000000) — page, surfaces and glass
+   are all black-based; cards sit a hair lighter than the page
+   (#0e0e0e / #111111) so they read as raised 3D slabs. Depth
+   comes from a soft drop shadow plus a faint top highlight
+   (bevel) on the main card surfaces. Scoped to data-mode="dark"
+   only — light mode is untouched. The header/dock buttons are
+   NOT touched here (solid since the NO-bars change). */
+html[data-mode="dark"] .panel,html[data-mode="dark"] .hist-card,html[data-mode="dark"] .ep-card,html[data-mode="dark"] .kiri-card,html[data-mode="dark"] .key-acc,html[data-mode="dark"] .threed-card,html[data-mode="dark"] .song-ring-box,html[data-mode="dark"] .song-card-prog,html[data-mode="dark"] .song-menu-item,html[data-mode="dark"] .st-pick-row{box-shadow:0 12px 30px rgba(0,0,0,.65),0 2px 8px rgba(0,0,0,.45),inset 0 1px 0 rgba(255,255,255,.06)}
 </style>
 </head>
 <body>
@@ -4799,7 +4808,7 @@ function setMode(m,save){
   var eff=modeEffective(MODE);
   document.documentElement.setAttribute('data-mode',eff);
   var tc=document.querySelector('meta[name="theme-color"]');
-  if(tc)tc.setAttribute('content',eff==='light'?'#e7eaee':'#0A0B0D');
+  if(tc)tc.setAttribute('content',eff==='light'?'#e7eaee':'#000000');
   var t=THEMES[THEME_IDX];
   if(t)document.documentElement.style.setProperty('--accent-text',eff==='light'?t.lt:t.c);
   setBgBright(BGBRIGHT,false);
@@ -4890,7 +4899,7 @@ var BGBRIGHT=50;
    slab and never colour splashed over the content. */
 function bgStopsCss(v){
   var light=document.documentElement.getAttribute('data-mode')==='light';
-  var base=light?[231,234,238]:[10,11,13];
+  var base=light?[231,234,238]:[0,0,0];
   var mid;
   if(v<=50){var f=1-((50-v)/50)*0.9;mid=base.map(function(c){return Math.round(c*f);});}
   else{var f2=(v-50)/50;mid=base.map(function(c){return Math.round(c+(255-c)*f2*0.95);});}
@@ -10013,7 +10022,6 @@ function genShowSongs(items,streaming,restored){
      mixed into someone else's History, or lost. */
   var saveKey=(histCtx&&histCtx.acctKey)?histCtx.acctKey:histKey();
   if(!streaming&&!restored){
-    var autoJobs=[];
     songs.forEach(function(s,si){
       var su=/^https:/i.test(s.url)?s.url:((/^data:audio\//i.test(s.url)&&s.url.length<1200000)?s.url:null);
       if(su){
@@ -10030,13 +10038,6 @@ function genShowSongs(items,streaming,restored){
            the expiring provider URL — is what History keeps and
            syncs to the creator's Gmail account on the server. */
         try{histStoreSongNow(hit,saveKey);}catch(e){}
-        /* MOVAI Studio AUTO-SPLIT (owner order 2026-11-18): a
-           successfully generated song is prepared for the Studio
-           in the background (fetch + decode + Vocals/Instruments
-           split) — see stAutoQueue in the Studio engine. Only the
-           FINAL render queues it: streaming previews and restored
-           results never do, and failures never reach this code. */
-        autoJobs.push({idx:si,id:hit.id||'',url:su,title:s.title||sTitle,saveKey:saveKey});
       }
     });
     /* The Create results themselves are kept too (owner rule
@@ -10059,16 +10060,6 @@ function genShowSongs(items,streaming,restored){
     grid.appendChild(genSongCard(s,i+1,it,s.title||sTitle,(s.provider)||(it&&it.provider)||sProv,(it&&it.prompt)||sPrompt,streaming));
   });
   box.appendChild(grid);
-  /* Studio auto-split: queue the background preparation now that
-     the finished cards exist (each card carries its own live
-     «Preparing Studio… X%» badge). Never switches the view. */
-  if(!streaming&&!restored){
-    try{
-      if(typeof stAutoQueue==='function'){
-        autoJobs.forEach(function(j){stAutoQueue(j,grid.children[j.idx]||null);});
-      }
-    }catch(e){}
-  }
   /* Carry playback over the re-render by matching the song URL
      (never by position — order/count can shift between the
      streaming preview and the final render, and an index match
@@ -24296,72 +24287,10 @@ function stSetSplitProject(name,mainBuffer,vocBuf,instBuf,key){
   stRenderAllTracks();
   stMsg('');
 }
-/* ================= Studio AUTO-SPLIT (owner order 2026-11-18) =================
-   When a Create Song generation COMPLETES successfully,
-   genShowSongs queues each finished song here (stAutoQueue).
-   In the background — the creation UI is never blocked and the
-   view never switches — the song is fetched + decoded, split
-   with the SAME center-channel render the manual Split button
-   uses (stSplitRenderOne, with stSplitMath as its fallback),
-   and installed as the Studio's current project, already split
-   into Vocals + Instruments. The latest generated song replaces
-   the previous project. Progress shows live on the song's own
-   card and on the drawer's Studio item («Preparing Studio… X%»).
-   Failure handling: if the split itself fails after a good
-   decode, the song is loaded as ONE single track with a note in
-   the Studio; if the provider URL cannot be fetched/decoded at
-   all (e.g. it blocks cross-origin audio) the prep first waits
-   for the song's permanent stored URL (song-store) and retries
-   once with it, and only then gives up quietly — the song and
-   the creation flow are never broken. A guard (stAutoSeen, by
-   history id / URL) stops the same song being prepared twice,
-   and ST.autoToken discards a result the owner has superseded
-   by loading or clearing the Studio manually meanwhile. */
-var stAutoSeen={};
-var stAutoChain=Promise.resolve();
-var stAutoActive=0;
-function stAutoNavShow(pct){
-  var n=document.getElementById('stNavPrep');
-  if(n){n.style.display='';n.textContent='⏳ Preparing Studio… '+Math.round(pct)+'%';}
-}
-function stAutoNavDone(){
-  if(stAutoActive>0)return;
-  var n=document.getElementById('stNavPrep');
-  if(n)n.style.display='none';
-}
-function stAutoBadgeCreate(job,cardEl){
-  var d=document.createElement('div');
-  d.className='song-card-prog st-prep-badge';
-  d.setAttribute('role','status');d.setAttribute('aria-live','polite');
-  d.innerHTML='<div class="scp-line"><span class="scp-spin" aria-hidden="true"></span><span class="scp-txt st-prep-txt">⏳ Preparing Studio… 0%</span></div><div class="scp-bar"><div class="scp-fill st-prep-fill" style="width:0%"></div></div>';
-  cardEl.appendChild(d);
-  job._badge=d;
-}
-function stAutoBadgePaint(job,pct){
-  var d=job._badge;if(!d||!document.contains(d))return;
-  var t=d.querySelector('.st-prep-txt');
-  if(t)t.textContent='⏳ កំពុងរៀបចំ Studio · Preparing Studio… '+Math.round(pct)+'%';
-  var f=d.querySelector('.st-prep-fill');
-  if(f)f.style.width=Math.round(pct)+'%';
-}
-function stAutoBadgeDone(job,txt){
-  var d=job._badge;job._badge=null;
-  if(!d||!document.contains(d))return;
-  if(!txt){if(d.parentNode)d.remove();return;}
-  d.classList.add('done');
-  var sp=d.querySelector('.scp-spin');if(sp)sp.style.display='none';
-  var t=d.querySelector('.st-prep-txt');if(t)t.textContent=txt;
-  var f=d.querySelector('.st-prep-fill');if(f)f.style.width='100%';
-  setTimeout(function(){if(d.parentNode)d.remove();},9000);
-}
-function stAutoProgress(job,pct){
-  pct=Math.max(0,Math.min(100,pct));
-  stAutoBadgePaint(job,pct);
-  stAutoNavShow(pct);
-  /* The Studio panel's own progress bar is driven by the
-     existing stProgBegin/stProgSet machinery while the split
-     renders (see stAutoPrepareOne) — nothing to paint here. */
-}
+/* Studio AUTO-SPLIT removed (owner order 2026-11-18): freshly generated songs are
+   NO LONGER prepared/split in the background. The split happens ONLY when the user
+   taps the Vocal Studio / Split (AI) button or a Studio song-picker row.
+   stAutoWaitStoredUrl below is KEPT — the manual song picker uses it. */
 /* If the provider URL would not decode, the song's permanent
    stored URL may still land via song-store (histStoreSongNow):
    poll this song's History item until its `_storing` flag clears
@@ -24384,76 +24313,6 @@ function stAutoWaitStoredUrl(job){
       setTimeout(poll,3000);
     })();
   });
-}
-function stAutoQueue(job,cardEl){
-  if(!job||!job.url)return;
-  var key=job.id||job.url;
-  if(stAutoSeen[key])return;
-  stAutoSeen[key]=1;
-  job.key=key;
-  if(cardEl)stAutoBadgeCreate(job,cardEl);
-  stAutoActive++;
-  stAutoNavShow(0);
-  stAutoChain=stAutoChain.then(function(){return stAutoPrepareOne(job);}).catch(function(){});
-}
-async function stAutoPrepareOne(job){
-  var token=ST.autoToken;
-  var usedProg=false;
-  try{
-    /* Drive the Studio's own progress bar through its existing
-       machinery (label + % + elapsed seconds) unless a manual
-       Studio operation is using it right now. */
-    if(!ST.busy){stProgBegin('កំពុងរៀបចំ Studio · Preparing Studio');usedProg=true;}
-    stAutoProgress(job,2);
-    var buffer=null;
-    try{
-      buffer=await stFetchDecode(job.url);
-    }catch(e1){
-      var nu=await stAutoWaitStoredUrl(job);
-      if(nu){job.url=nu;buffer=await stFetchDecode(nu);}
-      else throw e1;
-    }
-    stAutoProgress(job,15);
-    var vocBuf=null,instBuf=null,splitOk=true;
-    ST.progSink=function(p){stAutoProgress(job,15+p*0.85);};
-    try{
-      vocBuf=await stSplitRenderOne(buffer,'voc',0,50);
-      instBuf=await stSplitRenderOne(buffer,'inst',50,100);
-    }catch(e2){
-      try{var m=stSplitMath(buffer);vocBuf=m.vocals;instBuf=m.inst;}
-      catch(e3){splitOk=false;}
-    }
-    ST.progSink=null;
-    if(token!==ST.autoToken){
-      /* The owner loaded or cleared the Studio by hand while
-         this prepared — their action wins; discard the result. */
-      stAutoBadgeDone(job,'');
-      return;
-    }
-    ST.songUrl=job.url;/* auto-split song came from this URL — Split (AI) can use it */
-    if(splitOk&&vocBuf&&instBuf){
-      stSetSplitProject(job.title||'Song',buffer,vocBuf,instBuf,job.key);
-      stAutoProgress(job,100);
-      stAutoBadgeDone(job,'✓ Studio · បំបែករួច · Split ready');
-    }else{
-      stSetSong(job.title||'Song',buffer);
-      ST.projectKey=job.key;
-      ST.autoNote='Split failed — song loaded as one track · បំបែកមិនបាន — បទត្រូវបានផ្ទុកជា Track តែមួយ';
-      stSyncEmptyUI();
-      stAutoBadgeDone(job,'Studio · 1 Track (split failed)');
-    }
-  }catch(e){
-    ST.progSink=null;
-    stAutoBadgeDone(job,'');
-    if(!ST.mainBuffer){
-      ST.autoNote='Studio: បើកបទចូលមិនបាន (Link ប្លុក Cross-origin) — សូម Upload File ជំនួស · Could not load the song into Studio (cross-origin blocked) — please upload the file instead.';
-      try{stSyncEmptyUI();}catch(e2){}
-    }
-  }finally{
-    if(usedProg&&!ST.busy)stProgEnd();
-    stAutoActive--;
-    stAutoNavDone();
-  }
 }
 /* ================= AI Studio SONG PICKER (owner order 2026-11-18) =================
    «បទរបស់ខ្ញុំ · My Songs» is the AI Studio's empty state: it
