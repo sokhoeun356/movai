@@ -4159,7 +4159,7 @@ async function apiRoute(req, res, urlPath) {
           let out;
           try {
             out = await withProviderKeyRotation('novai', async (k) => {
-              const r = await fetch('https://aiapi-pro.com/v1/video/generations', { method: 'POST', headers: { 'Authorization': 'Bearer ' + k, 'Content-Type': 'application/json' }, body: JSON.stringify({ model: 'cogvideox-flash', prompt }), signal: AbortSignal.timeout(60000) });
+              const r = await fetch('https://aiapi-pro.com/v1/video/generations', { method: 'POST', headers: { 'Authorization': 'Bearer ' + k, 'Content-Type': 'application/json' }, body: JSON.stringify({ model: 'cogvideox-flash', prompt }), signal: AbortSignal.timeout(180000) });
               const j = await r.json().catch(() => null);
               if (j && j.id) return { jobId: j.id };
               throw rotErr('NovAI: ' + genErrText(j, 'HTTP ' + r.status), r.status);
@@ -4240,11 +4240,12 @@ async function apiRoute(req, res, urlPath) {
           let out;
           try {
             out = await withProviderKeyRotation('novai', async (k) => {
-              const r = await fetch('https://aiapi-pro.com/v1/video/generations/' + encodeURIComponent(jobId), { headers: { 'Authorization': 'Bearer ' + k }, signal: AbortSignal.timeout(30000) });
+              const r = await fetch('https://aiapi-pro.com/v1/video/generations/' + encodeURIComponent(jobId) + '?model=cogvideox-flash', { headers: { 'Authorization': 'Bearer ' + k }, signal: AbortSignal.timeout(30000) });
               const j = await r.json().catch(() => null);
+              if (!r.ok) throw rotErr('NovAI: ' + genErrText(j, 'HTTP ' + r.status), r.status);
               const st = j && (j.status || (j.data && j.data.status));
               if (st === 'succeeded') {
-                const url = j && (j.url || j.video_url || (j.data && (j.data.url || j.data.video_url)) || (j.output && j.output.url) || (j.result && j.result.url));
+                const url = j && (j.url || j.video_url || (j.content && (j.content.video_url || j.content.url)) || (j.data && (j.data.url || j.data.video_url || (Array.isArray(j.data) && j.data[0] && j.data[0].url))) || (j.output && j.output.url) || (j.result && j.result.url));
                 if (url) return { status: 'done', videoUrl: url };
                 return { status: 'done', videoUrl: '', raw: j };
               }
@@ -4448,7 +4449,7 @@ async function apiRoute(req, res, urlPath) {
           }
           const genBody = {
             customMode: true,
-            instrumental: false,
+            instrumental: (body.instrumental === true || body.make_instrumental === true),
             callBackUrl: SUNO_CALLBACK_URL,
             model: sunoApiModel(model),
             style: (style || 'pop').slice(0, 1000),
