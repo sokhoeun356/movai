@@ -2559,12 +2559,37 @@ async function saveCreatorFollows(f) {
     } catch (e) {}
     scheduleBackup('creator-follows.json');
 }
-async function monetizationFollowerCount(email) {
+// Follower count for one creator — SINGLE source of truth for the
+// website (Monetization sheet, Profile, feed post counts) and the
+// Admin. Union of:
+//   (a) per-creator follows (creator_follows[email]) — someone tapped
+//       Follow on that creator's post, and
+//   (b) the Public-page followers list (followers.json) — but ONLY
+//       when the creator is an Admin, because the Follow pill on
+//       the Admin's post IS the Public-page follow: those people
+//       followed the Admin's page, so they are the Admin's followers.
+// Before this, (a) and (b) were counted by different screens, so the
+// Monetization sheet showed 0 while the Admin showed 3 (the
+// Public-page list). The feed post's «2 Followers» was the same
+// Public-page count at the time of the screenshot (it has since
+// grown to 3) — a live count, not a stale one.
+async function creatorFollowerCount(email) {
   try {
+    const em = normEmail(email);
+    if (!em) return 0;
+    const set = new Set();
     const f = await loadCreatorFollows();
-    const arr = f[normEmail(email)];
-    return Array.isArray(arr) ? arr.length : 0;
+    const arr = Array.isArray(f[em]) ? f[em] : [];
+    for (const x of arr) { const n = normEmail(x); if (n) set.add(n); }
+    if (ADMIN_EMAILS.includes(em)) {
+      const pub = await loadFollowers();
+      for (const x of pub) { const n = normEmail(x); if (n) set.add(n); }
+    }
+    return set.size;
   } catch (e) { return 0; }
+}
+async function monetizationFollowerCount(email) {
+  return creatorFollowerCount(email);
 }
 // One logged-in view on a post: always accrues watch time for the
 // owner (eligibility progress, even before approval / while the toggle
@@ -7750,7 +7775,8 @@ async function apiRoute(req, res, urlPath) {
         if (!f[target].includes(email)) f[target].push(email);
         if (f[target].length > 10000) f[target] = f[target].slice(-10000);
         await saveCreatorFollows(f);
-        return sendJSON(res, 200, { ok: true, count: f[target].length, following: true, followers: f[target].length });
+        const _c = await creatorFollowerCount(target);
+        return sendJSON(res, 200, { ok: true, count: _c, following: true, followers: _c });
       }
       const want = !!(body && body.follow);
       let arr = await loadFollowers();
@@ -7777,7 +7803,7 @@ async function apiRoute(req, res, urlPath) {
         f[target] = f[target].filter((e) => e !== email);
         await saveCreatorFollows(f);
       }
-      const count = Array.isArray(f[target]) ? f[target].length : 0;
+      const count = await creatorFollowerCount(target);
       return sendJSON(res, 200, { ok: true, count, following: false, followers: count });
     }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
     return;
@@ -7792,7 +7818,8 @@ async function apiRoute(req, res, urlPath) {
     if (!target) return sendJSON(res, 200, { ok: false, error: 'សូមដាក់ Gmail' });
     const f = await loadCreatorFollows();
     const arr = Array.isArray(f[target]) ? f[target] : [];
-    return sendJSON(res, 200, { ok: true, count: arr.length, following: !!(by && arr.includes(by)), followers: arr.length });
+    const total = await creatorFollowerCount(target);
+    return sendJSON(res, 200, { ok: true, count: total, following: !!(by && arr.includes(by)), followers: total });
   }
   // GET /api/public/follow?email= — PUBLIC. Returns {ok, following, followers}.
   if (req.method === 'GET' && urlPath === '/api/public/follow') {
@@ -9656,6 +9683,42 @@ async function apiRoute(req, res, urlPath) {
         } catch (e) {}
       }
       return sendJSON(res, 200, { ok: true, views: p.views });
+    }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
+    return;
+  }
+  // POST /api/public/watch — PUBLIC. {postId?, ownerEmail?, email, seconds}.
+  // Accrues LISTENING time (seconds) as Watch hours for a post's
+  // creator (Monetization eligibility progress). Watch time ONLY:
+  // no view increment, no earnings — the website heartbeats here
+  // every 30s of real playback and flushes the remainder on
+  // pause/ended. Logged-in listeners only; the creator listening
+  // to their own song is NOT counted. `seconds` is capped per call
+  // (1..300) so a bad client cannot inflate hours in one shot.
+  if (req.method === 'POST' && urlPath === '/api/public/watch') {
+    readJSONBody(req, 64 * 1024).then(async (body) => {
+      const viewer = normEmail(body && body.email);
+      if (!viewer) return sendJSON(res, 200, { ok: false, error: 'សូមចូលគណនេយ្យជាមុនសិន · Please sign in first' });
+      const users = await loadUsers();
+      if (!users[viewer]) return sendJSON(res, 200, { ok: false, error: 'no_account' });
+      let owner = '';
+      const postId = typeof body.postId === 'string' ? body.postId.trim() : '';
+      if (postId) {
+        const posts = await loadPublicPosts();
+        const p = posts.find((x) => x && x.id === postId);
+        if (!p) return sendJSON(res, 200, { ok: false, error: 'រក post នេះមិនឃើញទេ · Post not found' });
+        owner = normEmail(p.email);
+      } else if (body && body.ownerEmail) {
+        owner = normEmail(body.ownerEmail);
+      }
+      if (!owner) return sendJSON(res, 200, { ok: false, error: 'សូមដាក់ postId ឬ ownerEmail · Missing postId or ownerEmail' });
+      if (owner === viewer) return sendJSON(res, 200, { ok: true, skipped: 'self' });
+      const secs = Math.max(0, Math.min(300, Math.floor(numOr(body && body.seconds, 0))));
+      if (secs <= 0) return sendJSON(res, 200, { ok: false, error: 'សូមដាក់ seconds · Missing seconds' });
+      const got = await monetizationRecord(owner);
+      if (!got) return sendJSON(res, 200, { ok: false, error: 'no_account' });
+      got.rec.watchSeconds = numOr(got.rec.watchSeconds, 0) + secs;
+      await saveMonetizationEarnings(got.m);
+      return sendJSON(res, 200, { ok: true, watchSeconds: got.rec.watchSeconds, watchHours: Math.round(got.rec.watchSeconds / 3600 * 100) / 100 });
     }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
     return;
   }
