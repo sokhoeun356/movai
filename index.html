@@ -9453,7 +9453,28 @@ function genShowSongs(items,streaming,restored){
   genSongAudios.forEach(function(a){try{a.pause();}catch(e){}});
   genSongAudios=[];
   box.innerHTML='';
-  gen.lastSongs=songs.map(function(s){return s.url;});
+  /* Accumulate finished results (owner order 2026-11-18): a new
+     generation PREPENDS its songs to the ones already in the
+     creation place instead of replacing them, so Suno (v6) and
+     Magic Hour (V5) songs sit together in one list, newest first
+     — deduped by URL, capped at 20. The streaming preview path
+     keeps clearing and re-rendering on its own; the final render
+     merges the new songs with the persisted accumulated list. */
+  var accSongs=songs.slice();
+  if(!streaming&&!restored){
+    try{
+      var accRaw=localStorage.getItem((histCtx&&histCtx.lastKey)?histCtx.lastKey:lastSongsKey());
+      var accJ=accRaw?JSON.parse(accRaw):null;
+      var accOld=(accJ&&Array.isArray(accJ.songs))?accJ.songs:[];
+      var accSeen={};
+      songs.forEach(function(s){accSeen[s.url]=1;});
+      accOld.forEach(function(s){
+        if(s&&s.url&&!accSeen[s.url]){accSeen[s.url]=1;accSongs.push({url:s.url,title:s.title||'',model:s.model||'',image:(s.image&&/^https:/i.test(s.image))?s.image:null,provider:s.provider||''});}
+      });
+      accSongs=accSongs.slice(0,20);
+    }catch(e){}
+  }
+  gen.lastSongs=accSongs.map(function(s){return s.url;});
   var sTitle=(histCtx&&histCtx.title)||'';
   var sProv=histCtx?histCtx.provider:histProviderName();
   var sPrompt=histCtx?histCtx.prompt:'';
@@ -9500,18 +9521,18 @@ function genShowSongs(items,streaming,restored){
        restores them (lastSongsRestore) instead of leaving an
        empty results box. Only permanent https URLs are kept. */
     try{
-      var keep=songs.filter(function(s){return /^https:/i.test(s.url);}).map(function(s){return {url:s.url,title:s.title||'',model:sModel,image:(s.image&&/^https:/i.test(s.image))?s.image:null};});
+      var keep=accSongs.filter(function(s){return /^https:/i.test(s.url);}).map(function(s){return {url:s.url,title:s.title||'',model:s.model||sModel,provider:(s.provider||sProv),image:(s.image&&/^https:/i.test(s.image))?s.image:null};});
       if(keep.length)localStorage.setItem((histCtx&&histCtx.lastKey)?histCtx.lastKey:lastSongsKey(),JSON.stringify({ts:Date.now(),title:sTitle,provider:sProv,model:sModel,prompt:sPrompt,songs:keep}));
     }catch(e){}
   }
   var saved=streaming?[]:histGetFrom(saveKey);
   var grid=document.createElement('div');
   grid.className='song-grid';
-  songs.forEach(function(s,i){
+  accSongs.forEach(function(s,i){
     var it=null;
     for(var j=0;j<saved.length;j++){if(saved[j].type==='song'&&saved[j].url===s.url){it=saved[j];break;}}
     if(!s.model)s.model=(it&&it.model)||sModel;
-    grid.appendChild(genSongCard(s,i+1,it,s.title||sTitle,sProv,sPrompt,streaming));
+    grid.appendChild(genSongCard(s,i+1,it,s.title||sTitle,(s.provider)||(it&&it.provider)||sProv,(it&&it.prompt)||sPrompt,streaming));
   });
   box.appendChild(grid);
   /* Studio auto-split: queue the background preparation now that
