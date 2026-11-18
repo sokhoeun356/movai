@@ -4038,8 +4038,10 @@ async function apiRoute(req, res, urlPath) {
         let out;
         try {
           out = await withProviderKeyRotation('openrouter', async (k) => {
-            // Try each free model in order; fall back only when the
-            // model itself is unavailable (404 / model error).
+            // Try each free model in order; fall back when the model
+            // itself is unavailable (404 / model error) OR when it is
+            // rate-limited right now (429 — per-model on OpenRouter,
+            // so the next model may still answer).
             let lastModelErr = null;
             for (const model of OPENROUTER_LYRICS_MODELS) {
               let r, j;
@@ -4053,7 +4055,11 @@ async function apiRoute(req, res, urlPath) {
               if (content) return { lyrics: content, model };
               const errMsg = genErrText(j, 'HTTP ' + r.status);
               const modelGone = r.status === 404 || /model (not found|not available|does not exist)|no such model|unknown model/i.test(errMsg);
-              if (modelGone && model !== OPENROUTER_LYRICS_MODELS[OPENROUTER_LYRICS_MODELS.length - 1]) { lastModelErr = errMsg; continue; }
+              // Rate limit (429) is per-model on OpenRouter: if this model is
+              // rate-limited right now, the next model may still answer, so
+              // fall back to it instead of failing the whole request.
+              const modelLimited = r.status === 429;
+              if ((modelGone || modelLimited) && model !== OPENROUTER_LYRICS_MODELS[OPENROUTER_LYRICS_MODELS.length - 1]) { lastModelErr = errMsg; continue; }
               throw rotErr('OpenRouter: ' + errMsg, r.status);
             }
             throw rotErr('OpenRouter: ' + (lastModelErr || 'no lyrics returned'), 0);
@@ -4062,7 +4068,8 @@ async function apiRoute(req, res, urlPath) {
           if (e && e.noKey) return sendJSON(res, 200, { ok: false, error: 'Admin មិនទាន់ដាក់ OpenRouter Key ទេ · The Admin has not added an OpenRouter key yet' });
           const st = (e && e.httpStatus) || 0;
           if (st === 401 || st === 403) return sendJSON(res, 200, { ok: false, error: 'OpenRouter Key មិនត្រឹមត្រូវទេ — សូមប្រាប់ Admin ពិនិត្យ Key · The OpenRouter key seems invalid, please ask the Admin to check it' });
-          if (st === 402 || st === 429) return sendJSON(res, 200, { ok: false, error: 'OpenRouter អស់កូតា / ស្នើសុំច្រើនពេក — សូមសាកល្បងម្ដងទៀតនៅពេលក្រោយ · OpenRouter quota / rate limit reached, please try again later' });
+          if (st === 429) return sendJSON(res, 200, { ok: false, error: 'ស្នើសុំច្រើនពេក — សូមរង់ចាំ 1 នាទីហើយសាកម្ដងទៀត · Too many requests right now — please wait 1 minute and try again' });
+          if (st === 402) return sendJSON(res, 200, { ok: false, error: 'OpenRouter អស់កូតា — សូមសាកល្បងម្ដងទៀតនៅពេលក្រោយ · OpenRouter quota reached, please try again later' });
           return sendJSON(res, 200, { ok: false, error: 'បង្កើតអត្ថបទមិនបានទេ — សូមសាកល្បងម្ដងទៀត · Could not generate lyrics, please try again' });
         }
         return sendJSON(res, 200, { ok: true, lyrics: out.lyrics, model: out.model });
