@@ -6518,7 +6518,16 @@ async function apiRoute(req, res, urlPath) {
     const h = await loadHistory();
     const tombs = await loadDeletedItems();
     const arr = (Array.isArray(h[email]) ? h[email] : []).filter((it) => { const k = histKey(it); return k && !tombs.history[k]; });
-    return sendJSON(res, 200, { ok: true, email, items: arr.slice(0, 300) });
+    // Server tombstones, so the phone can DROP local items deleted
+    // server-side (owner 2026-11-18: a deleted broken song stayed in
+    // the phone's localStorage because pull only ADDED). Return the
+    // ids/urls (most recent 600) alongside the items.
+    const tombKeys = Object.keys(tombs.history || {});
+    tombKeys.sort((a, b) => String(tombs.history[b] || '').localeCompare(String(tombs.history[a] || '')));
+    const recent = tombKeys.slice(0, 600);
+    const deletedIds = recent.filter((k) => k.indexOf('id:') === 0).map((k) => k.slice(3));
+    const deletedUrls = recent.filter((k) => k.indexOf('url:') === 0).map((k) => k.slice(4));
+    return sendJSON(res, 200, { ok: true, email, items: arr.slice(0, 300), deletedIds, deletedUrls });
   }
   // POST /api/public/history — PUBLIC. {email, items:[...]}. Merges the
   // incoming items with the stored History for that email (by item id,
