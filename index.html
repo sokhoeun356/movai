@@ -3514,7 +3514,7 @@ input[type=range].st-range{accent-color:var(--accent);min-height:32px;cursor:poi
       </div>
       <p class="monet-note" style="text-align:center" data-i18n="earnWithdrawOnlyNote">ដកបានតែប៉ុណ្ណោះ — ទិញអ្វីមិនបានទេ · Withdraw only — cannot be used to buy anything</p>
     </div>
-    <div class="monet-sec">
+    <div class="monet-sec" id="monetRulesSec" style="display:none">
       <div class="monet-sec-head">គោលការណ៍ · Rules / Policy</div>
       <p class="monet-note">មានសិទ្ធិរកលុយ (Eligible) នៅពេលមាន៖ <b>1000 followers</b> និង <b>2000 watch hours</b> · Eligible at 1000 followers + 2000 watch hours.</p>
       <p class="monet-note">ចំណូលពីការមើល · View earnings: <b>RPM $0.001 per 1000 views</b> (1000 Views = $0.001)។ Views រាប់តែពីអ្នកមើលដែលមានគណនី Google ប៉ុណ្ណោះ · Only views from viewers signed in with a Google account count. អ្នកអាច Share ទៅ Facebook ឬទៅអ្នកដទៃ — Views នឹងកើនដូចគ្នា · Sharing to Facebook or others still counts views the same way.</p>
@@ -3544,6 +3544,7 @@ input[type=range].st-range{accent-color:var(--accent);min-height:32px;cursor:poi
     </div>
     <p class="monet-msg" id="monetMsg"></p>
     <button type="button" class="btn btn-green btn-block" id="monetApplyBtn" style="margin-top:10px" onclick="monetApply()" disabled>Apply · ស្នើសុំ</button>
+    <button type="button" class="btn btn-block" id="monetRulesToggleBtn" style="margin-top:10px;background:var(--card2);color:var(--text);border:1px solid var(--line2)" onclick="monetToggleRules()">មើលគោលការណ៍ · View Policy</button>
   </div>
 </div>
 <div id="pubSheet" class="pkg-sheet" style="display:none" role="dialog" aria-modal="true" onclick="if(event.target===this)pubSheetClose()">
@@ -4030,7 +4031,7 @@ km:{
  walletErrFail:'ផ្ញើសំណើមិនបានទេ — សូមព្យាយាមម្ដងទៀត · Could not send the request — please try again',
  walletGmail:'Gmail របស់អ្នក · Your Gmail',walletUserIdLbl:'លេខសម្គាល់ (ID) របស់អ្នក · Your User ID',
  walletFeeLine:'ថ្លៃសេវា · Fee $0.50 (ក្រោម $50) · 5% (ចាប់ពី $50)',
- monetTitle:'Monetization 💲',monetApply:'Apply · ស្នើសុំ',monetApplied:'Applied · បានស្នើហើយ',monetApproved:'Approved · បានយល់ព្រម',monetNotEligible:'មិនទាន់គ្រប់លក្ខខណ្ឌ · Not eligible yet',monetEligibleYes:'មានសិទ្ធិ ✓ · Eligible ✓',monetEligibleNo:'មិនទាន់មានសិទ្ធិ · Not eligible yet',monetLoading:'កំពុងផ្ទុក… · Loading…',monetApplySent:'បានផ្ញើសំណើទៅ Admin ហើយ ✓ · Application sent to the Admin ✓',monetApplyFail:'ស្នើមិនបានទេ — សូមព្យាយាមម្ដងទៀត · Could not apply — please try again',
+ monetTitle:'Monetization 💲',monetApply:'Apply · ស្នើសុំ',monetApplied:'Applied · បានស្នើហើយ',monetApproved:'Approved · បានយល់ព្រម',monetNotEligible:'មិនទាន់គ្រប់លក្ខខណ្ឌ · Not eligible yet',monetEligibleYes:'មានសិទ្ធិ ✓ · Eligible ✓',monetEligibleNo:'មិនទាន់មានសិទ្ធិ · Not eligible yet',monetLoading:'កំពុងផ្ទុក… · Loading…',monetApplySent:'បានផ្ញើសំណើទៅ Admin ហើយ ✓ · Application sent to the Admin ✓',monetApplyFail:'ស្នើមិនបានទេ — សូមព្យាយាមម្ដងទៀត · Could not apply — please try again',monetViewPolicy:'មើលគោលការណ៍ · View Policy',monetHidePolicy:'លាក់គោលការណ៍ · Hide Policy',
  walletErrGmail:'សូមបញ្ចូល Gmail របស់អ្នកឲ្យត្រឹមត្រូវ · Please enter your Gmail correctly',
  walletErrUserId:'សូមបញ្ចូលលេខសម្គាល់ (ID) របស់អ្នក · Please enter your User ID',
  walletWithdrawPolicyTitle:'គោលការណ៍ដកលុយ · Withdraw policy',
@@ -4333,7 +4334,7 @@ en:{
  walletErrFail:'Could not send the request — please try again · ផ្ញើសំណើមិនបានទេ — សូមព្យាយាមម្ដងទៀត',
  walletGmail:'Your Gmail · Gmail របស់អ្នក',walletUserIdLbl:'Your User ID · លេខសម្គាល់ (ID) របស់អ្នក',
  walletFeeLine:'Fee $0.50 (under $50) · 5% (at $50+) · ថ្លៃសេវា',
- monetTitle:'Monetization 💲',monetApply:'Apply',monetApplied:'Applied',monetApproved:'Approved',monetNotEligible:'Not eligible yet',monetEligibleYes:'Eligible ✓',monetEligibleNo:'Not eligible yet',monetLoading:'Loading…',monetApplySent:'Application sent to the Admin ✓',monetApplyFail:'Could not apply — please try again',
+ monetTitle:'Monetization 💲',monetApply:'Apply',monetApplied:'Applied',monetApproved:'Approved',monetNotEligible:'Not eligible yet',monetEligibleYes:'Eligible ✓',monetEligibleNo:'Not eligible yet',monetLoading:'Loading…',monetApplySent:'Application sent to the Admin ✓',monetApplyFail:'Could not apply — please try again',monetViewPolicy:'View Policy',monetHidePolicy:'Hide Policy',
  walletErrGmail:'Please enter your Gmail correctly · សូមបញ្ចូល Gmail របស់អ្នកឲ្យត្រឹមត្រូវ',
  walletErrUserId:'Please enter your User ID · សូមបញ្ចូលលេខសម្គាល់ (ID) របស់អ្នក',
  walletWithdrawPolicyTitle:'Withdraw policy · គោលការណ៍ដកលុយ',
@@ -6469,9 +6470,23 @@ function monetOpen(){
   var u=null;try{u=acctCurrent();}catch(e){}
   if(!u||!u.email){loginSheetOpen();return;}
   var s=document.getElementById('monetSheet');if(s)sheetShowAnim(s);
+  monetRulesReset();
   monetLoadData();
 }
 function monetClose(){var s=document.getElementById('monetSheet');sheetHideAnim(s);}
+/* Rules / Policy is hidden by default; the "មើលគោលការណ៍" button at the
+   very bottom of the Monetization page (below Apply) toggles it. */
+function monetToggleRules(){
+  var sec=document.getElementById('monetRulesSec');if(!sec)return;
+  var btn=document.getElementById('monetRulesToggleBtn');
+  var show=sec.style.display==='none';
+  sec.style.display=show?'':'none';
+  if(btn)btn.textContent=tx(show?'monetHidePolicy':'monetViewPolicy');
+}
+function monetRulesReset(){
+  var sec=document.getElementById('monetRulesSec');if(sec)sec.style.display='none';
+  var btn=document.getElementById('monetRulesToggleBtn');if(btn)btn.textContent=tx('monetViewPolicy');
+}
 function monetLoadData(){
   var em=walletEmail();if(!em)return;
   monetSetMsg(tx('monetLoading'),true);
