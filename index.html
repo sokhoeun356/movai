@@ -1612,6 +1612,34 @@ html[data-mode="light"] .btn-free{color:#63910c}
 .wallet-method.on{border-color:var(--accent);background:rgba(var(--accent-rgb),.16);color:var(--accent-text)}
 .pkg-card .btn.wallet-btn{background:rgba(0,0,0,.30);color:#fff;border:1px solid rgba(255,255,255,.55)}
 .pkg-card .btn.wallet-btn:active{filter:brightness(1.2)}
+/* ===== Monetization =====
+   Drawer + Profile entries are GREY and NOT tappable while the
+   Admin toggle is OFF (monetCheckEnabled / monetApplyEnabledState
+   add .monet-disabled). When ON they show normal text. */
+.monet-disabled{color:#8b9099!important;opacity:.55;cursor:not-allowed!important;pointer-events:none}
+.monet-disabled span,.monet-disabled small{color:#8b9099!important}
+.drawer nav button.monet-disabled{color:#8b9099!important}
+.prof-pkg-open.monet-disabled{color:#8b9099!important}
+.monet-sec{border:1px solid var(--line2);border-radius:14px;padding:14px;margin-top:12px;background:var(--card2);text-align:left}
+.monet-sec-head{font-size:0.9375rem;font-weight:900}
+.monet-note{font-size:0.8125rem;color:var(--muted);line-height:1.7;margin-top:8px}
+.monet-row{display:flex;justify-content:space-between;gap:10px;padding:8px 0;border-top:1px solid var(--line);font-size:0.875rem}
+.monet-row:first-of-type{border-top:none}
+.monet-bar{height:8px;border-radius:999px;background:rgba(127,127,127,.25);margin-top:6px;overflow:hidden}
+.monet-bar-fill{height:100%;border-radius:999px;background:var(--accent);width:0%}
+.monet-msg{font-size:0.8125rem;margin-top:10px;min-height:16px;line-height:1.6;font-weight:700}
+.pub-creator-fcount{font-size:0.75rem;color:var(--muted);font-weight:700;white-space:nowrap}
+/* ===== Wallet in Profile: balance + two tappable rows ONLY =====
+   My Profile shows ONLY the balance card plus two tappable rows
+   («Top up» / «Withdraw»); each row opens its own SMALL sheet
+   (walletTopupSheet / walletWithdrawSheet) holding the form.
+   The sheets sit above the Profile sheet (z-index 96 > 95). */
+.wallet-action-row{display:flex;align-items:center;gap:10px;width:100%;margin-top:10px;background:var(--card2);border:1px solid var(--line2);border-radius:12px;padding:14px;font-family:inherit;font-size:0.9375rem;font-weight:900;color:var(--text);cursor:pointer;text-align:left;min-height:52px}
+.wallet-action-row:active{opacity:.85}
+.wallet-action-row .war-sub{font-size:0.8125rem;font-weight:700;color:var(--muted)}
+.wallet-action-row .war-arrow{margin-left:auto;font-size:1.25rem;font-weight:900;color:var(--muted);line-height:1}
+#walletTopupSheet,#walletWithdrawSheet{z-index:96}
+#walletTopupSheet .wallet-sec,#walletWithdrawSheet .wallet-sec{border:none;padding:0;margin-top:6px;background:transparent}
 /* Google sign-in loading spinner — shown in the login sheet while
    Google is opening, INSTEAD of any «Opening Google…» text (owner
    rule: a spinning indicator only, no waiting words). */
@@ -2769,6 +2797,7 @@ input[type=range].st-range{accent-color:var(--accent);min-height:32px;cursor:poi
     <button onclick="menuGo('sec-history')"><span data-i18n="navHistory">ប្រវត្តិ</span> <small>History</small></button>
     <button onclick="menuGo('sec-playlist')"><span data-i18n="plTitle">Playlist · បញ្ជីចម្រៀង</span> <small>Playlist</small></button>
     <button onclick="menuGo('sec-packages')"><span data-i18n="navPackages">កញ្ចប់សេវាកម្ម</span> <small data-i18n="navPackagesSub">Packages</small></button>
+    <button id="drawerMonetBtn" class="monet-entry monet-disabled" onclick="monetOpen()"><span>Monetization 💲</span> <small>រកលុយ · Earn</small></button>
     <button class="nav-desktop-only" onclick="dockGo('notif')"><span data-i18n="navNews">ដំណឹង</span> <small data-i18n="navNewsSub">News</small></button>
   </nav>
   <div class="set-box" id="acctBox" style="margin-top:22px">
@@ -3376,67 +3405,130 @@ input[type=range].st-range{accent-color:var(--accent);min-height:32px;cursor:poi
       <h3 style="font-size:1rem;font-weight:800" data-i18n="profileTitle">ប្រូហ្វាល់របស់ខ្ញុំ</h3>
       <button type="button" class="drawer-close" style="background:var(--card2);color:var(--text);border-color:var(--line2)" onclick="profileClose()" aria-label="Close">✕</button>
     </div>
-    <!-- Wallet (owner order): balance at the very TOP of My
-         Profile, then Top-up and Withdraw request forms. Static
-         markup (NOT rebuilt by profileRender) so typed amounts
-         and attached images survive profile re-renders; the
-         balance is refreshed by walletLoadBalance() on open and
-         after every wallet action. -->
+    <!-- Wallet (owner correction): My Profile shows ONLY the
+         Wallet Balance card plus two tappable rows — «Top up»
+         and «Withdraw». The full forms are NOT inline here:
+         each row opens its own SMALL sheet (walletTopupSheet /
+         walletWithdrawSheet, right after this Profile sheet)
+         containing the form. Static markup (NOT rebuilt by
+         profileRender); the balance is refreshed by
+         walletLoadBalance() on open and after every action. -->
     <div id="walletBox" style="margin-top:10px">
       <div class="wallet-bal-card">
         <div class="wallet-bal-label" data-i18n="walletTitle">កាបូបលុយ · Wallet</div>
         <div class="wallet-bal-amt" id="walletBalance">$0.00</div>
       </div>
-      <div class="wallet-sec">
-        <div class="wallet-sec-head" data-i18n="walletTopupTitle">បញ្ចូលលុយ · Top up</div>
-        <div class="wallet-methods" role="group" aria-label="Payment method">
-          <button type="button" class="wallet-method on" id="walletMethodKhmer" onclick="walletSetMethod('khmer')" data-i18n="walletMethodKhmer">ខ្មែរ · Khmer</button>
-          <button type="button" class="wallet-method" id="walletMethodForeign" onclick="walletSetMethod('foreign')" data-i18n="walletMethodForeign">បរទេស · Foreign</button>
-        </div>
-        <div class="auth-field">
-          <label for="walletTopupAmount" data-i18n="walletAmount">ចំនួនលុយ (USD) · Amount (USD)</label>
-          <input class="input" id="walletTopupAmount" type="number" inputmode="decimal" min="5" step="0.01" placeholder="5.00">
-        </div>
-        <p class="wallet-note" data-i18n="walletMinNote">អប្បបរមា $5.00 · Minimum $5.00</p>
-        <label class="pay-receipt-pick" for="walletTopupFile" data-i18n="walletReceiptPick">ភ្ជាប់រូបវិក្កយបត្រ (បើមាន) · Attach receipt image (optional)</label>
-        <input type="file" id="walletTopupFile" accept="image/*" style="display:none" onchange="walletFilePick(this,'topup')">
-        <div id="walletTopupPrev"></div>
-        <p class="wallet-msg" id="walletTopupMsg"></p>
-        <button type="button" class="kbtn kbtn-black" id="walletTopupBtn" style="margin-top:8px;width:100%" onclick="walletTopupSubmit()" data-i18n="walletSubmit">ផ្ញើសំណើ · Submit</button>
-      </div>
-      <div class="wallet-sec">
-        <div class="wallet-sec-head" data-i18n="walletWithdrawTitle">ដកលុយ · Withdraw</div>
-        <!-- Withdraw form (owner spec): exactly 4 fields, in this
-             order — 1 Amount, 2 Gmail, 3 User ID, 4 KHQR image.
-             Gmail + User ID are pre-filled from the signed-in
-             account by walletWithdrawPrefill() and stay editable. -->
-        <div class="auth-field">
-          <label for="walletWithdrawAmount" data-i18n="walletAmount">ចំនួនលុយ (USD) · Amount (USD)</label>
-          <input class="input" id="walletWithdrawAmount" type="number" inputmode="decimal" min="5" step="0.01" placeholder="5.00" oninput="walletWithdrawTotal()">
-        </div>
-        <p class="wallet-note" data-i18n="walletMinNote">អប្បបរមា $5.00 · Minimum $5.00</p>
-        <div class="auth-field">
-          <label for="walletWithdrawEmail" data-i18n="walletGmail">Gmail របស់អ្នក · Your Gmail</label>
-          <input class="input" id="walletWithdrawEmail" type="email" inputmode="email" autocomplete="email" placeholder="you@gmail.com">
-        </div>
-        <div class="auth-field">
-          <label for="walletWithdrawUserId" data-i18n="walletUserIdLbl">លេខសម្គាល់ (ID) របស់អ្នក · Your User ID</label>
-          <input class="input" id="walletWithdrawUserId" type="text" autocomplete="off" autocapitalize="characters" placeholder="7C26UTFM4T">
-        </div>
-        <label class="pay-receipt-pick" for="walletWithdrawFile" data-i18n="walletKhqrPick">ភ្ជាប់រូប KHQR របស់អ្នក · Attach your KHQR image</label>
-        <input type="file" id="walletWithdrawFile" accept="image/*" style="display:none" onchange="walletFilePick(this,'withdraw')">
-        <div id="walletWithdrawPrev"></div>
-        <p class="wallet-note" data-i18n="walletFeeLine" style="margin-top:8px">ថ្លៃសេវា · Fee $0.50</p>
-        <p class="wallet-note" id="walletWithdrawTotalLine" style="font-weight:800;color:var(--text)"></p>
-        <p class="wallet-msg" id="walletWithdrawMsg"></p>
-        <button type="button" class="kbtn kbtn-black" id="walletWithdrawBtn" style="margin-top:8px;width:100%" onclick="walletWithdrawSubmit()">Withdraw 💲0.00</button>
-        <div class="wallet-policy">
-          <div class="wallet-policy-head" data-i18n="walletWithdrawPolicyTitle">គោលការណ៍ដកលុយ · Withdraw policy</div>
-          <p class="wallet-note" data-i18n="walletWithdrawPolicy">សូមរង់ចាំ 24 ម៉ោងបន្ទាប់ពីដាក់សំណើ។ រង់ចាំយូរបំផុត៖ 3 ថ្ងៃ ទៅ 1 សប្តាហ៍។ លឿនបំផុត៖ 1 ម៉ោង (ក្រុមហ៊ុនជាអ្នកកំណត់ល្បឿន)។ Admin នឹងផ្ទេរលុយទៅ KHQR របស់អ្នក។ · Please wait 24 hours after submitting. Maximum wait: 3 days to 1 week. Fastest: 1 hour (the company decides the speed). The Admin will transfer the money to your KHQR.</p>
-        </div>
-      </div>
+      <button type="button" class="wallet-action-row" id="walletTopupOpenBtn" onclick="walletTopupOpen()"><span data-i18n="walletTopupTitle">បញ្ចូលលុយ · Top up</span><span class="war-arrow" aria-hidden="true">›</span></button>
+      <button type="button" class="wallet-action-row" id="walletWithdrawOpenBtn" onclick="walletWithdrawOpen()"><span data-i18n="walletWithdrawTitle">ដកលុយ · Withdraw</span><span class="war-arrow" aria-hidden="true">›</span></button>
     </div>
     <div id="profileBody" style="margin-top:8px"></div>
+  </div>
+</div>
+<!-- Top-up sheet: SMALL popup opened by the «Top up» row in My
+     Profile. Holds the Top-up form (same ids / handlers as
+     before): Khmer/Foreign choice, amount min $5, receipt
+     upload, Submit -> POST /api/public/wallet/topup-request. -->
+<div id="walletTopupSheet" class="pkg-sheet" style="display:none" role="dialog" aria-modal="true" onclick="if(event.target===this)walletTopupClose()">
+  <div class="pkg-sheet-card">
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:10px">
+      <h3 style="font-size:1rem;font-weight:800" data-i18n="walletTopupTitle">បញ្ចូលលុយ · Top up</h3>
+      <button type="button" class="drawer-close" style="background:var(--card2);color:var(--text);border-color:var(--line2)" onclick="walletTopupClose()" aria-label="Close">✕</button>
+    </div>
+    <div class="wallet-sec">
+      <div class="wallet-methods" role="group" aria-label="Payment method">
+        <button type="button" class="wallet-method on" id="walletMethodKhmer" onclick="walletSetMethod('khmer')" data-i18n="walletMethodKhmer">ខ្មែរ · Khmer</button>
+        <button type="button" class="wallet-method" id="walletMethodForeign" onclick="walletSetMethod('foreign')" data-i18n="walletMethodForeign">បរទេស · Foreign</button>
+      </div>
+      <div class="auth-field">
+        <label for="walletTopupAmount" data-i18n="walletAmount">ចំនួនលុយ (USD) · Amount (USD)</label>
+        <input class="input" id="walletTopupAmount" type="number" inputmode="decimal" min="5" step="0.01" placeholder="5.00">
+      </div>
+      <p class="wallet-note" data-i18n="walletMinNote">អប្បបរមា $5.00 · Minimum $5.00</p>
+      <label class="pay-receipt-pick" for="walletTopupFile" data-i18n="walletReceiptPick">ភ្ជាប់រូបវិក្កយបត្រ (បើមាន) · Attach receipt image (optional)</label>
+      <input type="file" id="walletTopupFile" accept="image/*" style="display:none" onchange="walletFilePick(this,'topup')">
+      <div id="walletTopupPrev"></div>
+      <p class="wallet-msg" id="walletTopupMsg"></p>
+      <button type="button" class="kbtn kbtn-black" id="walletTopupBtn" style="margin-top:8px;width:100%" onclick="walletTopupSubmit()" data-i18n="walletSubmit">ផ្ញើសំណើ · Submit</button>
+    </div>
+  </div>
+</div>
+<!-- Withdraw sheet: SMALL popup opened by the «Withdraw» row in
+     My Profile. Holds the Withdraw form (same ids / handlers as
+     before): exactly 4 fields in order — 1 Amount (min $5),
+     2 Gmail (pre-filled), 3 User ID (pre-filled), 4 KHQR image;
+     the tiered fee line ($0.50 under $50, 5% at $50+), the
+     «Withdraw 💲<net>» button, the policy text, and Submit ->
+     POST /api/public/wallet/withdraw-request. -->
+<div id="walletWithdrawSheet" class="pkg-sheet" style="display:none" role="dialog" aria-modal="true" onclick="if(event.target===this)walletWithdrawClose()">
+  <div class="pkg-sheet-card">
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:10px">
+      <h3 style="font-size:1rem;font-weight:800" data-i18n="walletWithdrawTitle">ដកលុយ · Withdraw</h3>
+      <button type="button" class="drawer-close" style="background:var(--card2);color:var(--text);border-color:var(--line2)" onclick="walletWithdrawClose()" aria-label="Close">✕</button>
+    </div>
+    <div class="wallet-sec">
+      <div class="auth-field">
+        <label for="walletWithdrawAmount" data-i18n="walletAmount">ចំនួនលុយ (USD) · Amount (USD)</label>
+        <input class="input" id="walletWithdrawAmount" type="number" inputmode="decimal" min="5" step="0.01" placeholder="5.00" oninput="walletWithdrawTotal()">
+      </div>
+      <p class="wallet-note" data-i18n="walletMinNote">អប្បបរមា $5.00 · Minimum $5.00</p>
+      <div class="auth-field">
+        <label for="walletWithdrawEmail" data-i18n="walletGmail">Gmail របស់អ្នក · Your Gmail</label>
+        <input class="input" id="walletWithdrawEmail" type="email" inputmode="email" autocomplete="email" placeholder="you@gmail.com">
+      </div>
+      <div class="auth-field">
+        <label for="walletWithdrawUserId" data-i18n="walletUserIdLbl">លេខសម្គាល់ (ID) របស់អ្នក · Your User ID</label>
+        <input class="input" id="walletWithdrawUserId" type="text" autocomplete="off" autocapitalize="characters" placeholder="7C26UTFM4T">
+      </div>
+      <label class="pay-receipt-pick" for="walletWithdrawFile" data-i18n="walletKhqrPick">ភ្ជាប់រូប KHQR របស់អ្នក · Attach your KHQR image</label>
+      <input type="file" id="walletWithdrawFile" accept="image/*" style="display:none" onchange="walletFilePick(this,'withdraw')">
+      <div id="walletWithdrawPrev"></div>
+      <p class="wallet-note" id="walletWithdrawFeeLine" style="margin-top:8px">ថ្លៃសេវា · Fee $0.50 (ក្រោម $50) · 5% (ចាប់ពី $50)</p>
+      <p class="wallet-note" id="walletWithdrawTotalLine" style="font-weight:800;color:var(--text)"></p>
+      <p class="wallet-msg" id="walletWithdrawMsg"></p>
+      <button type="button" class="kbtn kbtn-black" id="walletWithdrawBtn" style="margin-top:8px;width:100%" onclick="walletWithdrawSubmit()">Withdraw 💲0.00</button>
+      <div class="wallet-policy">
+        <div class="wallet-policy-head" data-i18n="walletWithdrawPolicyTitle">គោលការណ៍ដកលុយ · Withdraw policy</div>
+        <p class="wallet-note" data-i18n="walletWithdrawPolicy">សូមរង់ចាំ 24 ម៉ោងបន្ទាប់ពីដាក់សំណើ។ រង់ចាំយូរបំផុត៖ 3 ថ្ងៃ ទៅ 1 សប្តាហ៍។ លឿនបំផុត៖ 1 ម៉ោង (ក្រុមហ៊ុនជាអ្នកកំណត់ល្បឿន)។ Admin នឹងផ្ទេរលុយទៅ KHQR របស់អ្នក។ · Please wait 24 hours after submitting. Maximum wait: 3 days to 1 week. Fastest: 1 hour (the company decides the speed). The Admin will transfer the money to your KHQR.</p>
+      </div>
+    </div>
+  </div>
+</div>
+<div id="monetSheet" class="pkg-sheet" style="display:none" role="dialog" aria-modal="true" onclick="if(event.target===this)monetClose()">
+  <div class="pkg-sheet-card">
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:10px">
+      <h3 style="font-size:1.0625rem;font-weight:800">Monetization 💲</h3>
+      <button type="button" class="drawer-close" style="background:var(--card2);color:var(--text);border-color:var(--line2)" onclick="monetClose()" aria-label="Close">✕</button>
+    </div>
+    <div class="monet-sec">
+      <div class="monet-sec-head">គោលការណ៍ · Rules / Policy</div>
+      <p class="monet-note">មានសិទ្ធិរកលុយ (Eligible) នៅពេលមាន៖ <b>1000 followers</b> និង <b>2000 watch hours</b> · Eligible at 1000 followers + 2000 watch hours.</p>
+      <p class="monet-note">ចំណូលពីការមើល · View earnings: <b>RPM $0.001 per 1000 views</b> (1000 Views = $0.001)។ Views រាប់តែពីអ្នកមើលដែលមានគណនី Google ប៉ុណ្ណោះ · Only views from viewers signed in with a Google account count. អ្នកអាច Share ទៅ Facebook ឬទៅអ្នកដទៃ — Views នឹងកើនដូចគ្នា · Sharing to Facebook or others still counts views the same way.</p>
+      <div class="monet-sec-head" style="margin-top:10px">Package cashback · លុយត្រឡប់ពីកញ្ចប់</div>
+      <div class="monet-row"><span>$5 package</span><b>+$0.01</b></div>
+      <div class="monet-row"><span>$10 package</span><b>+$0.05</b></div>
+      <div class="monet-row"><span>$15 package</span><b>+$0.05</b></div>
+      <div class="monet-row"><span>$22 package</span><b>+$0.10</b></div>
+      <div class="monet-row"><span>$25 package</span><b>+$0.10</b></div>
+      <p class="monet-note">Cashback ចូល Balance ភ្លាមៗពេលទិញកញ្ចប់ · Cashback is added to your Balance instantly when you buy a package.</p>
+      <p class="monet-note">ដកលុយ · Withdraw: min <b>$5</b>; fee <b>$0.50 under $50</b> and <b>5% at $50+</b> (e.g. $100 → fee $5.00, net $95.00).</p>
+    </div>
+    <div class="monet-sec">
+      <div class="monet-sec-head">វឌ្ឍនភាពរបស់អ្នក · Your progress</div>
+      <div class="monet-row"><span>Followers · អ្នកតាមដាន</span><b id="monetFollowers">— / 1000</b></div>
+      <div class="monet-bar"><div class="monet-bar-fill" id="monetFollowersBar"></div></div>
+      <div class="monet-row"><span>Watch hours · ម៉ោងមើល</span><b id="monetWatchHours">— / 2000</b></div>
+      <div class="monet-bar"><div class="monet-bar-fill" id="monetWatchBar"></div></div>
+      <div class="monet-row"><span>Eligible · មានសិទ្ធិឬអត់</span><b id="monetEligible">—</b></div>
+    </div>
+    <div class="monet-sec">
+      <div class="monet-sec-head">ចំណូលរបស់អ្នក · Your earnings</div>
+      <div class="monet-row"><span>Total earned · សរុប</span><b id="monetTotalEarned">$0.00</b></div>
+      <div class="monet-row"><span>Eligible views · Views ដែលមានសិទ្ធិ</span><b id="monetEligibleViews">0</b></div>
+      <div class="monet-sec-head" style="margin-top:10px">Earnings by country · ចំណូលតាមប្រទេស</div>
+      <div id="monetByCountry"><p class="monet-note">—</p></div>
+    </div>
+    <p class="monet-msg" id="monetMsg"></p>
+    <button type="button" class="btn btn-green btn-block" id="monetApplyBtn" style="margin-top:10px" onclick="monetApply()" disabled>Apply · ស្នើសុំ</button>
   </div>
 </div>
 <div id="pubSheet" class="pkg-sheet" style="display:none" role="dialog" aria-modal="true" onclick="if(event.target===this)pubSheetClose()">
@@ -3921,12 +4013,13 @@ km:{
  walletErrAmount:'សូមបញ្ចូលចំនួនចាប់ពី $5.00 ឡើងទៅ · Please enter an amount of $5.00 or more',
  walletErrFail:'ផ្ញើសំណើមិនបានទេ — សូមព្យាយាមម្ដងទៀត · Could not send the request — please try again',
  walletGmail:'Gmail របស់អ្នក · Your Gmail',walletUserIdLbl:'លេខសម្គាល់ (ID) របស់អ្នក · Your User ID',
- walletFeeLine:'ថ្លៃសេវា · Fee $0.50',
+ walletFeeLine:'ថ្លៃសេវា · Fee $0.50 (ក្រោម $50) · 5% (ចាប់ពី $50)',
+ monetTitle:'Monetization 💲',monetApply:'Apply · ស្នើសុំ',monetApplied:'Applied · បានស្នើហើយ',monetApproved:'Approved · បានយល់ព្រម',monetNotEligible:'មិនទាន់គ្រប់លក្ខខណ្ឌ · Not eligible yet',monetEligibleYes:'មានសិទ្ធិ ✓ · Eligible ✓',monetEligibleNo:'មិនទាន់មានសិទ្ធិ · Not eligible yet',monetLoading:'កំពុងផ្ទុក… · Loading…',monetApplySent:'បានផ្ញើសំណើទៅ Admin ហើយ ✓ · Application sent to the Admin ✓',monetApplyFail:'ស្នើមិនបានទេ — សូមព្យាយាមម្ដងទៀត · Could not apply — please try again',
  walletErrGmail:'សូមបញ្ចូល Gmail របស់អ្នកឲ្យត្រឹមត្រូវ · Please enter your Gmail correctly',
  walletErrUserId:'សូមបញ្ចូលលេខសម្គាល់ (ID) របស់អ្នក · Please enter your User ID',
  walletWithdrawPolicyTitle:'គោលការណ៍ដកលុយ · Withdraw policy',
  walletWithdrawPolicy:'សូមរង់ចាំ 24 ម៉ោងបន្ទាប់ពីដាក់សំណើ។ រង់ចាំយូរបំផុត៖ 3 ថ្ងៃ ទៅ 1 សប្តាហ៍។ លឿនបំផុត៖ 1 ម៉ោង (ក្រុមហ៊ុនជាអ្នកកំណត់ល្បឿន)។ Admin នឹងផ្ទេរលុយទៅ KHQR របស់អ្នក។ · Please wait 24 hours after submitting. Maximum wait: 3 days to 1 week. Fastest: 1 hour (the company decides the speed). The Admin will transfer the money to your KHQR.',
- walletWithdrawFee:'ថ្លៃសេវាដកលុយ៖ ថេរ $0.50 ក្នុងមួយដង (មិនមែនភាគរយទេ)។ ដក $X ត្រូវកាត់ $X + $0.50 — កាត់តែបន្ទាប់ពី Admin យល់ព្រមប៉ុណ្ណោះ។ · Withdraw fee: a FLAT $0.50 per withdrawal (not a percentage). Withdrawing $X costs $X + $0.50 — deducted only after the Admin approves.',
+ walletWithdrawFee:'ថ្លៃសេវាដកលុយ៖ ក្រោម $50 កាត់ថេរ $0.50; ចាប់ពី $50 ឡើងទៅកាត់ 5% (ឧ. $100 កាត់ $5.00 ទទួលបាន $95.00) — កាត់តែបន្ទាប់ពី Admin យល់ព្រមប៉ុណ្ណោះ។ · Withdraw fee: under $50 a flat $0.50; at $50+ a 5% fee (e.g. $100 → fee $5.00, net $95.00) — deducted only after the Admin approves.',
  walletWithdrawTotalFmt:'សរុបត្រូវកាត់ (ក្រោយ Admin យល់ព្រម)៖ {t} · Total deducted (after Admin approval): {t}',
  walletBuyBtn:'ទិញដោយ Wallet · Buy with Wallet',walletBuying:'កំពុងទិញ… · Buying…',
  walletBuyDone:'ទិញរួចរាល់ ✓ កញ្ចប់របស់អ្នកបានបើកហើយ · Purchase complete ✓ Your package is now active',
@@ -4222,12 +4315,13 @@ en:{
  walletErrAmount:'Please enter an amount of $5.00 or more · សូមបញ្ចូលចំនួនចាប់ពី $5.00 ឡើងទៅ',
  walletErrFail:'Could not send the request — please try again · ផ្ញើសំណើមិនបានទេ — សូមព្យាយាមម្ដងទៀត',
  walletGmail:'Your Gmail · Gmail របស់អ្នក',walletUserIdLbl:'Your User ID · លេខសម្គាល់ (ID) របស់អ្នក',
- walletFeeLine:'Fee $0.50 · ថ្លៃសេវា',
+ walletFeeLine:'Fee $0.50 (under $50) · 5% (at $50+) · ថ្លៃសេវា',
+ monetTitle:'Monetization 💲',monetApply:'Apply',monetApplied:'Applied',monetApproved:'Approved',monetNotEligible:'Not eligible yet',monetEligibleYes:'Eligible ✓',monetEligibleNo:'Not eligible yet',monetLoading:'Loading…',monetApplySent:'Application sent to the Admin ✓',monetApplyFail:'Could not apply — please try again',
  walletErrGmail:'Please enter your Gmail correctly · សូមបញ្ចូល Gmail របស់អ្នកឲ្យត្រឹមត្រូវ',
  walletErrUserId:'Please enter your User ID · សូមបញ្ចូលលេខសម្គាល់ (ID) របស់អ្នក',
  walletWithdrawPolicyTitle:'Withdraw policy · គោលការណ៍ដកលុយ',
  walletWithdrawPolicy:'Please wait 24 hours after submitting. Maximum wait: 3 days to 1 week. Fastest: 1 hour (the company decides the speed). The Admin will transfer the money to your KHQR. · សូមរង់ចាំ 24 ម៉ោងបន្ទាប់ពីដាក់សំណើ។ រង់ចាំយូរបំផុត៖ 3 ថ្ងៃ ទៅ 1 សប្តាហ៍។ លឿនបំផុត៖ 1 ម៉ោង (ក្រុមហ៊ុនជាអ្នកកំណត់ល្បឿន)។ Admin នឹងផ្ទេរលុយទៅ KHQR របស់អ្នក។',
- walletWithdrawFee:'Withdraw fee: a FLAT $0.50 per withdrawal (not a percentage). Withdrawing $X costs $X + $0.50 — deducted only after the Admin approves. · ថ្លៃសេវាដកលុយ៖ ថេរ $0.50 ក្នុងមួយដង (មិនមែនភាគរយទេ)។ ដក $X ត្រូវកាត់ $X + $0.50 — កាត់តែបន្ទាប់ពី Admin យល់ព្រមប៉ុណ្ណោះ។',
+ walletWithdrawFee:'Withdraw fee: under $50 a flat $0.50; at $50+ a 5% fee (e.g. $100 → fee $5.00, net $95.00) — deducted only after the Admin approves. · ថ្លៃសេវាដកលុយ៖ ក្រោម $50 កាត់ថេរ $0.50; ចាប់ពី $50 ឡើងទៅកាត់ 5% (ឧ. $100 កាត់ $5.00 ទទួលបាន $95.00) — កាត់តែបន្ទាប់ពី Admin យល់ព្រមប៉ុណ្ណោះ។',
  walletWithdrawTotalFmt:'Total deducted (after Admin approval): {t} · សរុបត្រូវកាត់ (ក្រោយ Admin យល់ព្រម)៖ {t}',
  walletBuyBtn:'Buy with Wallet · ទិញដោយ Wallet',walletBuying:'Buying… · កំពុងទិញ…',
  walletBuyDone:'Purchase complete ✓ Your package is now active · ទិញរួចរាល់ ✓ កញ្ចប់របស់អ្នកបានបើកហើយ',
@@ -5917,9 +6011,9 @@ function pkgShowReqFail(){
             {email, userId, amount, khqrImageUrl?} — the form's 4
             fields are Amount (min $5.00), Gmail and User ID
             (pre-filled from the account, editable) and the KHQR
-            image. FLAT $0.50 fee per withdrawal: the button and
-            the line above it show the net live as
-            «Withdraw 💲<amount − 0.50>».
+            image. Fee tiers: under $50 flat $0.50, at $50+ 5%
+            of the amount: the button and the line above it show
+            the net live as «Withdraw 💲<net>».
    Buy:     POST /api/public/wallet/buy-package {email, packageId}
             — pays a package straight from the balance.
    Attached images (receipt / KHQR) upload FIRST through the same
@@ -6077,6 +6171,22 @@ function walletTopupSubmit(){
     walletSetMsg('walletTopupMsg',tx('walletErrFail'),false);
   });
 }
+/* Wallet sheets (owner correction): My Profile shows ONLY the
+   balance card + the «Top up» / «Withdraw» tappable rows; each
+   row opens its SMALL sheet holding the form (same ids and
+   submit handlers as before — presentation only). */
+function walletTopupOpen(){
+  if(!walletEmail()){loginSheetOpen();return;}
+  try{walletSetMethod(WALLET.method);}catch(e){}
+  var s=document.getElementById('walletTopupSheet');if(s)sheetShowAnim(s);
+}
+function walletTopupClose(){var s=document.getElementById('walletTopupSheet');sheetHideAnim(s);}
+function walletWithdrawOpen(){
+  if(!walletEmail()){loginSheetOpen();return;}
+  try{walletWithdrawPrefill();}catch(e){}
+  var s=document.getElementById('walletWithdrawSheet');if(s)sheetShowAnim(s);
+}
+function walletWithdrawClose(){var s=document.getElementById('walletWithdrawSheet');sheetHideAnim(s);}
 /* Pre-fill the withdraw Gmail + User ID fields from the signed-in
    account (owner spec) — both stay editable. Called every time
    My Profile opens, and re-syncs the live net label. */
@@ -6086,20 +6196,29 @@ function walletWithdrawPrefill(){
   var id=document.getElementById('walletWithdrawUserId');if(id)id.value=u.id||'';
   walletWithdrawTotal();
 }
-/* Live net display (owner spec): the line above the Withdraw
-   button AND the button itself show the net amount after the
-   FLAT $0.50 fee, exactly as «Withdraw 💲<net>» — $5 typed shows
-   «Withdraw 💲4.50», $10 shows «Withdraw 💲9.50». The small
-   «Fee $0.50» line sits right above the net line in the markup. */
+/* Withdraw fee tiers (owner spec): amount < $50 -> fee flat $0.50;
+   amount >= $50 -> fee 5% of amount (e.g. $100 -> fee $5.00, net $95.00). */
+function walletWithdrawFee(amt){
+  var a=Number(amt);if(!isFinite(a)||a<=0)return 0;
+  if(a>=50)return Math.round(a*0.05*100)/100;
+  return 0.50;
+}
+/* Live net display: the line above the Withdraw button AND the
+   button itself show «Withdraw 💲<net>» after the tiered fee —
+   $5 shows «Withdraw 💲4.50», $10 shows «Withdraw 💲9.50»,
+   $100 shows «Withdraw 💲95.00». The fee line shows the fee. */
 function walletWithdrawTotal(){
   var line=document.getElementById('walletWithdrawTotalLine');
   var btn=document.getElementById('walletWithdrawBtn');
+  var feeLine=document.getElementById('walletWithdrawFeeLine');
   var amt=walletParse(document.getElementById('walletWithdrawAmount'));
   var has=(amt!==null&&amt>0);
-  var net=has?Math.max(0,Math.round((amt-0.5)*100)/100):0;
+  var fee=has?walletWithdrawFee(amt):0;
+  var net=has?Math.max(0,Math.round((amt-fee)*100)/100):0;
   var label='Withdraw 💲'+net.toFixed(2);
   if(line)line.textContent=has?label:'';
   if(btn&&!btn.disabled)btn.textContent=label;
+  if(feeLine)feeLine.textContent=has?('ថ្លៃសេវា · Fee $'+fee.toFixed(2)+(amt>=50?' (5%)':'')):tx('walletFeeLine');
 }
 function walletWithdrawSubmit(){
   if(!walletEmail()){loginSheetOpen();return;}
@@ -6128,6 +6247,171 @@ function walletWithdrawSubmit(){
   }).catch(function(){
     if(btn)btn.disabled=false;
     walletSetMsg('walletWithdrawMsg',tx('walletErrFail'),false);
+  });
+}
+/* ================= Monetization =================
+   Admin toggle: GET /api/public/monetization/enabled -> {enabled}
+   Status:       GET /api/public/monetization/status?email=
+   Earnings:     GET /api/public/monetization/earnings?email=
+   Apply:        POST /api/public/monetization/apply {email}
+   Entries (drawer + My Profile) are GREY and NOT tappable
+   (.monet-disabled, pointer-events:none) while the toggle is OFF;
+   when ON they show normal text and are tappable. The enabled
+   state is checked on app load (genInit), when the drawer opens
+   (openMenu) and when My Profile opens (profileOpen). */
+var MONET={enabled:false,status:null,earnings:null,busy:false};
+function monetNum(v){var n=(typeof pubSrvNum==='function')?pubSrvNum(v):(isFinite(Number(v))?Number(v):null);return n;}
+function monetPick(obj,keys){
+  if(!obj||typeof obj!=='object')return null;
+  var scopes=[obj,obj.data,obj.status,obj.monetization];
+  for(var s=0;s<scopes.length;s++){
+    var o=scopes[s];if(!o||typeof o!=='object')continue;
+    for(var i=0;i<keys.length;i++){var v=monetNum(o[keys[i]]);if(v!==null)return v;}
+  }
+  return null;
+}
+function monetPickStr(obj,keys){
+  if(!obj||typeof obj!=='object')return '';
+  var scopes=[obj,obj.data,obj.status,obj.monetization];
+  for(var s=0;s<scopes.length;s++){
+    var o=scopes[s];if(!o||typeof o!=='object')continue;
+    for(var i=0;i<keys.length;i++){if(typeof o[keys[i]]==='string'&&o[keys[i]])return o[keys[i]];}
+  }
+  return '';
+}
+function monetSetMsg(t,ok){var m=document.getElementById('monetMsg');if(!m)return;m.textContent=t||'';m.style.color=ok?'var(--accent-text)':'#f87171';}
+function monetApplyEnabledState(){
+  var on=!!MONET.enabled;
+  var els=document.querySelectorAll('.monet-entry');
+  for(var i=0;i<els.length;i++){
+    els[i].classList.toggle('monet-disabled',!on);
+    els[i].setAttribute('aria-disabled',on?'false':'true');
+    if(els[i].tagName==='BUTTON')els[i].disabled=false;
+  }
+}
+function monetCheckEnabled(){
+  return authFetchJson('/api/public/monetization/enabled','GET',null,15000).then(function(d){
+    var en=null;
+    if(d&&typeof d==='object'){
+      if(typeof d.enabled==='boolean')en=d.enabled;
+      else if(d.data&&typeof d.data.enabled==='boolean')en=d.data.enabled;
+      else if(d.monetization&&typeof d.monetization.enabled==='boolean')en=d.monetization.enabled;
+    }
+    MONET.enabled=!!en;
+    monetApplyEnabledState();
+    return MONET.enabled;
+  }).catch(function(){monetApplyEnabledState();return MONET.enabled;});
+}
+function monetOpen(){
+  if(!MONET.enabled){monetCheckEnabled();return;}
+  closeMenu();
+  try{profileClose();}catch(e){}
+  var u=null;try{u=acctCurrent();}catch(e){}
+  if(!u||!u.email){loginSheetOpen();return;}
+  var s=document.getElementById('monetSheet');if(s)sheetShowAnim(s);
+  monetLoadData();
+}
+function monetClose(){var s=document.getElementById('monetSheet');sheetHideAnim(s);}
+function monetLoadData(){
+  var em=walletEmail();if(!em)return;
+  monetSetMsg(tx('monetLoading'),true);
+  var p1=authFetchJson('/api/public/monetization/status?email='+encodeURIComponent(em),'GET',null,20000).then(function(d){if(d)MONET.status=d;});
+  var p2=authFetchJson('/api/public/monetization/earnings?email='+encodeURIComponent(em),'GET',null,20000).then(function(d){if(d)MONET.earnings=d;});
+  Promise.all([p1,p2]).then(function(){monetRender();monetSetMsg('',true);}).catch(function(){monetRender();});
+}
+function monetRender(){
+  var st=MONET.status||{},ea=MONET.earnings||{};
+  var followers=monetPick(st,['followers','followerCount','followersCount']);
+  if(followers===null)followers=monetPick(ea,['followers','followerCount']);
+  var watch=monetPick(st,['watchHours','watch_hours','watchTimeHours']);
+  var eligibleVal=null;
+  var scopes=[st,st.data,st.status];for(var s=0;s<scopes.length;s++){var o=scopes[s];if(o&&typeof o.eligible==='boolean'){eligibleVal=o.eligible;break;}}
+  if(eligibleVal===null&&followers!==null&&watch!==null)eligibleVal=(followers>=1000&&watch>=2000);
+  var statusStr=monetPickStr(st,['applyStatus','applicationStatus','monetizationStatus','state']).toLowerCase();
+  var fEl=document.getElementById('monetFollowers');if(fEl)fEl.textContent=(followers===null?'—':Math.floor(followers))+' / 1000';
+  var fb=document.getElementById('monetFollowersBar');if(fb)fb.style.width=Math.min(100,((followers||0)/1000)*100)+'%';
+  var wEl=document.getElementById('monetWatchHours');if(wEl)wEl.textContent=(watch===null?'—':(Math.round(watch*10)/10))+' / 2000';
+  var wb=document.getElementById('monetWatchBar');if(wb)wb.style.width=Math.min(100,((watch||0)/2000)*100)+'%';
+  var eEl=document.getElementById('monetEligible');if(eEl)eEl.textContent=eligibleVal===null?'—':(eligibleVal?tx('monetEligibleYes'):tx('monetEligibleNo'));
+  var total=monetPick(ea,['totalEarned','total','earnings','totalEarnings']);
+  if(total===null)total=monetPick(st,['totalEarned','totalEarnings']);
+  var tEl=document.getElementById('monetTotalEarned');if(tEl)tEl.textContent='$'+(total===null?0:total).toFixed(2);
+  var views=monetPick(ea,['eligibleViews','views','eligible_views']);
+  var vEl=document.getElementById('monetEligibleViews');if(vEl)vEl.textContent=(views===null?'0':Math.floor(views));
+  var bc=document.getElementById('monetByCountry');
+  if(bc){
+    var by=null;
+    var escopes=[ea,ea.data,ea.earnings];for(var q=0;q<escopes.length;q++){var eo=escopes[q];if(eo&&(eo.byCountry||eo.earningsByCountry||eo.countries)){by=eo.byCountry||eo.earningsByCountry||eo.countries;break;}}
+    if(by&&typeof by==='object'){
+      var h='';
+      if(Array.isArray(by)){by.forEach(function(r){if(!r)return;var c=r.country||r.name||r.code||'';var amt=monetNum(r.amount!==undefined?r.amount:(r.earned!==undefined?r.earned:r.total));if(c)h+='<div class="monet-row"><span>'+escHtml(String(c))+'</span><b>$'+(amt===null?0:amt).toFixed(2)+'</b></div>';});}
+      else{for(var k in by){if(!Object.prototype.hasOwnProperty.call(by,k))continue;var av=monetNum(by[k]);h+='<div class="monet-row"><span>'+escHtml(k)+'</span><b>$'+(av===null?0:av).toFixed(2)+'</b></div>';}}
+      bc.innerHTML=h||'<p class="monet-note">—</p>';
+    }else bc.innerHTML='<p class="monet-note">—</p>';
+  }
+  var btn=document.getElementById('monetApplyBtn');
+  if(btn){
+    if(statusStr==='approved'||statusStr==='active'||statusStr==='enabled'){btn.disabled=true;btn.textContent=tx('monetApproved');}
+    else if(statusStr==='applied'||statusStr==='pending'||statusStr==='submitted'){btn.disabled=true;btn.textContent=tx('monetApplied');}
+    else{btn.disabled=!eligibleVal;btn.textContent=tx('monetApply');}
+  }
+}
+function monetApply(){
+  var em=walletEmail();if(!em){loginSheetOpen();return;}
+  var btn=document.getElementById('monetApplyBtn');if(!btn||btn.disabled||MONET.busy)return;
+  MONET.busy=true;btn.disabled=true;
+  authFetchJson('/api/public/monetization/apply','POST',{email:em},30000).then(function(data){
+    MONET.busy=false;
+    if(data&&(data.ok===true||data.applied===true||data.success===true)){monetSetMsg(tx('monetApplySent'),true);btn.textContent=tx('monetApplied');monetLoadData();}
+    else if(data&&data.ok!==false){monetSetMsg(tx('monetApplySent'),true);btn.textContent=tx('monetApplied');}
+    else{monetSetMsg(authErrText(data,'monetApplyFail'),false);monetRender();}
+  }).catch(function(){MONET.busy=false;monetSetMsg(tx('monetApplyFail'),false);monetRender();});
+}
+/* ===== Follow (per user) =====
+   Follow button on posts and user profiles:
+   POST /api/public/follow {email, targetEmail}
+   POST /api/public/unfollow {email, targetEmail}
+   GET  /api/public/followers?email=&by=  (email = target, by = viewer) */
+var userFollowCounts={};
+var userFollowBusy={};
+function userFollowersLoad(targetEmail,byEmail){
+  var t=String(targetEmail||'').trim().toLowerCase();if(!t)return Promise.resolve(null);
+  var path='/api/public/followers?email='+encodeURIComponent(t)+'&by='+encodeURIComponent(String(byEmail||'').trim().toLowerCase());
+  return authFetchJson(path,'GET',null,15000).then(function(d){
+    if(!d||typeof d!=='object')return null;
+    var c=monetPick(d,['followers','followerCount','count','total']);
+    var f=null;var sc=[d,d.data];for(var i=0;i<sc.length;i++){if(sc[i]&&typeof sc[i].following==='boolean'){f=sc[i].following;break;}}
+    if(c!==null)userFollowCounts[t]=Math.max(0,Math.floor(c));
+    if(f!==null)pubCreatorFollows[t]=f;
+    try{pubCreatorFollowRender();}catch(e){}
+    return d;
+  }).catch(function(){return null;});
+}
+function userFollowToggle(targetEmail){
+  var t=String(targetEmail||'').trim().toLowerCase();if(!t)return;
+  var u=null;try{u=acctCurrent();}catch(e){}
+  if(!u||!u.email){loginSheetOpen();return;}
+  if(String(u.email).trim().toLowerCase()===t)return;
+  if(userFollowBusy[t])return;
+  var want=!pubCreatorFollows[t];
+  var prevF=!!pubCreatorFollows[t],prevC=userFollowCounts[t];
+  pubCreatorFollows[t]=want;
+  if(typeof userFollowCounts[t]==='number')userFollowCounts[t]=Math.max(0,userFollowCounts[t]+(want?1:-1));
+  userFollowBusy[t]=true;
+  try{pubCreatorFollowRender();}catch(e){}
+  var path=want?'/api/public/follow':'/api/public/unfollow';
+  authFetchJson(path,'POST',{email:u.email,targetEmail:t},20000).then(function(d){
+    userFollowBusy[t]=false;
+    if(d&&typeof d==='object'){
+      var c=monetPick(d,['followers','followerCount','count']);
+      if(c!==null)userFollowCounts[t]=Math.max(0,Math.floor(c));
+    }
+    try{pubCreatorFollowRender();}catch(e){}
+    userFollowersLoad(t,u.email);
+  }).catch(function(){
+    userFollowBusy[t]=false;
+    pubCreatorFollows[t]=prevF;if(prevC!==undefined)userFollowCounts[t]=prevC;
+    try{pubCreatorFollowRender();}catch(e){}
   });
 }
 /* ===== Buy with Wallet =====
@@ -10241,6 +10525,7 @@ function openMenu(){
   var b=document.getElementById('drawerBackdrop');
   try{notifLoad();}catch(e){}
   try{pushRefreshToggle();}catch(e){}
+  try{monetCheckEnabled();}catch(e){}
   d.classList.add('open');if(b)b.classList.add('open');
   document.body.style.overflow='hidden';
   try{chatFabHide();}catch(e){}
@@ -10802,16 +11087,28 @@ function pubCreatorFollowRender(){
   var btns=document.querySelectorAll('[data-creator-follow]');
   for(var i=0;i<btns.length;i++){
     var b=btns[i];
-    var on=!!pubCreatorFollows[b.getAttribute('data-creator-follow')];
+    var key=b.getAttribute('data-creator-follow');
+    var on=!!pubCreatorFollows[key];
     b.className='pub-creator-follow'+(on?' following':'');
     b.setAttribute('aria-pressed',on?'true':'false');
     b.textContent=tx(on?'pubFollowing':'pubFollow');
+    if(key&&typeof userFollowBusy!=='undefined'&&userFollowBusy[key])b.disabled=true;else b.disabled=false;
+  }
+  var counts=document.querySelectorAll('[data-creator-fcount]');
+  for(var j=0;j<counts.length;j++){
+    var ck=counts[j].getAttribute('data-creator-fcount');
+    var n=(typeof userFollowCounts!=='undefined')?userFollowCounts[ck]:undefined;
+    if(typeof n==='number')counts[j].textContent=Math.max(0,Math.floor(n))+' '+tx('pubFollowers');
   }
 }
 function pubCreatorFollowToggle(key){
   if(!key)return;
   var u=null;try{u=acctCurrent();}catch(e){}
   if(!u||!u.email){loginSheetOpen();return;}
+  /* Real per-user follow via /api/public/follow + /api/public/unfollow
+     when the post carries the creator's Gmail; posts without a
+     Gmail keep the local toggle exactly as before. */
+  if(key.indexOf('@')>0&&typeof userFollowToggle==='function'){userFollowToggle(key);try{pubLockTouch();}catch(e){}return;}
   pubCreatorFollows[key]=!pubCreatorFollows[key];
   pubCreatorFollowRender();
   pubLockTouch();
@@ -12347,19 +12644,33 @@ function pubCardEl(it){
       else{head.appendChild(fbtn);head.appendChild(nwrap);}
     }else{
       head.appendChild(nm);
-      if(isSongCard){
-        /* Follow this song's creator (owner order 2026-11-17):
-           a Follow pill right after the creator's name on every
-           song card, not only the Admin's. */
+      {
+        /* Follow button on posts and user profiles: a Follow pill
+           right after the creator's name on every post (not only
+           songs / not only the Admin's). It POSTs to
+           /api/public/follow {email, targetEmail} (or
+           /api/public/unfollow) and shows the follower count from
+           GET /api/public/followers?email=&by= — see
+           userFollowToggle / userFollowersLoad. */
         var ckey=pubCreatorKey(it);
         var cfbtn=document.createElement('button');
         cfbtn.type='button';
         cfbtn.className='pub-creator-follow'+(pubCreatorFollows[ckey]?' following':'');
         cfbtn.setAttribute('data-creator-follow',ckey);
+        cfbtn.setAttribute('data-user-follow',ckey);
         cfbtn.setAttribute('aria-pressed',pubCreatorFollows[ckey]?'true':'false');
         cfbtn.textContent=tx(pubCreatorFollows[ckey]?'pubFollowing':'pubFollow');
         cfbtn.addEventListener('click',function(){pubCreatorFollowToggle(ckey);});
         head.appendChild(cfbtn);
+        if(ckey&&ckey.indexOf('@')>0){
+          var cfcount=document.createElement('span');
+          cfcount.className='pub-creator-fcount';
+          cfcount.setAttribute('data-creator-fcount',ckey);
+          var cfn=(typeof userFollowCounts!=='undefined')?userFollowCounts[ckey]:undefined;
+          cfcount.textContent=(typeof cfn==='number')?(Math.max(0,Math.floor(cfn))+' '+tx('pubFollowers')):'';
+          head.appendChild(cfcount);
+          (function(tk){var vu=null;try{vu=acctCurrent();}catch(e){}try{userFollowersLoad(tk,vu&&vu.email?vu.email:'');}catch(e){}})(ckey);
+        }
       }
     }
   }
@@ -16755,6 +17066,11 @@ function profileRender(){
   h+='<button type="button" id="profModeBtnAuto" onclick="setMode(\'auto\')" style="display:flex;align-items:center;justify-content:center;gap:6px"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 1 0 18z" fill="currentColor" stroke="none"/></svg>'+escHtml(tx('modeAuto'))+'</button>';
   h+='</div></div>';
   h+='<button type="button" class="prof-pkg-open" onclick="profileGoPackages()"><span>'+escHtml(tx('navPackages'))+'</span><span class="ppo-sub">'+escHtml(tx('navPackagesSub'))+'</span><span class="ppo-arrow" aria-hidden="true">›</span></button>';
+  /* Monetization entry in My Profile (same grey-disabled rule as
+     the drawer entry while the Admin toggle is OFF) + this user's
+     follower count from GET /api/public/followers?email=&by=. */
+  h+='<button type="button" class="prof-pkg-open monet-entry monet-disabled" id="profileMonetBtn" onclick="monetOpen()"><span>Monetization 💲</span><span class="ppo-sub">រកលុយ · Earn</span><span class="ppo-arrow" aria-hidden="true">›</span></button>';
+  h+='<div style="display:flex;justify-content:space-between;gap:10px;padding:10px 0 0;font-size:0.875rem"><span style="color:var(--muted)">'+escHtml(tx('pubFollowers'))+'</span><b id="profileFollowersCount">—</b></div>';
   h+='<button type="button" class="kbtn" style="margin-top:14px;width:100%;background:rgba(248,113,113,.10);color:#f87171;border:1px solid rgba(248,113,113,.45)" onclick="acctLogout()">'+escHtml(tx('acctLogout'))+'</button>';
   /* Contact block (owner order 2026-11-17): directly under the
      red button — tappable phone rows (tel:) and masked Gmail
@@ -16762,6 +17078,17 @@ function profileRender(){
   h+='<div style="margin-top:14px">'+contactBlockHtml()+'</div>';
   body.innerHTML=h;
   try{syncModeBtns();}catch(e){}
+  try{monetApplyEnabledState();}catch(e){}
+  try{
+    if(u&&u.email){
+      userFollowersLoad(u.email,u.email).then(function(){
+        var fc=document.getElementById('profileFollowersCount');
+        var n=userFollowCounts[String(u.email).trim().toLowerCase()];
+        if(fc&&typeof n==='number')fc.textContent=Math.max(0,Math.floor(n));
+        else if(fc&&MONET.status){var mf=monetPick(MONET.status,['followers','followerCount']);if(mf!==null)fc.textContent=Math.floor(mf);}
+      });
+    }
+  }catch(e){}
 }
 /* Packages are NOT listed inside the profile sheet (owner rule):
    the profile shows ONE «កញ្ចប់សេវាកម្ម · Packages» row only, and the
@@ -16770,6 +17097,7 @@ function profileRender(){
 function profileGoPackages(){profileClose();menuGo('sec-packages');}
 function profileOpen(){
   var u=acctCurrent();if(!u){loginSheetOpen();return;}
+  try{monetCheckEnabled();}catch(e){}
   profileRender();
   /* Wallet balance refreshes every time the Profile opens (and
      after every wallet action — see the wallet submit handlers). */
@@ -17535,6 +17863,7 @@ function genInit(){
   histRender();
   d3SetProvider('hunyuan3d');
   uiInit();
+  try{monetCheckEnabled();}catch(e){}
   try{verifyTokenFromUrl();}catch(e){}
   try{acctAdminSync();}catch(e){}
   /* Block re-check while the app stays open: if the Admin blocks
@@ -17591,7 +17920,7 @@ function genInit(){
     var pw=document.getElementById('songStylePresetWrap');
     if(pw&&!pw.contains(e.target))songStyleClosePicker();
   });
-  document.addEventListener('keydown',function(e){if(e.key==='Escape'){closeMenu();profileClose();loginSheetClose();pubSheetClose();notifSheetClose();packagesHide();}});
+  document.addEventListener('keydown',function(e){if(e.key==='Escape'){closeMenu();profileClose();loginSheetClose();pubSheetClose();notifSheetClose();packagesHide();try{walletTopupClose();}catch(e){}try{walletWithdrawClose();}catch(e){}try{monetClose();}catch(e){}}});
 }
 
 (function(){ try{genInit()}catch(e){} })();

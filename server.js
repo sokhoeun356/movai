@@ -154,6 +154,7 @@ const GH_DATA_FILES = [
   'updates.json', 'admin-lockouts.json', 'history.json', 'mp3cache.json',
   'cloudinary-accounts.json', 'cloudinary-rotation.json', 'admin-key.json', 'mvsep-cache.json',
   'feature-usage.json', 'wallet-requests.json', 'device-records.json',
+  'monetization-earnings.json', 'monetization-applications.json', 'creator-follows.json',
 ];
 const ghShaCache = {}; // filename -> GitHub blob sha (for PUT updates)
 function ghEnabled() { return !!GH_TOKEN; }
@@ -1494,6 +1495,11 @@ const SETTINGS_DEFAULTS = {
   // instead of 24. When false (default) the gift is 24 song credits.
   // The gift is song-only either way — no media credits. Default OFF.
   gift50: false,
+  // Monetization master toggle (owner order 2026-11-18). When true, the
+  // website shows the Monetization section and package cashback + view
+  // earnings are active. When false (default) nothing earns and the
+  // website hides the Monetization UI. Default OFF.
+  monetization: false,
   theme: 0, font: 50,
   glassClear: 45, glassBlur: 65, glassShine: 55,
   tshadow: 'none', txtblur: 0, bgb: 50, brandfx: 'none', mode: 'dark',
@@ -1554,6 +1560,9 @@ function cleanSettings(j, base) {
   // Gift-50 toggle (owner order 2026-11-18). Boolean; invalid values
   // keep the stored value (default OFF).
   if (typeof j.gift50 === 'boolean') s.gift50 = j.gift50;
+  // Monetization toggle (owner order 2026-11-18). Boolean; invalid
+  // values keep the stored value (default OFF).
+  if (typeof j.monetization === 'boolean') s.monetization = j.monetization;
   s.theme = Math.round(clampNum(j.theme, 0, 6, s.theme));
   s.font = clampNum(j.font, 0, 100, s.font);
   s.glassClear = clampNum(j.glassClear, 0, 100, s.glassClear);
@@ -2007,14 +2016,14 @@ function featureUsageList() {
 // ---- Wallet / Balance (stored-value money, owner order 2026-11-18) ----
 // Users top up money (min $5) into a stored balance, use it to buy any
 // package or to pay $0.10 for an instant password reset, and can ask to
-// withdraw (min $5, flat $0.50 fee per withdrawal). Top-ups and
+// withdraw (min $5; fee tier: under $50 flat $0.50, $50+ is 5% of the
+// amount). Top-ups and
 // withdrawals are REQUESTS: the Admin approves/rejects them; money only
 // moves on approval. Balances live on the user record (users.json,
 // GitHub-backed); requests live in wallet-requests.json (GitHub-backed).
 // Money is always stored rounded to 2 decimals (dollars).
 const WALLET_MIN_TOPUP = 5.00;
 const WALLET_MIN_WITHDRAW = 5.00;
-const WALLET_WITHDRAW_FEE = 0.50;
 const WALLET_INSTANT_RESET_PRICE = 0.10;
 const WALLET_FREE_RESET_LIMIT = 2; // free email-code resets per user, ever
 const INSTANT_RESET_TTL_MS = 10 * 60 * 1000; // instant-reset token lives 10 min
@@ -2024,6 +2033,17 @@ const WALLET_REQUESTS_FILE = path.join(DATA_DIR, 'wallet-requests.json');
 const instantResetTokens = new Map();
 function walletMoney(n) { return Math.round(numOr(n, 0) * 100) / 100; }
 function walletBalance(u) { return walletMoney(u && u.balance); }
+// Withdraw fee tier (owner order 2026-11-18): under $50 the fee is a
+// flat $0.50; $50 and over it is 5% of the amount ($50 -> $2.50 fee,
+// net $47.50; $100 -> $5.00 fee, net $95.00). total = amount + fee
+// (deducted from the balance on Admin approval); net = amount - fee
+// (what the user receives).
+function walletWithdrawFee(amount) {
+  const a = walletMoney(amount);
+  if (!Number.isFinite(a) || a < WALLET_MIN_WITHDRAW) return 0.50;
+  if (a < 50) return 0.50;
+  return walletMoney(a * 0.05);
+}
 function loadWalletRequests() {
   try { const j = JSON.parse(fs.readFileSync(WALLET_REQUESTS_FILE, 'utf8')); if (Array.isArray(j)) return j; } catch (e) {}
   return [];
@@ -2039,6 +2059,145 @@ function newWalletRequestId() {
 function walletRequestPublic(r, users) {
   const u = users && r && users[r.email];
   return Object.assign({}, r, { buyerId: u && u.id ? u.id : '', balance: u ? walletBalance(u) : 0 });
+}
+// ---- Monetization (owner order 2026-11-18) ----
+// The website can earn money for its users: package cashback + view
+// earnings (RPM $0.001 per 1000 views). Master toggle `monetization`
+// in settings (default OFF). Data lives in three GitHub-backed files:
+//   monetization-earnings.json — per-user {views, watchSeconds,
+//     earnMicro, pendingMicro, paidOutMicro, cashbackTotal, byCountry}
+//     (earnMicro/pendingMicro/paidOutMicro are INTEGER micro-dollars:
+//     1 eligible view = 1 micro-dollar = $0.000001, so $0.001 per 1000
+//     views is exact with no float drift; $0.01 = 10,000 micro-dollars).
+//   monetization-applications.json — per-user {email, name, followers,
+//     watchHours, appliedAt, status, reason?, decidedAt?}.
+//   creator-follows.json — {targetEmail: [followerEmail, ...]}.
+// Eligibility (YouTube-style): >= 1000 followers AND >= 2000 watch
+// hours (watchSeconds / 3600). Only a logged-in viewer counts toward
+// watch time / earnings; guest views earn nothing. Earnings pay out
+// only when monetization is ON and the owner is approved; watch time
+// and followers accumulate regardless (they are the path to apply).
+const MONETIZATION_EARNINGS_FILE = path.join(DATA_DIR, 'monetization-earnings.json');
+const MONETIZATION_APPLICATIONS_FILE = path.join(DATA_DIR, 'monetization-applications.json');
+const CREATOR_FOLLOWS_FILE = path.join(DATA_DIR, 'creator-follows.json');
+const MONETIZATION_VIEW_EARN_MICRO = 1; // 1 micro-dollar per eligible view ($0.001 / 1000 views)
+const MONETIZATION_MICRO_PER_CENT = 10000; // $0.01 = 10,000 micro-dollars
+const MONETIZATION_FOLLOWERS_NEEDED = 1000;
+const MONETIZATION_WATCH_HOURS_NEEDED = 2000;
+const MONETIZATION_WATCH_SECONDS_NEEDED = MONETIZATION_WATCH_HOURS_NEEDED * 3600;
+// Package cashback tiers by price: use the largest listed price <= the
+// package price. $5->$0.01, $10->$0.05, $15->$0.05, $22->$0.10,
+// $25->$0.10 (so a $180/$216 yearly package earns $0.10).
+const MONETIZATION_CASHBACK_TIERS = [[25, 0.10], [22, 0.10], [15, 0.05], [10, 0.05], [5, 0.01]];
+function monetizationCashbackForPrice(price) {
+  const p = walletMoney(price);
+  if (!Number.isFinite(p) || p <= 0) return 0;
+  for (const t of MONETIZATION_CASHBACK_TIERS) { if (p >= t[0]) return t[1]; }
+  return 0;
+}
+function loadMonetizationEarnings() {
+  try { const j = JSON.parse(fs.readFileSync(MONETIZATION_EARNINGS_FILE, 'utf8')); if (j && typeof j === 'object' && !Array.isArray(j)) return j; } catch (e) {}
+  return {};
+}
+function saveMonetizationEarnings(m) {
+  try { fs.mkdirSync(DATA_DIR, { recursive: true }); } catch (e) {}
+  fs.writeFileSync(MONETIZATION_EARNINGS_FILE, JSON.stringify(m, null, 2));
+  ghPersistFile(MONETIZATION_EARNINGS_FILE);
+}
+function monetizationRecord(email) {
+  const em = normEmail(email);
+  if (!em) return null;
+  const m = loadMonetizationEarnings();
+  if (!m[em] || typeof m[em] !== 'object') m[em] = { views: 0, watchSeconds: 0, earnMicro: 0, pendingMicro: 0, paidOutMicro: 0, cashbackTotal: 0, byCountry: {} };
+  return { m, rec: m[em], em };
+}
+// Lifetime package-cashback total for one user (dollars, 2 decimals).
+// Called from the purchase-approve and wallet buy-package paths AFTER
+// the balance was already updated by the caller (the caller saves users).
+function monetizationRecordCashback(email, amount) {
+  try {
+    const got = monetizationRecord(email);
+    if (!got) return;
+    got.rec.cashbackTotal = walletMoney(numOr(got.rec.cashbackTotal, 0) + walletMoney(amount));
+    saveMonetizationEarnings(got.m);
+  } catch (e) {}
+}
+function loadMonetizationApplications() {
+  try { const j = JSON.parse(fs.readFileSync(MONETIZATION_APPLICATIONS_FILE, 'utf8')); if (j && typeof j === 'object' && !Array.isArray(j)) return j; } catch (e) {}
+  return {};
+}
+function saveMonetizationApplications(a) {
+  try { fs.mkdirSync(DATA_DIR, { recursive: true }); } catch (e) {}
+  fs.writeFileSync(MONETIZATION_APPLICATIONS_FILE, JSON.stringify(a, null, 2));
+  ghPersistFile(MONETIZATION_APPLICATIONS_FILE);
+}
+function monetizationIsApproved(email) {
+  try {
+    const a = loadMonetizationApplications();
+    const app = a[normEmail(email)];
+    return !!(app && app.status === 'approved');
+  } catch (e) { return false; }
+}
+function loadCreatorFollows() {
+  try { const j = JSON.parse(fs.readFileSync(CREATOR_FOLLOWS_FILE, 'utf8')); if (j && typeof j === 'object' && !Array.isArray(j)) return j; } catch (e) {}
+  return {};
+}
+function saveCreatorFollows(f) {
+  try { fs.mkdirSync(DATA_DIR, { recursive: true }); } catch (e) {}
+  fs.writeFileSync(CREATOR_FOLLOWS_FILE, JSON.stringify(f, null, 2));
+  ghPersistFile(CREATOR_FOLLOWS_FILE);
+}
+function monetizationFollowerCount(email) {
+  try {
+    const f = loadCreatorFollows();
+    const arr = f[normEmail(email)];
+    return Array.isArray(arr) ? arr.length : 0;
+  } catch (e) { return 0; }
+}
+// One logged-in view on a post: always accrues watch time for the
+// owner (eligibility progress, even before approval / while the toggle
+// is OFF); when monetization is ON and the owner is approved it also
+// accrues the $0.000001 view earning and moves whole cents into the
+// owner's wallet balance (fractional remainder stays pending).
+// Returns the owner's earnings record (or null for a guest view).
+// Async because a whole-cent payout awaits the users GitHub flush.
+async function monetizationOnView(ownerEmail, viewerEmail, country, durationSec) {
+  const owner = normEmail(ownerEmail);
+  const viewer = normEmail(viewerEmail);
+  if (!owner || !viewer) return null;
+  const got = monetizationRecord(owner);
+  if (!got) return null;
+  const rec = got.rec;
+  const dur = Math.max(0, Math.floor(numOr(durationSec, 0)));
+  if (dur > 0) rec.watchSeconds = numOr(rec.watchSeconds, 0) + dur;
+  const cc = (typeof country === 'string' && country.trim()) ? country.trim().toUpperCase().slice(0, 8) : 'Unknown';
+  if (monetizationEnabled() && monetizationIsApproved(owner)) {
+    rec.views = numOr(rec.views, 0) + 1;
+    rec.earnMicro = numOr(rec.earnMicro, 0) + MONETIZATION_VIEW_EARN_MICRO;
+    rec.pendingMicro = numOr(rec.pendingMicro, 0) + MONETIZATION_VIEW_EARN_MICRO;
+    if (!rec.byCountry || typeof rec.byCountry !== 'object') rec.byCountry = {};
+    if (!rec.byCountry[cc] || typeof rec.byCountry[cc] !== 'object') rec.byCountry[cc] = { views: 0, earnMicro: 0 };
+    rec.byCountry[cc].views = numOr(rec.byCountry[cc].views, 0) + 1;
+    rec.byCountry[cc].earnMicro = numOr(rec.byCountry[cc].earnMicro, 0) + MONETIZATION_VIEW_EARN_MICRO;
+    // Move whole cents to the wallet balance (fractional remainder
+    // stays pending). $0.01 = 10,000 micro-dollars.
+    const wholeMicro = Math.floor(numOr(rec.pendingMicro, 0) / MONETIZATION_MICRO_PER_CENT) * MONETIZATION_MICRO_PER_CENT;
+    if (wholeMicro > 0) {
+      const dollars = walletMoney(wholeMicro / 1000000);
+      const users = loadUsers();
+      const u = users[owner];
+      if (u) {
+        u.balance = walletMoney(walletBalance(u) + dollars);
+        u.updatedAt = new Date().toISOString();
+        saveUsers(users);
+        await ghFlushFile(USERS_FILE);
+        rec.paidOutMicro = numOr(rec.paidOutMicro, 0) + wholeMicro;
+        rec.pendingMicro = numOr(rec.pendingMicro, 0) - wholeMicro;
+      }
+    }
+  }
+  saveMonetizationEarnings(got.m);
+  return rec;
 }
 // ---- Device account limit + VPN-proof fingerprint (owner order 2026-11-18) ----
 // Anti-abuse: one person can own 10 Gmails on one phone and register 10
@@ -2108,6 +2267,12 @@ function deviceLimitSetting() {
 // immediately. Separate from autoCatch and deviceLimitEnabled.
 function gift50Enabled() {
   try { const s = loadSettings(); return s && s.gift50 === true; } catch (e) { return false; }
+}
+// Monetization toggle, read FRESH from disk on every call
+// (loadSettings re-reads settings.json — no in-memory cache), so an
+// Admin change takes effect immediately. Default OFF.
+function monetizationEnabled() {
+  try { const s = loadSettings(); return s && s.monetization === true; } catch (e) { return false; }
 }
 const DEVICE_RECORDS_FILE = path.join(DATA_DIR, 'device-records.json');
 // device-records.json shape: { "<fingerprintKey>": {
@@ -3331,11 +3496,17 @@ function sunoPreviewFromData(d) {
   return first ? (first.stream_audio_url || first.audio_url) : '';
 }
 let _healStarted = false; // startup song-URL heal runs once (see apiRoute top)
+let _ghResyncLastAt = 0; // last GitHub data resync (see ghMergePublicHistoryFromGitHub)
 function apiRoute(req, res, urlPath) {
   // Startup heal (owner order 2026-11-18): once, on the first request
   // after (re)start, re-link dead Magic Hour / proxy-upload song URLs to
   // their Cloudinary copy when one exists. Fire-and-forget, never blocks.
   if (!_healStarted) { _healStarted = true; try { (async () => { try { await ghRestoreUploads(); } catch (e) {} try { await healDeadSongUrls(); } catch (e) {} })().catch(() => {}); } catch (e) {} }
+  // Periodic GitHub data resync (§6 fix): every 5 min, re-pull
+  // public.json + history.json from GitHub so external edits (e.g.
+  // deleting broken songs) take effect on the RUNNING server without
+  // a restart. Fire-and-forget, never blocks.
+  if (Date.now() - _ghResyncLastAt > 5 * 60 * 1000) { _ghResyncLastAt = Date.now(); ghMergePublicHistoryFromGitHub().catch(() => {}); }
   // Attack protection: count this IP's requests (all /api/* + /uploads/*).
   // A correct admin key is never rate-limited or blocked here (the admin
   // can never lock themselves out — see isAdminKeyRequest).
@@ -5256,6 +5427,168 @@ function apiRoute(req, res, urlPath) {
     }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
     return;
   }
+  // ---- Monetization (owner order 2026-11-18) ----
+  // GET /api/admin/monetization — admin key required. Reads the master
+  // toggle (default OFF). POST /api/admin/monetization {enabled} sets it.
+  // GET /api/public/monetization/enabled — PUBLIC, no auth.
+  if (req.method === 'GET' && urlPath === '/api/admin/monetization') {
+    const a = adminKeyOk(req);
+    if (!a.ok) return sendJSON(res, 200, { ok: false, error: a.error });
+    return sendJSON(res, 200, { ok: true, enabled: monetizationEnabled() });
+  }
+  if (req.method === 'POST' && urlPath === '/api/admin/monetization') {
+    const a = adminKeyOk(req);
+    if (!a.ok) return sendJSON(res, 200, { ok: false, error: a.error });
+    readJSONBody(req, 64 * 1024).then(async (body) => {
+      if (!body || typeof body.enabled !== 'boolean') return sendJSON(res, 200, { ok: false, error: 'សូមដាក់ enabled: true/false' });
+      const out = saveSettings(Object.assign(loadSettings(), { monetization: body.enabled }));
+      return sendJSON(res, 200, { ok: true, enabled: out.monetization === true });
+    }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
+    return;
+  }
+  if (req.method === 'GET' && urlPath === '/api/public/monetization/enabled') {
+    return sendJSON(res, 200, { ok: true, enabled: monetizationEnabled() });
+  }
+  // GET /api/public/monetization/earnings?email=X — PUBLIC. Total earned
+  // (dollars), eligible views, lifetime cashback, earnings by country.
+  if (req.method === 'GET' && urlPath === '/api/public/monetization/earnings') {
+    const email = normEmail(new URL(req.url, 'http://localhost').searchParams.get('email') || '');
+    if (!email) return sendJSON(res, 200, { ok: false, error: 'សូមដាក់ Gmail' });
+    const got = monetizationRecord(email);
+    const rec = got ? got.rec : { views: 0, watchSeconds: 0, earnMicro: 0, pendingMicro: 0, paidOutMicro: 0, cashbackTotal: 0, byCountry: {} };
+    const byCountry = [];
+    const bc = (rec.byCountry && typeof rec.byCountry === 'object') ? rec.byCountry : {};
+    for (const c of Object.keys(bc).sort()) {
+      const v = bc[c] || {};
+      byCountry.push({ country: c, views: numOr(v.views, 0), earnings: numOr(v.earnMicro, 0) / 1000000 });
+    }
+    return sendJSON(res, 200, {
+      ok: true, email,
+      earnings: numOr(rec.earnMicro, 0) / 1000000,
+      views: numOr(rec.views, 0),
+      cashback: walletMoney(numOr(rec.cashbackTotal, 0)),
+      pending: numOr(rec.pendingMicro, 0) / 1000000,
+      paidOut: numOr(rec.paidOutMicro, 0) / 1000000,
+      watchSeconds: numOr(rec.watchSeconds, 0),
+      byCountry,
+    });
+  }
+  // GET /api/public/monetization/status?email=X — PUBLIC. Eligibility
+  // (1000 followers + 2000 watch hours), applied/approved, earnings.
+  if (req.method === 'GET' && urlPath === '/api/public/monetization/status') {
+    const email = normEmail(new URL(req.url, 'http://localhost').searchParams.get('email') || '');
+    if (!email) return sendJSON(res, 200, { ok: false, error: 'សូមដាក់ Gmail' });
+    const got = monetizationRecord(email);
+    const rec = got ? got.rec : { views: 0, watchSeconds: 0, earnMicro: 0, pendingMicro: 0, paidOutMicro: 0, cashbackTotal: 0, byCountry: {} };
+    const followers = monetizationFollowerCount(email);
+    const watchHours = numOr(rec.watchSeconds, 0) / 3600;
+    const apps = loadMonetizationApplications();
+    const app = apps[email] || null;
+    const applied = !!(app && (app.status === 'pending' || app.status === 'approved'));
+    const approved = !!(app && app.status === 'approved');
+    const eligible = followers >= MONETIZATION_FOLLOWERS_NEEDED && watchHours >= MONETIZATION_WATCH_HOURS_NEEDED;
+    return sendJSON(res, 200, {
+      ok: true, email, enabled: monetizationEnabled(),
+      followers, followersNeeded: MONETIZATION_FOLLOWERS_NEEDED,
+      watchHours: Math.round(watchHours * 100) / 100, watchHoursNeeded: MONETIZATION_WATCH_HOURS_NEEDED,
+      eligible, applied, approved,
+      earnings: numOr(rec.earnMicro, 0) / 1000000, views: numOr(rec.views, 0),
+    });
+  }
+  // POST /api/public/monetization/apply — {email} — PUBLIC. Applies for
+  // monetization when eligible and not already applied/approved.
+  // Notifies the Admin (bell + Telegram) so the Admin can approve.
+  if (req.method === 'POST' && urlPath === '/api/public/monetization/apply') {
+    readJSONBody(req, 64 * 1024).then(async (body) => {
+      const email = normEmail(body && body.email);
+      if (!email) return sendJSON(res, 200, { ok: false, error: 'សូមដាក់ Gmail ត្រឹមត្រូវ' });
+      const users = loadUsers();
+      const u = users[email];
+      if (!u) return sendJSON(res, 200, { ok: false, error: 'រក Gmail នេះមិនឃើញទេ — សូម Sign-up ជាមុនសិន · No account with this Gmail, please sign up first' });
+      const got = monetizationRecord(email);
+      const rec = got ? got.rec : { views: 0, watchSeconds: 0, earnMicro: 0, pendingMicro: 0, paidOutMicro: 0, cashbackTotal: 0, byCountry: {} };
+      const followers = monetizationFollowerCount(email);
+      const watchHours = numOr(rec.watchSeconds, 0) / 3600;
+      if (followers < MONETIZATION_FOLLOWERS_NEEDED || watchHours < MONETIZATION_WATCH_HOURS_NEEDED) {
+        return sendJSON(res, 200, { ok: false, error: 'នៅមិនទាន់គ្រប់គោលការណ៍ទេ — ត្រូវការ Followers ' + MONETIZATION_FOLLOWERS_NEEDED + ' (មាន ' + followers + ') និង Watch hours ' + MONETIZATION_WATCH_HOURS_NEEDED + ' (មាន ' + (Math.round(watchHours * 100) / 100) + ') · Not eligible yet — need ' + MONETIZATION_FOLLOWERS_NEEDED + ' followers (have ' + followers + ') and ' + MONETIZATION_WATCH_HOURS_NEEDED + ' watch hours (have ' + (Math.round(watchHours * 100) / 100) + ')', followers, watchHours: Math.round(watchHours * 100) / 100 });
+      }
+      const apps = loadMonetizationApplications();
+      const prev = apps[email];
+      if (prev && (prev.status === 'pending' || prev.status === 'approved')) {
+        return sendJSON(res, 200, { ok: false, error: prev.status === 'approved' ? 'អ្នកបានអនុម័តរួចហើយ · Already approved' : 'អ្នកបានស្នើរួចហើយ — សូមរង់ចាំ Admin · Already applied — please wait for the Admin' });
+      }
+      const now = new Date().toISOString();
+      apps[email] = { email, name: u.name || '', followers, watchHours: Math.round(watchHours * 100) / 100, appliedAt: now, status: 'pending' };
+      saveMonetizationApplications(apps);
+      await ghFlushFile(MONETIZATION_APPLICATIONS_FILE);
+      addNotification('purchase-request', email, '💲 ស្នើ Monetization · Monetization application', (u.name || email) + ' (' + email + ') · ID: ' + (u.id || '—') + ' បានស្នើរកលុយ — Followers ' + followers + ', Watch hours ' + (Math.round(watchHours * 100) / 100), { extra: { monetizationApplication: true, email, followers, watchHours: Math.round(watchHours * 100) / 100, buyerId: u.id || '—' } });
+      return sendJSON(res, 200, { ok: true, application: apps[email] });
+    }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
+    return;
+  }
+  // GET /api/admin/monetization/applications — admin key required.
+  // Lists all monetization applications, newest first.
+  if (req.method === 'GET' && urlPath === '/api/admin/monetization/applications') {
+    const a = adminKeyOk(req);
+    if (!a.ok) return sendJSON(res, 200, { ok: false, error: a.error });
+    const apps = loadMonetizationApplications();
+    const list = Object.values(apps).sort((x, y) => String(y.appliedAt || '').localeCompare(String(x.appliedAt || '')));
+    return sendJSON(res, 200, { ok: true, applications: list });
+  }
+  // POST /api/admin/monetization/approve — {email} — admin key required.
+  // Approves the user for monetization; notifies the user.
+  if (req.method === 'POST' && urlPath === '/api/admin/monetization/approve') {
+    const a = adminKeyOk(req);
+    if (!a.ok) return sendJSON(res, 200, { ok: false, error: a.error });
+    readJSONBody(req, 64 * 1024).then(async (body) => {
+      const email = normEmail(body && body.email);
+      if (!email) return sendJSON(res, 200, { ok: false, error: 'សូមដាក់ Gmail ត្រឹមត្រូវ' });
+      const apps = loadMonetizationApplications();
+      const app = apps[email];
+      if (!app) return sendJSON(res, 200, { ok: false, error: 'រកសំណើនេះមិនឃើញទេ' });
+      app.status = 'approved';
+      app.decidedAt = new Date().toISOString();
+      saveMonetizationApplications(apps);
+      await ghFlushFile(MONETIZATION_APPLICATIONS_FILE);
+      addNotification('purchase-approved', email, '✅ Monetization បានអនុម័ត · Monetization approved', (app.name || email) + ' (' + email + ') — ឥឡូវអ្នកអាចរកលុយពី Views និង Cashback បានហើយ · You can now earn from views and cashback', { extra: { monetizationApplication: true, email, decision: 'approved' } });
+      return sendJSON(res, 200, { ok: true, application: app });
+    }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
+    return;
+  }
+  // POST /api/admin/monetization/reject — {email, reason?} — admin key
+  // required. Rejects the application; the user may apply again later.
+  if (req.method === 'POST' && urlPath === '/api/admin/monetization/reject') {
+    const a = adminKeyOk(req);
+    if (!a.ok) return sendJSON(res, 200, { ok: false, error: a.error });
+    readJSONBody(req, 64 * 1024).then(async (body) => {
+      const email = normEmail(body && body.email);
+      const reason = typeof body.reason === 'string' ? body.reason.trim().slice(0, 200) : '';
+      if (!email) return sendJSON(res, 200, { ok: false, error: 'សូមដាក់ Gmail ត្រឹមត្រូវ' });
+      const apps = loadMonetizationApplications();
+      const app = apps[email];
+      if (!app) return sendJSON(res, 200, { ok: false, error: 'រកសំណើនេះមិនឃើញទេ' });
+      app.status = 'rejected';
+      if (reason) app.reason = reason;
+      app.decidedAt = new Date().toISOString();
+      saveMonetizationApplications(apps);
+      await ghFlushFile(MONETIZATION_APPLICATIONS_FILE);
+      addNotification('purchase-rejected', email, '❌ Monetization មិនបានអនុម័ត · Monetization rejected', (app.name || email) + ' (' + email + ')' + (reason ? ' — ' + reason : '') + ' · អ្នកអាចស្នើម្ដងទៀតពេលគ្រប់គោលការណ៍ · You may apply again later', { extra: { monetizationApplication: true, email, decision: 'rejected', reason } });
+      return sendJSON(res, 200, { ok: true, application: app });
+    }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
+    return;
+  }
+  // POST /api/admin/resync-data — admin key required. Forces an
+  // immediate re-pull of public.json + history.json from GitHub
+  // (see §6 data-sync fix). Returns what changed.
+  if (req.method === 'POST' && urlPath === '/api/admin/resync-data') {
+    const a = adminKeyOk(req);
+    if (!a.ok) return sendJSON(res, 200, { ok: false, error: a.error });
+    readJSONBody(req, 64 * 1024).then(async () => {
+      const out = await ghMergePublicHistoryFromGitHub();
+      return sendJSON(res, 200, { ok: true, resync: out });
+    }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
+    return;
+  }
   // POST /api/admin/grant — {email, credits, songCredits, note?} — admin key required.
   // credits/songCredits are DELTAS (can be negative to deduct, balance never below 0).
   if (req.method === 'POST' && urlPath === '/api/admin/grant') {
@@ -5802,6 +6135,7 @@ function apiRoute(req, res, urlPath) {
       const email = normEmail(body && body.email);
       if (!email) return sendJSON(res, 200, { ok: false, error: 'សូមដាក់ Gmail' });
       if (!body || !Array.isArray(body.items)) return sendJSON(res, 200, { ok: false, error: 'ទិន្នន័យមិនត្រឹមត្រូវទេ' });
+      await ghResyncPublicHistoryThrottled();
       const h = loadHistory();
       const byKey = {};
       const stored = Array.isArray(h[email]) ? h[email] : [];
@@ -6129,6 +6463,18 @@ function apiRoute(req, res, urlPath) {
       u.songCredits = Math.max(0, Math.floor(numOr(u.songCredits, 0)) + pkg.songCredits);
       if (pkg.credits) { u.plan = r.packageId; u.planExpiresAt = new Date(Date.now() + Math.max(1, pkg.days || 30) * 86400000).toISOString(); }
       if (pkg.songCredits) { u.songPlan = r.packageId; u.songPlanExpiresAt = new Date(Date.now() + Math.max(1, pkg.days || 30) * 86400000).toISOString(); }
+      // Monetization cashback (owner order 2026-11-18): when monetization
+      // is ON, an approved package purchase adds cashback to the wallet
+      // balance immediately, by package price tier. The balance is the
+      // single source of truth — cashback is real wallet money.
+      let _cb = 0;
+      if (monetizationEnabled()) {
+        _cb = monetizationCashbackForPrice(pkg.price);
+        if (_cb > 0) {
+          u.balance = walletMoney(walletBalance(u) + _cb);
+          monetizationRecordCashback(r.email, _cb);
+        }
+      }
       u.updatedAt = now;
       saveUsers(users);
       logGrant({ email: r.email, credits: pkg.credits, songCredits: pkg.songCredits, note: 'purchase:' + r.packageId, at: now });
@@ -6143,8 +6489,9 @@ function apiRoute(req, res, urlPath) {
       await ghFlushFile(PURCHASE_REQUESTS_FILE);
       const _pd2 = pkgDisplay(pkg);
       addNotification('purchase-approved', r.email, '✅ បានអនុម័ត · Purchase approved', pkgNotifText(pkg, r.email, u.id || '—'), { extra: { pkg: r.packageId, pkgName: _pd2.pkgName, priceText: _pd2.priceText, creditText: _pd2.creditText, buyerId: u.id || '—', decision: 'approved' }, telegramHtml: pkgNotifTelegram('✅ បានអនុម័ត · Purchase approved', pkg, r.email, u.id || '—') });
+      if (_cb > 0) addNotification('grant', r.email, '💰 Cashback · បានលុយត្រឡប់វិញ', 'ទិញកញ្ចប់ ' + r.packageId + ' ($' + walletMoney(pkg.price).toFixed(2) + ') បាន Cashback $' + _cb.toFixed(2) + ' ចូល Wallet (នៅសល់ $' + u.balance.toFixed(2) + ')', { extra: { cashback: _cb, pkg: r.packageId, balance: u.balance, buyerId: u.id || '—' } });
       markPurchaseRequestDecided(r.email, r.packageId, 'approved', now);
-      return sendJSON(res, 200, { ok: true, request: r, user: pubUser(u) });
+      return sendJSON(res, 200, { ok: true, request: r, user: pubUser(u), cashback: _cb });
     }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
     return;
   }
@@ -6215,9 +6562,9 @@ function apiRoute(req, res, urlPath) {
   }
   // POST /api/public/wallet/withdraw-request — {email, userId?, amount, khqrImageUrl?}
   // — PUBLIC. Asks to withdraw from the Wallet. amount >= $5.00 and
-  // <= balance. Flat fee $0.50 per withdrawal (e.g. deposit $5, withdraw
-  // $4.50). Nothing is deducted yet — the Admin deducts (amount + fee)
-  // when approving.
+  // <= balance. Fee tier: under $50 flat $0.50 (e.g. withdraw $5, net
+  // $4.50); $50+ is 5% of the amount ($100 -> $5.00 fee, net $95.00).
+  // Nothing is deducted yet — the Admin deducts (amount + fee) when approving.
   if (req.method === 'POST' && urlPath === '/api/public/wallet/withdraw-request') {
     readJSONBody(req, 64 * 1024).then(async (body) => {
       const email = normEmail(body && body.email);
@@ -6235,11 +6582,12 @@ function apiRoute(req, res, urlPath) {
       // Admin sees WHO asked, even if the Gmail is ever renamed. The
       // website sends its account userId; when it is missing, fall back
       // to the account's own id. net = what the user actually receives
-      // (amount − $0.50 fee; e.g. withdraw $5 → net $4.50). total =
-      // what is deducted from the balance on approval (amount + fee).
+      // (amount − fee; e.g. withdraw $5 → net $4.50). total = what is
+      // deducted from the balance on approval (amount + fee).
       const userId = (typeof body.userId === 'string' && body.userId.trim()) ? body.userId.trim().slice(0, 50) : (u.id || '');
+      const fee = walletWithdrawFee(amount);
       const r = {
-        id: newWalletRequestId(), type: 'withdraw', email, userId, amount, fee: WALLET_WITHDRAW_FEE, total: walletMoney(amount + WALLET_WITHDRAW_FEE), net: walletMoney(amount - WALLET_WITHDRAW_FEE),
+        id: newWalletRequestId(), type: 'withdraw', email, userId, amount, fee, total: walletMoney(amount + fee), net: walletMoney(amount - fee),
         khqrImageUrl: typeof body.khqrImageUrl === 'string' ? body.khqrImageUrl.trim().slice(0, 500) : '',
         status: 'pending', createdAt: now, updatedAt: now,
       };
@@ -6248,10 +6596,10 @@ function apiRoute(req, res, urlPath) {
       await ghFlushFile(WALLET_REQUESTS_FILE);
       // Bell + Telegram (addNotification kind 'purchase-request' sends
       // both, same path as top-up/purchase requests): amount, Gmail,
-      // User ID, fee $0.50, net amount. Nothing is deducted yet — the
-      // Admin deducts (amount + fee) only when approving.
-      addNotification('purchase-request', email, '💸 សំណើដកលុយ · Wallet withdraw request', (u.name || email) + ' (' + email + ') · User ID: ' + (r.userId || '—') + ' ស្នើដក $' + amount.toFixed(2) + ' (ថ្លៃសេវា $' + WALLET_WITHDRAW_FEE.toFixed(2) + ' — ទទួលបាន $' + r.net.toFixed(2) + ' — សរុបកាត់ $' + r.total.toFixed(2) + ')', { extra: { walletRequestId: r.id, type: 'withdraw', amount, fee: WALLET_WITHDRAW_FEE, total: r.total, net: r.net, buyerId: r.userId || '—', userId: r.userId || '' } });
-      return sendJSON(res, 200, { ok: true, request: walletRequestPublic(r, users), fee: WALLET_WITHDRAW_FEE, net: r.net });
+      // User ID, fee, net amount. Nothing is deducted yet — the Admin
+      // deducts (amount + fee) only when approving.
+      addNotification('purchase-request', email, '💸 សំណើដកលុយ · Wallet withdraw request', (u.name || email) + ' (' + email + ') · User ID: ' + (r.userId || '—') + ' ស្នើដក $' + amount.toFixed(2) + ' (ថ្លៃសេវា $' + fee.toFixed(2) + ' — ទទួលបាន $' + r.net.toFixed(2) + ' — សរុបកាត់ $' + r.total.toFixed(2) + ')', { extra: { walletRequestId: r.id, type: 'withdraw', amount, fee, total: r.total, net: r.net, buyerId: r.userId || '—', userId: r.userId || '' } });
+      return sendJSON(res, 200, { ok: true, request: walletRequestPublic(r, users), fee, net: r.net });
     }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹমត្រូវទេ', 'Bad request')));
     return;
   }
@@ -6278,13 +6626,25 @@ function apiRoute(req, res, urlPath) {
       u.songCredits = Math.max(0, Math.floor(numOr(u.songCredits, 0)) + pkg.songCredits);
       if (pkg.credits) { u.plan = packageId; u.planExpiresAt = new Date(Date.now() + Math.max(1, pkg.days || 30) * 86400000).toISOString(); }
       if (pkg.songCredits) { u.songPlan = packageId; u.songPlanExpiresAt = new Date(Date.now() + Math.max(1, pkg.days || 30) * 86400000).toISOString(); }
+      // Monetization cashback (owner order 2026-11-18): when monetization
+      // is ON, buying a package with the Wallet adds cashback to the
+      // balance immediately, by package price tier.
+      let _cb = 0;
+      if (monetizationEnabled()) {
+        _cb = monetizationCashbackForPrice(price);
+        if (_cb > 0) {
+          u.balance = walletMoney(u.balance + _cb);
+          monetizationRecordCashback(email, _cb);
+        }
+      }
       u.updatedAt = now;
       saveUsers(users);
       logGrant({ email, credits: pkg.credits, songCredits: pkg.songCredits, note: 'wallet-buy:' + packageId, at: now });
       await ghFlushFile(USERS_FILE);
       const _pdw = pkgDisplay(pkg);
       addNotification('purchase-approved', email, '✅ បានទិញកញ្ចប់ដោយ Wallet · Package bought with Wallet', pkgNotifText(pkg, email, u.id || '—') + ' — បង់ដោយ Wallet $' + price.toFixed(2) + ' (នៅសល់ $' + u.balance.toFixed(2) + ')', { extra: { pkg: packageId, pkgName: _pdw.pkgName, priceText: _pdw.priceText, creditText: _pdw.creditText, buyerId: u.id || '—', decision: 'approved', paidBy: 'wallet', price }, telegramHtml: pkgNotifTelegram('✅ បានទិញកញ្ចប់ដោយ Wallet · Package bought with Wallet', pkg, email, u.id || '—') });
-      return sendJSON(res, 200, { ok: true, user: pubUser(u), package: packageId, price, balance: u.balance });
+      if (_cb > 0) addNotification('grant', email, '💰 Cashback · បានលុយត្រឡប់វិញ', 'ទិញកញ្ចប់ ' + packageId + ' ($' + price.toFixed(2) + ') បាន Cashback $' + _cb.toFixed(2) + ' ចូល Wallet (នៅសល់ $' + u.balance.toFixed(2) + ')', { extra: { cashback: _cb, pkg: packageId, balance: u.balance, buyerId: u.id || '—' } });
+      return sendJSON(res, 200, { ok: true, user: pubUser(u), package: packageId, price, balance: u.balance, cashback: _cb });
     }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
     return;
   }
@@ -6435,7 +6795,7 @@ function apiRoute(req, res, urlPath) {
   }
   // POST /api/admin/wallet/approve — {requestId} — admin key required.
   // Top-up: adds the amount to the user's balance. Withdraw: deducts
-  // (amount + $0.50 fee) from the balance (only if sufficient). Marks the
+  // (amount + fee) from the balance (only if sufficient). Marks the
   // request approved and notifies the user.
   if (req.method === 'POST' && urlPath === '/api/admin/wallet/approve') {
     const a = adminKeyOk(req);
@@ -6457,14 +6817,17 @@ function apiRoute(req, res, urlPath) {
         await ghFlushFile(USERS_FILE);
         addNotification('grant', r.email, '✅ បញ្ចូលលុយបានអនុម័ត · Top-up approved', '$' + walletMoney(r.amount).toFixed(2) + ' បានបញ្ចូលទៅ Wallet របស់ ' + r.email + ' (នៅសល់ $' + u.balance.toFixed(2) + ')', { extra: { walletRequestId: r.id, type: 'topup', amount: walletMoney(r.amount), balance: u.balance, buyerId: u.id || '—' } });
       } else if (r.type === 'withdraw') {
-        const total = walletMoney(walletMoney(r.amount) + WALLET_WITHDRAW_FEE);
+        // Fee tier: use the fee stored on the request (set at request
+        // time); older requests without a stored fee recompute it.
+        const fee = (Number.isFinite(r.fee) && r.fee >= 0) ? walletMoney(r.fee) : walletWithdrawFee(r.amount);
+        const total = (Number.isFinite(r.total) && r.total > 0) ? walletMoney(r.total) : walletMoney(walletMoney(r.amount) + fee);
         const bal = walletBalance(u);
         if (total > bal) return sendJSON(res, 200, { ok: false, error: 'លុយក្នុង Wallet មិនគ្រប់ទេ (ត្រូវការ $' + total.toFixed(2) + ', នៅសល់ $' + bal.toFixed(2) + ') · Insufficient wallet balance', balance: bal });
         u.balance = walletMoney(bal - total);
         u.updatedAt = now;
         saveUsers(users);
         await ghFlushFile(USERS_FILE);
-        addNotification('deduct', r.email, '✅ ដកលុយបានអនុម័ត · Withdraw approved', '$' + walletMoney(r.amount).toFixed(2) + ' (+ថ្លៃសេវា $' + WALLET_WITHDRAW_FEE.toFixed(2) + ' = $' + total.toFixed(2) + ') បានកាត់ពី Wallet របស់ ' + r.email + ' (នៅសល់ $' + u.balance.toFixed(2) + ') — Admin នឹងផ្ញើលុយតាម KHQR របស់អ្នក', { extra: { walletRequestId: r.id, type: 'withdraw', amount: walletMoney(r.amount), fee: WALLET_WITHDRAW_FEE, total, balance: u.balance, buyerId: u.id || '—' } });
+        addNotification('deduct', r.email, '✅ ដកលុយបានអនុម័ត · Withdraw approved', '$' + walletMoney(r.amount).toFixed(2) + ' (+ថ្លៃសេវា $' + fee.toFixed(2) + ' = $' + total.toFixed(2) + ') បានកាត់ពី Wallet របស់ ' + r.email + ' (នៅសល់ $' + u.balance.toFixed(2) + ') — Admin នឹងផ្ញើលុយតាម KHQR របស់អ្នក', { extra: { walletRequestId: r.id, type: 'withdraw', amount: walletMoney(r.amount), fee, total, balance: u.balance, buyerId: u.id || '—' } });
       } else {
         return sendJSON(res, 200, { ok: false, error: 'ប្រភេទសំណើនេះមិនស្គាល់ទេ' });
       }
@@ -6643,13 +7006,25 @@ function apiRoute(req, res, urlPath) {
     return sendJSON(res, 200, { ok: true, notifications: list });
   }
   // ---- Follow the Public page ----
-  // POST /api/public/follow — PUBLIC. {email, follow: true|false}.
-  // follow=true adds the email to the followers list; false removes it.
-  // Returns {ok, following, followers}.
+  // POST /api/public/follow — PUBLIC. Two shapes:
+  //   (a) {email, follow: true|false} — legacy: follow/unfollow the
+  //       Public page (flat followers list). Unchanged behaviour.
+  //   (b) {email, targetEmail} — monetization: follow a creator
+  //       (per-creator follows). Returns {ok, count, following}.
   if (req.method === 'POST' && urlPath === '/api/public/follow') {
     readJSONBody(req, 64 * 1024).then((body) => {
       const email = normEmail(body && body.email);
       if (!email) return sendJSON(res, 200, { ok: false, error: 'សូមដាក់ Gmail ត្រឹមត្រូវ' });
+      const target = normEmail(body && body.targetEmail);
+      if (target) {
+        if (target === email) return sendJSON(res, 200, { ok: false, error: 'មិនអាច Follow ខ្លួនឯងបានទេ · You cannot follow yourself' });
+        const f = loadCreatorFollows();
+        if (!Array.isArray(f[target])) f[target] = [];
+        if (!f[target].includes(email)) f[target].push(email);
+        if (f[target].length > 10000) f[target] = f[target].slice(-10000);
+        saveCreatorFollows(f);
+        return sendJSON(res, 200, { ok: true, count: f[target].length, following: true, followers: f[target].length });
+      }
       const want = !!(body && body.follow);
       let arr = loadFollowers();
       if (want) {
@@ -6662,6 +7037,35 @@ function apiRoute(req, res, urlPath) {
       return sendJSON(res, 200, { ok: true, following: want, followers: arr.length });
     }).catch((e) => sendJSON(res, 200, { ok: false, error: String(e && e.message ? e.message : e) }));
     return;
+  }
+  // POST /api/public/unfollow — PUBLIC. {email, targetEmail}.
+  // Monetization: unfollow a creator. Returns {ok, count, following:false}.
+  if (req.method === 'POST' && urlPath === '/api/public/unfollow') {
+    readJSONBody(req, 64 * 1024).then((body) => {
+      const email = normEmail(body && body.email);
+      const target = normEmail(body && body.targetEmail);
+      if (!email || !target) return sendJSON(res, 200, { ok: false, error: 'សូមដាក់ Gmail និង targetEmail ត្រឹមត្រូវ' });
+      const f = loadCreatorFollows();
+      if (Array.isArray(f[target])) {
+        f[target] = f[target].filter((e) => e !== email);
+        saveCreatorFollows(f);
+      }
+      const count = Array.isArray(f[target]) ? f[target].length : 0;
+      return sendJSON(res, 200, { ok: true, count, following: false, followers: count });
+    }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
+    return;
+  }
+  // GET /api/public/followers?email=X&by=Y — PUBLIC. Monetization:
+  // how many followers creator X has, and whether viewer Y follows X.
+  // Returns {ok, count, following}.
+  if (req.method === 'GET' && urlPath === '/api/public/followers') {
+    const q = new URL(req.url, 'http://localhost').searchParams;
+    const target = normEmail(q.get('email') || '');
+    const by = normEmail(q.get('by') || '');
+    if (!target) return sendJSON(res, 200, { ok: false, error: 'សូមដាក់ Gmail' });
+    const f = loadCreatorFollows();
+    const arr = Array.isArray(f[target]) ? f[target] : [];
+    return sendJSON(res, 200, { ok: true, count: arr.length, following: !!(by && arr.includes(by)), followers: arr.length });
   }
   // GET /api/public/follow?email= — PUBLIC. Returns {ok, following, followers}.
   if (req.method === 'GET' && urlPath === '/api/public/follow') {
@@ -7392,6 +7796,125 @@ function apiRoute(req, res, urlPath) {
         if (changedHistory) { saveHistory(h); await ghFlushFile(HISTORY_FILE); }
       } catch (e) { console.log('[heal] history skipped: ' + (e && e.message ? e.message : e)); }
     } catch (e) { console.log('[heal] skipped: ' + (e && e.message ? e.message : e)); }
+  }
+  // ---- GitHub data resync (§6 data-sync fix, owner order 2026-11-18) ----
+  // ROOT CAUSE (verified 2026-11-18): the live server only re-pulls
+  // GitHub data at STARTUP (ghRestoreAll). A running server keeps
+  // serving its local ./data/ files forever, so an external edit to
+  // movai-data (e.g. deleting broken songs from public.json /
+  // history.json on GitHub) never takes effect until the next restart.
+  // Worse, the next local WRITE (a history sync, a view, a like)
+  // re-pushes the STALE local file to GitHub and silently UNDOES the
+  // external edit — GitHub history.json was reverted from the fixed 2
+  // items back to the old 11 items this way, while public.json survived
+  // only because no public.json write happened in the window.
+  // FIX: (1) before any handler writes public.json / history.json, the
+  // throttled merge below re-pulls GitHub and merges it into the local
+  // file, so a write is always based on fresh GitHub state and can never
+  // resurrect a deletion; (2) any request also triggers a periodic
+  // merge (every 5 min) so a running server picks up external edits
+  // even with no write traffic; (3) POST /api/admin/resync-data forces
+  // an immediate merge. GitHub is authoritative for WHICH posts/items
+  // exist; local counters (views/likes/downloads) are preserved by
+  // taking the max; a local-only item created within the last 5 minutes
+  // is kept (its GitHub PUT may still be in flight — post/history
+  // writes are awaited, so this is only a safety grace).
+  // NOTE: public.json is read/written here with a direct file path
+  // (NOT loadPublicPosts/savePublicPosts), because PUBLIC_FILE is a
+  // const declared later in apiRoute — using it from the apiRoute top
+  // or from early handlers would hit its temporal dead zone.
+  async function ghMergePublicHistoryFromGitHub() {
+    const out = { publicChanged: false, historyChanged: false, publicPosts: 0, historyItems: 0, error: '' };
+    const pubPath = path.join(DATA_DIR, 'public.json');
+    const readPub = () => { try { const j = JSON.parse(fs.readFileSync(pubPath, 'utf8')); return Array.isArray(j) ? j : []; } catch (e) { return []; } };
+    const writePub = (arr) => { try { fs.mkdirSync(DATA_DIR, { recursive: true }); } catch (e) {} fs.writeFileSync(pubPath, JSON.stringify(arr, null, 2)); ghPersistFile(pubPath); };
+    try {
+      // --- public.json ---
+      try {
+        const gh = await ghGetFile('public.json');
+        if (gh && gh.text) {
+          const ghPosts = JSON.parse(gh.text);
+          if (Array.isArray(ghPosts)) {
+            const local = readPub();
+            const ghById = {};
+            for (const p of ghPosts) { if (p && typeof p.id === 'string') ghById[p.id] = p; }
+            const merged = [];
+            let changed = false;
+            for (const gp of ghPosts) {
+              if (!gp || typeof gp.id !== 'string') continue;
+              const lp = local.find((x) => x && x.id === gp.id);
+              if (!lp) { merged.push(gp); changed = true; continue; }
+              const m = Object.assign({}, gp);
+              m.views = Math.max(numOr(lp.views, 0), numOr(gp.views, 0));
+              m.likes = Math.max(numOr(lp.likes, 0), numOr(gp.likes, 0));
+              m.downloads = Math.max(numOr(lp.downloads, 0), numOr(gp.downloads, 0));
+              if (Array.isArray(lp.likedBy) && lp.likedBy.length > (Array.isArray(gp.likedBy) ? gp.likedBy.length : 0)) m.likedBy = lp.likedBy;
+              if (m.views !== numOr(gp.views, 0) || m.likes !== numOr(gp.likes, 0) || m.downloads !== numOr(gp.downloads, 0)) changed = true;
+              merged.push(m);
+            }
+            const graceMs = 5 * 60 * 1000;
+            for (const lp of local) {
+              if (!lp || typeof lp.id !== 'string') continue;
+              if (ghById[lp.id]) continue;
+              const created = Date.parse(lp.createdAt || '');
+              if (Number.isFinite(created) && Date.now() - created < graceMs) { merged.push(lp); continue; }
+              changed = true;
+            }
+            if (changed || merged.length !== local.length) { writePub(merged); out.publicChanged = true; }
+            out.publicPosts = merged.length;
+          }
+        }
+      } catch (e) { out.error = 'public: ' + (e && e.message ? e.message : e); }
+      // --- history.json ---
+      try {
+        const gh = await ghGetFile('history.json');
+        if (gh && gh.text) {
+          const ghH = JSON.parse(gh.text);
+          if (ghH && typeof ghH === 'object' && !Array.isArray(ghH)) {
+            const local = loadHistory();
+            const merged = {};
+            let changed = false;
+            const graceMs = 5 * 60 * 1000;
+            const emails = new Set(Object.keys(ghH).concat(Object.keys(local)));
+            for (const em of emails) {
+              const ghItems = Array.isArray(ghH[em]) ? ghH[em] : [];
+              const loItems = Array.isArray(local[em]) ? local[em] : [];
+              const ghByKey = {};
+              for (const it of ghItems) { const k = histKey(it); if (k) ghByKey[k] = it; }
+              const outItems = [];
+              for (const it of ghItems) {
+                if (!it || typeof it !== 'object') continue;
+                const k = histKey(it);
+                const li = k ? loItems.find((x) => histKey(x) === k) : null;
+                if (li && numOr(li.ts, 0) > numOr(it.ts, 0)) { outItems.push(li); changed = true; }
+                else outItems.push(it);
+              }
+              for (const li of loItems) {
+                if (!li || typeof li !== 'object') continue;
+                const k = histKey(li);
+                if (!k || ghByKey[k]) continue;
+                if (Number.isFinite(numOr(li.ts, 0)) && numOr(li.ts, 0) > 0 && Date.now() - numOr(li.ts, 0) < graceMs) { outItems.push(li); continue; }
+                changed = true;
+              }
+              if (outItems.length) merged[em] = outItems.sort((a, b) => numOr(b.ts, 0) - numOr(a.ts, 0)).slice(0, 300);
+            }
+            if (changed || JSON.stringify(local) !== JSON.stringify(merged)) { saveHistory(merged); out.historyChanged = true; }
+            out.historyItems = Object.values(merged).reduce((n, a) => n + (Array.isArray(a) ? a.length : 0), 0);
+          }
+        }
+      } catch (e) { out.error = (out.error ? out.error + '; ' : '') + 'history: ' + (e && e.message ? e.message : e); }
+    } catch (e) { out.error = String(e && e.message ? e.message : e); }
+    return out;
+  }
+  // Throttled merge: at most one GitHub re-pull per minute, so the
+  // refresh-before-write in the hot handlers (view/like/sync) does not
+  // add a GitHub GET to every request. Returns the merge summary or null.
+  async function ghResyncPublicHistoryThrottled() {
+    try {
+      if (Date.now() - _ghResyncLastAt < 60 * 1000) return null;
+      _ghResyncLastAt = Date.now();
+      return await ghMergePublicHistoryFromGitHub();
+    } catch (e) { return null; }
   }
   // ---- LOCAL MP3 CONVERSION PERMANENTLY REMOVED (owner order 2026-11-17 ~11:16): ----
   // The local WAV->MP3 converter (convertAndCacheMp3, ~420 MB RSS) OOM-crashed the
@@ -8283,6 +8806,7 @@ function apiRoute(req, res, urlPath) {
       const youtubeChannel = typeof body.youtubeChannel === 'string' ? body.youtubeChannel.trim().slice(0, 2000) : '';
       const avatar = typeof body.avatar === 'string' ? body.avatar.trim().slice(0, 500) : '';
       const now = new Date().toISOString();
+      await ghResyncPublicHistoryThrottled();
       const posts = loadPublicPosts();
       const p = {
         id: newPublicId(), email,
@@ -8322,6 +8846,7 @@ function apiRoute(req, res, urlPath) {
     readJSONBody(req, 64 * 1024).then(async (body) => {
       const id = typeof body.id === 'string' ? body.id.trim() : '';
       if (!id) return sendJSON(res, 200, { ok: false, error: 'សូមដាក់ post id' });
+      await ghResyncPublicHistoryThrottled();
       const posts = loadPublicPosts();
       const idx = posts.findIndex((x) => x && x.id === id);
       if (idx < 0) return sendJSON(res, 200, { ok: false, error: 'រកមិនឃើញ post នេះទេ' });
@@ -8359,6 +8884,7 @@ function apiRoute(req, res, urlPath) {
       const email = normEmail(body && body.email) || (typeof body.email === 'string' ? body.email.trim().toLowerCase().slice(0, 200) : '');
       if (!postId) return sendJSON(res, 200, { ok: false, error: 'សូមដាក់ postId' });
       if (!email) return sendJSON(res, 200, { ok: false, error: 'សូមដាក់ Gmail ត្រឹមត្រូវ' });
+      await ghResyncPublicHistoryThrottled();
       const posts = loadPublicPosts();
       const p = posts.find((x) => x.id === postId);
       if (!p) return sendJSON(res, 404, { ok: false, error: 'រក post នេះមិនឃើញទេ' });
@@ -8373,17 +8899,33 @@ function apiRoute(req, res, urlPath) {
     }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
     return;
   }
-  // POST /api/public/view — PUBLIC. {postId}. Counts one view.
+  // POST /api/public/view — PUBLIC. {postId, email?, country?, durationSec?}.
+  // Counts one view. When a logged-in user views, watch time accrues
+  // for the post owner (monetization eligibility) and — when monetization
+  // is ON and the owner is approved — the $0.000001 view earning.
+  // Guest views (no email) count toward the post total but earn nothing.
   if (req.method === 'POST' && urlPath === '/api/public/view') {
     readJSONBody(req, 64 * 1024).then(async (body) => {
       const postId = typeof body.postId === 'string' ? body.postId.trim() : '';
       if (!postId) return sendJSON(res, 200, { ok: false, error: 'សូមដាក់ postId' });
+      await ghResyncPublicHistoryThrottled();
       const posts = loadPublicPosts();
       const p = posts.find((x) => x.id === postId);
       if (!p) return sendJSON(res, 404, { ok: false, error: 'រក post នេះមិនឃើញទេ' });
       p.views = (p.views || 0) + 1;
       savePublicPosts(posts);
       await ghFlushFile(PUBLIC_FILE);
+      // Monetization: a logged-in view accrues watch time + (when ON and
+      // the owner is approved) the view earning. Never blocks the view
+      // count — a monetization failure must not lose the view.
+      const _vEmail = normEmail(body && body.email);
+      if (_vEmail) {
+        try {
+          const _vCountry = (typeof body.country === 'string' && body.country.trim()) ? body.country.trim() : ((typeof body.countryCode === 'string' && body.countryCode.trim()) ? body.countryCode.trim() : '');
+          const _vDur = numOr(body && (body.durationSec !== undefined ? body.durationSec : body.duration), 0);
+          await monetizationOnView(p.email, _vEmail, _vCountry, _vDur);
+        } catch (e) {}
+      }
       return sendJSON(res, 200, { ok: true, views: p.views });
     }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
     return;
@@ -8395,6 +8937,7 @@ function apiRoute(req, res, urlPath) {
     readJSONBody(req, 64 * 1024).then(async (body) => {
       const postId = typeof body.postId === 'string' ? body.postId.trim() : '';
       if (!postId) return sendJSON(res, 200, { ok: false, error: 'សូមដាក់ postId' });
+      await ghResyncPublicHistoryThrottled();
       const posts = loadPublicPosts();
       const p = posts.find((x) => x.id === postId);
       if (!p) return sendJSON(res, 404, { ok: false, error: 'រក post នេះមិនឃើញទេ' });
