@@ -46,7 +46,7 @@ main{max-width:720px;margin:0 auto;padding:calc(4rem + env(safe-area-inset-top,0
    frame (top-left) and the top-right account cluster float directly
    over the page, exactly as the page was before the strip was added.
    There is deliberately no full-width band at the top. */
-.brand-frame{display:inline-flex;align-items:center;gap:10px;background:linear-gradient(135deg,rgba(255,255,255,calc(.04 + var(--glass-shine,.55)*.4)),rgba(255,255,255,calc(var(--glass-shine,.55)*.1)) 42%,rgba(190,198,212,calc(var(--glass-frost,.65)*.24)) 80%,rgba(var(--glass-tint),.22));background-color:rgba(var(--glass-tint),var(--glass-alpha,.5));-webkit-backdrop-filter:blur(var(--glass-blur,18px)) saturate(170%);backdrop-filter:blur(var(--glass-blur,18px)) saturate(170%);border:1px solid rgba(var(--glass-text-rgb),calc(.16 + var(--glass-shine,.55)*.22));border-radius:999px;padding:6px 18px 6px 6px;box-shadow:inset 0 1px 0 rgba(255,255,255,calc(.1 + var(--glass-shine,.55)*.55)),inset 0 -1px 0 rgba(255,255,255,.10),0 10px 28px rgba(0,0,0,.24)}
+.brand-frame{display:inline-flex;align-items:center;gap:10px;background:linear-gradient(135deg,rgba(255,255,255,calc(.04 + var(--glass-shine,.55)*.4)),rgba(255,255,255,calc(var(--glass-shine,.55)*.1)) 42%,rgba(190,198,212,calc(var(--glass-frost,.65)*.24)) 80%,rgba(var(--glass-tint),.22));background-color:rgba(var(--glass-tint),var(--glass-alpha,.5));-webkit-backdrop-filter:blur(var(--glass-blur,18px)) saturate(170%);backdrop-filter:blur(var(--glass-blur,18px)) saturate(170%);border:1px solid rgba(var(--glass-text-rgb),calc(.16 + var(--glass-shine,.55)*.22));border-radius:999px;padding:6px;box-shadow:inset 0 1px 0 rgba(255,255,255,calc(.1 + var(--glass-shine,.55)*.55)),inset 0 -1px 0 rgba(255,255,255,.10),0 10px 28px rgba(0,0,0,.24)}
 .brand-frame .brand-name{font-size:1.3125rem;font-weight:900;letter-spacing:-.02em;color:var(--glass-text);text-shadow:0 1px 3px rgba(var(--glass-shadow-rgb),.3)}
 .brand-frame .brand-name span{color:var(--accent-text)}
 .brand-frame .brand-logo{height:30px;width:30px;flex:0 0 auto;border-radius:8px}
@@ -238,6 +238,14 @@ main{max-width:720px;margin:0 auto;padding:calc(4rem + env(safe-area-inset-top,0
    separate label row above the field takes vertical space. */
 .fl-field{position:relative}
 .fl-label{position:absolute;top:8px;left:14px;font-size:0.6875rem;font-weight:700;letter-spacing:.03em;color:var(--label);pointer-events:none;z-index:1}
+/* AI Lyrics controls at the Title field's top-right corner (owner
+   order 2026-11-18): [language select][AI button] sit in the label
+   band at the top-right; the Title input's right padding keeps typed
+   text clear of them. The status line sits just under the Title. */
+.ai-titlebar{position:absolute;top:8px;right:10px;display:flex;gap:6px;align-items:center;z-index:2}
+.ai-titlebar #aiLyricsLang{min-height:30px;height:30px;padding:4px 6px;font-size:0.75rem;width:auto;max-width:110px;border-radius:8px}
+.ai-lyrics-mini{flex:0 0 auto;min-height:30px;height:30px;padding:4px 12px;border:none;border-radius:8px;background:var(--accent-fill);color:#0d1005;font-family:inherit;font-size:0.8125rem;font-weight:800;cursor:pointer}
+.ai-lyrics-mini:disabled{opacity:.45;cursor:not-allowed}
 /* Song voice row (owner order 2026-11-17): the Male/Female/Random
    chips share the row's free space evenly, and the Instrumental
    toggle (custom SVG icon + switch, no text) sits at the right
@@ -326,6 +334,10 @@ textarea.input{resize:vertical}
  .nav-row .create-modebar .kbtn{font-size:0.65625rem;padding:6px 0}
 }
 #sec-create{margin-top:10px}
+/* ===== Create panel: NO card frame (owner order 2026-11-18) =====
+   The Create form sits directly on the page background — no
+   enclosing card. Other .panel cards keep their frames. */
+#sec-create{border:0;background:transparent}
 /* ===== Provider + version combo (owner order 2026-11-17) =====
    The provider field and the selected provider's version/model
    field live together in ONE compact row at the top-left of the
@@ -2962,7 +2974,6 @@ input[type=range].st-range{accent-color:var(--accent);min-height:32px;cursor:poi
   <div class="brand-frame">
     <button class="menu-btn" id="menuBtn" onclick="toggleMenu()" aria-label="ម៉ឺនុយ"><span></span><span></span><span></span></button>
     <img class="brand-logo" src="data:image/png;base64,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" alt="MovAi" width="30" height="30">
-    <span class="brand-name">Mov<span>Ai</span></span>
   </div>
 </div>
 <div id="topSearchBar" role="search">
@@ -3112,19 +3123,19 @@ input[type=range].st-range{accent-color:var(--accent);min-height:32px;cursor:poi
           <div style="flex-basis:100%;display:flex;flex-direction:column;gap:10px">
             <div class="fl-field">
               <span class="fl-label" data-i18n="lblSongTitle">ចំណងជើង</span>
-              <input type="text" class="input" id="songTitle" data-i18n-ph="songTitlePh" placeholder="ឧ. ឈ្មោះបទចម្រៀងរបស់អ្នក..." maxlength="200" style="min-height:56px;padding:24px 14px 8px">
-            </div>
-            <div class="fl-field">
-              <span class="fl-label" data-i18n="lblSongLyrics">អត្ថបទចម្រៀង</span>
-              <textarea class="input" id="songLyrics" rows="5" data-i18n-ph="songLyricsPh" placeholder="សរសេរអត្ថបទចម្រៀង (lyrics) របស់អ្នកនៅទីនេះ..." style="border:1px solid var(--line2);background:var(--field);padding:26px 14px 12px;min-height:110px;border-radius:12px"></textarea>
-              <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:8px">
-                <button type="button" class="btn btn-green" id="aiLyricsBtn" onclick="aiLyricsGenerate()" style="flex:0 0 auto;min-height:44px;padding:10px 18px">✨ <span data-i18n="aiLyricsBtn">AI Lyrics · បង្កើតអត្ថបទ</span></button>
-                <select id="aiLyricsLang" class="input" style="flex:0 0 auto;min-height:44px;padding:10px 12px;width:auto" aria-label="Lyrics language · ភាសាអត្ថបទ">
+              <input type="text" class="input" id="songTitle" data-i18n-ph="songTitlePh" placeholder="ឧ. ឈ្មោះបទចម្រៀងរបស់អ្នក..." maxlength="200" style="min-height:56px;padding:24px 172px 8px 14px">
+              <div class="ai-titlebar">
+                <select id="aiLyricsLang" class="input" aria-label="ភាសាអត្ថបទ">
                   <option value="kh">ខ្មែរ</option>
                   <option value="en">English</option>
                 </select>
-                <span id="aiLyricsStatus" style="font-size:0.8125rem;color:var(--muted)"></span>
+                <button type="button" class="ai-lyrics-mini" id="aiLyricsBtn" onclick="aiLyricsGenerate()">AI</button>
               </div>
+            </div>
+            <div id="aiLyricsStatus" style="font-size:0.8125rem;color:var(--muted);margin-top:4px"></div>
+            <div class="fl-field">
+              <span class="fl-label" data-i18n="lblSongLyrics">អត្ថបទចម្រៀង</span>
+              <textarea class="input" id="songLyrics" rows="5" data-i18n-ph="songLyricsPh" placeholder="សរសេរអត្ថបទចម្រៀង (lyrics) របស់អ្នកនៅទីនេះ..." style="border:1px solid var(--line2);background:var(--field);padding:26px 14px 12px;min-height:110px;border-radius:12px"></textarea>
             </div>
             <div>
               <div style="display:flex;gap:8px">
@@ -4242,7 +4253,7 @@ km:{
  lblSongDur:'រយៈពេលបទ',
  lblSongTitle:'ចំណងជើង',songTitlePh:'ឧ. ឈ្មោះបទចម្រៀងរបស់អ្នក...',
  lblSongLyrics:'អត្ថបទចម្រៀង',songLyricsPh:'សរសេរអត្ថបទចម្រៀង (lyrics) របស់អ្នកនៅទីនេះ...',
- aiLyricsBtn:'AI Lyrics · បង្កើតអត្ថបទ',aiLyricsBusy:'AI កំពុងសរសេរអត្ថបទ… {s}s · {p}%',aiLyricsDone:'AI សរសេរអត្ថបទរួចហើយ ✓',aiLyricsNeedTitle:'សូមសរសេរចំណងជើងជាមុនសិន',aiLyricsNeedLogin:'សូមចូលគណនេយ្យជាមុនសិន',aiLyricsFail:'បង្កើតអត្ថបទមិនបានទេ — សូមសាកល្បងម្ដងទៀត',
+ aiLyricsBtn:'AI Lyrics · បង្កើតអត្ថបទ',aiLyricsLangLabel:'ភាសាអត្ថបទ',aiLyricsBusy:'AI កំពុងសរសេរអត្ថបទ… {s}s · {p}%',aiLyricsDone:'AI សរសេរអត្ថបទរួចហើយ ✓',aiLyricsNeedTitle:'សូមសរសេរចំណងជើងជាមុនសិន',aiLyricsNeedLogin:'សូមចូលគណនេយ្យជាមុនសិន',aiLyricsFail:'បង្កើតអត្ថបទមិនបានទេ — សូមសាកល្បងម្ដងទៀត',
  lblSongStyle:'ស្ទាយបទចម្រៀង',btnAddStyle:'Add',songStylePh:'ឧ. Pop, Rock, សំឡេងខ្មែរបុរាណ...',stylePickPh:'ជ្រើសរើស Style…',
  lblSongVoice:'សំឡេង',voiceMale:'ប្រុស',voiceFemale:'ស្រី',voiceRandom:'ចៃដន្យ',
  lblSongInstr:'Instrumental · ភ្លេងសុទ្ធ',
@@ -4547,7 +4558,7 @@ en:{
  lblSongDur:'Song length',
  lblSongTitle:'Title',songTitlePh:'e.g. Your song title...',
  lblSongLyrics:'Lyrics',songLyricsPh:'Write your song lyrics here...',
- aiLyricsBtn:'AI Lyrics · Generate lyrics',aiLyricsBusy:'AI is writing lyrics… {s}s · {p}%',aiLyricsDone:'AI wrote the lyrics ✓',aiLyricsNeedTitle:'Please enter a song title first',aiLyricsNeedLogin:'Please sign in first',aiLyricsFail:'Could not generate lyrics — please try again',
+ aiLyricsBtn:'AI Lyrics · Generate lyrics',aiLyricsLangLabel:'Lyrics language',aiLyricsBusy:'AI is writing lyrics… {s}s · {p}%',aiLyricsDone:'AI wrote the lyrics ✓',aiLyricsNeedTitle:'Please enter a song title first',aiLyricsNeedLogin:'Please sign in first',aiLyricsFail:'Could not generate lyrics — please try again',
  lblSongStyle:'Style',btnAddStyle:'Add',songStylePh:'e.g. Pop, Rock, Khmer traditional...',stylePickPh:'Choose styles…',
  lblSongVoice:'Voice',voiceMale:'Male',voiceFemale:'Female',voiceRandom:'Random',
  lblSongInstr:'Instrumental',
@@ -4980,6 +4991,7 @@ function applyLang(){
      after the language pass resets the static price markup. */
   try{pkgPricesRender();}catch(e){}
   try{songStyleRenderPresets();}catch(e){}
+  try{aiLyricsLangRender();}catch(e){}
   /* The Withdraw button carries the live net label (no data-i18n),
      so re-sync it after a language pass. */
   try{walletWithdrawTotal();}catch(e){}
@@ -9100,6 +9112,40 @@ function songStyleAdd(){
    lyrics auto-fill into #songLyrics. 0 MovAi credits. The key never
    leaves the server. Progress ticks on the status line (seconds + %);
    on failure the error shows there and tapping the button retries. */
+/* ---- AI Lyrics language list (owner order 2026-11-18) ----
+   ALL languages, not just Khmer/English. Each entry is
+   [code, Khmer label, English label]. Labels are always in the
+   SITE language (Khmer site → Khmer labels; English site →
+   English labels) — never mixed. Rebuilt on every language pass;
+   the selected value is preserved, default = the site language. */
+var AI_LYRICS_LANGS=[
+ ['kh','ខ្មែរ','Khmer'],['en','អង់គ្លេស','English'],['th','ថៃ','Thai'],
+ ['vi','វៀតណាម','Vietnamese'],['lo','ឡាវ','Lao'],['zh','ចិន','Chinese'],
+ ['ja','ជប៉ុន','Japanese'],['ko','កូរ៉េ','Korean'],['es','អេស្ប៉ាញ','Spanish'],
+ ['fr','បារាំង','French'],['de','អាល្លឺម៉ង់','German'],['pt','ព័រទុយហ្គាល់','Portuguese'],
+ ['ru','រុស្ស៊ី','Russian'],['ar','អារ៉ាប់','Arabic'],['hi','ហិណ្ឌូ','Hindi'],
+ ['id','ឥណ្ឌូនេស៊ី','Indonesian'],['ms','ម៉ាឡេ','Malay'],['fil','ហ្វីលីពីន','Filipino'],
+ ['it','អ៊ីតាលី','Italian'],['nl','ហូឡង់','Dutch'],['tr','ទួរគី','Turkish'],
+ ['my','ភូមា','Burmese'],['bn','បេងហ្គាល់','Bengali'],['ur','អ៊ូឌូ','Urdu'],
+ ['fa','ពែរ្ស','Persian'],['uk','អ៊ុយក្រែន','Ukrainian'],['pl','ប៉ូឡូញ','Polish'],
+ ['sv','ស៊ុយអែដ','Swedish'],['da','ដាណឺម៉ាក','Danish'],['fi','ហ្វាំងឡង់','Finnish'],
+ ['no','ន័រវែស','Norwegian'],['cs','ឆេក','Czech'],['hu','ហុងគ្រី','Hungarian'],
+ ['el','ក្រិក','Greek'],['he','ហេប្រឺ','Hebrew']
+];
+function aiLyricsLangRender(){
+  var sel=document.getElementById('aiLyricsLang');if(!sel)return;
+  var cur=sel.value||(LANG==='en'?'en':'kh');
+  var ok=false;for(var i=0;i<AI_LYRICS_LANGS.length;i++)if(AI_LYRICS_LANGS[i][0]===cur){ok=true;break;}
+  if(!ok)cur=(LANG==='en'?'en':'kh');
+  var html='';
+  for(var j=0;j<AI_LYRICS_LANGS.length;j++){
+    var L=AI_LYRICS_LANGS[j];
+    html+='<option value="'+L[0]+'"'+(L[0]===cur?' selected':'')+'>'+escHtml(LANG==='en'?L[2]:L[1])+'</option>';
+  }
+  sel.innerHTML=html;
+  sel.value=cur;
+  sel.setAttribute('aria-label',tx('aiLyricsLangLabel'));
+}
 var aiLyricsBusy=false,aiLyricsTimer=null,aiLyricsSec=0;
 function aiLyricsSetStatus(t,err){
   var s=document.getElementById('aiLyricsStatus');if(!s)return;
@@ -9115,7 +9161,7 @@ function aiLyricsGenerate(){
   if(!email){aiLyricsSetStatus(tx('aiLyricsNeedLogin'),true);try{loginSheetOpen();}catch(e){}return;}
   var langEl=document.getElementById('aiLyricsLang');
   var lang=langEl?langEl.value:'kh';
-  if(lang!=='kh'&&lang!=='en')lang='kh';
+  /* All languages in #aiLyricsLang pass through (owner order 2026-11-18). */
   var btn=document.getElementById('aiLyricsBtn');
   aiLyricsBusy=true;aiLyricsSec=0;
   if(btn)btn.disabled=true;
