@@ -918,7 +918,7 @@ async function pubUser(u, modelLogins, deviceInfo) {
   const map = modelLogins || await loadModelLogins();
   const model = u.model || '';
   const count = model && map && typeof map === 'object' ? (Number(map[model]) || 0) : 0;
-  const out = { id: u.id || '', email: u.email, name: u.name || '', firstName: u.firstName || '', lastName: u.lastName || '', credits: u.credits, songCredits: u.songCredits, balance: Math.round(numOr(u.balance, 0) * 100) / 100, earnBalance: Math.round(numOr(u.earnBalance, 0) * 100) / 100, plan: u.plan || '', songPlan: u.songPlan || '', createdAt: u.createdAt, updatedAt: u.updatedAt, lastIp: u.lastIp || '', country: u.country || '', countryCode: u.countryCode || '', device: u.device || '', model, modelLogins: count, lastSeen: u.lastSeen || '', knownDevices: Array.isArray(u.knownDevices) ? u.knownDevices : [], hasPassword: !!(u.passwordHash && u.passwordSalt),
+  const out = { id: u.id || '', email: u.email, name: u.name || '', firstName: u.firstName || '', lastName: u.lastName || '', credits: u.credits, songCredits: u.songCredits, balance: Math.round(numOr(u.balance, 0) * 100) / 100, earnBalance: Math.round(numOr(u.earnBalance, 0) * 100) / 100, plan: u.plan || '', songPlan: u.songPlan || '', freeDlUsed: featureFreeUsed(u, 'freeDlUsed'), freeMvUsed: featureFreeUsed(u, 'freeMvUsed'), freeVsUsed: featureFreeUsed(u, 'freeVsUsed'), mvLeft: featurePkgLeft(u, 'mvLeft'), vsLeft: featurePkgLeft(u, 'vsLeft'), createdAt: u.createdAt, updatedAt: u.updatedAt, lastIp: u.lastIp || '', country: u.country || '', countryCode: u.countryCode || '', device: u.device || '', model, modelLogins: count, lastSeen: u.lastSeen || '', knownDevices: Array.isArray(u.knownDevices) ? u.knownDevices : [], hasPassword: !!(u.passwordHash && u.passwordSalt),
     // Device fingerprint (anti-abuse): the device the account was
     // registered on (deviceId, never overwritten by later sign-ins from
     // other devices), the most recent device seen, and the model the
@@ -941,6 +941,65 @@ async function pubUser(u, modelLogins, deviceInfo) {
     out.emailBlocked = !!deviceInfo.emailBlocked;
   }
   return out;
+}
+// ---- "Free 2 + package allowance" limits (Download MP3, MV, Vocal Studio) ----
+// Counters live on the user record (users.data jsonb): freeDlUsed,
+// freeMvUsed, freeVsUsed (0–2 each), mvLeft, vsLeft. Existing users
+// default to 0 via numOr() — no migration, no schema change, no new table.
+const FEATURE_FREE_LIMIT = 2;
+const FEATURE_MV_VS_GRANT = {
+  'song-trial': { mv: 5, vs: 10 },
+  'song-popular': { mv: 10, vs: 20 },
+  'song-pro': { mv: 22, vs: 33 },
+};
+function featureFreeUsed(u, field) { return Math.min(FEATURE_FREE_LIMIT, Math.max(0, Math.floor(numOr(u && u[field], 0)))); }
+function featurePkgLeft(u, field) { return Math.max(0, Math.floor(numOr(u && u[field], 0))); }
+// Active package = either plan expiry (media: monthly/yearly) or
+// song-plan expiry (song-trial/popular/pro) is still in the future.
+// Both expiries are set when a package is activated (purchase approve /
+// wallet buy) and are never cleared on expiry — only the date decides,
+// exactly as the plan-expiry sweep (checkPlanExpiries) reads them.
+function hasActivePackage(u) {
+  if (!u) return false;
+  const now = Date.now();
+  const p = Date.parse(u.planExpiresAt || '');
+  if (p && p > now) return true;
+  const s = Date.parse(u.songPlanExpiresAt || '');
+  if (s && s > now) return true;
+  return false;
+}
+function featureLimitsFor(u) {
+  const dlUsed = featureFreeUsed(u, 'freeDlUsed');
+  const mvUsed = featureFreeUsed(u, 'freeMvUsed');
+  const vsUsed = featureFreeUsed(u, 'freeVsUsed');
+  // Package allowances are usable ONLY while a package is active.
+  // When the package expires, any remaining mvLeft/vsLeft is LOST
+  // (effective 0 here) — only the lifetime Free 2 survive expiry.
+  const active = hasActivePackage(u);
+  const mvPkg = active ? featurePkgLeft(u, 'mvLeft') : 0;
+  const vsPkg = active ? featurePkgLeft(u, 'vsLeft') : 0;
+  const mvFreeLeft = Math.max(0, FEATURE_FREE_LIMIT - mvUsed);
+  const vsFreeLeft = Math.max(0, FEATURE_FREE_LIMIT - vsUsed);
+  return {
+    download: { free: FEATURE_FREE_LIMIT, used: dlUsed, freeLeft: Math.max(0, FEATURE_FREE_LIMIT - dlUsed), unlimited: active },
+    mv: { free: FEATURE_FREE_LIMIT, used: mvUsed, freeLeft: mvFreeLeft, pkgLeft: mvPkg, left: mvFreeLeft + mvPkg },
+    vs: { free: FEATURE_FREE_LIMIT, used: vsUsed, freeLeft: vsFreeLeft, pkgLeft: vsPkg, left: vsFreeLeft + vsPkg },
+  };
+}
+// Grant MV/VS allowances for a song-package purchase. Media packages
+// (monthly/yearly) grant nothing. Returns the grant {mv, vs} or null.
+// hadActive = whether the user had an ACTIVE package BEFORE this
+// purchase activates the new plan. If the previous package had
+// EXPIRED, its leftover mvLeft/vsLeft is LOST: reset to 0 first, so
+// the new grant does NOT stack on expired leftovers. If the previous
+// package is still ACTIVE, the new grant accumulates on top.
+function grantFeatureAllowance(u, packageId, hadActive) {
+  const g = FEATURE_MV_VS_GRANT[packageId];
+  if (!g || !u) return null;
+  if (!hadActive) { u.mvLeft = 0; u.vsLeft = 0; }
+  u.mvLeft = featurePkgLeft(u, 'mvLeft') + g.mv;
+  u.vsLeft = featurePkgLeft(u, 'vsLeft') + g.vs;
+  return g;
 }
 async function loadGrants() {
   const j = await loadKvDoc('grants', []);
@@ -4972,6 +5031,26 @@ async function apiRoute(req, res, urlPath) {
         const audioUrl = body && typeof body.audioUrl === 'string' ? body.audioUrl.trim() : '';
         if (!audioUrl || !/^https?:\/\//i.test(audioUrl)) return sendJSON(res, 200, { ok: false, error: 'មិនមាន Link បទចម្រៀងទេ · No song audio URL' });
         const songTitle = body && typeof body.songTitle === 'string' ? body.songTitle.trim().slice(0, 200) : '';
+        // "Free 2 + package allowance" — Vocal Studio gate. Runs BEFORE
+        // any MVSEP call (the cached re-split included), so a rejected
+        // request never consumes MVSEP quota. Package allowance first,
+        // then the 2 free uses. The allowance is consumed when the
+        // split is accepted, even if MVSEP later fails or times out
+        // (same as the generation-credit pattern: checked + deducted
+        // up front). Unknown email -> {ok:false, error:'no_account'};
+        // locked -> {ok:false, error:'vs_out', message} (no MVSEP call).
+        const _vsUsers = await loadUsers();
+        const _vsU = _vsUsers[email];
+        if (!_vsU) return sendJSON(res, 200, { ok: false, error: 'no_account' });
+        // Package allowance is spendable ONLY while a package is
+        // active. An expired package's remaining vsLeft is LOST —
+        // never spent; go straight to the lifetime Free 2 instead.
+        if (hasActivePackage(_vsU) && featurePkgLeft(_vsU, 'vsLeft') > 0) { _vsU.vsLeft = featurePkgLeft(_vsU, 'vsLeft') - 1; }
+        else if (featureFreeUsed(_vsU, 'freeVsUsed') < FEATURE_FREE_LIMIT) { _vsU.freeVsUsed = featureFreeUsed(_vsU, 'freeVsUsed') + 1; }
+        else return sendJSON(res, 200, { ok: false, error: 'vs_out', message: 'You have used your 2 free Vocal Studio splits and have no allowance left — please buy a song package to continue.' });
+        _vsU.updatedAt = new Date().toISOString();
+        await saveUsers(_vsUsers);
+        scheduleBackup('users.json');
         // Fast path: this song was separated before — ask MVSEP for the
         // OLD job's fresh stem URLs instead of creating (and paying quota
         // for) a new separation. Re-splits return in ~1-2s. If the old
@@ -5121,6 +5200,11 @@ async function apiRoute(req, res, urlPath) {
           balance: 0,
           earnBalance: 0,
           giftClaimed: false,
+          freeDlUsed: 0,
+          freeMvUsed: 0,
+          freeVsUsed: 0,
+          mvLeft: 0,
+          vsLeft: 0,
           plan: typeof body.plan === 'string' ? body.plan.slice(0, 50) : '',
           songPlan: typeof body.songPlan === 'string' ? body.songPlan.slice(0, 50) : '',
           createdAt: now, updatedAt: now,
@@ -5290,7 +5374,7 @@ async function apiRoute(req, res, urlPath) {
       }
       if (!u) {
         const takenIds = new Set(Object.values(users).map((x) => x.id).filter(Boolean));
-        u = { id: genUserId(takenIds), email, name: g.name || '', credits: 0, songCredits: 0, balance: 0, earnBalance: 0, giftClaimed: false, plan: '', songPlan: '', createdAt: now, updatedAt: now };
+        u = { id: genUserId(takenIds), email, name: g.name || '', credits: 0, songCredits: 0, balance: 0, earnBalance: 0, giftClaimed: false, freeDlUsed: 0, freeMvUsed: 0, freeVsUsed: 0, mvLeft: 0, vsLeft: 0, plan: '', songPlan: '', createdAt: now, updatedAt: now };
         users[email] = u;
       } else {
         if (!u.id) { const takenIds = new Set(Object.values(users).map((x) => x.id).filter(Boolean)); u.id = genUserId(takenIds); }
@@ -6800,10 +6884,21 @@ async function apiRoute(req, res, urlPath) {
       const u = users[r.email];
       if (!u) return sendJSON(res, 200, { ok: false, error: 'រកអ្នកប្រើនេះមិនឃើញទេ' });
       const now = new Date().toISOString();
+      // Capture BEFORE the plan activation below: if the previous
+      // package had already expired, its leftover MV/VS allowance is
+      // lost and the new grant must NOT stack on it (see
+      // grantFeatureAllowance). If still active, the grant accumulates.
+      const _hadActivePkg = hasActivePackage(u);
       u.credits = Math.max(0, Math.floor(numOr(u.credits, 0)) + pkg.credits);
       u.songCredits = Math.max(0, Math.floor(numOr(u.songCredits, 0)) + pkg.songCredits);
       if (pkg.credits) { u.plan = r.packageId; u.planExpiresAt = new Date(Date.now() + Math.max(1, pkg.days || 30) * 86400000).toISOString(); }
       if (pkg.songCredits) { u.songPlan = r.packageId; u.songPlanExpiresAt = new Date(Date.now() + Math.max(1, pkg.days || 30) * 86400000).toISOString(); }
+      // "Free 2 + package allowance": song packages grant MV/VS
+      // allowances (accumulate). Exactly once per purchase — this
+      // handler only runs while the request is still 'pending' and
+      // marks it 'approved' below, so a second approve of the same
+      // request is refused above and can never grant twice.
+      grantFeatureAllowance(u, r.packageId, _hadActivePkg);
       // Monetization cashback (owner order 2026-11-18): when monetization
       // is ON, an approved package purchase adds cashback to the EARN
       // balance immediately, by package price tier. Earn money is NOT
@@ -6967,11 +7062,20 @@ async function apiRoute(req, res, urlPath) {
       const bal = walletBalance(u);
       if (price > bal) return sendJSON(res, 200, { ok: false, error: 'លុយក្នុង Wallet មិនគ្រប់ទេ (ត្រូវការ $' + price.toFixed(2) + ', នៅសល់ $' + bal.toFixed(2) + ') · Insufficient wallet balance (need $' + price.toFixed(2) + ', have $' + bal.toFixed(2) + ')', balance: bal, price });
       const now = new Date().toISOString();
+      // Capture BEFORE the plan activation below (same rule as the
+      // purchase-request approve handler): expired leftovers are lost,
+      // an active package's grant accumulates.
+      const _hadActivePkg = hasActivePackage(u);
       u.balance = walletMoney(bal - price);
       u.credits = Math.max(0, Math.floor(numOr(u.credits, 0)) + pkg.credits);
       u.songCredits = Math.max(0, Math.floor(numOr(u.songCredits, 0)) + pkg.songCredits);
       if (pkg.credits) { u.plan = packageId; u.planExpiresAt = new Date(Date.now() + Math.max(1, pkg.days || 30) * 86400000).toISOString(); }
       if (pkg.songCredits) { u.songPlan = packageId; u.songPlanExpiresAt = new Date(Date.now() + Math.max(1, pkg.days || 30) * 86400000).toISOString(); }
+      // "Free 2 + package allowance": song packages grant MV/VS
+      // allowances (accumulate). Exactly once per purchase — a wallet
+      // buy is a single payment action; each call buys (and grants)
+      // exactly one package.
+      grantFeatureAllowance(u, packageId, _hadActivePkg);
       // Monetization cashback (owner order 2026-11-18): when monetization
       // is ON, buying a package with the Wallet adds cashback to the
       // EARN balance immediately, by package price tier. Earn money is
@@ -8181,6 +8285,28 @@ async function apiRoute(req, res, urlPath) {
       // UTF-8 filename so browsers that support it still save the Khmer name.
       const asciiName = name.replace(/[^\x20-\x7E]/g, '_').replace(/"/g, '');
       const disp = 'attachment; filename="' + asciiName + '"; filename*=UTF-8\'\'' + encodeURIComponent(name).replace(/'/g, '%27');
+      // "Free 2 + package allowance" — Download MP3 gate (owner order
+      // 2026-11-18). The website passes ?email=<signed-in Gmail>.
+      // No email param (old clients / direct links) -> unchanged
+      // behaviour (allowed, nothing consumed). With an email: an
+      // active package downloads unlimited (no free use consumed);
+      // otherwise one of the 2 free downloads is consumed and saved
+      // BEFORE serving; when both are used the file is NOT served.
+      // Unknown email -> {ok:false, error:'no_account'} (never served).
+      // Locked -> {ok:false, error:'download_out', message} (never served).
+      const _dlEmail = normEmail(qp.get('email') || '');
+      if (_dlEmail) {
+        const _dlUsers = await loadUsers();
+        const _dlU = _dlUsers[_dlEmail];
+        if (!_dlU) return sendJSON(res, 200, { ok: false, error: 'no_account' });
+        if (!hasActivePackage(_dlU)) {
+          if (featureFreeUsed(_dlU, 'freeDlUsed') >= FEATURE_FREE_LIMIT) return sendJSON(res, 200, { ok: false, error: 'download_out', message: 'You have used your 2 free downloads — please buy a package to download unlimited songs.' });
+          _dlU.freeDlUsed = featureFreeUsed(_dlU, 'freeDlUsed') + 1;
+          _dlU.updatedAt = new Date().toISOString();
+          await saveUsers(_dlUsers);
+          scheduleBackup('users.json');
+        }
+      }
       if (!u) return sendJSON(res, 400, { ok: false, error: 'missing u' });
       try {
         // Cached MP3? Serve it instantly (no re-fetch, no re-encode).
@@ -9198,6 +9324,51 @@ async function apiRoute(req, res, urlPath) {
     }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
     return;
   }
+  // ---- "Free 2 + package allowance" limits (Download MP3, MV, Vocal Studio) ----
+  // GET /api/public/feature-limits?email= — PUBLIC. Read-only; never
+  // creates a user. Returns the Free-2 + package-allowance state:
+  // {ok:true, email, download:{free:2, used, freeLeft, unlimited},
+  //  mv:{free:2, used, freeLeft, pkgLeft, left},
+  //  vs:{free:2, used, freeLeft, pkgLeft, left}}
+  // download.unlimited = the user has ANY active (non-expired) package.
+  // Unknown email -> {ok:false, error:'no_account'}.
+  if (req.method === 'GET' && urlPath === '/api/public/feature-limits') {
+    const email = normEmail(new URL(req.url, 'http://localhost').searchParams.get('email') || '');
+    if (!email) return sendJSON(res, 200, { ok: false, error: 'no_account' });
+    const u = (await loadUsers())[email];
+    if (!u) return sendJSON(res, 200, { ok: false, error: 'no_account' });
+    const lim = featureLimitsFor(u);
+    return sendJSON(res, 200, { ok: true, email, download: lim.download, mv: lim.mv, vs: lim.vs });
+  }
+  // POST /api/public/mv-use — PUBLIC. {email}. The website calls this
+  // when the user taps MV, before opening the MV player. Package
+  // allowance first, then the 2 free uses; otherwise locked.
+  // {ok:true, source:'package'|'free', left} — left = total MV plays
+  // remaining (freeLeft + mvLeft after the decrement/increment).
+  // Locked -> {ok:false, error:'mv_out', message} (no counter changed).
+  // Unknown email -> {ok:false, error:'no_account'}.
+  if (req.method === 'POST' && urlPath === '/api/public/mv-use') {
+    readJSONBody(req, 64 * 1024).then(async (body) => {
+      const email = normEmail(body && body.email);
+      if (!email) return sendJSON(res, 200, { ok: false, error: 'no_account' });
+      const users = await loadUsers();
+      const u = users[email];
+      if (!u) return sendJSON(res, 200, { ok: false, error: 'no_account' });
+      const now = new Date().toISOString();
+      let source;
+      // Package allowance is spendable ONLY while a package is active.
+      // An expired package's remaining mvLeft is LOST — never spent;
+      // go straight to the lifetime Free 2 instead.
+      if (hasActivePackage(u) && featurePkgLeft(u, 'mvLeft') > 0) { u.mvLeft = featurePkgLeft(u, 'mvLeft') - 1; source = 'package'; }
+      else if (featureFreeUsed(u, 'freeMvUsed') < FEATURE_FREE_LIMIT) { u.freeMvUsed = featureFreeUsed(u, 'freeMvUsed') + 1; source = 'free'; }
+      else return sendJSON(res, 200, { ok: false, error: 'mv_out', message: 'You have used your 2 free MV plays and have no MV allowance left — please buy a song package to continue.' });
+      u.updatedAt = now;
+      await saveUsers(users);
+      scheduleBackup('users.json');
+      return sendJSON(res, 200, { ok: true, source, left: featureLimitsFor(u).mv.left });
+    }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
+    return;
+  }
   // POST /api/public/download — PUBLIC. {postId}. Counts one download.
   // Mirrors /api/public/view: increment, save, await the GitHub flush so
   // the count is locked in and never lost on restart.
@@ -9337,6 +9508,17 @@ async function checkPlanExpiries() {
         const uid = u.id || '—';
         await addNotification('plan-expired', em, '⏰ កញ្ចប់ផុតកំណត់ · Package expired', (u.name || em) + ' · ' + em + ' · ID: ' + uid + ' — កញ្ចប់ ' + pl.label + ' បានផុតកំណត់ (' + String(pl.exp).slice(0, 10) + ')');
         u[pl.field] = pl.exp;
+        u.updatedAt = new Date().toISOString();
+        changed = true;
+      }
+      // Cleanup (low-risk, same rule as featureLimitsFor): once NO
+      // package is active any more, leftover MV/VS allowances are
+      // lost — zero them so the stored counters match the effective
+      // limits. Skipped while either plan is still active. Free 2
+      // counters are lifetime and are never touched here.
+      if (!hasActivePackage(u) && (featurePkgLeft(u, 'mvLeft') > 0 || featurePkgLeft(u, 'vsLeft') > 0)) {
+        u.mvLeft = 0;
+        u.vsLeft = 0;
         u.updatedAt = new Date().toISOString();
         changed = true;
       }
