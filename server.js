@@ -4031,6 +4031,36 @@ async function apiRoute(req, res, urlPath) {
           if (out.done) return sendJSON(res, 200, { ok: true, done: true, imageUrl: out.imageUrl });
           return sendJSON(res, 200, { ok: true, jobId: out.jobId });
         }
+        if (provider === 'agnes') {
+          // Agnes image via the admin-stored keys (browser sends no
+          // key). Free ($0) — no MovAi credit is charged, like NovAI.
+          // API: POST https://apihub.agnes-ai.com/v1/images/generations
+          // {model:'agnes-image-2.5-flash', prompt, size:'1K',
+          //  ratio:'16:9'|'9:16'|..., n:1} → data[0].url.
+          // Ratio from the requested dimensions (Agnes supports
+          // 1:1, 3:4, 4:3, 16:9, 9:16, 2:3, 3:2, 21:9).
+          const _ar = width / height;
+          const _ratios = [['21:9', 21 / 9], ['16:9', 16 / 9], ['3:2', 3 / 2], ['4:3', 4 / 3], ['1:1', 1], ['3:4', 3 / 4], ['2:3', 2 / 3], ['9:16', 9 / 16]];
+          let _ratio = '1:1', _bd = 1e9;
+          for (const _rr of _ratios) { const _d = Math.abs(Math.log(_ar / _rr[1])); if (_d < _bd) { _bd = _d; _ratio = _rr[0]; } }
+          let out;
+          try {
+            out = await withProviderKeyRotation('agnes', async (k) => {
+              const r = await fetch('https://apihub.agnes-ai.com/v1/images/generations', { method: 'POST', headers: { 'Authorization': 'Bearer ' + k, 'Content-Type': 'application/json' }, body: JSON.stringify({ model: 'agnes-image-2.5-flash', prompt, size: '1K', ratio: _ratio, n: 1 }), signal: AbortSignal.timeout(120000) });
+              const j = await r.json().catch(() => null);
+              const url = j && j.data && (Array.isArray(j.data) ? (j.data[0] && (j.data[0].url || j.data[0].image_url)) : (j.data.url || j.data.image_url));
+              if (url) return { done: true, imageUrl: url };
+              const id = j && (j.id || (j.data && !Array.isArray(j.data) && j.data.id));
+              if (id) return { jobId: id };
+              throw rotErr('Agnes: ' + genErrText(j, 'HTTP ' + r.status), r.status);
+            }, key);
+          } catch (e) {
+            if (e && e.noKey) return sendJSON(res, 200, { ok: false, error: 'Admin មិនទាន់ដាក់ Agnes Key ទេ' });
+            return sendJSON(res, 200, { ok: false, error: (e && e.message) || 'Agnes: request failed' });
+          }
+          if (out.done) return sendJSON(res, 200, { ok: true, done: true, imageUrl: out.imageUrl });
+          return sendJSON(res, 200, { ok: true, jobId: out.jobId });
+        }
         if (provider === 'cloudflare') {
           const accountId = String(body.accountId || '').trim();
           if (!key || !accountId) return sendJSON(res, 200, { ok: false, error: 'មិនទាន់មាន Cloudflare Account ID / API Token ទេ' });
@@ -4107,6 +4137,13 @@ async function apiRoute(req, res, urlPath) {
             return sendJSON(res, 200, { ok: false, error: (e && e.message) || 'NovAI: request failed' });
           }
           return sendJSON(res, 200, Object.assign({ ok: true }, out));
+        }
+        if (provider === 'agnes') {
+          // Agnes images return synchronously with a URL — there is
+          // no status endpoint to poll. A jobId here means the
+          // create call returned one without a URL; say so plainly
+          // instead of polling a non-existent endpoint.
+          return sendJSON(res, 200, { ok: false, error: 'Agnes: រូបភាពមិនទាន់រួចរាល់ទេ — សូមសាកល្បងម្តងទៀត · Agnes image was accepted but no URL came back, please retry' });
         }
         return sendJSON(res, 200, { ok: false, error: 'Provider មិនស្គាល់ទេ' });
       } catch (e) { return sendJSON(res, 200, { ok: false, error: 'សួរព័ត៌មានមិនបានទេ៖ ' + (e && e.message ? e.message : 'unknown') }); }
