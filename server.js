@@ -2569,6 +2569,9 @@ async function saveCreatorFollows(f) {
 //       when the creator is an Admin, because the Follow pill on
 //       the Admin's post IS the Public-page follow: those people
 //       followed the Admin's page, so they are the Admin's followers.
+//   (c) promo followers bought via Promo (owner order 2026-11-19):
+//       the monetization-earnings record's `promoFollowers` counter
+//       is ADDED to the union above — no fake follow rows exist.
 // Before this, (a) and (b) were counted by different screens, so the
 // Monetization sheet showed 0 while the Admin showed 3 (the
 // Public-page list). The feed post's «2 Followers» was the same
@@ -2586,7 +2589,19 @@ async function creatorFollowerCount(email) {
       const pub = await loadFollowers();
       for (const x of pub) { const n = normEmail(x); if (n) set.add(n); }
     }
-    return set.size;
+    // Promo followers (owner order 2026-11-19): a separate counter
+    // `promoFollowers` on the monetization-earnings record — never
+    // fake creator_follows rows. Added to the organic total so promo
+    // followers count toward the displayed total and the 1,000
+    // monetization eligibility threshold. Read defensively so a
+    // storage hiccup never zeroes the organic count.
+    let promo = 0;
+    try {
+      const m = await loadMonetizationEarnings();
+      const rec = m && m[em];
+      promo = rec ? Math.max(0, Math.floor(numOr(rec.promoFollowers, 0))) : 0;
+    } catch (e2) {}
+    return set.size + promo;
   } catch (e) { return 0; }
 }
 async function monetizationFollowerCount(email) {
@@ -9875,6 +9890,10 @@ async function apiRoute(req, res, urlPath) {
   //     5.5K=$0.55, 10K=$1.00, 100K=$10.00, 1M=$100.00, 10M=$1,000.00).
   //   Watch hours: $8.00 per 500 hours = $0.016/hour (500=$8.00,
   //     1k=$16.00, 5.5K=$88.00).
+  //   Follows: $0.01332 per follower (500=$6.66, 1k=$13.32,
+  //     5.5K=$73.26). Any positive integer amount; packages 500 /
+  //     1k / 5.5K + custom. No postId — followers go to the user's
+  //     account, not a post.
   // Storage (exact fields — same fields the live site already reads):
   //   Post views: public_posts row `data.views` (integer) — the same
   //     field the feed sorts by and POST /api/public/view increments.
@@ -9890,16 +9909,27 @@ async function apiRoute(req, res, urlPath) {
   //     rounded to 2 decimals on read (same as /api/public/watch and
   //     the monetization status). Promo hours are stored as
   //     amount * 3600 seconds.
+  //   Promo FOLLOWERS: the same record's `promoFollowers` (integer)
+  //     — a SEPARATE counter, never fake creator_follows rows (no
+  //     fake follower accounts). creatorFollowerCount() adds it to
+  //     the organic follow count, so promo followers count toward
+  //     the displayed follower total everywhere (monetization
+  //     status / eligibility at 1,000 followers, profile, feed
+  //     counts) while the organic base stays untouched.
   // Boosted views NEVER generate view earnings: this code only touches
-  // `views` / `watchSeconds` and never earnMicro / pendingMicro.
+  // `views` / `watchSeconds` / `promoFollowers` and never earnMicro /
+  // pendingMicro. Promo followers likewise generate NO earnings.
   // Payment rule (same as the wallet package buy): deduct from the
   // spendable Wallet `balance` BEFORE adding; refund on failure.
   // Notifications use addNotification (Admin bell + Telegram), same as
   // purchase-approve / grant / deduct.
   const PROMO_VIEW_PRICE = 0.0001; // $ per view
   const PROMO_HOUR_PRICE = 0.016; // $ per watch hour
+  const PROMO_FOLLOWER_PRICE = 0.01332; // $ per follower (500=$6.66)
   function promoPriceFor(type, amount) {
-    return walletMoney(type === 'hours' ? amount * PROMO_HOUR_PRICE : amount * PROMO_VIEW_PRICE);
+    if (type === 'hours') return walletMoney(amount * PROMO_HOUR_PRICE);
+    if (type === 'follows') return walletMoney(amount * PROMO_FOLLOWER_PRICE);
+    return walletMoney(amount * PROMO_VIEW_PRICE);
   }
   function promoValidAmount(v) {
     const n = Number(v);
@@ -9907,10 +9937,12 @@ async function apiRoute(req, res, urlPath) {
   }
   // Applies a promo boost that has already passed validation (and, for
   // buys, payment). Saves the post row (views only) and the owner's
-  // monetization-earnings record. Returns {views, watchHours} where
-  // views is the post's view count (or null when no post was given)
-  // and watchHours is the owner's NEW total watch hours in HOURS
-  // (2 decimals).
+  // monetization-earnings record. Returns {views, watchHours,
+  // followers} where views is the post's view count (or null when no
+  // post was given; for 'follows' it is the user's TOTAL view count,
+  // integer), watchHours is the owner's NEW total watch hours in
+  // HOURS (2 decimals), and followers (follows only) is the user's
+  // NEW total follower count (organic + promoFollowers, integer).
   async function promoApplyBoost(email, post, type, amount) {
     let views = null;
     if (type === 'views' && post) {
@@ -9927,25 +9959,37 @@ async function apiRoute(req, res, urlPath) {
     const got = await monetizationRecord(email);
     if (!got) throw new Error('no_account');
     if (type === 'views') got.rec.views = numOr(got.rec.views, 0) + amount;
+    else if (type === 'follows') got.rec.promoFollowers = Math.max(0, Math.floor(numOr(got.rec.promoFollowers, 0)) + amount);
     else got.rec.watchSeconds = numOr(got.rec.watchSeconds, 0) + amount * 3600;
     await saveMonetizationEarnings(got.m);
     const watchHours = Math.round(numOr(got.rec.watchSeconds, 0) / 3600 * 100) / 100;
+    if (type === 'follows') {
+      views = Math.max(0, Math.floor(numOr(got.rec.views, 0)));
+      const followers = await creatorFollowerCount(email);
+      return { views, watchHours, followers };
+    }
     return { views, watchHours };
   }
   // POST /api/public/promo/buy — {email, postId, type, amount} — PUBLIC
-  // (logged-in user). type 'views' (postId REQUIRED) or 'hours' (postId
-  // OPTIONAL — hours go to the user's total, not a post). Deducts the
-  // price from the spendable Wallet balance BEFORE adding; refunds on
-  // failure. Success: {ok:true, type, amount, price, balance, views,
-  // watchHours} — price in dollars (2 decimals), balance = NEW wallet
-  // balance, views = post's NEW view count (hours + postId: current
-  // views; hours without postId: null), watchHours = user's NEW total
-  // watch hours IN HOURS. Errors: insufficient_balance / not_found /
-  // not_owner / not_public / invalid_amount / invalid_type.
+  // (logged-in user). type 'views' (postId REQUIRED), 'hours' (postId
+  // OPTIONAL — hours go to the user's total, not a post) or 'follows'
+  // (postId NOT used — followers go to the user's account, not a
+  // post). Deducts the price from the spendable Wallet balance BEFORE
+  // adding; refunds on failure. Success: {ok:true, type, amount,
+  // price, balance, views, watchHours} — price in dollars (2
+  // decimals), balance = NEW wallet balance, views = post's NEW view
+  // count (hours + postId: current views; hours without postId: null;
+  // follows: user's TOTAL view count, integer), watchHours = user's
+  // NEW total watch hours IN HOURS. Follows success ALSO carries
+  // followers = user's NEW total follower count (organic +
+  // promoFollowers, integer). Errors: insufficient_balance /
+  // not_found / not_owner / not_public / invalid_amount /
+  // invalid_type.
   if (req.method === 'POST' && urlPath === '/api/public/promo/buy') {
     readJSONBody(req, 64 * 1024).then(async (body) => {
       const type = typeof body.type === 'string' ? body.type.trim().toLowerCase() : '';
-      if (type !== 'views' && type !== 'hours') return sendJSON(res, 200, { ok: false, error: 'invalid_type' });
+      if (type !== 'views' && type !== 'hours' && type !== 'follows') return sendJSON(res, 200, { ok: false, error: 'invalid_type' });
+      const promoLabel = type === 'views' ? 'Views' : type === 'follows' ? 'Follows' : 'Watch hours';
       const amount = promoValidAmount(body && body.amount);
       if (!amount) return sendJSON(res, 200, { ok: false, error: 'invalid_amount' });
       const email = normEmail(body && body.email);
@@ -9962,7 +10006,7 @@ async function apiRoute(req, res, urlPath) {
         if (!post) return sendJSON(res, 200, { ok: false, error: 'not_found' });
         if (normEmail(post.email) !== email) return sendJSON(res, 200, { ok: false, error: 'not_owner' });
         if (post.visibility !== 'public') return sendJSON(res, 200, { ok: false, error: 'not_public' });
-      } else if (postId) {
+      } else if (type === 'hours' && postId) {
         const posts = await loadPublicPosts();
         post = posts.find((x) => x && x.id === postId) || null;
         if (!post) return sendJSON(res, 200, { ok: false, error: 'not_found' });
@@ -9991,7 +10035,8 @@ async function apiRoute(req, res, urlPath) {
         return sendJSON(res, 200, { ok: false, error: 'failed' });
       }
       await logGrant({ email, credits: 0, songCredits: 0, note: 'promo-buy:' + type + ':' + amount + ':$' + price.toFixed(2) + (post ? ' post:' + post.id : ''), at: now });
-      await addNotification('purchase-approved', email, '🚀 Promo · ' + (type === 'views' ? 'Views' : 'Watch hours') + ' +' + amount, (u.name || email) + ' (' + email + ') · ID: ' + (u.id || '—') + ' បានទិញ Promo ' + (type === 'views' ? 'Views' : 'Watch hours') + ' +' + amount + ' តម្លៃ $' + price.toFixed(2) + (post ? ' — «' + (post.title || '') + '»' : '') + ' (នៅសល់ $' + u.balance.toFixed(2) + ')', { extra: { promo: true, type, amount, price, balance: u.balance, buyerId: u.id || '—', decision: 'approved', paidBy: 'wallet' } });
+      await addNotification('purchase-approved', email, '🚀 Promo · ' + promoLabel + ' +' + amount, (u.name || email) + ' (' + email + ') · ID: ' + (u.id || '—') + ' បានទិញ Promo ' + promoLabel + ' +' + amount + ' តម្លៃ $' + price.toFixed(2) + (post ? ' — «' + (post.title || '') + '»' : '') + ' (នៅសល់ $' + u.balance.toFixed(2) + ')', { extra: { promo: true, type, amount, price, balance: u.balance, buyerId: u.id || '—', decision: 'approved', paidBy: 'wallet' } });
+      if (type === 'follows') return sendJSON(res, 200, { ok: true, type, amount, price, balance: u.balance, followers: applied.followers, views: applied.views, watchHours: applied.watchHours });
       return sendJSON(res, 200, { ok: true, type, amount, price, balance: u.balance, views: applied.views, watchHours: applied.watchHours });
     }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
     return;
@@ -10005,12 +10050,16 @@ async function apiRoute(req, res, urlPath) {
   // (owner correction 2026-11-19: the admin sets the money, the grant
   // must charge it, never grant free). Price: views amount * $0.0001,
   // hours amount * $0.016, rounded to 2 decimals (promoPriceFor, same
-  // as the buy endpoint). For 'views', postId is REQUIRED. Success:
+  // as the buy endpoint). For 'views', postId is REQUIRED. For
+  // 'follows', postId is NOT used (followers go to the target's
+  // account). Follows price: amount * $0.01332 (500=$6.66). Success:
   // {ok:true, type, amount, price, balance, views, watchHours, email,
   // name} — price = dollars charged (2 decimals), balance = target
   // user's NEW spendable balance, views = post's NEW view count
-  // (hours without postId: null), watchHours = user's NEW total watch
-  // hours IN HOURS. Errors: insufficient_balance (carries balance +
+  // (hours without postId: null; follows: target's TOTAL view count,
+  // integer), watchHours = user's NEW total watch hours IN HOURS.
+  // Follows success ALSO carries followers = target user's NEW total
+  // follower count (organic + promoFollowers, integer). Errors: insufficient_balance (carries balance +
   // price) / user_not_found / post_not_found / not_public /
   // invalid_amount / invalid_type / unauthorized. Add-failure after
   // deduction refunds and returns {ok:false, error:'failed'}.
@@ -10019,7 +10068,8 @@ async function apiRoute(req, res, urlPath) {
     if (!a.ok) return sendJSON(res, 200, { ok: false, error: 'unauthorized' });
     readJSONBody(req, 64 * 1024).then(async (body) => {
       const type = typeof body.type === 'string' ? body.type.trim().toLowerCase() : '';
-      if (type !== 'views' && type !== 'hours') return sendJSON(res, 200, { ok: false, error: 'invalid_type' });
+      if (type !== 'views' && type !== 'hours' && type !== 'follows') return sendJSON(res, 200, { ok: false, error: 'invalid_type' });
+      const promoLabel = type === 'views' ? 'Views' : type === 'follows' ? 'Follows' : 'Watch hours';
       const amount = promoValidAmount(body && body.amount);
       if (!amount) return sendJSON(res, 200, { ok: false, error: 'invalid_amount' });
       const targetId = typeof body.targetId === 'string' ? body.targetId.trim() : '';
@@ -10038,7 +10088,7 @@ async function apiRoute(req, res, urlPath) {
         if (!post) return sendJSON(res, 200, { ok: false, error: 'post_not_found' });
         if (normEmail(post.email) !== email) return sendJSON(res, 200, { ok: false, error: 'post_not_found' });
         if (post.visibility !== 'public') return sendJSON(res, 200, { ok: false, error: 'not_public' });
-      } else if (postId) {
+      } else if (type === 'hours' && postId) {
         const posts = await loadPublicPosts();
         post = posts.find((x) => x && x.id === postId) || null;
         if (!post) return sendJSON(res, 200, { ok: false, error: 'post_not_found' });
@@ -10068,7 +10118,8 @@ async function apiRoute(req, res, urlPath) {
         return sendJSON(res, 200, { ok: false, error: 'failed' });
       }
       await logGrant({ email, credits: 0, songCredits: 0, note: 'promo-grant:' + type + ':' + amount + ':$' + price.toFixed(2) + (post ? ' post:' + post.id : ''), at: now });
-      await addNotification('grant', email, '➕ Promo · ' + (type === 'views' ? 'Views' : 'Watch hours') + ' +' + amount, 'Admin បានបន្ថែម Promo ' + (type === 'views' ? 'Views' : 'Watch hours') + ' +' + amount + ' ឲ្យ ' + email + ' · ID: ' + (target.id || '—') + ' តម្លៃ $' + price.toFixed(2) + (post ? ' — «' + (post.title || '') + '»' : '') + ' (នៅសល់ $' + target.balance.toFixed(2) + ')', { extra: { promo: true, type, amount, price, balance: target.balance, buyerId: target.id || '—' } });
+      await addNotification('grant', email, '➕ Promo · ' + promoLabel + ' +' + amount, 'Admin បានបន្ថែម Promo ' + promoLabel + ' +' + amount + ' ឲ្យ ' + email + ' · ID: ' + (target.id || '—') + ' តម្លៃ $' + price.toFixed(2) + (post ? ' — «' + (post.title || '') + '»' : '') + ' (នៅសល់ $' + target.balance.toFixed(2) + ')', { extra: { promo: true, type, amount, price, balance: target.balance, buyerId: target.id || '—' } });
+      if (type === 'follows') return sendJSON(res, 200, { ok: true, type, amount, price, balance: target.balance, followers: applied.followers, views: applied.views, watchHours: applied.watchHours, email, name: target.name || '' });
       return sendJSON(res, 200, { ok: true, type, amount, price, balance: target.balance, views: applied.views, watchHours: applied.watchHours, email, name: target.name || '' });
     }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
     return;
