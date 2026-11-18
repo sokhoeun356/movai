@@ -271,8 +271,11 @@ async function ghRestoreAll() {
     } catch (e) {
       console.log('[github] restore ' + name + ' skipped: ' + (e && e.message ? e.message : e));
     }
-  }));
-  await ghRestoreUploads(); // uploaded MP3/cover files (GitHub-backed)
+  })); // uploaded MP3/cover files are restored lazily on the first API
+  // request (see apiRoute top) — ghRestoreUploads lives inside apiRoute
+  // and is not in scope here; calling it here threw a ReferenceError
+  // that .catch(()=>{}) swallowed, so the restore never ran (root cause
+  // of uploads vanishing on restart, owner order 2026-11-18).
 }
 
 // Graduated admin-key lockout (owner order 2026-11-16, corrected) —
@@ -3327,7 +3330,12 @@ function sunoPreviewFromData(d) {
   const first = arr.find((c) => c && (c.stream_audio_url || c.audio_url));
   return first ? (first.stream_audio_url || first.audio_url) : '';
 }
+let _healStarted = false; // startup song-URL heal runs once (see apiRoute top)
 function apiRoute(req, res, urlPath) {
+  // Startup heal (owner order 2026-11-18): once, on the first request
+  // after (re)start, re-link dead Magic Hour / proxy-upload song URLs to
+  // their Cloudinary copy when one exists. Fire-and-forget, never blocks.
+  if (!_healStarted) { _healStarted = true; try { (async () => { try { await ghRestoreUploads(); } catch (e) {} try { await healDeadSongUrls(); } catch (e) {} })().catch(() => {}); } catch (e) {} }
   // Attack protection: count this IP's requests (all /api/* + /uploads/*).
   // A correct admin key is never rate-limited or blocked here (the admin
   // can never lock themselves out — see isAdminKeyRequest).
@@ -5802,7 +5810,23 @@ function apiRoute(req, res, urlPath) {
         const k = histKey(it);
         if (k) byKey[k] = it;
       }
-      for (const it of body.items) {
+      // PERMANENT URL (owner order 2026-11-18): History items must store
+      // a permanent Cloudinary URL, never a Magic Hour signed URL (dead
+      // in 24h). Convert Magic Hour URLs in parallel (fast HEAD check
+      // first, upload only when the copy does not exist yet). A URL that
+      // cannot be made permanent is kept as-is (the startup heal retries
+      // it later) so a History sync never loses the user's song.
+      const converted = await Promise.all(body.items.map(async (it) => {
+        if (!it || typeof it !== 'object') return it;
+        const u = typeof it.url === 'string' ? it.url : '';
+        if (!u || !isMagicHourUrl(u)) return it;
+        try {
+          const perm = await permanentSongUrl(u, it.title || '');
+          if (perm && perm !== u) return Object.assign({}, it, { url: perm });
+        } catch (e) {}
+        return it;
+      }));
+      for (const it of converted) {
         if (!it || typeof it !== 'object') continue;
         const k = histKey(it);
         if (!k) continue;
@@ -6189,7 +6213,7 @@ function apiRoute(req, res, urlPath) {
     }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
     return;
   }
-  // POST /api/public/wallet/withdraw-request — {email, amount, khqrImageUrl?}
+  // POST /api/public/wallet/withdraw-request — {email, userId?, amount, khqrImageUrl?}
   // — PUBLIC. Asks to withdraw from the Wallet. amount >= $5.00 and
   // <= balance. Flat fee $0.50 per withdrawal (e.g. deposit $5, withdraw
   // $4.50). Nothing is deducted yet — the Admin deducts (amount + fee)
@@ -6207,16 +6231,27 @@ function apiRoute(req, res, urlPath) {
       if (amount > bal) return sendJSON(res, 200, { ok: false, error: 'លុយក្នុង Wallet មិនគ្រប់ទេ (នៅសល់ $' + bal.toFixed(2) + ') · Insufficient wallet balance ($' + bal.toFixed(2) + ' left)', balance: bal });
       const now = new Date().toISOString();
       const reqs = loadWalletRequests();
+      // userId (owner order 2026-11-18): stored on the request so the
+      // Admin sees WHO asked, even if the Gmail is ever renamed. The
+      // website sends its account userId; when it is missing, fall back
+      // to the account's own id. net = what the user actually receives
+      // (amount − $0.50 fee; e.g. withdraw $5 → net $4.50). total =
+      // what is deducted from the balance on approval (amount + fee).
+      const userId = (typeof body.userId === 'string' && body.userId.trim()) ? body.userId.trim().slice(0, 50) : (u.id || '');
       const r = {
-        id: newWalletRequestId(), type: 'withdraw', email, amount, fee: WALLET_WITHDRAW_FEE, total: walletMoney(amount + WALLET_WITHDRAW_FEE),
+        id: newWalletRequestId(), type: 'withdraw', email, userId, amount, fee: WALLET_WITHDRAW_FEE, total: walletMoney(amount + WALLET_WITHDRAW_FEE), net: walletMoney(amount - WALLET_WITHDRAW_FEE),
         khqrImageUrl: typeof body.khqrImageUrl === 'string' ? body.khqrImageUrl.trim().slice(0, 500) : '',
         status: 'pending', createdAt: now, updatedAt: now,
       };
       reqs.push(r);
       saveWalletRequests(reqs);
       await ghFlushFile(WALLET_REQUESTS_FILE);
-      addNotification('purchase-request', email, '💸 សំណើដកលុយ · Wallet withdraw request', (u.name || email) + ' (' + email + ') · ID: ' + (u.id || '—') + ' ស្នើដក $' + amount.toFixed(2) + ' (ថ្លៃសេវា $' + WALLET_WITHDRAW_FEE.toFixed(2) + ' — សរុបកាត់ $' + r.total.toFixed(2) + ')', { extra: { walletRequestId: r.id, type: 'withdraw', amount, fee: WALLET_WITHDRAW_FEE, total: r.total, buyerId: u.id || '—' } });
-      return sendJSON(res, 200, { ok: true, request: walletRequestPublic(r, users), fee: WALLET_WITHDRAW_FEE });
+      // Bell + Telegram (addNotification kind 'purchase-request' sends
+      // both, same path as top-up/purchase requests): amount, Gmail,
+      // User ID, fee $0.50, net amount. Nothing is deducted yet — the
+      // Admin deducts (amount + fee) only when approving.
+      addNotification('purchase-request', email, '💸 សំណើដកលុយ · Wallet withdraw request', (u.name || email) + ' (' + email + ') · User ID: ' + (r.userId || '—') + ' ស្នើដក $' + amount.toFixed(2) + ' (ថ្លៃសេវា $' + WALLET_WITHDRAW_FEE.toFixed(2) + ' — ទទួលបាន $' + r.net.toFixed(2) + ' — សរុបកាត់ $' + r.total.toFixed(2) + ')', { extra: { walletRequestId: r.id, type: 'withdraw', amount, fee: WALLET_WITHDRAW_FEE, total: r.total, net: r.net, buyerId: r.userId || '—', userId: r.userId || '' } });
+      return sendJSON(res, 200, { ok: true, request: walletRequestPublic(r, users), fee: WALLET_WITHDRAW_FEE, net: r.net });
     }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹমត្រូវទេ', 'Bad request')));
     return;
   }
@@ -7236,6 +7271,128 @@ function apiRoute(req, res, urlPath) {
     _cloudQueue = run.catch(() => {});
     return run;
   }
+  // ---- PERMANENT SONG URLs (owner order 2026-11-18): a song's canonical
+  // audio URL must be a PERMANENT Cloudinary URL — never a Magic Hour
+  // signed URL (expires after 24h) and never a bare proxy /uploads/ URL.
+  // New posts/History items are converted to Cloudinary before saving
+  // (see POST /api/public/post and POST /api/public/history), and a
+  // startup heal (healDeadSongUrls, triggered once at the top of
+  // apiRoute) re-links old dead links to their Cloudinary copy when one
+  // exists. The Cloudinary public_id is deterministic from the source
+  // URL (sha256, first 24 hex chars), so a copy stored earlier is found
+  // again from the same source URL without re-uploading. NOTE: this
+  // block must NOT use PUBLIC_FILE / UPLOADS_DIR (consts declared later
+  // inside apiRoute — TDZ when the heal runs at the top); it uses
+  // path.join(DATA_DIR, ...) directly instead. ----
+  function isCloudinaryUrl(u) {
+    return typeof u === 'string' && u.indexOf('res.cloudinary.com/') >= 0;
+  }
+  function isMagicHourUrl(u) {
+    return typeof u === 'string' && u.indexOf('magichour.ai') >= 0;
+  }
+  function isProxyUploadsUrl(u) {
+    return typeof u === 'string' && u.indexOf('/uploads/') >= 0 && (u.indexOf('movai-proxy.onrender.com/uploads/') >= 0 || u.indexOf('://') < 0);
+  }
+  // Fast check: does the Cloudinary asset for this source URL already
+  // exist (stored earlier under its deterministic public_id)? Tries every
+  // enabled Cloudinary account (the asset lives on exactly one). Returns
+  // the permanent mp3Url, or null. No upload — just HEAD requests.
+  async function cloudinaryExistingMp3Url(sourceUrl, title) {
+    try {
+      if (!cloudinaryConfigured()) return null;
+      const cands = cloudinaryCandidates();
+      if (!cands.length) return null;
+      const detId = cloudinaryPublicIdForUrl(sourceUrl);
+      for (const a of cands) {
+        let mp3Url = null;
+        try { mp3Url = cloudinaryMp3UrlFor(a, detId, title || ''); } catch (e) { mp3Url = null; }
+        if (!mp3Url) continue;
+        try {
+          const r = await fetch(mp3Url, { method: 'HEAD', signal: AbortSignal.timeout(15000) });
+          if (r && (r.status === 200 || r.status === 206)) return mp3Url;
+        } catch (e) {}
+      }
+      return null;
+    } catch (e) { return null; }
+  }
+  // Ensure a song URL is permanent. Cloudinary URLs pass through.
+  // Anything else is first checked against Cloudinary (asset may already
+  // exist under its deterministic public_id), then uploaded via
+  // cloudinaryStoreSong. Returns the permanent Cloudinary mp3Url, or
+  // null when Cloudinary cannot provide one (not configured, or the
+  // source is gone/expired so it cannot be fetched).
+  async function permanentSongUrl(url, title) {
+    const u = String(url || '').trim();
+    if (!u) return null;
+    if (isCloudinaryUrl(u)) return u;
+    if (!cloudinaryConfigured()) return null;
+    const existing = await cloudinaryExistingMp3Url(u, title);
+    if (existing) return existing;
+    try {
+      const cl = await cloudinaryStoreSong(u, title || '');
+      if (cl && cl.mp3Url) return cl.mp3Url;
+    } catch (e) {}
+    return null;
+  }
+  // Startup heal: re-link dead song URLs to their Cloudinary copy.
+  // Scans public.json + history.json. For a Magic Hour URL, the
+  // Cloudinary copy (if stored earlier) is found via the deterministic
+  // public_id and the URL is replaced — no re-upload, no source fetch,
+  // so even an EXPIRED Magic Hour link heals when its copy exists.
+  // For a dead proxy /uploads/ URL (file gone from disk and no GitHub
+  // backup), there is no deterministic Cloudinary mapping, so it is only
+  // logged, never re-linked. Runs once, fire-and-forget; never throws,
+  // never blocks startup or any request.
+  async function healDeadSongUrls() {
+    try {
+      const pubPath = path.join(DATA_DIR, 'public.json');
+      let changedPublic = false;
+      try {
+        let posts = [];
+        try { const j = JSON.parse(fs.readFileSync(pubPath, 'utf8')); if (Array.isArray(j)) posts = j; } catch (e) { posts = []; }
+        for (const p of posts) {
+          if (!p || typeof p.url !== 'string') continue;
+          const u = p.url;
+          if (isCloudinaryUrl(u)) continue;
+          if (isMagicHourUrl(u)) {
+            const perm = await cloudinaryExistingMp3Url(u, p.title || '');
+            if (perm && perm !== u) { p.url = perm; changedPublic = true; console.log('[heal] public post ' + p.id + ' re-linked to Cloudinary'); }
+          } else if (isProxyUploadsUrl(u)) {
+            const name = String(u.split('/uploads/').pop() || '').split('?')[0].split('#')[0];
+            let ok = false;
+            try { ok = fs.existsSync(path.join(DATA_DIR, 'uploads', name)); } catch (e) { ok = false; }
+            if (!ok) {
+              try { const gb = await ghGetUpload(name); if (gb && gb.length) ok = true; } catch (e) {}
+            }
+            if (!ok) console.log('[heal] public post ' + p.id + ' dead upload, no Cloudinary copy: ' + u.slice(0, 90));
+          }
+        }
+        if (changedPublic) {
+          try { fs.mkdirSync(DATA_DIR, { recursive: true }); } catch (e) {}
+          fs.writeFileSync(pubPath, JSON.stringify(posts, null, 2));
+          ghPersistFile(pubPath);
+          await ghFlushFile(pubPath);
+        }
+      } catch (e) { console.log('[heal] public posts skipped: ' + (e && e.message ? e.message : e)); }
+      let changedHistory = false;
+      try {
+        const h = loadHistory();
+        for (const email of Object.keys(h)) {
+          const items = Array.isArray(h[email]) ? h[email] : [];
+          for (const it of items) {
+            if (!it || typeof it.url !== 'string') continue;
+            const u = it.url;
+            if (isCloudinaryUrl(u)) continue;
+            if (isMagicHourUrl(u)) {
+              const perm = await cloudinaryExistingMp3Url(u, it.title || '');
+              if (perm && perm !== u) { it.url = perm; changedHistory = true; console.log('[heal] history ' + email + ' "' + String(it.title || '').slice(0, 40) + '" re-linked to Cloudinary'); }
+            }
+          }
+        }
+        if (changedHistory) { saveHistory(h); await ghFlushFile(HISTORY_FILE); }
+      } catch (e) { console.log('[heal] history skipped: ' + (e && e.message ? e.message : e)); }
+    } catch (e) { console.log('[heal] skipped: ' + (e && e.message ? e.message : e)); }
+  }
   // ---- LOCAL MP3 CONVERSION PERMANENTLY REMOVED (owner order 2026-11-17 ~11:16): ----
   // The local WAV->MP3 converter (convertAndCacheMp3, ~420 MB RSS) OOM-crashed the
   // 512 MB Render instance, so it is DELETED — not disabled, not dormant. Render
@@ -7904,6 +8061,20 @@ function apiRoute(req, res, urlPath) {
       return false;
     }
   }
+  // Verified GitHub backup (owner order 2026-11-18): PUT the upload to
+  // the movai-data repo and CONFIRM it landed, retrying once on failure.
+  // Returns true only when the file is present in the repo (or when
+  // GitHub is not configured at all, where ghPutUpload is a no-op true).
+  // Callers must refuse success when this returns false — a file that is
+  // only on the ephemeral Render disk will be wiped by the next restart.
+  async function ghPutUploadVerified(name, b64) {
+    let ok = false;
+    try { ok = await ghPutUpload(name, b64); } catch (e) { ok = false; }
+    if (!ok) {
+      try { ok = await ghPutUpload(name, b64); } catch (e) { ok = false; }
+    }
+    return !!ok;
+  }
   async function ghGetUpload(name) {
     if (!ghEnabled()) return null;
     try {
@@ -7976,9 +8147,11 @@ function apiRoute(req, res, urlPath) {
         const host = (req.headers && req.headers.host) || 'movai-proxy.onrender.com';
         // Back up to GitHub BEFORE returning success, so the Admin app
         // only proceeds to create the post once the file is durable.
-        // A GitHub failure does NOT fail the upload (the local file
-        // still works) — it is only logged.
-        await ghPutUpload(name, b64);
+        // VERIFIED (owner order 2026-11-18): the backup is retried once,
+        // and if it still fails the upload is REFUSED (surfaced as an
+        // error) instead of silently reporting success with a file that
+        // a restart would wipe.
+        if (!(await ghPutUploadVerified(name, b64))) return sendJSON(res, 200, { ok: false, error: 'រក្សាទុកឯកសារបរាជ័យ (GitHub backup) — សូមព្យាយាមម្តងទៀត · Upload backup failed, please try again' });
         return sendJSON(res, 200, { ok: true, url: proto + '://' + host + '/uploads/' + name, name, kind, size: buf.length });
       } catch (e) {
         return sendJSON(res, 200, { ok: false, error: 'រក្សាទុកឯកសារបរាជ័យ' });
@@ -8006,7 +8179,7 @@ function apiRoute(req, res, urlPath) {
         fs.writeFileSync(path.join(UPLOADS_DIR, name), buf);
         const proto = req.headers && req.headers['x-forwarded-proto'] === 'http' ? 'http' : 'https';
         const host = (req.headers && req.headers.host) || 'movai-proxy.onrender.com';
-        await ghPutUpload(name, b64);
+        if (!(await ghPutUploadVerified(name, b64))) return sendJSON(res, 200, { ok: false, error: 'រក្សាទុកឯកសារបរាជ័យ (GitHub backup) — សូមព្យាយាមម្តងទៀត · Upload backup failed, please try again' });
         return sendJSON(res, 200, { ok: true, url: proto + '://' + host + '/uploads/' + name, name, kind: 'image', size: buf.length });
       } catch (e) {
         return sendJSON(res, 200, { ok: false, error: 'រក្សាទុករូបភាពបរាជ័យ' });
@@ -8037,7 +8210,7 @@ function apiRoute(req, res, urlPath) {
         fs.writeFileSync(path.join(UPLOADS_DIR, name), buf);
         const proto = req.headers && req.headers['x-forwarded-proto'] === 'http' ? 'http' : 'https';
         const host = (req.headers && req.headers.host) || 'movai-proxy.onrender.com';
-        await ghPutUpload(name, b64);
+        if (!(await ghPutUploadVerified(name, b64))) return sendJSON(res, 200, { ok: false, error: 'រក្សាទុកឯកសារបរាជ័យ (GitHub backup) — សូមព្យាយាមម្តងទៀត · Upload backup failed, please try again' });
         return sendJSON(res, 200, { ok: true, url: proto + '://' + host + '/uploads/' + name, name, size: buf.length });
       } catch (e) {
         return sendJSON(res, 200, { ok: false, error: 'រក្សាទុកវិក្កយបត្របរាជ័យ' });
@@ -8086,8 +8259,23 @@ function apiRoute(req, res, urlPath) {
       if (!PUBLIC_MODES.includes(mode)) return sendJSON(res, 200, { ok: false, error: 'Mode មិនត្រឹមត្រូវទេ' });
       const title = typeof body.title === 'string' ? body.title.trim().slice(0, 200) : '';
       if (!title) return sendJSON(res, 200, { ok: false, error: 'សូមដាក់ចំណងជើង' });
-      const url = typeof body.url === 'string' ? body.url.trim().slice(0, 2000) : '';
+      let url = typeof body.url === 'string' ? body.url.trim().slice(0, 2000) : '';
       if (!url) return sendJSON(res, 200, { ok: false, error: 'សូមដាក់ link' });
+      // PERMANENT URL (owner order 2026-11-18): a public post's canonical
+      // audio URL must be a permanent Cloudinary URL — never a Magic Hour
+      // signed URL (dead in 24h). Convert first; a Magic Hour URL that
+      // cannot be stored to Cloudinary is refused (a public post that
+      // breaks tomorrow is worse than no post). A proxy /uploads/ URL is
+      // GitHub-backed and durable, so it is kept when Cloudinary cannot
+      // take it; a Cloudinary URL passes through untouched.
+      if (isMagicHourUrl(url)) {
+        const perm = await permanentSongUrl(url, title);
+        if (!perm) return sendJSON(res, 200, { ok: false, error: 'បទនេះរក្សាទុកជាអចិន្ត្រៃយ៍មិនបានទេ (Cloudinary) — សូមព្យាយាមម្តងទៀត · This song could not be stored permanently, please try again' });
+        url = perm;
+      } else if (isProxyUploadsUrl(url)) {
+        const perm = await permanentSongUrl(url, title);
+        if (perm) url = perm;
+      }
       const visibility = body.visibility === 'private' ? 'private' : 'public';
       const aspectRaw = typeof body.aspect === 'string' ? body.aspect.trim() : '';
       const aspect = (aspectRaw === '1x1' || aspectRaw === '4x6') ? aspectRaw : '';

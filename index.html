@@ -1605,6 +1605,8 @@ html[data-mode="light"] .btn-free{color:#63910c}
 .wallet-sec-head{font-size:0.9375rem;font-weight:900}
 .wallet-note{font-size:0.8125rem;color:var(--muted);line-height:1.7;margin-top:8px}
 .wallet-msg{font-size:0.8125rem;margin-top:10px;min-height:16px;line-height:1.6;font-weight:700}
+.wallet-policy{border-top:1px solid var(--line2);margin-top:12px;padding-top:10px}
+.wallet-policy-head{font-size:0.8125rem;font-weight:900}
 .wallet-methods{display:flex;gap:8px;margin-top:10px}
 .wallet-method{flex:1 1 0;padding:11px 8px;border-radius:12px;border:1px solid var(--line2);background:var(--field);color:var(--text);font-family:inherit;font-size:0.875rem;font-weight:800;cursor:pointer;min-height:46px}
 .wallet-method.on{border-color:var(--accent);background:rgba(var(--accent-rgb),.16);color:var(--accent-text)}
@@ -3404,18 +3406,34 @@ input[type=range].st-range{accent-color:var(--accent);min-height:32px;cursor:poi
       </div>
       <div class="wallet-sec">
         <div class="wallet-sec-head" data-i18n="walletWithdrawTitle">ដកលុយ · Withdraw</div>
+        <!-- Withdraw form (owner spec): exactly 4 fields, in this
+             order — 1 Amount, 2 Gmail, 3 User ID, 4 KHQR image.
+             Gmail + User ID are pre-filled from the signed-in
+             account by walletWithdrawPrefill() and stay editable. -->
         <div class="auth-field">
           <label for="walletWithdrawAmount" data-i18n="walletAmount">ចំនួនលុយ (USD) · Amount (USD)</label>
           <input class="input" id="walletWithdrawAmount" type="number" inputmode="decimal" min="5" step="0.01" placeholder="5.00" oninput="walletWithdrawTotal()">
         </div>
         <p class="wallet-note" data-i18n="walletMinNote">អប្បបរមា $5.00 · Minimum $5.00</p>
-        <p class="wallet-note" data-i18n="walletWithdrawFee">ថ្លៃសេវាដកលុយ៖ ថេរ $0.50 ក្នុងមួយដង (មិនមែនភាគរយទេ)។ ដក $X ត្រូវកាត់ $X + $0.50 — កាត់តែបន្ទាប់ពី Admin យល់ព្រមប៉ុណ្ណោះ។ · Withdraw fee: a FLAT $0.50 per withdrawal (not a percentage). Withdrawing $X costs $X + $0.50 — deducted only after the Admin approves.</p>
-        <p class="wallet-note" id="walletWithdrawTotalLine" style="font-weight:800;color:var(--text)"></p>
+        <div class="auth-field">
+          <label for="walletWithdrawEmail" data-i18n="walletGmail">Gmail របស់អ្នក · Your Gmail</label>
+          <input class="input" id="walletWithdrawEmail" type="email" inputmode="email" autocomplete="email" placeholder="you@gmail.com">
+        </div>
+        <div class="auth-field">
+          <label for="walletWithdrawUserId" data-i18n="walletUserIdLbl">លេខសម្គាល់ (ID) របស់អ្នក · Your User ID</label>
+          <input class="input" id="walletWithdrawUserId" type="text" autocomplete="off" autocapitalize="characters" placeholder="7C26UTFM4T">
+        </div>
         <label class="pay-receipt-pick" for="walletWithdrawFile" data-i18n="walletKhqrPick">ភ្ជាប់រូប KHQR របស់អ្នក · Attach your KHQR image</label>
         <input type="file" id="walletWithdrawFile" accept="image/*" style="display:none" onchange="walletFilePick(this,'withdraw')">
         <div id="walletWithdrawPrev"></div>
+        <p class="wallet-note" data-i18n="walletFeeLine" style="margin-top:8px">ថ្លៃសេវា · Fee $0.50</p>
+        <p class="wallet-note" id="walletWithdrawTotalLine" style="font-weight:800;color:var(--text)"></p>
         <p class="wallet-msg" id="walletWithdrawMsg"></p>
-        <button type="button" class="kbtn kbtn-black" id="walletWithdrawBtn" style="margin-top:8px;width:100%" onclick="walletWithdrawSubmit()" data-i18n="walletSubmit">ផ្ញើសំណើ · Submit</button>
+        <button type="button" class="kbtn kbtn-black" id="walletWithdrawBtn" style="margin-top:8px;width:100%" onclick="walletWithdrawSubmit()">Withdraw 💲0.00</button>
+        <div class="wallet-policy">
+          <div class="wallet-policy-head" data-i18n="walletWithdrawPolicyTitle">គោលការណ៍ដកលុយ · Withdraw policy</div>
+          <p class="wallet-note" data-i18n="walletWithdrawPolicy">សូមរង់ចាំ 24 ម៉ោងបន្ទាប់ពីដាក់សំណើ។ រង់ចាំយូរបំផុត៖ 3 ថ្ងៃ ទៅ 1 សប្តាហ៍។ លឿនបំផុត៖ 1 ម៉ោង (ក្រុមហ៊ុនជាអ្នកកំណត់ល្បឿន)។ Admin នឹងផ្ទេរលុយទៅ KHQR របស់អ្នក។ · Please wait 24 hours after submitting. Maximum wait: 3 days to 1 week. Fastest: 1 hour (the company decides the speed). The Admin will transfer the money to your KHQR.</p>
+        </div>
       </div>
     </div>
     <div id="profileBody" style="margin-top:8px"></div>
@@ -3899,9 +3917,15 @@ km:{
  walletImgOk:'បានភ្ជាប់រូបហើយ ✓ · Image attached ✓',walletRemove:'ដកចេញ · Remove',
  walletSubmit:'ផ្ញើសំណើ · Submit',walletSending:'កំពុងផ្ញើ… · Sending…',
  walletTopupSent:'បានផ្ញើសំណើបញ្ចូលលុយទៅ Admin ហើយ ✓ — រង់ចាំ Admin យល់ព្រម លុយនឹងចូល Wallet របស់អ្នក។ · Top-up request sent to the Admin ✓ — once approved, the money lands in your wallet.',
- walletWithdrawSent:'បានផ្ញើសំណើដកលុយទៅ Admin ហើយ ✓ — Admin នឹងផ្ញើលុយទៅ KHQR របស់អ្នក ក្រោយយល់ព្រម។ · Withdraw request sent to the Admin ✓ — after approval the Admin sends the money to your KHQR.',
+ walletWithdrawSent:'បានផ្ញើសំណើដកលុយទៅ Admin និង Telegram ហើយ ✓ — សូមរង់ចាំ 24 ម៉ោង; Admin នឹងផ្ទេរលុយទៅ KHQR របស់អ្នក។ · Withdraw request sent to the Admin and Telegram ✓ — please wait 24 hours; the Admin will transfer the money to your KHQR.',
  walletErrAmount:'សូមបញ្ចូលចំនួនចាប់ពី $5.00 ឡើងទៅ · Please enter an amount of $5.00 or more',
  walletErrFail:'ផ្ញើសំណើមិនបានទេ — សូមព្យាយាមម្ដងទៀត · Could not send the request — please try again',
+ walletGmail:'Gmail របស់អ្នក · Your Gmail',walletUserIdLbl:'លេខសម្គាល់ (ID) របស់អ្នក · Your User ID',
+ walletFeeLine:'ថ្លៃសេវា · Fee $0.50',
+ walletErrGmail:'សូមបញ្ចូល Gmail របស់អ្នកឲ្យត្រឹមត្រូវ · Please enter your Gmail correctly',
+ walletErrUserId:'សូមបញ្ចូលលេខសម្គាល់ (ID) របស់អ្នក · Please enter your User ID',
+ walletWithdrawPolicyTitle:'គោលការណ៍ដកលុយ · Withdraw policy',
+ walletWithdrawPolicy:'សូមរង់ចាំ 24 ម៉ោងបន្ទាប់ពីដាក់សំណើ។ រង់ចាំយូរបំផុត៖ 3 ថ្ងៃ ទៅ 1 សប្តាហ៍។ លឿនបំផុត៖ 1 ម៉ោង (ក្រុមហ៊ុនជាអ្នកកំណត់ល្បឿន)។ Admin នឹងផ្ទេរលុយទៅ KHQR របស់អ្នក។ · Please wait 24 hours after submitting. Maximum wait: 3 days to 1 week. Fastest: 1 hour (the company decides the speed). The Admin will transfer the money to your KHQR.',
  walletWithdrawFee:'ថ្លៃសេវាដកលុយ៖ ថេរ $0.50 ក្នុងមួយដង (មិនមែនភាគរយទេ)។ ដក $X ត្រូវកាត់ $X + $0.50 — កាត់តែបន្ទាប់ពី Admin យល់ព្រមប៉ុណ្ណោះ។ · Withdraw fee: a FLAT $0.50 per withdrawal (not a percentage). Withdrawing $X costs $X + $0.50 — deducted only after the Admin approves.',
  walletWithdrawTotalFmt:'សរុបត្រូវកាត់ (ក្រោយ Admin យល់ព្រម)៖ {t} · Total deducted (after Admin approval): {t}',
  walletBuyBtn:'ទិញដោយ Wallet · Buy with Wallet',walletBuying:'កំពុងទិញ… · Buying…',
@@ -4194,9 +4218,15 @@ en:{
  walletImgOk:'Image attached ✓ · បានភ្ជាប់រូបហើយ ✓',walletRemove:'Remove · ដកចេញ',
  walletSubmit:'Submit · ផ្ញើសំណើ',walletSending:'Sending… · កំពុងផ្ញើ…',
  walletTopupSent:'Top-up request sent to the Admin ✓ — once approved, the money lands in your wallet. · បានផ្ញើសំណើបញ្ចូលលុយទៅ Admin ហើយ ✓ — រង់ចាំ Admin យល់ព្រម លុយនឹងចូល Wallet របស់អ្នក។',
- walletWithdrawSent:'Withdraw request sent to the Admin ✓ — after approval the Admin sends the money to your KHQR. · បានផ្ញើសំណើដកលុយទៅ Admin ហើយ ✓ — Admin នឹងផ្ញើលុយទៅ KHQR របស់អ្នក ក្រោយយល់ព្រម។',
+ walletWithdrawSent:'Withdraw request sent to the Admin and Telegram ✓ — please wait 24 hours; the Admin will transfer the money to your KHQR. · បានផ្ញើសំណើដកលុយទៅ Admin និង Telegram ហើយ ✓ — សូមរង់ចាំ 24 ម៉ោង; Admin នឹងផ្ទេរលុយទៅ KHQR របស់អ្នក។',
  walletErrAmount:'Please enter an amount of $5.00 or more · សូមបញ្ចូលចំនួនចាប់ពី $5.00 ឡើងទៅ',
  walletErrFail:'Could not send the request — please try again · ផ្ញើសំណើមិនបានទេ — សូមព្យាយាមម្ដងទៀត',
+ walletGmail:'Your Gmail · Gmail របស់អ្នក',walletUserIdLbl:'Your User ID · លេខសម្គាល់ (ID) របស់អ្នក',
+ walletFeeLine:'Fee $0.50 · ថ្លៃសេវា',
+ walletErrGmail:'Please enter your Gmail correctly · សូមបញ្ចូល Gmail របស់អ្នកឲ្យត្រឹមត្រូវ',
+ walletErrUserId:'Please enter your User ID · សូមបញ្ចូលលេខសម្គាល់ (ID) របស់អ្នក',
+ walletWithdrawPolicyTitle:'Withdraw policy · គោលការណ៍ដកលុយ',
+ walletWithdrawPolicy:'Please wait 24 hours after submitting. Maximum wait: 3 days to 1 week. Fastest: 1 hour (the company decides the speed). The Admin will transfer the money to your KHQR. · សូមរង់ចាំ 24 ម៉ោងបន្ទាប់ពីដាក់សំណើ។ រង់ចាំយូរបំផុត៖ 3 ថ្ងៃ ទៅ 1 សប្តាហ៍។ លឿនបំផុត៖ 1 ម៉ោង (ក្រុមហ៊ុនជាអ្នកកំណត់ល្បឿន)។ Admin នឹងផ្ទេរលុយទៅ KHQR របស់អ្នក។',
  walletWithdrawFee:'Withdraw fee: a FLAT $0.50 per withdrawal (not a percentage). Withdrawing $X costs $X + $0.50 — deducted only after the Admin approves. · ថ្លៃសេវាដកលុយ៖ ថេរ $0.50 ក្នុងមួយដង (មិនមែនភាគរយទេ)។ ដក $X ត្រូវកាត់ $X + $0.50 — កាត់តែបន្ទាប់ពី Admin យល់ព្រមប៉ុណ្ណោះ។',
  walletWithdrawTotalFmt:'Total deducted (after Admin approval): {t} · សរុបត្រូវកាត់ (ក្រោយ Admin យល់ព្រម)៖ {t}',
  walletBuyBtn:'Buy with Wallet · ទិញដោយ Wallet',walletBuying:'Buying… · កំពុងទិញ…',
@@ -4731,6 +4761,9 @@ function applyLang(){
      after the language pass resets the static price markup. */
   try{pkgPricesRender();}catch(e){}
   try{songStyleRenderPresets();}catch(e){}
+  /* The Withdraw button carries the live net label (no data-i18n),
+     so re-sync it after a language pass. */
+  try{walletWithdrawTotal();}catch(e){}
 }
 function uiInit(){
   renderSwatches();
@@ -5881,9 +5914,12 @@ function pkgShowReqFail(){
             {email, amount, method:'khmer'|'foreign', receiptUrl?}
             — a request only; the Admin approves before money lands.
    Withdraw: POST /api/public/wallet/withdraw-request
-            {email, amount, khqrImageUrl?} — FLAT $0.50 fee per
-            withdrawal, deducted (amount + $0.50) only after the
-            Admin approves.
+            {email, userId, amount, khqrImageUrl?} — the form's 4
+            fields are Amount (min $5.00), Gmail and User ID
+            (pre-filled from the account, editable) and the KHQR
+            image. FLAT $0.50 fee per withdrawal: the button and
+            the line above it show the net live as
+            «Withdraw 💲<amount − 0.50>».
    Buy:     POST /api/public/wallet/buy-package {email, packageId}
             — pays a package straight from the balance.
    Attached images (receipt / KHQR) upload FIRST through the same
@@ -6041,22 +6077,44 @@ function walletTopupSubmit(){
     walletSetMsg('walletTopupMsg',tx('walletErrFail'),false);
   });
 }
-/* Live total under the withdraw amount: amount + the FLAT $0.50
-   fee, so the user sees the full deduction before sending. */
+/* Pre-fill the withdraw Gmail + User ID fields from the signed-in
+   account (owner spec) — both stay editable. Called every time
+   My Profile opens, and re-syncs the live net label. */
+function walletWithdrawPrefill(){
+  var u=(typeof acctCurrent==='function')?acctCurrent():null;if(!u)return;
+  var em=document.getElementById('walletWithdrawEmail');if(em)em.value=u.email||'';
+  var id=document.getElementById('walletWithdrawUserId');if(id)id.value=u.id||'';
+  walletWithdrawTotal();
+}
+/* Live net display (owner spec): the line above the Withdraw
+   button AND the button itself show the net amount after the
+   FLAT $0.50 fee, exactly as «Withdraw 💲<net>» — $5 typed shows
+   «Withdraw 💲4.50», $10 shows «Withdraw 💲9.50». The small
+   «Fee $0.50» line sits right above the net line in the markup. */
 function walletWithdrawTotal(){
-  var line=document.getElementById('walletWithdrawTotalLine');if(!line)return;
+  var line=document.getElementById('walletWithdrawTotalLine');
+  var btn=document.getElementById('walletWithdrawBtn');
   var amt=walletParse(document.getElementById('walletWithdrawAmount'));
-  if(amt===null||!(amt>0)){line.textContent='';return;}
-  line.textContent=tx('walletWithdrawTotalFmt').replace('{t}',walletFmt(amt+0.5));
+  var has=(amt!==null&&amt>0);
+  var net=has?Math.max(0,Math.round((amt-0.5)*100)/100):0;
+  var label='Withdraw 💲'+net.toFixed(2);
+  if(line)line.textContent=has?label:'';
+  if(btn&&!btn.disabled)btn.textContent=label;
 }
 function walletWithdrawSubmit(){
-  var em=walletEmail();if(!em){loginSheetOpen();return;}
+  if(!walletEmail()){loginSheetOpen();return;}
   var amt=walletReadAmount('walletWithdrawAmount');
   if(amt===null){walletSetMsg('walletWithdrawMsg',tx('walletErrAmount'),false);return;}
+  var emEl=document.getElementById('walletWithdrawEmail');
+  var em=emEl?String(emEl.value||'').trim():walletEmail();
+  if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(em)){walletSetMsg('walletWithdrawMsg',tx('walletErrGmail'),false);return;}
+  var idEl=document.getElementById('walletWithdrawUserId');
+  var uid=idEl?String(idEl.value||'').trim():'';
+  if(!uid){walletSetMsg('walletWithdrawMsg',tx('walletErrUserId'),false);return;}
   var btn=document.getElementById('walletWithdrawBtn');if(btn)btn.disabled=true;
   walletSetMsg('walletWithdrawMsg',tx('walletSending'),true);
   walletUploadFile('withdraw').then(function(url){
-    var payload={email:em,amount:amt};
+    var payload={email:em,userId:uid,amount:amt};
     if(url)payload.khqrImageUrl=url;
     return authFetchJson('/api/public/wallet/withdraw-request','POST',payload,30000);
   }).then(function(data){
@@ -16716,6 +16774,8 @@ function profileOpen(){
   /* Wallet balance refreshes every time the Profile opens (and
      after every wallet action — see the wallet submit handlers). */
   try{walletLoadBalance();}catch(e){}
+  /* Withdraw Gmail + User ID pre-fill from this account (editable). */
+  try{walletWithdrawPrefill();}catch(e){}
   var s=document.getElementById('profileSheet');if(s)sheetShowAnim(s);
 }
 function profileClose(){var s=document.getElementById('profileSheet');sheetHideAnim(s);}
