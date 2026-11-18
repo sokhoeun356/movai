@@ -215,7 +215,7 @@ main{max-width:720px;margin:0 auto;padding:calc(4.75rem + env(safe-area-inset-to
 .hero p{font-size:0.9375rem;color:var(--muted);margin-top:14px;line-height:1.65;max-width:540px}
 .modes{display:flex;gap:10px;margin-top:26px}
 .modes .kbtn{flex:1;padding:15px;font-size:1rem}
-.kbtn{display:inline-flex;align-items:center;justify-content:center;gap:8px;border-radius:12px;padding:12px 22px;font-size:0.9375rem;font-weight:700;font-family:inherit;cursor:pointer;text-decoration:none;border:1px solid transparent;min-height:44px}
+.kbtn{display:inline-flex;align-items:center;justify-content:center;gap:8px;border-radius:12px;padding:12px 22px;font-size:0.9375rem;font-weight:700;font-family:inherit;cursor:pointer;text-decoration:none;border:1px solid transparent;min-height:44px;position:relative}
 .kbtn-black{background:var(--accent-fill);color:#0d1005;border-color:transparent}
 .kbtn-white{background:var(--card);color:var(--text2);border:1px solid var(--line2)}
 .panel{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:20px;margin-top:16px}
@@ -460,7 +460,14 @@ html[data-mode="light"] .err-title{color:#b91c1c}
    the first ~10 items are visible, anything past that scrolls
    up/down inside the area (max-height + overflow-y:auto) — the
    same pattern as the Admin API lists (show a few + scroll). */
-.hist-scroll{overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;scrollbar-width:thin;scrollbar-color:var(--line3) transparent}
+/* History list scroll (fix 2026-11-18): overscroll-behavior MUST be
+   auto, NOT contain. With contain, a drag starting on a song card
+   was trapped inside this container even when the list was shorter
+   than max-height (no overflow to scroll) — the gesture never
+   chained to the page, so the list did not move at all. With auto,
+   a short list chains to the page scroll, and a long list still
+   scrolls internally first. */
+.hist-scroll{overflow-y:auto;overflow-x:hidden;overscroll-behavior:auto;-webkit-overflow-scrolling:touch;scrollbar-width:thin;scrollbar-color:var(--line3) transparent}
 .hist-scroll::-webkit-scrollbar{width:5px}
 .hist-scroll::-webkit-scrollbar-thumb{background:var(--line3);border-radius:99px}
 .hist-scroll-list{max-height:600px}
@@ -836,11 +843,18 @@ img.hist-media,.d3-preview{cursor:zoom-in}
 .song-title{font-size:0.75rem;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.35}
 .song-sub{font-size:0.625rem;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:1px;line-height:1.4;font-variant-numeric:tabular-nums}
 .song-dur{flex:0 0 auto;font-size:0.6875rem;font-weight:700;color:var(--muted);font-variant-numeric:tabular-nums}
-.song-ico-btn{width:26px;height:26px;flex:0 0 auto;display:inline-flex;align-items:center;justify-content:center;border:1px solid var(--line2);background:var(--card);color:var(--text);border-radius:7px;cursor:pointer;padding:0;font-family:inherit}
+.song-ico-btn{width:26px;height:26px;flex:0 0 auto;display:inline-flex;align-items:center;justify-content:center;border:1px solid var(--line2);background:var(--card);color:var(--text);border-radius:7px;cursor:pointer;padding:0;font-family:inherit;position:relative}
+/* Post to Public badge on the small icon buttons (same number-only
+   treatment as the History buttons — the green colour alone says
+   it) + solid-grey lock, mirroring .song-act. */
+.song-ico-btn > .feat-limit-badge{top:auto;bottom:4px;left:4px;right:auto;padding:0 4px}
+.song-ico-btn > .feat-limit-badge .fl-free{display:none}
+.song-ico-btn > .feat-limit-badge .fl-num{font-size:0.75rem}
+.song-ico-btn.feat-locked{background:#9aa0a8!important;border-color:#9aa0a8!important;color:#fff!important;opacity:1;filter:none}
 .song-ico-btn svg{width:13px;height:13px;display:block}
 .song-ico-btn:active{opacity:.75}
 .song-ico-btn.liked{color:#ff2e88;border-color:rgba(255,46,136,.55)}
-.song-seek{display:block;width:100%;height:12px;margin:5px 0 0;accent-color:var(--accent);cursor:pointer}
+.song-seek{display:block;width:100%;height:12px;margin:5px 0 0;accent-color:var(--accent);cursor:pointer;touch-action:pan-y}
 /* ===== Song History rows — BIG cards (owner order 2026-11-18) =====
    ONLY the Song History list rows change (cards built by
    histSongCard, marked .hist-song-lg): a taller card with a bigger
@@ -905,7 +919,7 @@ img.hist-media,.d3-preview{cursor:zoom-in}
    button opens the Packages page (see featLockedGoPackages).
    The song-menu row keeps the faded treatment (it is a list row,
    not a button). */
-.song-act.feat-locked,.pub-pill.feat-locked,.pub-act.feat-locked{background:#9aa0a8!important;border-color:#9aa0a8!important;color:#fff!important;opacity:1;filter:none}
+.song-act.feat-locked,.pub-pill.feat-locked,.pub-act.feat-locked,.kbtn.feat-locked{background:#9aa0a8!important;border-color:#9aa0a8!important;color:#fff!important;opacity:1;filter:none}
 .song-menu-item:has(>.feat-limit-badge.fl-out){opacity:.45;filter:grayscale(.55)}
 .hist-song-lg .song-seek{height:22px;margin-top:8px}
 /* Song menu — bottom sheet listing EVERY action of one Song
@@ -4345,7 +4359,7 @@ km:{
  histEmptySong:'មិនទាន់មានបទចម្រៀងទេ — បទចម្រៀងដែលអ្នកបង្កើតនឹងរក្សាទុកនៅទីនេះជាប់រហូត',
  histEmpty3d:'មិនទាន់មាន 3D ទេ — ម៉ូដែល 3D ដែលអ្នកបង្កើតនឹងរក្សាទុកនៅទីនេះជាប់រហូត',
  histEmptyStory:'មិនទាន់មាន Story ទេ — Story ដែលអ្នកបង្កើតនឹងរក្សាទុកនៅទីនេះជាប់រហូត',
- mvBtn:'MV',featFree:'Free',featOut:'អស់',featLockedDl:'អស់ Free Download ហើយ — ទិញ Package ដើម្បី Download មិនកំណត់',featLockedMv:'អស់ Free MV ហើយ — ទិញ Package ដើម្បីបង្កើត MV បន្ថែម',featLockedVs:'អស់ Free Vocal Studio ហើយ — ទិញ Package ដើម្បីបំបែកបទបន្ថែម',mvFormat:'ទម្រង់អេក្រង់ · Screen format',mvFmtPortrait:'បញ្ឈរ',mvFmtLandscape:'ផ្ដេក',mvFmtSquare:'ការ៉េ',mvFmtWide:'ធំទូលាយ',
+ mvBtn:'MV',featFree:'Free',featOut:'អស់',featLockedDl:'អស់ Free Download ហើយ — ទិញ Package ដើម្បី Download មិនកំណត់',featLockedMv:'អស់ Free MV ហើយ — ទិញ Package ដើម្បីបង្កើត MV បន្ថែម',featLockedVs:'អស់ Free Vocal Studio ហើយ — ទិញ Package ដើម្បីបំបែកបទបន្ថែម',featLockedPost:'អស់ Free Post ហើយ — ទិញ Package ដើម្បី Post មិនកំណត់',mvFormat:'ទម្រង់អេក្រង់ · Screen format',mvFmtPortrait:'បញ្ឈរ',mvFmtLandscape:'ផ្ដេក',mvFmtSquare:'ការ៉េ',mvFmtWide:'ធំទូលាយ',
  mvBg:'ផ្ទៃខាងក្រោយ · Background',mvBgAuto:'អូតូ',mvBgUpload:'Upload វីដេអូ / រូបភាព',mvBgAutoNote:'អូតូ — ប្រើរូប cover របស់បទ ឬផ្ទៃ MovAi ដែលបង្កើតឲ្យ',
  mvLyricsLbl:'អត្ថបទចម្រៀង · Lyrics',mvLyricsHave:'មានអត្ថបទរួច — អក្សរនឹងរត់តាមពេលច្រៀង (karaoke)',mvLyricsNone:'បទនេះមិនទាន់មានអត្ថបទទេ — ឲ្យ AI ស្ដាប់ហើយសរសេរឲ្យ',mvTrTitle:'🎧 Transcript · អត្ថបទតាមពេលច្រៀង',mvTrHint:'បន្ទាត់នីមួយៗមានវិនាទីដែលគេច្រៀងពិត — ចុចលើបន្ទាត់ ដើម្បីលោតទៅវិនាទីនោះ',
  mvAiBtn:'AI ស្ដាប់ + សរសេរអត្ថបទ',mvAiBusy:'AI កំពុងស្ដាប់… {s} វិនាទី',mvAiDone:'AI សរសេរអត្ថបទរួចរាល់ ✓',mvAiFail:'AI ស្ដាប់មិនបានទេ — server អាចមិនទាន់មានមុខងារនេះ ឬអ៊ីនធឺណិតមានបញ្ហា។ សូមព្យាយាមម្ដងទៀត',
@@ -4648,7 +4662,7 @@ en:{
  histEmptySong:'No songs yet — songs you create will be saved here permanently',
  histEmpty3d:'No 3D models yet — 3D models you create will be saved here permanently',
  histEmptyStory:'No stories yet — stories you create will be saved here permanently',
- mvBtn:'MV',featFree:'Free',featOut:'Out',featLockedDl:'Free downloads are out — buy a package for unlimited downloads',featLockedMv:'Free MV uses are out — buy a package to make more MVs',featLockedVs:'Free Vocal Studio uses are out — buy a package to split more songs',mvFormat:'Screen format',mvFmtPortrait:'Portrait',mvFmtLandscape:'Landscape',mvFmtSquare:'Square',mvFmtWide:'Ultra-wide',
+ mvBtn:'MV',featFree:'Free',featOut:'Out',featLockedDl:'Free downloads are out — buy a package for unlimited downloads',featLockedMv:'Free MV uses are out — buy a package to make more MVs',featLockedVs:'Free Vocal Studio uses are out — buy a package to split more songs',featLockedPost:'Free posts are out — buy a package to post unlimited songs',mvFormat:'Screen format',mvFmtPortrait:'Portrait',mvFmtLandscape:'Landscape',mvFmtSquare:'Square',mvFmtWide:'Ultra-wide',
  mvBg:'Background',mvBgAuto:'Auto',mvBgUpload:'Upload video / image',mvBgAutoNote:'Auto — uses the song cover, or a generated MovAi backdrop',
  mvLyricsLbl:'Lyrics',mvLyricsHave:'Lyrics found — they will run karaoke-style with the singing',mvLyricsNone:'This song has no lyrics yet — let AI listen and write them',mvTrTitle:'🎧 Transcript · lyrics by sung time',mvTrHint:'Every line carries the exact second it is sung — tap a line to jump to that second',
  mvAiBtn:'AI listen + write lyrics',mvAiBusy:'AI is listening… {s}s',mvAiDone:'AI wrote the lyrics ✓',mvAiFail:'AI could not listen — the server may not have this feature yet, or the connection failed. Please try again',
@@ -7930,7 +7944,8 @@ function genShowImage(src,blob,remoteSrc){
   row.appendChild(dl);
   var pb=document.createElement('button');
   pb.className='kbtn kbtn-white';pb.style.flex='1';pb.textContent=tx('pubPostBtn');
-  pb.addEventListener('click',function(){pubOpenSheet({type:'image',url:(remoteSrc&&/^https:/i.test(remoteSrc))?remoteSrc:(/^https:/i.test(src)?src:''),prompt:histCtx?histCtx.prompt:''});});
+  pb.appendChild(featLimitBadge('post'));
+  pb.addEventListener('click',function(){if(featLimitsLocked('post')){featLockedGoPackages('post');return;}pubOpenSheet({type:'image',url:(remoteSrc&&/^https:/i.test(remoteSrc))?remoteSrc:(/^https:/i.test(src)?src:''),prompt:histCtx?histCtx.prompt:''});});
   row.appendChild(pb);
   box.appendChild(row);
   gen.lastImg={src:src,blob:blob,remote:remoteSrc,name:(histCtx?histCtx.prompt:'')};
@@ -8410,7 +8425,8 @@ function genShowVideo(src){
   row.appendChild(dl);
   var pb=document.createElement('button');
   pb.className='kbtn kbtn-white';pb.style.flex='1';pb.textContent=tx('pubPostBtn');
-  pb.addEventListener('click',function(){pubOpenSheet({type:'video',url:/^https:/i.test(src)?src:'',prompt:histCtx?histCtx.prompt:''});});
+  pb.appendChild(featLimitBadge('post'));
+  pb.addEventListener('click',function(){if(featLimitsLocked('post')){featLockedGoPackages('post');return;}pubOpenSheet({type:'video',url:/^https:/i.test(src)?src:'',prompt:histCtx?histCtx.prompt:''});});
   row.appendChild(pb);
   box.appendChild(row);
   gen.lastVideo=src;
@@ -9002,13 +9018,16 @@ var FEAT_LIMIT_FREE=2;
 var featLimits={loaded:false,fetching:false,
   download:{freeLeft:FEAT_LIMIT_FREE,unlimited:false},
   mv:{freeLeft:FEAT_LIMIT_FREE,pkgLeft:0,left:FEAT_LIMIT_FREE},
-  vs:{freeLeft:FEAT_LIMIT_FREE,pkgLeft:0,left:FEAT_LIMIT_FREE}};
+  vs:{freeLeft:FEAT_LIMIT_FREE,pkgLeft:0,left:FEAT_LIMIT_FREE},
+  post:{freeLeft:FEAT_LIMIT_FREE,unlimited:false}};
 function featLimitsEmail(){try{return genUserEmail()||'';}catch(e){return '';}}
 function featLimitsApply(d){
   if(!d||typeof d!=='object')return;
-  var dl=d.download||{},mv=d.mv||{},vs=d.vs||{};
+  var dl=d.download||{},mv=d.mv||{},vs=d.vs||{},po=d.post||{};
   featLimits.download.freeLeft=Math.max(0,parseInt(dl.freeLeft,10)||0);
   featLimits.download.unlimited=dl.unlimited===true;
+  featLimits.post.freeLeft=Math.max(0,parseInt(po.freeLeft,10)||0);
+  featLimits.post.unlimited=po.unlimited===true;
   featLimits.mv.freeLeft=Math.max(0,parseInt(mv.freeLeft,10)||0);
   /* `left` is always rebuilt as freeLeft + pkgLeft (never trusted
      as a separate total), so the badge can never show a total
@@ -9023,8 +9042,8 @@ function featLimitsApply(d){
   featLimitsPaint();
 }
 /* Sync user object (POST /api/admin/sync → pubUser) — FREE
-   counters ONLY. The five counters ride the sync object
-   (freeDlUsed / freeMvUsed / freeVsUsed / mvLeft / vsLeft), but
+   counters ONLY. The six counters ride the sync object
+   (freeDlUsed / freeMvUsed / freeVsUsed / freePostUsed / mvLeft / vsLeft), but
    the sync object carries NO expiry: its plan / songPlan are bare
    package-id strings with no expiry date (no planExpiresAt /
    songPlanExpiresAt, no .until — verified against the server's
@@ -9032,17 +9051,18 @@ function featLimitsApply(d){
    after the package has expired. Those leftovers are LOST at
    expiry and must never reach the badges or the gates, so they
    are deliberately NOT read here. Free 2 is LIFETIME (it survives
-   any expiry), so only the three free counters are applied.
+   any expiry), so only the four free counters are applied.
    Package counts (pkgLeft / left) and Download-unlimited belong
    ONLY to the expiry-aware GET /api/public/feature-limits, which
    is re-fetched at once below so an expired package flips the
    badges to «អស់» as soon as that fetch lands. */
 function featLimitsApplyUser(u){
   if(!u||typeof u!=='object')return;
-  if(u.freeDlUsed===undefined&&u.freeMvUsed===undefined&&u.freeVsUsed===undefined)return;
+  if(u.freeDlUsed===undefined&&u.freeMvUsed===undefined&&u.freeVsUsed===undefined&&u.freePostUsed===undefined)return;
   if(u.freeDlUsed!==undefined)featLimits.download.freeLeft=Math.max(0,FEAT_LIMIT_FREE-(parseInt(u.freeDlUsed,10)||0));
   if(u.freeMvUsed!==undefined)featLimits.mv.freeLeft=Math.max(0,FEAT_LIMIT_FREE-(parseInt(u.freeMvUsed,10)||0));
   if(u.freeVsUsed!==undefined)featLimits.vs.freeLeft=Math.max(0,FEAT_LIMIT_FREE-(parseInt(u.freeVsUsed,10)||0));
+  if(u.freePostUsed!==undefined)featLimits.post.freeLeft=Math.max(0,FEAT_LIMIT_FREE-(parseInt(u.freePostUsed,10)||0));
   /* Totals keep the package counts the last feature-limits fetch
      owned — this function never writes pkgLeft / unlimited, so a
      stale mvLeft / vsLeft from the sync object cannot resurrect
@@ -9067,17 +9087,24 @@ function featLimitsRefresh(){try{featLimitsFetch();}catch(e){}}
 function featLimitsLeft(kind){
   if(kind==='download')return featLimits.download.unlimited?Infinity:featLimits.download.freeLeft;
   if(kind==='mv')return featLimits.mv.left;
+  if(kind==='post')return featLimits.post.unlimited?Infinity:featLimits.post.freeLeft;
   return featLimits.vs.left;
 }
 function featLimitsLocked(kind){
   if(!featLimits.loaded)return false;
   if(kind==='download')return !featLimits.download.unlimited&&featLimits.download.freeLeft<=0;
+  if(kind==='post')return !featLimits.post.unlimited&&featLimits.post.freeLeft<=0;
   return featLimitsLeft(kind)<=0;
 }
 function featLimitBadgeHtml(kind){
   if(kind==='download'){
     if(featLimits.download.unlimited)return '<span class="fl-num">∞</span>';
     if(featLimits.download.freeLeft>0)return '<span class="fl-free">'+escHtml(tx('featFree'))+'</span> <span class="fl-num">'+featLimits.download.freeLeft+'</span>';
+    return escHtml(tx('featOut'));
+  }
+  if(kind==='post'){
+    if(featLimits.post.unlimited)return '<span class="fl-num">∞</span>';
+    if(featLimits.post.freeLeft>0)return '<span class="fl-free">'+escHtml(tx('featFree'))+'</span> <span class="fl-num">'+featLimits.post.freeLeft+'</span>';
     return escHtml(tx('featOut'));
   }
   var f=kind==='mv'?featLimits.mv:featLimits.vs;
@@ -9091,7 +9118,7 @@ function featLimitBadgePaintOne(b){
   b.innerHTML=featLimitBadgeHtml(kind);
   var cls='feat-limit-badge';
   if(locked)cls+=' fl-out';
-  else if(kind!=='download'){
+  else if(kind==='mv'||kind==='vs'){
     var f=kind==='mv'?featLimits.mv:featLimits.vs;
     if(f.freeLeft<=0&&f.pkgLeft>0)cls+=' fl-pkg';
   }
@@ -9112,7 +9139,7 @@ function featLimitBadge(kind){
 /* Locked message — the red pill toast the download-failure path
    already uses, in the page's language. */
 function featLockedShow(kind){
-  var key=kind==='mv'?'featLockedMv':(kind==='vs'?'featLockedVs':'featLockedDl');
+  var key=kind==='mv'?'featLockedMv':(kind==='vs'?'featLockedVs':(kind==='post'?'featLockedPost':'featLockedDl'));
   try{mp3FailText(tx(key));}catch(e){}
 }
 /* Locked tap → Buy Package (owner order 2026-11-18 13:18): when a
@@ -9440,7 +9467,8 @@ function genSongCard(song,n,it,title,prov,prompt,streaming){
   acts.appendChild(sh);
   acts.appendChild(plIcoBtn({url:u,title:(it&&it.title)||title||tx('songLabelFmt').replace('{n}',n),image:(song&&song.image)||'',name:''}));
   var pb=songIcoBtn(tx('pubPostBtn'),SONG_SVG_POST);
-  pb.addEventListener('click',function(){pubOpenSheet(it||{type:'song',url:u,title:title,prompt:prompt});});
+  pb.appendChild(featLimitBadge('post'));
+  pb.addEventListener('click',function(){var _pi=it||{type:'song',url:u,title:title,prompt:prompt};if(featLimitsLocked('post')&&_pi.pubPost!=='public'){featLockedGoPackages('post');return;}pubOpenSheet(_pi);});
   acts.appendChild(pb);
   card.appendChild(acts);
   if(streaming){
@@ -10155,7 +10183,8 @@ function songMenuOpen(it,lkBtn,dlBtn,shBtn,ownerName){
   vsRow.appendChild(featLimitBadge('vs'));
   add(SONG_SVG_SHARE,tx('histShare'),false,function(){songMenuClose();histShare(it,shBtn);});
   add(plBookmarkSvg(plHas(it.url)),plHas(it.url)?tx('plSaved'):tx('plSave'),false,function(){featureUsage('history_save');plToggle({url:it.url,title:it.title||'',image:it.image||'',name:ownerName||''});songMenuClose();});
-  add(SONG_SVG_POST,(it.pubPost==='public')?tx('pubPostedAlready'):tx('pubPostBtn'),false,function(){songMenuClose();featureUsage('history_post_public');pubOpenSheet(it);});
+  var postRow=add(SONG_SVG_POST,(it.pubPost==='public')?tx('pubPostedAlready'):tx('pubPostBtn'),false,function(){if(featLimitsLocked('post')&&it.pubPost!=='public'){songMenuClose();featLockedGoPackages('post');return;}songMenuClose();featureUsage('history_post_public');pubOpenSheet(it);});
+  postRow.appendChild(featLimitBadge('post'));
   var delB=add(SONG_SVG_DEL,tx('histDelete'),true,function(){
     histDelete(it.id,delB);
     var still=false;
@@ -10404,7 +10433,8 @@ function histCard(it){
     var pb=document.createElement('button');
     pb.type='button';pb.className='kbtn kbtn-white';
     pb.textContent=(it.pubPost==='public')?tx('pubPostedAlready'):tx('pubPostBtn');
-    pb.addEventListener('click',function(){featureUsage('history_post_public');pubOpenSheet(it);});
+    pb.appendChild(featLimitBadge('post'));
+    pb.addEventListener('click',function(){if(featLimitsLocked('post')&&it.pubPost!=='public'){featLockedGoPackages('post');return;}featureUsage('history_post_public');pubOpenSheet(it);});
     row.appendChild(pb);
   }
   var del=document.createElement('button');
@@ -14275,6 +14305,18 @@ function pubDoPost(vis){
   var u=null;try{u=acctCurrent();}catch(e){}
   if(!u){pubSheetClose();loginSheetOpen();return;}
   var msg=document.getElementById('pubSheetMsg');
+  /* Free 2 — Post to Public (owner order 2026-11-18): a public
+     post costs one of the 2 lifetime free posts; an active
+     package makes it unlimited. Private posts are NOT counted
+     (the gate is public-only). The server is the final truth
+     (post_out below) — this is the early stop so the user never
+     fills the sheet only to be refused. */
+  if(vis==='public'&&featLimitsLocked('post')){
+    featLimitsRefresh();
+    try{pubSheetClose();}catch(e){}
+    featLockedGoPackages('post');
+    return;
+  }
   /* A song posted to Public MUST carry its style (owner rule) —
      without one chosen in the sheet, ask for it instead of
      posting a style-less song. */
@@ -14354,6 +14396,16 @@ function pubDoPostSend(vis,coverUrl){
       return r.json().catch(function(){return {};});
     })
     .then(function(data){
+      if(data&&data.ok===false){
+        if(data.error==='post_out'){
+          featLimitsRefresh();
+          try{pubSheetClose();}catch(e){}
+          featLockedGoPackages('post');
+          return;
+        }
+        if(msg){msg.textContent=(typeof data.error==='string'&&data.error)?data.error:tx('pubPostFail');msg.style.color='#f87171';}
+        return;
+      }
       if(item.id){
         var a=histGet();
         for(var i=0;i<a.length;i++){if(a[i].id===item.id){a[i].pubPost=vis;histSave(a);break;}}
@@ -14625,7 +14677,7 @@ function postFlowRenderForm(title){
     }
   }
   var sb=document.getElementById('postSubmitBtn');
-  if(sb)sb.addEventListener('click',postFlowSubmit);
+  if(sb){sb.appendChild(featLimitBadge('post'));sb.addEventListener('click',postFlowSubmit);}
   var bb=document.getElementById('postBackBtn');
   if(bb)bb.addEventListener('click',postFlowRenderStep1);
   postFlowKindSync();
@@ -14659,6 +14711,15 @@ async function postFlowSubmit(){
   if(!u){postFlowClose();loginSheetOpen();return;}
   var li=postLimitInfo(u);
   if(!li.admin&&li.used>=li.limit){postFlowMsgSet(escHtml(tx('postLimitHit').replace('{m}',li.limit)),'#f87171');return;}
+  /* Free 2 — Post to Public (owner order 2026-11-18): this flow
+     always posts PUBLIC, so it costs one of the 2 lifetime free
+     posts; an active package makes it unlimited. */
+  if(featLimitsLocked('post')){
+    featLimitsRefresh();
+    postFlowClose();
+    featLockedGoPackages('post');
+    return;
+  }
   var titleEl=document.getElementById('postTitleInput');
   var title=titleEl?titleEl.value.trim():'';
   if(!title){postFlowMsgSet(escHtml(tx('postNeedTitle')),'#f87171');if(titleEl)titleEl.focus();return;}
@@ -14691,6 +14752,17 @@ async function postFlowSubmit(){
     var r=await fetch(PUB_API+'/post',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
     if(!r||!r.ok)throw new Error('http '+(r?r.status:0));
     var pj=await r.json().catch(function(){return {};});
+    if(pj&&pj.ok===false){
+      if(pj.error==='post_out'){
+        featLimitsRefresh();
+        postFlowBusyStop();
+        postFlowClose();
+        featLockedGoPackages('post');
+        postFlow.busy=false;
+        return;
+      }
+      throw new Error((typeof pj.error==='string'&&pj.error)?pj.error:tx('pubPostFail'));
+    }
     postCountBump(u);
     /* Lock it NOW (owner rule): the post is in the Public feed
        and the permanent lock from this moment on — up once, up
