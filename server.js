@@ -2053,9 +2053,10 @@ function publicSettings(s) {
 // ({key, endpoint, updatedAt}) are migrated on load, never losing a key.
 // Providers: novai, magichour, masterpiecex, hunyuan3d, suno, acemusic,
 // musicapi, groq (the AI chat key), tavus kept for the legacy proxy branch,
-// agnes (Agnes AI — free text/image/video Flash models, OpenAI-compatible).
+// agnes (Agnes AI — free text/image/video Flash models, OpenAI-compatible),
+// openrouter (OpenRouter — free chat models for the AI Lyrics generator).
 const ADMIN_KEYS_FILE = path.join(DATA_DIR, 'admin-keys.json');
-const KNOWN_KEY_PROVIDERS = ['novai', 'magichour', 'masterpiecex', 'hunyuan3d', 'suno', 'acemusic', 'musicapi', 'tavus', 'groq', 'mvsep', 'agnes'];
+const KNOWN_KEY_PROVIDERS = ['novai', 'magichour', 'masterpiecex', 'hunyuan3d', 'suno', 'acemusic', 'musicapi', 'tavus', 'groq', 'mvsep', 'agnes', 'openrouter'];
 function normProvider(v) {
   if (typeof v !== 'string') return '';
   let p = v.trim().toLowerCase().replace(/[\s_-]+/g, '');
@@ -4002,6 +4003,72 @@ async function apiRoute(req, res, urlPath) {
       }
       if (ipc.rateLimited) { try { res.setHeader('Retry-After', String(ipc.retryAfter || 60)); } catch (e) {} return sendJSON(res, 429, { ok: false, error: 'Request ច្រើនពេក — សូមរង់ចាំ ' + (ipc.retryAfter || 60) + ' វិនាទី · Too many requests, please wait' }); }
     }
+  }
+  // ---- AI Auto Lyrics Generator (OpenRouter Free API) ----
+  // POST /api/gen/lyrics — {email, title, language} → {ok:true, lyrics}
+  // The user only enters a Title; the AI writes complete lyrics
+  // (Verse 1, Chorus, Verse 2, Bridge, Final Chorus) in the requested
+  // language (Khmer default). 0 MovAi credits — lyrics are free.
+  // The OpenRouter key stays server-side (admin-stored keys only); it is
+  // NEVER sent to the frontend, never logged, never returned.
+  // Free models rotate (OpenRouter changes its free list often), so the
+  // endpoint tries a short prioritized list and falls back only when the
+  // error says the model itself is unavailable (404 / model error).
+  // Key-level failures (401/402/429/quota) rotate to the next stored key
+  // via withProviderKeyRotation and fail immediately on other errors.
+  const OPENROUTER_LYRICS_MODELS = [
+    'google/gemma-4-31b-it:free',
+    'google/gemma-4-26b-a4b-it:free',
+    'nvidia/nemotron-3-ultra-550b-a55b:free'
+  ];
+  if (req.method === 'POST' && urlPath === '/api/gen/lyrics') {
+    readJSONBody(req, 64 * 1024).then(async (body) => {
+      try {
+        if (!body || typeof body.title !== 'string' || !body.title.trim()) return sendJSON(res, 200, { ok: false, error: 'សូមសរសេរចំណងជើងបទចម្រៀងជាមុនសិន · Please enter a song title first' });
+        if (!normEmail(body.email)) return sendJSON(res, 200, { ok: false, error: 'សូមចូលគណនេយ្យជាមុនសិន · Please sign in first', needLogin: true });
+        const title = body.title.trim().slice(0, 200);
+        const lang = (typeof body.language === 'string' && body.language.trim()) ? body.language.trim().toLowerCase().slice(0, 10) : 'kh';
+        const keys = await adminProviderKeyList('openrouter');
+        if (!keys.length) return sendJSON(res, 200, { ok: false, error: 'Admin មិនទាន់ដាក់ OpenRouter Key ទេ · The Admin has not added an OpenRouter key yet — please add a free key in Admin → API Keys → OpenRouter (openrouter.ai/keys)' });
+        const sysPrompt = lang === 'kh'
+          ? 'អ្នកជាអ្នកនិពន្ធបទចម្រៀងអាជីព។ សូមសរសេរអត្ថបទចម្រៀងពេញលេញជាភាសាខ្មែរ សម្រាប់ចំណងជើងបទដែលបានផ្តល់ឱ្យ។ អត្ថបទត្រូវមានរចនាសម្ព័ន្ធដូចខាងក្រោមតាមលំដាប់៖ [Verse 1], [Chorus], [Verse 2], [Bridge], [Final Chorus]។ Verse នីមួយៗ 4-6 បន្ទាត់, Chorus 4 បន្ទាត់, Bridge 4 បន្ទាត់, Final Chorus 4 បន្ទាត់។ អត្ថបទត្រូវមានអារម្មណ៍, ច្រៀងបានស្រួល, និងសមនឹងចំណងជើង។ សូមផ្តល់តែអត្ថបទចម្រៀងជាមួយស្លាកផ្នែកប៉ុណ្ណោះ — កុំមានការពន្យល់ ឬអត្ថបទបន្ថែម។'
+          : (lang === 'en'
+            ? 'You are a professional songwriter. Write complete, original song lyrics in English for the given song title. Structure the lyrics exactly with these sections in this order: [Verse 1], [Chorus], [Verse 2], [Bridge], [Final Chorus]. Each verse 4-6 lines, each chorus 4 lines, bridge 4 lines, final chorus 4 lines. Make the lyrics emotional, singable, and fitting the title. Output ONLY the lyrics with the section labels — no explanations, no extra text.'
+            : 'You are a professional songwriter. Write complete, original song lyrics in ' + lang + ' for the given song title. Structure the lyrics exactly with these sections in this order: [Verse 1], [Chorus], [Verse 2], [Bridge], [Final Chorus]. Each verse 4-6 lines, each chorus 4 lines, bridge 4 lines, final chorus 4 lines. Make the lyrics emotional, singable, and fitting the title. Output ONLY the lyrics with the section labels — no explanations, no extra text.');
+        let out;
+        try {
+          out = await withProviderKeyRotation('openrouter', async (k) => {
+            // Try each free model in order; fall back only when the
+            // model itself is unavailable (404 / model error).
+            let lastModelErr = null;
+            for (const model of OPENROUTER_LYRICS_MODELS) {
+              let r, j;
+              try {
+                r = await fetch('https://openrouter.ai/api/v1/chat/completions', { method: 'POST', headers: { 'Authorization': 'Bearer ' + k, 'Content-Type': 'application/json', 'HTTP-Referer': 'https://movai-1.onrender.com', 'X-Title': 'MovAi' }, body: JSON.stringify({ model, messages: [{ role: 'system', content: sysPrompt }, { role: 'user', content: 'Song title: ' + title }], temperature: 0.8, max_tokens: 1500 }), signal: AbortSignal.timeout(60000) });
+                j = await r.json().catch(() => null);
+              } catch (e) {
+                throw rotErr('OpenRouter: ' + (e && e.message ? e.message : 'request failed'), 0);
+              }
+              const content = j && j.choices && j.choices[0] && j.choices[0].message && typeof j.choices[0].message.content === 'string' ? j.choices[0].message.content.trim() : '';
+              if (content) return { lyrics: content, model };
+              const errMsg = genErrText(j, 'HTTP ' + r.status);
+              const modelGone = r.status === 404 || /model (not found|not available|does not exist)|no such model|unknown model/i.test(errMsg);
+              if (modelGone && model !== OPENROUTER_LYRICS_MODELS[OPENROUTER_LYRICS_MODELS.length - 1]) { lastModelErr = errMsg; continue; }
+              throw rotErr('OpenRouter: ' + errMsg, r.status);
+            }
+            throw rotErr('OpenRouter: ' + (lastModelErr || 'no lyrics returned'), 0);
+          });
+        } catch (e) {
+          if (e && e.noKey) return sendJSON(res, 200, { ok: false, error: 'Admin មិនទាន់ដាក់ OpenRouter Key ទេ · The Admin has not added an OpenRouter key yet' });
+          const st = (e && e.httpStatus) || 0;
+          if (st === 401 || st === 403) return sendJSON(res, 200, { ok: false, error: 'OpenRouter Key មិនត្រឹមត្រូវទេ — សូមប្រាប់ Admin ពិនិត្យ Key · The OpenRouter key seems invalid, please ask the Admin to check it' });
+          if (st === 402 || st === 429) return sendJSON(res, 200, { ok: false, error: 'OpenRouter អស់កូតា / ស្នើសុំច្រើនពេក — សូមសាកល្បងម្ដងទៀតនៅពេលក្រោយ · OpenRouter quota / rate limit reached, please try again later' });
+          return sendJSON(res, 200, { ok: false, error: 'បង្កើតអត្ថបទមិនបានទេ — សូមសាកល្បងម្ដងទៀត · Could not generate lyrics, please try again' });
+        }
+        return sendJSON(res, 200, { ok: true, lyrics: out.lyrics, model: out.model });
+      } catch (e) { return sendJSON(res, 200, { ok: false, error: 'បង្កើតអត្ថបទមិនបានទេ — សូមសាកល្បងម្ដងទៀត · Could not generate lyrics, please try again' }); }
+    }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
+    return;
   }
   // ---- Generate Image & Video (free APIs) ----
   // Keys arrive with each request only (from the visitor's own browser).
