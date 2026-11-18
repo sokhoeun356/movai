@@ -7284,7 +7284,14 @@ function modebarSync(){
   var tvi=document.getElementById('genTabVI');if(tvi)tvi.className=active==='vi'?'kbtn kbtn-black':'kbtn kbtn-white';
 }
 function genSectionVI(){
-  genSetMode(gen.mode==='video'?'image':'video');
+  /* Video is OFF (owner order 2026-11-18): NovAI video never finishes
+     (stuck at 90% for 6+ minutes; the NovAI submit call itself times
+     out). The Video+Image button now always opens the IMAGE mode —
+     video can never be entered from the UI. The video provider is
+     also null on the server, so a video generate fails cleanly
+     instead of hanging. To re-enable video later, restore the toggle
+     (gen.mode==='video'?'image':'video') and set a video provider. */
+  genSetMode('image');
 }
 function genSetMode(m){
   if(m==='3d')m='image';
