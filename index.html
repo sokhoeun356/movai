@@ -13,13 +13,21 @@
 
 <script src="https://js.puter.com/v2/" defer></script>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
-<script>try{var _de=document.documentElement;var _th=[['#addc29','173,220,41','#63910c'],['#ff2e88','255,46,136','#d6006d'],['#ff6a00','255,106,0','#cf5200'],['#ffe600','255,230,0','#857200'],['#00e5ff','0,229,255','#007d99'],['#b537f2','181,55,242','#8f27c9']];var _ti=parseInt(localStorage.getItem('movai-theme')||'0',10)||0;if(_ti<0||_ti>6)_ti=0;var _md=localStorage.getItem('movai-mode')||'dark';var _dark=_md==='dark'||(_md==='auto'&&window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches);_de.setAttribute('data-mode',_dark?'dark':'light');if(_ti===6){_de.style.setProperty('--accent','#b537f2');_de.style.setProperty('--accent-rgb','181,55,242');_de.style.setProperty('--accent-fill','linear-gradient(100deg,#ff2e88,#b537f2 52%,#00e5ff)');_de.style.setProperty('--accent-text',_dark?'#b537f2':'#8f27c9');}else{var _tt=_th[_ti];_de.style.setProperty('--accent',_tt[0]);_de.style.setProperty('--accent-rgb',_tt[1]);_de.style.setProperty('--accent-text',_dark?_tt[0]:_tt[2]);}function _gv(k,d){var x=parseInt(localStorage.getItem(k),10);if(isNaN(x))return d;if(x<0)x=0;if(x>100)x=100;return x;}var _leg=null;['movai-glass-fab','movai-glass-drawer','movai-glass-brand','movai-glass'].forEach(function(k){if(_leg===null){var t=parseInt(localStorage.getItem(k),10);if(!isNaN(t))_leg=t;}});var _gc=_gv('movai-glass-clear',_leg===null?45:100-_leg);var _gb=_gv('movai-glass-blur',_leg===null?65:_leg);var _gsh=_gv('movai-glass-shine',55);_de.style.setProperty('--glass-alpha',(0.75+((100-_gc)/100)*0.23).toFixed(3));_de.style.setProperty('--glass-blur',((_gb/100)*28).toFixed(1)+'px');_de.style.setProperty('--glass-shine',(_gsh/100).toFixed(3));_de.style.setProperty('--glass-frost',(_gb/100).toFixed(3));var _tbv=_gv('movai-txtblur',0);_de.style.setProperty('--txtblur',((_tbv/100)*16).toFixed(1)+'px');var _bgv=_gv('movai-bgb',50);var _base=_dark?[10,11,13]:[243,244,246];var _bc;if(_bgv<=50){var _f1=1-((50-_bgv)/50)*0.9;_bc=_base.map(function(c){return Math.round(c*_f1);});}else{var _f2=(_bgv-50)/50;_bc=_base.map(function(c){return Math.round(c+(255-c)*_f2*0.95);});}var _bgs='rgb('+_bc.join(',')+')';_de.style.setProperty('--bg',_bgs);_de.style.setProperty('--bg1',_bgs);_de.style.setProperty('--bg2',_bgs);var _tsv=localStorage.getItem('movai-tshadow');if(_tsv&&_tsv!=='none')_de.style.setProperty('--tshadow',_tsv);var _bfx=localStorage.getItem('movai-brandfx');if(_bfx)_de.setAttribute('data-brandfx',_bfx);var _smv=localStorage.getItem('movai-smooth');if(_smv==='1')_de.setAttribute('data-smooth','1');var _fv=parseInt(localStorage.getItem('movai-font')||'50',10);if(isNaN(_fv))_fv=50;if(_fv<0)_fv=0;if(_fv>100)_fv=100;var _ff=_fv<=50?0.6+(_fv/50)*0.4:1+((_fv-50)/50)*1.2;_de.style.fontSize=(16*_ff)+'px';}catch(e){}</script>
+<script src="https://cdn.jsdelivr.net/npm/lamejs@1.2.1/lame.min.js" defer></script>
+<script>try{var _de=document.documentElement;var _th=[['#addc29','173,220,41','#63910c'],['#ff2e88','255,46,136','#d6006d'],['#ff6a00','255,106,0','#cf5200'],['#ffe600','255,230,0','#857200'],['#00e5ff','0,229,255','#007d99'],['#b537f2','181,55,242','#8f27c9']];var _ti=parseInt(localStorage.getItem('movai-theme')||'0',10)||0;if(_ti<0||_ti>6)_ti=0;var _md=localStorage.getItem('movai-mode')||'dark';var _dark=_md==='dark'||(_md==='auto'&&window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches);_de.setAttribute('data-mode',_dark?'dark':'light');if(_ti===6){_de.style.setProperty('--accent','#b537f2');_de.style.setProperty('--accent-rgb','181,55,242');_de.style.setProperty('--accent-fill','linear-gradient(100deg,#ff2e88,#b537f2 52%,#00e5ff)');_de.style.setProperty('--accent-text',_dark?'#b537f2':'#8f27c9');}else{var _tt=_th[_ti];_de.style.setProperty('--accent',_tt[0]);_de.style.setProperty('--accent-rgb',_tt[1]);_de.style.setProperty('--accent-text',_dark?_tt[0]:_tt[2]);}function _gv(k,d){var x=parseInt(localStorage.getItem(k),10);if(isNaN(x))return d;if(x<0)x=0;if(x>100)x=100;return x;}var _leg=null;['movai-glass-fab','movai-glass-drawer','movai-glass-brand','movai-glass'].forEach(function(k){if(_leg===null){var t=parseInt(localStorage.getItem(k),10);if(!isNaN(t))_leg=t;}});var _gc=_gv('movai-glass-clear',_leg===null?45:100-_leg);var _gb=_gv('movai-glass-blur',_leg===null?65:_leg);var _gsh=_gv('movai-glass-shine',55);_de.style.setProperty('--glass-alpha',(0.75+((100-_gc)/100)*0.23).toFixed(3));_de.style.setProperty('--glass-blur',((_gb/100)*28).toFixed(1)+'px');_de.style.setProperty('--glass-shine',(_gsh/100).toFixed(3));_de.style.setProperty('--glass-frost',(_gb/100).toFixed(3));var _tbv=_gv('movai-txtblur',0);_de.style.setProperty('--txtblur',((_tbv/100)*16).toFixed(1)+'px');var _bgv=_gv('movai-bgb',50);var _base=_dark?[10,11,13]:[231,234,238];var _bc;if(_bgv<=50){var _f1=1-((50-_bgv)/50)*0.9;_bc=_base.map(function(c){return Math.round(c*_f1);});}else{var _f2=(_bgv-50)/50;_bc=_base.map(function(c){return Math.round(c+(255-c)*_f2*0.95);});}var _top=_bc.map(function(c){return Math.round(c+(255-c)*(_dark?0.05:0.3));});var _bot=_bc.map(function(c){return Math.round(c*(_dark?0.55:0.93));});_de.style.setProperty('--bg','rgb('+_bc.join(',')+')');_de.style.setProperty('--bg1','rgb('+_top.join(',')+')');_de.style.setProperty('--bg2','rgb('+_bot.join(',')+')');var _tsv=localStorage.getItem('movai-tshadow');if(_tsv&&_tsv!=='none')_de.style.setProperty('--tshadow',_tsv);var _bfx=localStorage.getItem('movai-brandfx');if(_bfx)_de.setAttribute('data-brandfx',_bfx);var _smv=localStorage.getItem('movai-smooth');if(_smv==='1')_de.setAttribute('data-smooth','1');var _fv=parseInt(localStorage.getItem('movai-font')||'50',10);if(isNaN(_fv))_fv=50;if(_fv<0)_fv=0;if(_fv>100)_fv=100;var _ff=_fv<=50?0.6+(_fv/50)*0.4:1+((_fv-50)/50)*1.2;_de.style.fontSize=(16*_ff)+'px';}catch(e){}</script>
 <style>
-:root{color-scheme:dark;--accent:#addc29;--accent-rgb:173,220,41;--accent-fill:var(--accent);--accent-text:var(--accent);--accent2:var(--accent);--accent-soft:#1c1e22;--accent-light:#23252a;--bg:#0a0b0d;--bg1:#0a0b0d;--bg2:#0a0b0d;--card:#14161a;--card2:#16181d;--field:#0d0f11;--composer:#0d0f11;--text:#f4f5f0;--text2:#c9ccd1;--label:#d6d8dc;--muted:#9a9ea6;--faint:#62666e;--movai:var(--accent);--movai-light:var(--accent);--line:rgba(255,255,255,.08);--line2:rgba(255,255,255,.12);--line3:rgba(255,255,255,.16);--shadow:none;--tshadow:none;--glass-alpha:.877;--glass-blur:18.2px;--glass-shine:.55;--glass-frost:.65;--txtblur:0px;--glass-tint:20,22,26;--glass-text:#f4f5f0;--glass-text2:#e8eaee;--glass-muted:#9a9ea6;--glass-faint:rgba(255,255,255,.45);--glass-line:rgba(255,255,255,.16);--glass-line2:rgba(255,255,255,.26);--glass-text-rgb:244,245,240;--glass-shadow-rgb:0,0,0}
-html[data-mode="light"]{color-scheme:light;--accent-soft:rgba(20,22,30,.07);--bg:#f3f4f6;--card:#ffffff;--card2:#ffffff;--field:#ffffff;--composer:#ffffff;--text:#17181c;--text2:#33363d;--label:#2c2f36;--muted:#5f646e;--faint:#8b9099;--line:rgba(20,22,30,.1);--line2:rgba(20,22,30,.16);--line3:rgba(20,22,30,.22);--glass-tint:255,255,255;--glass-text:#17181c;--glass-text2:#33363d;--glass-muted:#5f646e;--glass-faint:rgba(20,22,30,.5);--glass-line:rgba(20,22,30,.15);--glass-line2:rgba(20,22,30,.24);--glass-text-rgb:23,24,28;--glass-shadow-rgb:255,255,255}
+:root{color-scheme:dark;--accent:#addc29;--accent-rgb:173,220,41;--accent-fill:var(--accent);--accent-text:var(--accent);--accent2:var(--accent);--accent-soft:#1c1e22;--accent-light:#23252a;--bg:#0a0b0d;--bg1:#15171c;--bg2:#050607;--bg-glow:rgba(255,255,255,.05);--card:#14161a;--card2:#16181d;--field:#0d0f11;--composer:#0d0f11;--text:#f4f5f0;--text2:#c9ccd1;--label:#d6d8dc;--muted:#9a9ea6;--faint:#62666e;--movai:var(--accent);--movai-light:var(--accent);--line:rgba(255,255,255,.08);--line2:rgba(255,255,255,.12);--line3:rgba(255,255,255,.16);--shadow:none;--tshadow:none;--glass-alpha:.877;--glass-blur:18.2px;--glass-shine:.55;--glass-frost:.65;--txtblur:0px;--glass-tint:20,22,26;--glass-text:#f4f5f0;--glass-text2:#e8eaee;--glass-muted:#9a9ea6;--glass-faint:rgba(255,255,255,.45);--glass-line:rgba(255,255,255,.16);--glass-line2:rgba(255,255,255,.26);--glass-text-rgb:244,245,240;--glass-shadow-rgb:0,0,0}
+html[data-mode="light"]{color-scheme:light;--accent-soft:rgba(20,22,30,.07);--bg:#e7eaee;--bg1:#eff1f4;--bg2:#d9dde3;--bg-glow:rgba(255,255,255,.6);--card:#ffffff;--card2:#ffffff;--field:#ffffff;--composer:#ffffff;--text:#17181c;--text2:#33363d;--label:#2c2f36;--muted:#5f646e;--faint:#8b9099;--line:rgba(20,22,30,.1);--line2:rgba(20,22,30,.16);--line3:rgba(20,22,30,.22);--glass-tint:255,255,255;--glass-text:#17181c;--glass-text2:#33363d;--glass-muted:#5f646e;--glass-faint:rgba(20,22,30,.5);--glass-line:rgba(20,22,30,.15);--glass-line2:rgba(20,22,30,.24);--glass-text-rgb:23,24,28;--glass-shadow-rgb:255,255,255}
 *{margin:0;padding:0;box-sizing:border-box}
 html{background:#0A0B0D;background:var(--bg);min-height:100vh;min-height:100dvh}
-body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;background:#0A0B0D;background:var(--bg);color:var(--text);min-height:100vh;min-height:100dvh;text-shadow:var(--tshadow,none);-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+/* Page background — subtle 3D depth in BOTH themes: a faint light
+   glow at the very top over a soft vertical gradient (--bg1 lifted
+   top → --bg mid → --bg2 shaded bottom), computed from the user's
+   background-brightness value by setBgBright / the head script.
+   Day is a moderate, soft white-grey (never glaring); night is the
+   same gentle depth in dark tones. Kept quiet on purpose — depth
+   behind the content, never colour splashed over it. */
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;background:#0A0B0D;background-color:var(--bg);background-image:radial-gradient(130% 55% at 50% -10%,var(--bg-glow,rgba(255,255,255,.05)),rgba(0,0,0,0) 60%),linear-gradient(180deg,var(--bg1) 0%,var(--bg) 45%,var(--bg2) 100%);color:var(--text);min-height:100vh;min-height:100dvh;text-shadow:var(--tshadow,none);-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
 button{font-family:inherit;cursor:pointer}
 main{max-width:720px;margin:0 auto;padding:calc(4.75rem + env(safe-area-inset-top,0px)) 18px calc(106px + env(safe-area-inset-bottom,0px))}
 .menuwrap{position:fixed;top:calc(12px + env(safe-area-inset-top,0px));left:max(18px,calc(50% - 342px));z-index:30;display:flex}
@@ -833,6 +841,49 @@ img.hist-media,.d3-preview{cursor:zoom-in}
 .song-ico-btn:active{opacity:.75}
 .song-ico-btn.liked{color:#ff2e88;border-color:rgba(255,46,136,.55)}
 .song-seek{display:block;width:100%;height:12px;margin:5px 0 0;accent-color:var(--accent);cursor:pointer}
+/* ===== Song History rows — BIG cards (owner order 2026-11-18) =====
+   ONLY the Song History list rows change (cards built by
+   histSongCard, marked .hist-song-lg): a taller card with a bigger
+   cover, bigger title, and ONE actions row holding just 4 large
+   buttons (Like / Download / MV / Vocal Studio) plus a ☰ menu
+   button. The MV and Vocal Studio buttons carry a small «AI»
+   badge on their top-left corner — both are AI features. Share
+   lives only in the menu. Every other action (Listen, Save,
+   Post to Public, Delete) lives in the song menu sheet below.
+   Generation results, Playlist rows and the player card keep
+   the compact look. */
+#histList-song>.song-card.hist-song-lg{margin-top:12px}
+#histList-song>.song-card.hist-song-lg:first-child{margin-top:0}
+.song-card.hist-song-lg{padding:14px;border-radius:14px}
+.hist-song-lg .song-row{gap:12px}
+.hist-song-lg .song-coverwrap{width:68px;height:68px;border-radius:10px}
+.hist-song-lg .song-coverwrap .song-cover{border-radius:10px}
+.hist-song-lg .song-coverwrap .song-play{width:36px;height:36px;font-size:0.85rem}
+.hist-song-lg .song-cover-solid .sc-name{font-size:0.5625rem}
+.hist-song-lg .song-title{font-size:1rem;line-height:1.4}
+.hist-song-lg .song-sub{font-size:0.75rem;margin-top:3px}
+.hist-song-lg .song-dur{font-size:0.875rem}
+.hist-song-lg .song-acts{display:flex;align-items:stretch;gap:8px;margin-top:12px}
+.hist-song-lg .song-act{flex:1 1 0;width:auto;height:48px;border-radius:11px;position:relative}
+.hist-song-lg .song-act svg{width:21px;height:21px}
+/* AI badge (owner order 2026-11-18): a small «AI» pill pinned to
+   the TOP-LEFT corner of the MV and Vocal Studio buttons on a
+   Song History row, marking them as AI features. It never takes
+   taps and never shifts the button's icon. */
+.hist-song-lg .song-ai-badge{position:absolute;top:4px;left:4px;z-index:1;padding:1px 5px;border-radius:999px;background:var(--accent);color:#101216;font-size:0.5625rem;font-weight:900;line-height:1.35;letter-spacing:.04em;pointer-events:none;box-shadow:0 1px 4px rgba(0,0,0,.25)}
+.hist-song-lg .song-seek{height:22px;margin-top:8px}
+/* Song menu — bottom sheet listing EVERY action of one Song
+   History song, icon + text label, opened by the row's ☰ button. */
+.pkg-sheet.song-menu-sheet{align-items:flex-end;justify-content:center;padding:0}
+.pkg-sheet-card.song-menu-card{width:100%;max-width:520px;max-height:88vh;border-radius:20px 20px 0 0;border-bottom:none;padding:18px 16px calc(16px + env(safe-area-inset-bottom,0px))}
+.song-menu-item{display:flex;align-items:center;gap:14px;width:100%;min-height:54px;padding:10px 12px;border:1px solid var(--line);background:var(--card2);color:var(--text);border-radius:12px;cursor:pointer;font-family:inherit;text-align:left;margin-top:8px}
+.song-menu-item:first-child{margin-top:0}
+.song-menu-item:active{opacity:.8}
+.song-menu-ico{width:26px;height:26px;flex:0 0 auto;display:inline-flex;align-items:center;justify-content:center}
+.song-menu-ico svg{width:22px;height:22px;display:block}
+.song-menu-label{font-size:0.9375rem;font-weight:700;line-height:1.45}
+.song-menu-item.danger{color:#f87171}
+.song-menu-item.danger.armed{background:rgba(248,113,113,.14);border-color:rgba(248,113,113,.55)}
 .song-stream-badge{font-weight:700;color:var(--accent-text);animation:songPulse 1.8s ease-in-out infinite}
 @media (prefers-reduced-motion:reduce){.song-stream-badge{animation:none}}
 .song-cover{display:block;width:100%;aspect-ratio:1/1;object-fit:cover;border-radius:10px;background:#22262c}
@@ -1600,6 +1651,26 @@ html[data-mode="light"] .btn-free{color:#63910c}
 .prof-pic-btns{display:flex;gap:8px;margin-top:8px;flex-wrap:wrap}
 .prof-pic-btns .kbtn{flex:1 1 auto;padding:7px 10px;font-size:0.75rem;min-height:34px}
 .pkg-sheet-card{background:var(--card);border:1px solid var(--line2);border-radius:18px;padding:20px;width:100%;max-width:420px;max-height:88vh;overflow-y:auto;color:var(--text)}
+/* ===== App version badge + Version History (v1.5.0) =====
+   The badge sits beside the MovAi wordmark in the drawer head;
+   the Settings-box row and the history sheet both read the
+   current version from APP_VERSIONS[0] in the main script, so a
+   new release only ever prepends one entry to that array. */
+.ver-badge{font-size:0.6875rem;font-weight:800;letter-spacing:.03em;color:var(--accent-text);background:rgba(var(--accent-rgb),.16);border:1px solid rgba(var(--accent-rgb),.45);border-radius:999px;padding:3px 8px;line-height:1.2;white-space:nowrap}
+.ver-row-btn{display:flex;width:100%;align-items:center;justify-content:space-between;gap:10px;background:transparent;border:none;color:inherit;font-family:inherit;cursor:pointer;padding:2px 0;text-align:left;min-height:40px}
+.ver-row-val{display:flex;align-items:center;gap:6px;font-size:0.875rem;font-weight:800;color:var(--text)}
+.ver-chev{color:var(--muted);font-size:1rem;line-height:1}
+.drawer .ver-row-val{color:var(--glass-text)}
+.drawer .ver-chev{color:var(--glass-muted)}
+.ver-entry{padding:14px 0 4px;border-top:1px solid var(--line)}
+.ver-entry:first-child{border-top:none;padding-top:8px}
+.ver-entry-head{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.ver-num{font-size:1rem;font-weight:900}
+.ver-latest{font-size:0.625rem;font-weight:800;letter-spacing:.04em;color:#0a0b0d;background:var(--accent);border-radius:999px;padding:2px 7px;line-height:1.5}
+.ver-date{margin-left:auto;font-size:0.75rem;color:var(--muted);font-weight:600;white-space:nowrap}
+.ver-changes{list-style:none;margin:10px 0 6px;padding:0}
+.ver-changes li{position:relative;font-size:0.8125rem;line-height:1.6;color:var(--text2);padding-left:16px;margin-top:5px}
+.ver-changes li::before{content:'';position:absolute;left:2px;top:.55em;width:5px;height:5px;border-radius:50%;background:var(--accent)}
 /* ===== Offline / server-unreachable popup =====
    Sits ABOVE every other sheet (z-index 300) and cannot be
    dismissed by tapping outside or with a close button — it only
@@ -2613,6 +2684,13 @@ input[type=range].st-range{accent-color:var(--accent);min-height:32px;cursor:poi
 .st-fx-actions{display:flex;gap:8px;margin-top:16px}
 .st-fx-reset{flex:0 0 auto;min-height:42px;padding:9px 14px;border-radius:10px;border:1px solid var(--line2);background:transparent;color:var(--text);font-weight:700;cursor:pointer;font-family:inherit;font-size:0.8125rem}
 .st-fx-done{flex:1 1 auto;min-height:42px;padding:9px 14px;border:none;border-radius:10px;background:var(--accent-fill);color:#0d1005;font-weight:800;cursor:pointer;font-family:inherit;font-size:0.875rem}
+/* ===== Studio Export format choice sheet (owner order 2026-11-18) =====
+   Tapping Export opens this sheet (same bottom-sheet shell as
+   Effects) asking WAV or MP3; once a format is picked the
+   choices swap for live progress (% + elapsed seconds). */
+.st-exp-opt{display:block;width:100%;text-align:left;margin-top:10px;min-height:52px;padding:12px 14px;border-radius:12px;border:1px solid var(--line2);background:var(--field);color:var(--text);cursor:pointer;font-family:inherit}
+.st-exp-opt-t{display:block;font-weight:800;font-size:0.9375rem}
+.st-exp-opt-s{display:block;margin-top:3px;font-size:0.75rem;color:var(--muted);font-weight:400;line-height:1.45}
 /* ===== Studio auto-split additions (owner order 2026-11-18) =====
    The drawer Studio item carries a small live «Preparing
    Studio… X%» pill while a freshly generated song is fetched,
@@ -2654,7 +2732,7 @@ input[type=range].st-range{accent-color:var(--accent);min-height:32px;cursor:poi
 <body>
 <div class="drawer-backdrop" id="drawerBackdrop" onclick="closeMenu()"></div>
 <aside class="drawer" id="drawer" aria-label="ម៉ឺនុយ">
-  <div class="drawer-head"><b>Mov<span>Ai</span></b><button class="drawer-close" onclick="closeMenu()" aria-label="បិទម៉ឺនុយ">✕</button></div>
+  <div class="drawer-head"><span style="display:flex;align-items:center;gap:8px;min-width:0"><b>Mov<span>Ai</span></b><span class="ver-badge" id="verBadge">v1.5.0</span></span><button class="drawer-close" onclick="closeMenu()" aria-label="បិទម៉ឺនុយ">✕</button></div>
   <nav>
     <button class="nav-desktop-only" onclick="dockGo('public')"><span data-i18n="navPublic">សាធារណៈ</span> <small data-i18n="navPublicSub">Public</small></button>
     <button onclick="menuGo('sec-create','song')"><span data-i18n="navModeSong">បង្កើតបទចម្រៀង</span></button>
@@ -2699,6 +2777,12 @@ input[type=range].st-range{accent-color:var(--accent);min-height:32px;cursor:poi
       </div>
     </div>
     <div id="setIpSlot"></div>
+    <div class="set-row">
+      <button type="button" class="ver-row-btn" onclick="versionOpenFromDrawer()" aria-label="Version History">
+        <span class="set-label" data-i18n="verRow">កំណែ · Version</span>
+        <span class="ver-row-val"><span id="verRowVal">v1.5.0</span><span class="ver-chev" aria-hidden="true">›</span></span>
+      </button>
+    </div>
 
   </div>
   <div class="drawer-foot" style="margin-top:26px;padding-top:16px;border-top:1px solid var(--glass-line);display:flex;gap:18px;flex-wrap:wrap">
@@ -3066,7 +3150,7 @@ input[type=range].st-range{accent-color:var(--accent);min-height:32px;cursor:poi
         </div>
         <button type="button" class="st-rec-btn" id="stRecBtn" onclick="stRecToggle()" aria-label="Record · ថតសំឡេង">🎤 Rec</button>
         <span class="st-rec-ind" id="stRecInd"><span class="st-rec-dot"></span><span id="stRecTime">0:00</span></span>
-        <button type="button" class="st-export-btn" onclick="stExport()">Export · ទាញយក WAV</button>
+        <button type="button" class="st-export-btn" onclick="stExportOpen()">Export · ទាញយក</button>
       </div>
       <div id="stTracks"></div>
     </div>
@@ -3093,6 +3177,20 @@ input[type=range].st-range{accent-color:var(--accent);min-height:32px;cursor:poi
         <div class="st-fx-actions"><button type="button" class="st-fx-reset" onclick="stFxReset()">Reset · កំណត់ឡើងវិញ</button><button type="button" class="st-fx-done" onclick="stFxClose()">រួចរាល់ · Done</button></div>
       </div>
     </div>
+    <div class="st-fx-sheet" id="stExpSheet" role="dialog" aria-modal="true" aria-label="Export format · ទម្រង់ Export">
+      <div class="st-fx-backdrop" onclick="stExportClose()"></div>
+      <div class="st-fx-card">
+        <div class="st-fx-head"><span class="st-fx-title" id="stExpTitle">Export · ទាញយក</span><button type="button" class="st-fx-x" onclick="stExportClose()" aria-label="Close">✕</button></div>
+        <div id="stExpChoices">
+          <button type="button" class="st-exp-opt" onclick="stExport('wav')"><span class="st-exp-opt-t">Export WAV · ទាញយក WAV</span><span class="st-exp-opt-s">គុណភាពល្អបំផុត · ឯកសារធំ · Best quality · large file</span></button>
+          <button type="button" class="st-exp-opt" onclick="stExport('mp3')"><span class="st-exp-opt-t">Export MP3 · ទាញយក MP3</span><span class="st-exp-opt-s">192 kbps · ឯកសារតូចជាង · Smaller file</span></button>
+        </div>
+        <div id="stExpProgWrap" style="display:none">
+          <div class="st-prog-bar" style="margin-top:14px"><div class="st-prog-fill" id="stExpProgFill"></div></div>
+          <div class="st-prog-txt" id="stExpProgTxt"></div>
+        </div>
+      </div>
+    </div>
     <div class="st-transport" id="stTransport">
       <label class="st-master">Master <input type="range" class="st-range" id="stMasterVol" min="0" max="100" value="90" oninput="stSetMaster(this.value)"></label>
       <button type="button" class="st-skip" id="stSkipBack" onclick="stSeek(ST.pos-10)" aria-label="Back 10 seconds">⏮</button>
@@ -3102,7 +3200,7 @@ input[type=range].st-range{accent-color:var(--accent);min-height:32px;cursor:poi
       <button type="button" class="kbtn kbtn-white st-loop" id="stLoopBtn" onclick="stToggleLoop()" aria-pressed="false">វិលជុំ · Loop</button>
     </div>
     <div class="st-row" id="stExportRow">
-      <button type="button" class="btn btn-green" style="flex:1" onclick="stExport()">Export Mix · ទាញយក WAV</button>
+      <button type="button" class="btn btn-green" style="flex:1" onclick="stExportOpen()">Export Mix · ទាញយក</button>
     </div>
     <div class="st-pick" id="stPick">
       <div class="st-pick-head">បទរបស់ខ្ញុំ · My Songs</div>
@@ -3262,6 +3360,19 @@ input[type=range].st-range{accent-color:var(--accent);min-height:32px;cursor:poi
     <div id="pubSheetBody" style="margin-top:6px"></div>
   </div>
 </div>
+<!-- Song menu sheet (owner order 2026-11-18): opened by the ☰
+     button on a Song History row. Lists EVERY action of that song
+     with icon + text label; the body is rebuilt per song by
+     songMenuOpen. -->
+<div id="songMenuSheet" class="pkg-sheet song-menu-sheet" style="display:none" role="dialog" aria-modal="true" onclick="if(event.target===this)songMenuClose()">
+  <div class="pkg-sheet-card song-menu-card">
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:10px">
+      <h3 id="songMenuTitle" style="font-size:1rem;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"></h3>
+      <button type="button" class="drawer-close" style="background:var(--card2);color:var(--text);border-color:var(--line2);flex:0 0 auto" onclick="songMenuClose()" aria-label="Close">✕</button>
+    </div>
+    <div id="songMenuBody" style="margin-top:10px"></div>
+  </div>
+</div>
 <!-- Post-your-own-song sheet (owner rule 2026-11-16): opened by
      the «＋ ផុស» button in Create. Step 1 offers two sources —
      an MP3 from the phone, or a song the user created in this
@@ -3301,10 +3412,27 @@ input[type=range].st-range{accent-color:var(--accent);min-height:32px;cursor:poi
       </div>
     </div>
     <p id="authFormMsg" style="font-size:0.8125rem;margin-top:10px;min-height:16px;line-height:1.6"></p>
+    <!-- Device-limit Upgrade box: hidden unless the server refused
+         a registration with deviceLimitReached (this device already
+         has its 3 free accounts). deviceLimitApply() then leaves
+         ONLY the Gmail + password form above plus this box. -->
+    <div id="deviceLimitBox" style="display:none;margin-top:12px;padding:14px;border:1px solid var(--line2);border-radius:12px;background:var(--card2)">
+      <p style="font-weight:800;font-size:0.9375rem" data-i18n="deviceLimitTitle">Upgrade · បន្ថែម Gmail</p>
+      <p style="font-size:0.875rem;line-height:1.7;margin-top:6px" data-i18n="deviceLimitMsg">ឧបករណ៍នេះធ្លាប់បានប្រើហើយ · VPN មិនត្រូវបានគាំទ្រទេ។ ឧបករណ៍នេះមាន 3 គណនីរួចហើយ។ Upgrade ដើម្បីបន្ថែម Gmail — $1 ក្នុងមួយ Gmail។</p>
+      <p style="font-size:0.8125rem;color:var(--muted);margin-top:12px" data-i18n="deviceLimitSlots">ចំនួន Gmail បន្ថែម</p>
+      <div style="display:flex;align-items:center;gap:12px;margin-top:6px">
+        <button type="button" class="kbtn kbtn-white" style="min-width:44px;padding-left:0;padding-right:0" onclick="deviceSlotStep(-1)" aria-label="Less">−</button>
+        <span id="deviceSlotCount" style="font-weight:800;font-size:1.0625rem;min-width:28px;text-align:center">1</span>
+        <button type="button" class="kbtn kbtn-white" style="min-width:44px;padding-left:0;padding-right:0" onclick="deviceSlotStep(1)" aria-label="More">+</button>
+        <span id="deviceSlotPrice" style="font-weight:800;margin-left:auto">$1.00</span>
+      </div>
+      <button type="button" class="kbtn kbtn-black" id="deviceBuyBtn" style="margin-top:12px;width:100%" onclick="deviceBuySlots()">ទិញ · $1.00</button>
+      <p id="deviceBuyMsg" style="font-size:0.8125rem;margin-top:8px;min-height:16px;line-height:1.6"></p>
+    </div>
     <button type="button" class="google-btn" id="authNoAcctBtn" style="display:none;margin-top:10px" onclick="authGoogleSignup()"><svg viewBox="0 0 48 48" width="20" height="20" aria-hidden="true" style="flex:0 0 auto"><path fill="#FFC107" d="M43.6 20.1H42V20H24v8h11.3C33.7 32.7 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.9 1.2 8 3l5.7-5.7C34.3 6.1 29.3 4 24 4 13 4 4 13 4 24s9 20 20 20 20-9 20-20c0-1.3-.1-2.6-.4-3.9z"/><path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.9 1.2 8 3l5.7-5.7C34.3 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.1 26.7 36 24 36c-5.2 0-9.6-3.3-11.3-8l-6.5 5C9.5 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.1H42V20H24v8h11.3c-.8 2.3-2.3 4.3-4.1 5.6l6.2 5.2C36.9 39.2 44 34 44 24c0-1.3-.1-2.6-.4-3.9z"/></svg><span data-i18n="authContinueGoogle">បន្តជាមួយ Google · Continue with Google</span></button>
     <button type="button" class="kbtn kbtn-black" id="authSigninBtn" style="margin-top:6px;width:100%" onclick="authSigninSubmit()" data-i18n="authSigninBtn">ចូលប្រើ · Sign-in</button>
-    <button type="button" class="auth-forgot" onclick="forgotOpen()" data-i18n="authForgot">ភ្លេចលេខសម្ងាត់?</button>
-    <div class="auth-divider" aria-hidden="true"><span data-i18n="authOr">ឬ</span></div>
+    <button type="button" class="auth-forgot" id="authForgotBtn" onclick="forgotOpen()" data-i18n="authForgot">ភ្លេចលេខសម្ងាត់?</button>
+    <div class="auth-divider" id="authDivider" aria-hidden="true"><span data-i18n="authOr">ឬ</span></div>
     <button type="button" class="google-btn" id="loginGoogleBtn" onclick="authGoogleSignup()"><svg viewBox="0 0 48 48" width="20" height="20" aria-hidden="true" style="flex:0 0 auto"><path fill="#FFC107" d="M43.6 20.1H42V20H24v8h11.3C33.7 32.7 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.9 1.2 8 3l5.7-5.7C34.3 6.1 29.3 4 24 4 13 4 4 13 4 24s9 20 20 20 20-9 20-20c0-1.3-.1-2.6-.4-3.9z"/><path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.9 1.2 8 3l5.7-5.7C34.3 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.1 26.7 36 24 36c-5.2 0-9.6-3.3-11.3-8l-6.5 5C9.5 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.1H42V20H24v8h11.3c-.8 2.3-2.3 4.3-4.1 5.6l6.2 5.2C36.9 39.2 44 34 44 24c0-1.3-.1-2.6-.4-3.9z"/></svg><span data-i18n="authSignupGoogle">ចុះឈ្មោះជាមួយ Google · Sign up with Google</span></button>
     <div id="loginGsiSlot" style="display:none;margin-top:14px;justify-content:center"></div>
     <div id="loginSpinner" style="display:none;justify-content:center;margin-top:16px" role="status" aria-label="Loading"><span class="login-spin-ring"></span></div>
@@ -3479,6 +3607,15 @@ input[type=range].st-range{accent-color:var(--accent);min-height:32px;cursor:poi
     <div id="notifList" style="margin-top:6px"></div>
   </div>
 </div>
+<div id="versionSheet" class="pkg-sheet" style="display:none" role="dialog" aria-modal="true" onclick="if(event.target===this)versionSheetClose()">
+  <div class="pkg-sheet-card">
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:10px">
+      <h3 style="font-size:1.0625rem;font-weight:800" data-i18n="verTitle">ប្រវត្តិកំណែ · Version History</h3>
+      <button type="button" class="drawer-close" style="background:var(--card2);color:var(--text);border-color:var(--line2)" onclick="versionSheetClose()" aria-label="Close">✕</button>
+    </div>
+    <div id="versionList" style="margin-top:6px"></div>
+  </div>
+</div>
 <div id="offlineSheet" class="pkg-sheet offline-sheet" style="display:none" role="alertdialog" aria-modal="true" aria-labelledby="offlineTitle">
   <div class="pkg-sheet-card" style="text-align:center">
     <button type="button" class="offline-art" onclick="offlineRetry()" aria-label="ព្យាយាមម្ដងទៀត · Try again"><img src="data:image/webp;base64,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" alt="WiFi និង 4G/5G ដាច់ — No network" width="960" height="640"></button>
@@ -3614,6 +3751,12 @@ km:{
  authAlready:'អ្នកមានគណនីរួចហើយ។ សូមចូលប្រើដោយ Gmail និងលេខសម្ងាត់របស់អ្នក។',
  authErrPassEmpty:'សូមបញ្ចូលលេខសម្ងាត់',authErrNet:'ភ្ជាប់ទៅ Server មិនបានទេ — សូមព្យាយាមម្ដងទៀត',
  authErrSignin:'ចូលប្រើមិនបានទេ — សូមពិនិត្យ Gmail និងលេខសម្ងាត់របស់អ្នក',
+ deviceLimitTitle:'Upgrade · បន្ថែម Gmail',
+ deviceLimitMsg:'ឧបករណ៍នេះធ្លាប់បានប្រើហើយ · VPN មិនត្រូវបានគាំទ្រទេ។ ឧបករណ៍នេះមាន 3 គណនីរួចហើយ។ Upgrade ដើម្បីបន្ថែម Gmail — $1 ក្នុងមួយ Gmail។',
+ deviceLimitSlots:'ចំនួន Gmail បន្ថែម',deviceLimitBuy:'ទិញ',
+ deviceLimitOk:'បានទិញរួចហើយ ✓ — ឥឡូវអ្នកអាចចុះឈ្មោះ Gmail ថ្មីបាន',
+ deviceLimitFail:'ទិញមិនបានទេ — សូមពិនិត្យសមតុល្យ Wallet របស់អ្នក ហើយព្យាយាមម្ដងទៀត',
+ deviceLimitNeedEmail:'សូមបញ្ចូល Gmail របស់អ្នកជាមុនសិន',
  pwdCreateTitle:'បង្កើតលេខសម្ងាត់',
  pwdCreateNote:'គណនី Google របស់អ្នកត្រូវបានផ្ទៀងផ្ទាត់ហើយ។ សូមបង្កើតលេខសម្ងាត់សម្រាប់គណនី MovAi របស់អ្នក — លើកក្រោយអ្នកនឹងចូលប្រើដោយ Gmail និងលេខសម្ងាត់នេះ។',
  pwdConfirmLabel:'បញ្ជាក់លេខសម្ងាត់',pwdConfirmPh:'បញ្ចូលលេខសម្ងាត់ម្ដងទៀត',
@@ -3667,7 +3810,7 @@ km:{
  profileTitle:'ប្រូហ្វាល់របស់ខ្ញុំ',profileBalance:'សមតុល្យ Credit',profileAccount:'គណនី',profileEmail:'Gmail',
  profilePlan:'កញ្ចប់សេវាកម្ម',profileFree:'ឥតគិតថ្លៃ (Free)',profileSince:'សមាជិកតាំងពី',profileLabel:'ប្រូហ្វាល់',
  profileUserId:'លេខសម្គាល់ (ID)',profileCopy:'ចម្លង',profileCopied:'បានចម្លង ✓',acctFirstName:'នាម · First name',acctLastName:'គោត្តនាម · Last name',
- pubTabPublic:'សាធារណៈ',pubTabCreate:'បង្កើត',navModeSong:'បង្កើតបទចម្រៀង',navModeVI:'វីដេអូ+រូបភាព',navMode3d:'រូបភាព 3D',navStudio:'ស្ទូឌីយោ',studioOpen:'Studio',pubTitle:'Public · សាធារណៈ',pubRefresh:'ផ្ទុកថ្មី',pubLoading:'កំពុងផ្ទុក Public...',
+ pubTabPublic:'សាធារណៈ',pubTabCreate:'បង្កើត',navModeSong:'បង្កើតបទចម្រៀង',navModeVI:'វីដេអូ+រូបភាព',navMode3d:'រូបភាព 3D',navStudio:'ស្ទូឌីយោ',studioOpen:'Studio',vocalStudio:'Vocal Studio',pubTitle:'Public · សាធារណៈ',pubRefresh:'ផ្ទុកថ្មី',pubLoading:'កំពុងផ្ទុក Public...',
  pubRankNote:'រាំង (Ranking) រាប់តាមចំនួនអ្នកមើល (View) — អ្នកណា View ច្រើនជាងគេ គឺលេខ 1',
  pubEmpty:'មិនទាន់មានអ្វីផុសនៅ Public នៅឡើយទេ — ចូលទៅ បង្កើត ហើយចុច «ផុសទៅ Public» ដើម្បីផុសដំបូងគេ!',
  pubError:'ផ្ទុក Public feed មិនបាន — server អាចកំពុងដេក សូមចុចព្យាយាមម្ដងទៀត',pubRetry:'ព្យាយាមម្ដងទៀត',
@@ -3702,7 +3845,7 @@ km:{
  
  pubDlLimit:'អ្នកបានប្រើអស់ការទាញយកហ្វ្រី {p} 2 ដងហើយ — សូមទិញកញ្ចប់បទចម្រៀង ដើម្បីទាញយកបន្ត',
  giftTitle:'កាដូពី Admin',giftBody:'Free 250 Image.Video Credit + 24 Song Credit សម្រាប់អ្នកប្រើថ្មី',giftClaim:'ទទួលយក · Claim',blockedTitle:'គណនីនេះត្រូវបានប្លុក · This account is blocked',blockedBody:'គណនី / IP / ឧបករណ៍នេះត្រូវបាន Admin ប្លុក — អ្នកចូលប្រើ ឬបង្កើតអ្វីមិនបានទេ។ បើចង់ដោះស្រាយ សូមទាក់ទង Admin។',blockedContact:'ទាក់ទង Admin តាម Telegram',blockedLogout:'ចេញពីគណនី · Log out',
- navNotif:'ដំណឹង',notifTitle:'ដំណឹង · Notifications',notifEmpty:'មិនទាន់មានដំណឹងទេ',notifGuest:'សូម Log in ដើម្បីមើលដំណឹងរបស់អ្នក',notifLoading:'កំពុងផ្ទុក…',notifJustNow:'ទើបតែឥឡូវនេះ',notifMinAgo:'{n} នាទីមុន',notifHourAgo:'{n} ម៉ោងមុន',notifDayAgo:'{n} ថ្ងៃមុន',notifApproved:'កញ្ចប់របស់អ្នកត្រូវបានអនុម័ត ✓',notifRejected:'កញ្ចប់របស់អ្នកត្រូវបានបដិសេធ',notifLogin:'មានអ្នកប្រើថ្មី Log in',notifRequest:'មានសំណើទិញកញ្ចប់ថ្មី',notifGrant:'Admin បានបន្ថែម Credit ឲ្យអ្នក',notifDeduct:'Admin បានកាត់ Credit របស់អ្នក',notifInfo:'ដំណឹងពី MovAi',notifPost:'បានផុសថ្មីទៅ Public',notifGenCharge:'បានកាត់ Credit ពីការបង្កើត',notifGenRefund:'បានសង Credit វិញ · បង្កើតមិនបាន',
+ navNotif:'ដំណឹង',notifTitle:'ដំណឹង · Notifications',verTitle:'ប្រវត្តិកំណែ · Version History',verRow:'កំណែ · Version',verLatest:'ថ្មីបំផុត · Latest',notifEmpty:'មិនទាន់មានដំណឹងទេ',notifGuest:'សូម Log in ដើម្បីមើលដំណឹងរបស់អ្នក',notifLoading:'កំពុងផ្ទុក…',notifJustNow:'ទើបតែឥឡូវនេះ',notifMinAgo:'{n} នាទីមុន',notifHourAgo:'{n} ម៉ោងមុន',notifDayAgo:'{n} ថ្ងៃមុន',notifApproved:'កញ្ចប់របស់អ្នកត្រូវបានអនុម័ត ✓',notifRejected:'កញ្ចប់របស់អ្នកត្រូវបានបដិសេធ',notifLogin:'មានអ្នកប្រើថ្មី Log in',notifRequest:'មានសំណើទិញកញ្ចប់ថ្មី',notifGrant:'Admin បានបន្ថែម Credit ឲ្យអ្នក',notifDeduct:'Admin បានកាត់ Credit របស់អ្នក',notifInfo:'ដំណឹងពី MovAi',notifPost:'បានផុសថ្មីទៅ Public',notifGenCharge:'បានកាត់ Credit ពីការបង្កើត',notifGenRefund:'បានសង Credit វិញ · បង្កើតមិនបាន',
  pushAskTitle:'បើកដំណឹងពីទូរស័ព្ទ?',pushAskBody:'ទទួលដំណឹងពិតៗចេញពីទូរស័ព្ទរបស់អ្នកផ្ទាល់ — ពេលកញ្ចប់ត្រូវបានអនុម័ត ពេល Admin បន្ថែម ឬកាត់ Credit និងពេលមានកាដូ — ទោះបីអ្នកមិនបានបើក website ក៏ដោយ',pushAllow:'បើកដំណឹង · Enable',pushNotNow:'មិនបាច់ទេ · Not now',pushSetLabel:'ដំណឹងពីទូរស័ព្ទ · Push notifications',pushBlockedTitle:'Browser បានបិទដំណឹង · Notifications blocked',pushBlockedBody:'អ្នកធ្លាប់ចុច «Block» ពីមុន ទើប browser លែងលោតសួរ «Allow ឬអត់» ទៀត ហើយ website ក៏សុំសិទ្ធិឡើងវិញអត់បានដែរ។ សូមបើកវាដោយខ្លួនឯងតាមជំហានខាងក្រោម — មិនដល់ ១ នាទីទេ៖',pushBlockedStep1:'ចុចរូបសោ 🔒 នៅខាងឆ្វេងអាសយដ្ឋាន website នេះ លើ address bar ខាងលើ',pushBlockedStep2:'ចុច «Site settings» (ការកំណត់គេហទំព័រ)',pushBlockedStep3:'ចុច «Notifications» (ដំណឹង) រួចជ្រើស «Allow» (អនុញ្ញាត)',pushBlockedStep4:'ត្រឡប់មក website នេះវិញ រួចបើក switch «Push notifications» ម្ដងទៀត — វានឹងដំណើរការភ្លាម',pushBlockedAlt:'រករូបសោ 🔒 អត់ឃើញ? ចុច ⋮ (ចំណុច ៣ នៅខាងលើស្ដាំនៃ browser) → Settings → Site settings → Notifications → រក website នេះក្នុងបញ្ជី «Blocked» → Allow',pushBlockedDone:'ខ្ញុំបើករួចហើយ · I turned it on',pushBlockedClose:'បិទ · Close',pushBlockedStill:'នៅតែ Block នៅឡើយ — សូមពិនិត្យជំហានខាងលើម្ដងទៀត',
  acctErrFill:'សូមបំពេញឲ្យគ្រប់ — អ៊ីមែលត្រូវមាន @ ហើយពាក្យសម្ងាត់យ៉ាងតិច 4 តួ',
  acctErrExists:'អ៊ីមែលនេះបានចុះឈ្មោះរួចហើយ — បានប្ដូរទៅ ចូលគណនី',
@@ -3875,6 +4018,12 @@ en:{
  authAlready:'You already have an account. Please sign in with your Gmail and password.',
  authErrPassEmpty:'Please enter your password',authErrNet:'Could not reach the server — please try again',
  authErrSignin:'Could not sign in — please check your Gmail and password',
+ deviceLimitTitle:'Upgrade',
+ deviceLimitMsg:'This device has been used before · VPN is not supported. This device already has 3 accounts. Upgrade to add more Gmails — $1 per Gmail.',
+ deviceLimitSlots:'Extra Gmails',deviceLimitBuy:'Buy',
+ deviceLimitOk:'Slots added ✓ — you can now sign up with a new Gmail',
+ deviceLimitFail:'Could not buy slots — please check your wallet balance and try again',
+ deviceLimitNeedEmail:'Please enter your Gmail first',
  pwdCreateTitle:'Create Password',
  pwdCreateNote:'Your Google account is verified. Create a password for your MovAi account — next time you will sign in with your Gmail and this password.',
  pwdConfirmLabel:'Confirm password',pwdConfirmPh:'Re-enter your password',
@@ -3928,7 +4077,7 @@ en:{
  profileTitle:'My Profile',profileBalance:'Credit balance',profileAccount:'Account',profileEmail:'Gmail',
  profilePlan:'Package',profileFree:'Free',profileSince:'Member since',profileLabel:'Profile',
  profileUserId:'User ID',profileCopy:'Copy',profileCopied:'Copied ✓',acctFirstName:'First name · នាម',acctLastName:'Last name · គោត្តនាម',
- pubTabPublic:'Public',pubTabCreate:'Create',navModeSong:'Create Song',navModeVI:'Video+Image',navMode3d:'3D Image',navStudio:'Studio',studioOpen:'Studio',pubTitle:'Public',pubRefresh:'Refresh',pubLoading:'Loading Public...',
+ pubTabPublic:'Public',pubTabCreate:'Create',navModeSong:'Create Song',navModeVI:'Video+Image',navMode3d:'3D Image',navStudio:'Studio',studioOpen:'Studio',vocalStudio:'Vocal Studio',pubTitle:'Public',pubRefresh:'Refresh',pubLoading:'Loading Public...',
  pubRankNote:'Ranking is by views — whoever has the most views is #1',
  pubEmpty:'Nothing has been posted to Public yet — go to Create, make something, and tap "Post to Public" to be the first!',
  pubError:'Could not load the Public feed — the server may be asleep. Please try again',pubRetry:'Try again',
@@ -3963,7 +4112,7 @@ en:{
  
  pubDlLimit:'You have used your 2 free {p} downloads — please buy a Song package to keep downloading',
  giftTitle:'A Gift from Admin',giftBody:'Free 250 Image.Video Credit + 24 Song Credit for new users',giftClaim:'Claim · ទទួលយក',blockedTitle:'This account is blocked · គណនីនេះត្រូវបានប្លុក',blockedBody:'This account / IP / device has been blocked by the Admin — you cannot log in or create anything. To resolve this, contact the Admin.',blockedContact:'Contact Admin on Telegram',blockedLogout:'Log out · ចេញពីគណនី',
- navNotif:'Notifications',notifTitle:'Notifications · ដំណឹង',notifEmpty:'No notifications yet',notifGuest:'Log in to see your notifications',notifLoading:'Loading…',notifJustNow:'Just now',notifMinAgo:'{n} min ago',notifHourAgo:'{n} hr ago',notifDayAgo:'{n} days ago',notifApproved:'Your package was approved ✓',notifRejected:'Your package was rejected',notifLogin:'New user signed in',notifRequest:'New package purchase request',notifGrant:'Admin added credits to your account',notifDeduct:'Admin deducted credits from your account',notifInfo:'MovAi notification',notifPost:'New post on Public',notifGenCharge:'Credit charged for a creation',notifGenRefund:'Credit refunded · creation failed',
+ navNotif:'Notifications',notifTitle:'Notifications · ដំណឹង',verTitle:'Version History · ប្រវត្តិកំណែ',verRow:'Version · កំណែ',verLatest:'Latest · ថ្មីបំផុត',notifEmpty:'No notifications yet',notifGuest:'Log in to see your notifications',notifLoading:'Loading…',notifJustNow:'Just now',notifMinAgo:'{n} min ago',notifHourAgo:'{n} hr ago',notifDayAgo:'{n} days ago',notifApproved:'Your package was approved ✓',notifRejected:'Your package was rejected',notifLogin:'New user signed in',notifRequest:'New package purchase request',notifGrant:'Admin added credits to your account',notifDeduct:'Admin deducted credits from your account',notifInfo:'MovAi notification',notifPost:'New post on Public',notifGenCharge:'Credit charged for a creation',notifGenRefund:'Credit refunded · creation failed',
  pushAskTitle:'Turn on phone notifications?',pushAskBody:'Get real alerts on your phone — when a package is approved, when Admin adds or deducts credits, and when a gift arrives — even when the website is closed',pushAllow:'Enable · បើកដំណឹង',pushNotNow:'Not now · មិនបាច់ទេ',pushSetLabel:'Push notifications · ដំណឹងពីទូរស័ព្ទ',pushBlockedTitle:'Notifications blocked · Browser បានបិទដំណឹង',pushBlockedBody:'You tapped "Block" before, so the browser no longer shows the "Allow?" prompt — and the website cannot ask again. Turn it back on yourself with the steps below; it takes under a minute:',pushBlockedStep1:'Tap the 🔒 lock icon at the left end of the address bar at the top',pushBlockedStep2:'Tap "Site settings"',pushBlockedStep3:'Tap "Notifications", then choose "Allow"',pushBlockedStep4:'Come back to this website and turn the "Push notifications" switch on again — it will work right away',pushBlockedAlt:'Cannot find the 🔒? Tap ⋮ (the 3 dots at the top right of the browser) → Settings → Site settings → Notifications → find this site under "Blocked" → Allow',pushBlockedDone:'I turned it on · ខ្ញុំបើករួចហើយ',pushBlockedClose:'Close · បិទ',pushBlockedStill:'Still blocked — please check the steps above once more',
  acctErrFill:'Please fill everything — email must contain @ and password at least 4 characters',
  acctErrExists:'This email is already registered — switched to Log in',
@@ -4157,17 +4306,28 @@ function modeEffective(m){
   if(m==='auto')return (window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches)?'dark':'light';
   return 'dark';
 }
+/* The user's OWN day/night tap is a LOCK. When the user picks Day,
+   Night or Auto from the mode buttons, setMode() saves the choice
+   AND sets 'movai-mode-lock'. From then on nothing may override
+   it — in particular the Admin server settings, which acctAdminSync
+   re-fetches on app open and every minute and whose mode used to be
+   applied through setMode() with save, flipping the app back to
+   Night a few seconds after the user picked Day (and overwriting
+   the saved choice). adminApplySettings() checks this lock and
+   skips its mode entirely while it is set; the Admin mode remains
+   only a never-saved default for users who have not picked yet. */
+function modeUserLocked(){try{return localStorage.getItem('movai-mode-lock')==='1';}catch(e){return false;}}
 function setMode(m,save){
   MODE=(m==='light'||m==='auto')?m:'dark';
   var eff=modeEffective(MODE);
   document.documentElement.setAttribute('data-mode',eff);
   var tc=document.querySelector('meta[name="theme-color"]');
-  if(tc)tc.setAttribute('content',eff==='light'?'#f3f4f6':'#0A0B0D');
+  if(tc)tc.setAttribute('content',eff==='light'?'#e7eaee':'#0A0B0D');
   var t=THEMES[THEME_IDX];
   if(t)document.documentElement.style.setProperty('--accent-text',eff==='light'?t.lt:t.c);
   setBgBright(BGBRIGHT,false);
   syncModeBtns();
-  if(save!==false){try{localStorage.setItem('movai-mode',MODE);}catch(e){}}
+  if(save!==false){try{localStorage.setItem('movai-mode',MODE);localStorage.setItem('movai-mode-lock','1');}catch(e){}featureUsage(MODE==='light'?'theme_day':(MODE==='auto'?'theme_auto':'theme_night'));}
 }
 function syncModeBtns(){
   var map={dark:['modeBtnDark','profModeBtnDark'],light:['modeBtnLight','profModeBtnLight'],auto:['modeBtnAuto','profModeBtnAuto']};
@@ -4242,21 +4402,33 @@ function setTxtBlur(v,save){
   if(save!==false){try{localStorage.setItem('movai-txtblur',String(v));}catch(e){}}
 }
 var BGBRIGHT=50;
-function bgColorCss(v){
+/* Subtle 3D page depth (owner order 2026-11-18): the brightness
+   value yields the MID colour; the background is then painted as
+   a soft vertical gradient — the TOP stop lifted toward white,
+   the BOTTOM stop shaded — plus a faint light glow at the top
+   (see the body background in the stylesheet). Day mode's base is
+   a MODERATE white (a soft light grey, never the old glaring
+   #f3f4f6 slab) and night gets the same gentle depth in dark
+   tones, so both themes read as clean, quiet 3D — never a flat
+   slab and never colour splashed over the content. */
+function bgStopsCss(v){
   var light=document.documentElement.getAttribute('data-mode')==='light';
-  var base=light?[243,244,246]:[10,11,13];
-  var out;
-  if(v<=50){var f=1-((50-v)/50)*0.9;out=base.map(function(c){return Math.round(c*f);});}
-  else{var f2=(v-50)/50;out=base.map(function(c){return Math.round(c+(255-c)*f2*0.95);});}
-  return 'rgb('+out.join(',')+')';
+  var base=light?[231,234,238]:[10,11,13];
+  var mid;
+  if(v<=50){var f=1-((50-v)/50)*0.9;mid=base.map(function(c){return Math.round(c*f);});}
+  else{var f2=(v-50)/50;mid=base.map(function(c){return Math.round(c+(255-c)*f2*0.95);});}
+  var top=mid.map(function(c){return Math.round(c+(255-c)*(light?0.3:0.05));});
+  var bot=mid.map(function(c){return Math.round(c*(light?0.93:0.55));});
+  return {top:'rgb('+top.join(',')+')',mid:'rgb('+mid.join(',')+')',bot:'rgb('+bot.join(',')+')'};
 }
+function bgColorCss(v){return bgStopsCss(v).mid;}
 function setBgBright(v,save){
   v=parseInt(v,10);if(isNaN(v))v=50;
   if(v<0)v=0;if(v>100)v=100;
   BGBRIGHT=v;
-  var c=bgColorCss(v);
+  var st=bgStopsCss(v);
   var de=document.documentElement;
-  de.style.setProperty('--bg',c);de.style.setProperty('--bg1',c);de.style.setProperty('--bg2',c);
+  de.style.setProperty('--bg',st.mid);de.style.setProperty('--bg1',st.top);de.style.setProperty('--bg2',st.bot);
   var val=document.getElementById('bgBrightVal');if(val)val.textContent=v+'%';
   var r=document.getElementById('bgBrightRange');if(r&&String(r.value)!==String(v))r.value=String(v);
   if(save!==false){try{localStorage.setItem('movai-bgb',String(v));}catch(e){}}
@@ -5284,6 +5456,19 @@ function pkgEvent(action,packageId){
     var u=(typeof acctCurrent==='function')?acctCurrent():null;
     var email=(u&&u.email)?u.email:'guest';
     fetch(PKG_EVENT_URL,{method:'POST',headers:{'Content-Type':'application/json'},keepalive:true,body:JSON.stringify({email:email,packageId:packageId||'',action:action})}).catch(function(){});
+  }catch(e){}
+}
+/* Feature usage → Admin counting (owner order): every use of one
+   of the newer features is reported SILENTLY to the server — POST
+   https://movai-proxy.onrender.com/api/public/feature-usage
+   {feature:'<name>'} (no email sent). Fire-and-forget: never
+   awaited and every failure is swallowed, so a silent or slow
+   server can never block or break the app. Called alongside the
+   existing handlers only — it changes no behaviour. */
+var FEATURE_USAGE_URL='https://movai-proxy.onrender.com/api/public/feature-usage';
+function featureUsage(name){
+  try{
+    fetch(FEATURE_USAGE_URL,{method:'POST',headers:{'Content-Type':'application/json'},keepalive:true,body:JSON.stringify({feature:name})}).catch(function(){});
   }catch(e){}
 }
 function pkgSendPurchaseRequest(pl,receiptUrl){
@@ -7638,6 +7823,8 @@ var SONG_SVG_SHARE='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" s
 var SONG_SVG_POST='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3c2.7 2.6 4 5.6 4 9s-1.3 6.4-4 9c-2.7-2.6-4-5.6-4-9s1.3-6.4 4-9z"/></svg>';
 var SONG_SVG_DEL='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16"/><path d="M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/><path d="M6.5 7l.9 12.1A1 1 0 0 0 8.4 20h7.2a1 1 0 0 0 1-.9L17.5 7"/><path d="M10 11v5M14 11v5"/></svg>';
 var SONG_SVG_MV='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2.5" y="5" width="19" height="14" rx="3"/><path d="M10 9.5l5 2.5-5 2.5z" fill="currentColor" stroke="none"/></svg>';
+var SONG_SVG_MENU='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg>';
+var SONG_SVG_PLAY='<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5.4v13.2c0 .8.9 1.3 1.6.9l10.2-6.6c.6-.4.6-1.4 0-1.8L9.6 4.5C8.9 4.1 8 4.6 8 5.4z"/></svg>';
 /* MOVAI Studio (owner order 2026-11-17): the «Studio» action
    sits beside MV on the owner's OWN song cards only (creation
    results, History, Playlist, and own posts in Public — the
@@ -7664,6 +7851,14 @@ function songIcoBtn(label,svg,red){
   if(red)b.style.color='#f87171';
   b.innerHTML=svg;b.setAttribute('aria-label',label);b.title=label;
   return b;
+}
+/* Small «AI» badge pinned to a button's top-left corner (Song
+   History rows: the MV and Vocal Studio buttons). Purely a
+   label — it takes no taps and carries no handler. */
+function songAiBadge(){
+  var s=document.createElement('span');
+  s.className='song-ai-badge';s.textContent='AI';s.setAttribute('aria-hidden','true');
+  return s;
 }
 /* The placeholder cards shown while a song generation runs — one
    per expected song (Suno / MusicAPI return 2, Magic Hour / ACE
@@ -8593,16 +8788,76 @@ function fsExpandBtn(src,type,wm){
   return btn;
 }
 document.addEventListener('keydown',function(e){if(e.key==='Escape'){fsClose();payKhqrClose();payUsdtQrClose();}});
-/* Song History card — the same compact row as the generation
-   results: small cover · Play · title · duration · Like / Download /
-   Share / Post / Delete icon buttons, with a slim seek strip under
-   the row. Playback uses the one shared History audio element
-   (histPlayToggle / histPlayerSync, via the .hist-* classes). The
-   duration is read from the file's metadata once, lightly. */
+/* ---- Song menu (owner order 2026-11-18) ----
+   The ☰ button on a Song History row opens this bottom sheet,
+   which lists EVERY action the song has — icon + text label —
+   so nothing is lost when the row itself shows only the 4 big
+   buttons (Like / Download / MV / Vocal Studio). Each item runs the
+   very same handler the old tiny row icons ran. Delete keeps
+   its two-tap confirmation: the first tap arms the menu row
+   (the sheet stays open), the second tap deletes. */
+function songMenuClose(){
+  var s=document.getElementById('songMenuSheet');
+  if(s)sheetHideAnim(s);
+}
+function songMenuItem(svg,label,red){
+  var b=document.createElement('button');
+  b.type='button';b.className='song-menu-item'+(red?' danger':'');
+  b.innerHTML='<span class="song-menu-ico">'+svg+'</span><span class="song-menu-label">'+escHtml(label)+'</span>';
+  return b;
+}
+function songMenuOpen(it,lkBtn,dlBtn,shBtn,ownerName){
+  var sheet=document.getElementById('songMenuSheet');if(!sheet)return;
+  var title=document.getElementById('songMenuTitle');
+  if(title)title.textContent=it.title||'MovAi';
+  var body=document.getElementById('songMenuBody');if(!body)return;
+  body.innerHTML='';
+  function add(svg,label,red,fn){
+    var b=songMenuItem(svg,label,red);
+    b.addEventListener('click',fn);
+    body.appendChild(b);
+    return b;
+  }
+  add(SONG_SVG_PLAY,tx('histPlay'),false,function(){songMenuClose();histPlayToggle(it);});
+  add(histHeartSvg(!!it.liked),tx('histLike'),false,function(){histToggleLike(it.id,lkBtn);songMenuClose();});
+  add(SONG_SVG_DL,tx('histDownload'),false,function(){songMenuClose();histDownload(it,dlBtn);});
+  add(SONG_SVG_MV,tx('mvBtn'),false,function(){songMenuClose();featureUsage('history_mv');mvOpen({url:it.url,title:it.title||'',lyrics:it.prompt||'',image:it.image||''});});
+  add(SONG_SVG_STUDIO,tx('vocalStudio'),false,function(){songMenuClose();featureUsage('history_vocal_studio');studioOpenSong(it.url,it.title||'');});
+  add(SONG_SVG_SHARE,tx('histShare'),false,function(){songMenuClose();histShare(it,shBtn);});
+  add(plBookmarkSvg(plHas(it.url)),plHas(it.url)?tx('plSaved'):tx('plSave'),false,function(){featureUsage('history_save');plToggle({url:it.url,title:it.title||'',image:it.image||'',name:ownerName||''});songMenuClose();});
+  add(SONG_SVG_POST,(it.pubPost==='public')?tx('pubPostedAlready'):tx('pubPostBtn'),false,function(){songMenuClose();featureUsage('history_post_public');pubOpenSheet(it);});
+  var delB=add(SONG_SVG_DEL,tx('histDelete'),true,function(){
+    histDelete(it.id,delB);
+    var still=false;
+    try{still=histGet().some(function(x){return x.id===it.id;});}catch(e){}
+    if(!still){songMenuClose();return;}
+    /* First tap only ARMED the delete — keep the sheet open and
+       show the confirm label; histDelete's own timer disarms it,
+       after which the icon + label are restored here. */
+    delB.innerHTML='<span class="song-menu-ico">'+SONG_SVG_DEL+'</span><span class="song-menu-label">'+escHtml(tx('histDelConfirm'))+'</span>';
+    delB.classList.add('armed');
+    setTimeout(function(){
+      if(delB.isConnected&&delB.getAttribute('data-arm')!=='1'){
+        delB.innerHTML='<span class="song-menu-ico">'+SONG_SVG_DEL+'</span><span class="song-menu-label">'+escHtml(tx('histDelete'))+'</span>';
+        delB.classList.remove('armed');
+      }
+    },2750);
+  });
+  sheetShowAnim(sheet);
+}
+/* Song History card (owner order 2026-11-18) — a BIG card: larger
+   cover with the centred Play button, bigger title + duration,
+   then ONE actions row with only 4 large buttons (Like /
+   Download / MV / Vocal Studio) and a ☰ menu button that opens
+   the song menu with every remaining action. The slim seek strip
+   sits under the actions. Playback uses the one shared History
+   audio element (histPlayToggle / histPlayerSync, via the
+   .hist-* classes). The duration is read from the file's
+   metadata once, lightly. */
 function histSongCard(it){
   if(it&&it.url)mp3Warm(it.url);
   var card=document.createElement('div');
-  card.className='hist-card song-card';
+  card.className='hist-card song-card hist-song-lg';
   card.setAttribute('data-hist-id',it.id);
   card.setAttribute('data-hist-type','song');
   var ownerName='';
@@ -8658,29 +8913,40 @@ function histSongCard(it){
       if(isFinite(mAu.duration)&&mAu.duration>0)dur.textContent=histFmtTime(mAu.duration);
       try{mAu.removeAttribute('src');mAu.load();}catch(e){}
     });
+    /* Actions row (owner order 2026-11-18): only 4 LARGE buttons
+       stay on the card — Like / Download / MV / Vocal Studio —
+       plus the ☰ menu button, which opens the song menu holding
+       every other action (Listen, Share, Save, Post, Delete).
+       Share lives ONLY in that menu now. The MV and Vocal Studio
+       buttons each carry a small «AI» badge on their top-left
+       corner — both are AI features. */
+    card.appendChild(rowEl);
+    var acts=document.createElement('div');
+    acts.className='song-acts';
     var lk=songIcoBtn(tx('histLike'),histHeartSvg(!!it.liked));
-    lk.classList.add('hist-like');
+    lk.classList.add('hist-like');lk.classList.add('song-act');
     if(it.liked)lk.classList.add('liked');
     lk.addEventListener('click',function(){histToggleLike(it.id,lk);});
-    rowEl.appendChild(lk);
+    acts.appendChild(lk);
     var dl=songIcoBtn(tx('histDownload'),SONG_SVG_DL);
+    dl.classList.add('song-act');
     dl.addEventListener('click',function(){histDownload(it,dl);});
-    rowEl.appendChild(dl);
+    acts.appendChild(dl);
     var mvb=songIcoBtn(tx('mvBtn'),SONG_SVG_MV);
-    mvb.addEventListener('click',function(){mvOpen({url:it.url,title:it.title||'',lyrics:it.prompt||'',image:it.image||''});});
-    rowEl.appendChild(mvb);
-    rowEl.appendChild(studioIcoBtn(it.url,it.title||''));
-    var sh=songIcoBtn(tx('histShare'),SONG_SVG_SHARE);
-    sh.addEventListener('click',function(){histShare(it,sh);});
-    rowEl.appendChild(sh);
-    rowEl.appendChild(plIcoBtn({url:it.url,title:it.title||'',image:it.image||'',name:ownerName}));
-    var pb=songIcoBtn((it.pubPost==='public')?tx('pubPostedAlready'):tx('pubPostBtn'),SONG_SVG_POST);
-    pb.addEventListener('click',function(){pubOpenSheet(it);});
-    rowEl.appendChild(pb);
-    var del=songIcoBtn(tx('histDelete'),SONG_SVG_DEL,true);
-    del.addEventListener('click',function(){histDelete(it.id,del);});
-    rowEl.appendChild(del);
-    card.appendChild(rowEl);
+    mvb.classList.add('song-act');
+    mvb.appendChild(songAiBadge());
+    mvb.addEventListener('click',function(){featureUsage('history_mv');mvOpen({url:it.url,title:it.title||'',lyrics:it.prompt||'',image:it.image||''});});
+    acts.appendChild(mvb);
+    var stb=songIcoBtn(tx('vocalStudio'),SONG_SVG_STUDIO);
+    stb.classList.add('song-act');
+    stb.appendChild(songAiBadge());
+    stb.addEventListener('click',function(){featureUsage('history_vocal_studio');studioOpenSong(it.url,it.title||'');});
+    acts.appendChild(stb);
+    var menuB=songIcoBtn(tx('menuLabel'),SONG_SVG_MENU);
+    menuB.classList.add('song-act');
+    menuB.addEventListener('click',function(){songMenuOpen(it,lk,dl,null,ownerName);});
+    acts.appendChild(menuB);
+    card.appendChild(acts);
     var seek=document.createElement('input');
     seek.type='range';seek.className='song-seek hist-seek';seek.min='0';seek.max='1000';seek.value='0';
     seek.setAttribute('aria-label','Seek');
@@ -8805,7 +9071,7 @@ function histCard(it){
     var pb=document.createElement('button');
     pb.type='button';pb.className='kbtn kbtn-white';
     pb.textContent=(it.pubPost==='public')?tx('pubPostedAlready'):tx('pubPostBtn');
-    pb.addEventListener('click',function(){pubOpenSheet(it);});
+    pb.addEventListener('click',function(){featureUsage('history_post_public');pubOpenSheet(it);});
     row.appendChild(pb);
   }
   var del=document.createElement('button');
@@ -8918,7 +9184,7 @@ function histPlayToggle(it){
      puts the fresh-result song players to sleep. */
   try{genSongAudios.forEach(function(a){try{a.pause();}catch(e){}});}catch(e){}
   if(histAudioId===it.id){
-    if(au.paused){var pr=au.play();if(pr&&pr.catch)pr.catch(function(){});}
+    if(au.paused){var pr=au.play();if(pr&&pr.catch)pr.catch(function(){});featureUsage('history_listen');}
     else au.pause();
     histPlayerSync();
     return;
@@ -8931,6 +9197,7 @@ function histPlayToggle(it){
     var s=card.querySelector('.hist-speed');if(s)au.playbackRate=parseFloat(s.value)||1;
   }
   var p2=au.play();if(p2&&p2.catch)p2.catch(function(){});
+  featureUsage('history_listen');
   histPlayerSync();
 }
 function histStop(id){
@@ -8966,6 +9233,7 @@ function histPlayerSync(){
 }
 /* ---- Per-item actions: Download / Like / Share / Delete ---- */
 async function histDownload(it,anchorEl){
+  featureUsage('history_download');
   if(it.type==='video'){genDownloadVideo(it.url,it.title||it.prompt);return;}
   if(it.type==='song'){genDownloadSong(it.url,1,it.title,anchorEl);return;}
   if(it.type==='3d'){if(it.url)window.open(it.url,'_blank');return;}
@@ -8976,6 +9244,7 @@ function histToggleLike(id,btn){
   var a=histGet(),liked=false;
   for(var i=0;i<a.length;i++)if(a[i].id===id){a[i].liked=!a[i].liked;liked=a[i].liked;}
   histSave(a);
+  if(liked)featureUsage('history_like');
   if(btn){
     btn.classList.toggle('liked',liked);
     var svg=btn.querySelector('svg');
@@ -8983,6 +9252,7 @@ function histToggleLike(id,btn){
   }
 }
 function histShare(it,btn){
+  featureUsage('history_share');
   var url=it.url||'';
   var text=it.title||it.prompt||'MovAi';
   if(navigator.share){
@@ -9018,6 +9288,7 @@ function histDelete(id,btn){
     try{histTombAdd(histKey(),[id]);}catch(e){}
     histSave(histGet().filter(function(x){return x.id!==id;}));
     histRender();
+    featureUsage('history_delete');
     return;
   }
   btn.setAttribute('data-arm','1');
@@ -13406,6 +13677,12 @@ function acctAdminSync(){
     }catch(e){ctrl=null;}
     var pl=acctAdminPayload(u);
     pl.model=model||'';
+    /* Device fingerprint (device-limit rule): the stable device
+       ID + screen + timezone + VPN indicator ride every sync;
+       the cached model fills in when the UA-CH lookup gave ''. */
+    var df=movaiDeviceFields();
+    pl.deviceId=df.deviceId;pl.screen=df.screen;pl.timezone=df.timezone;pl.vpn=df.vpn;
+    if(!pl.model)pl.model=df.model;
     var opts={method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(pl)};
     if(ctrl)opts.signal=ctrl.signal;
     fetch(ACCT_SYNC_URL,opts).then(function(r){
@@ -13417,6 +13694,16 @@ function acctAdminSync(){
     }).then(function(data){
       done();
       if(data){
+        /* Device limit: only a FRESH local record can be a refused
+           registration (brand-new account, gift still pending or
+           created minutes ago). An established account's periodic
+           sync is a login, never a registration — a deviceLimit
+           answer there is ignored so login can never break. */
+        if(deviceLimitDetect(data)){
+          var freshDl=false;
+          try{freshDl=(u.giftPending===true)||(typeof u.created==='number'&&(Date.now()-u.created)<15*60*1000);}catch(e){}
+          if(freshDl){try{deviceLimitEnforce();}catch(e){}return;}
+        }
         var br='';try{br=acctBlockDetect(data);}catch(e){}
         if(br){try{acctBlockedEnforce(br);}catch(e){}return;}
         try{acctApplyServerData(data);}catch(e){}
@@ -13544,6 +13831,9 @@ function loginSheetOpen(){
   var fm=document.getElementById('authFormMsg');if(fm)fm.textContent='';
   try{authSavedRender();}catch(e){}
   loginBusy(false);
+  /* Device-limit state survives reopens of the sheet until the
+     slots are bought or a login succeeds (deviceLimitApply). */
+  try{deviceLimitApply();}catch(e){}
 }
 function loginSheetClose(){var s=document.getElementById('loginSheet');sheetHideAnim(s);}
 /* ===== Login gate for CREATION =====
@@ -13688,6 +13978,9 @@ function gisOnCredential(resp){
   verifyGateStart(prof);
 }
 function gisFinishLogin(prof){
+  /* A completed login lifts any device-limit restriction — the
+     limit only ever refuses NEW registrations, never a login. */
+  try{deviceLimitClear();}catch(e){}
   var email=prof.email;
   var us=acctUsersGet();
   var rec=us[email];
@@ -13736,6 +14029,214 @@ function gisFinishLogin(prof){
   try{pushMaybeAsk();}catch(e){}
   try{pushEnsureSubscribed();}catch(e){}
 }
+/* ===== Device fingerprint + device limit · ដែនកំណត់ឧបករណ៍ =====
+   Server rule (2026-11-18): ONE device may REGISTER at most 3
+   accounts; extra Gmails cost $1 each, bought from the wallet
+   balance (POST /api/public/device/buy-slot). Signing in with an
+   existing account is never limited. Every relevant call — the
+   account sync, sign-in, set-password, remember-login and
+   buy-slot — therefore carries the device fingerprint:
+   - deviceId: a stable UUID minted ONCE per browser/device and
+     kept in localStorage `movai_device_id`;
+   - model: the device model (UA Client Hints high-entropy value,
+     cached in `movai_device_model`; Android UA segment as the
+     synchronous fallback — the same model the sync reports);
+   - screen: physical pixels, e.g. '720x1600';
+   - timezone: the Intl timezone, e.g. 'Asia/Phnom_Penh';
+   - vpn: best-effort client-side VPN indicator — true when the
+     current timezone no longer matches the timezone this device
+     first appeared with (`movai_device_tz` baseline): a VPN exit
+     node usually changes it. The server makes the final call.
+   When a registration is refused with deviceLimitReached, the
+   login sheet drops to ONLY the Gmail + password form plus the
+   Upgrade box (deviceLimitApply) — login itself is untouched. */
+var deviceLimitActive=false;
+var deviceSlotCount=1;
+var movaiModelCache=null;
+function movaiUuid(){
+  try{
+    if(window.crypto&&typeof crypto.randomUUID==='function')return crypto.randomUUID();
+    if(window.crypto&&crypto.getRandomValues){
+      var b=new Uint8Array(16);crypto.getRandomValues(b);
+      b[6]=(b[6]&0x0f)|0x40;b[8]=(b[8]&0x3f)|0x80;
+      var h='';for(var i=0;i<16;i++)h+=('0'+b[i].toString(16)).slice(-2);
+      return h.slice(0,8)+'-'+h.slice(8,12)+'-'+h.slice(12,16)+'-'+h.slice(16,20)+'-'+h.slice(20);
+    }
+  }catch(e){}
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g,function(c){var r=(Math.random()*16)|0;return (c==='x'?r:(r&0x3)|0x8).toString(16);});
+}
+function movaiTimezone(){
+  try{return Intl.DateTimeFormat().resolvedOptions().timeZone||'';}catch(e){return '';}
+}
+function movaiDeviceId(){
+  var id='';
+  try{id=String(localStorage.getItem('movai_device_id')||'');}catch(e){}
+  if(!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)){
+    id=movaiUuid();
+    try{localStorage.setItem('movai_device_id',id);}catch(e){}
+    /* First sight of this device: pin its timezone as the VPN
+       baseline (see the vpn flag in movaiDeviceFields). */
+    try{localStorage.setItem('movai_device_tz',movaiTimezone());}catch(e){}
+  }
+  return id;
+}
+function movaiDeviceModel(){
+  if(movaiModelCache!==null)return movaiModelCache;
+  var m='';
+  try{m=String(localStorage.getItem('movai_device_model')||'');}catch(e){}
+  if(!m){
+    /* Synchronous fallback: the model segment of the Android UA
+       string, e.g. «(Linux; Android 13; CPH2325)». */
+    try{
+      var ua=navigator.userAgent||'';
+      if(/android/i.test(ua)){
+        var par=ua.match(/\(([^)]*)\)/);
+        if(par){
+          var seg=par[1].split(';');
+          for(var i=0;i<seg.length;i++){
+            var s=seg[i].trim();
+            if(s&&s!=='K'&&!/^(linux|android)/i.test(s)){m=s;break;}
+          }
+        }
+      }
+    }catch(e){}
+  }
+  movaiModelCache=m;
+  try{
+    if(navigator.userAgentData&&typeof navigator.userAgentData.getHighEntropyValues==='function'){
+      navigator.userAgentData.getHighEntropyValues(['model']).then(function(v){
+        var hm=(v&&typeof v.model==='string')?v.model.trim():'';
+        if(hm&&hm!=='K'){movaiModelCache=hm;try{localStorage.setItem('movai_device_model',hm);}catch(e){}}
+      }).catch(function(){});
+    }
+  }catch(e){}
+  return movaiModelCache;
+}
+function movaiDeviceFields(){
+  var tz=movaiTimezone();
+  var vpn=false;
+  try{
+    var base=String(localStorage.getItem('movai_device_tz')||'');
+    if(tz&&base&&tz!==base)vpn=true;
+  }catch(e){}
+  var scr='';
+  try{
+    var dpr=window.devicePixelRatio||1;
+    scr=Math.round(screen.width*dpr)+'x'+Math.round(screen.height*dpr);
+  }catch(e){}
+  return {deviceId:movaiDeviceId(),model:movaiDeviceModel(),screen:scr,timezone:tz,vpn:vpn};
+}
+/* Merge the device fingerprint into a request body (in place). */
+function movaiWithDevice(body){
+  var f=movaiDeviceFields();
+  for(var k in f)body[k]=f[k];
+  return body;
+}
+/* A server answer that refuses a REGISTRATION because this device
+   already has its 3 free accounts (flag at the top level or
+   nested, or the wording in the refusal text). */
+function deviceLimitDetect(data){
+  if(!data||typeof data!=='object')return false;
+  var subs=[data,data.user,data.account,data.data,data.result];
+  for(var i=0;i<subs.length;i++){
+    var s=subs[i];
+    if(s&&typeof s==='object'&&s.deviceLimitReached===true)return true;
+  }
+  if(data.ok===false){
+    var t='';
+    if(typeof data.error==='string')t+=data.error+' ';
+    if(typeof data.message==='string')t+=data.message;
+    else if(data.message&&typeof data.message==='object')t+=(data.message.en||'')+' '+(data.message.km||'');
+    if(/device.?limit|deviceLimitReached/i.test(t))return true;
+  }
+  return false;
+}
+/* Restricted login-sheet state: while deviceLimitActive, the
+   sheet shows ONLY the Gmail + password form and the Upgrade
+   box — the saved-account card, Forgot link, divider and both
+   Google buttons are hidden. Turning it off restores them. */
+function deviceLimitApply(){
+  var on=deviceLimitActive;
+  var box=document.getElementById('deviceLimitBox');
+  if(box)box.style.display=on?'block':'none';
+  if(on){
+    ['savedAcctWrap','authUseAnother','authForgotBtn','authDivider','loginGoogleBtn','loginGsiSlot','authNoAcctBtn'].forEach(function(id){
+      var el=document.getElementById(id);if(el)el.style.display='none';
+    });
+    deviceSlotRender();
+  }else{
+    var f=document.getElementById('authForgotBtn');if(f)f.style.display='';
+    var d=document.getElementById('authDivider');if(d)d.style.display='';
+    var g=document.getElementById('loginGoogleBtn');if(g)g.style.display='';
+  }
+}
+function deviceLimitShow(){
+  deviceLimitActive=true;
+  loginSheetOpen();
+}
+function deviceLimitClear(){
+  if(!deviceLimitActive)return;
+  deviceLimitActive=false;
+  deviceLimitApply();
+  try{authSavedRender();}catch(e){}
+}
+/* A brand-new account's first sync was refused: the registration
+   never happened server-side, so drop the local session (the
+   account record is kept, exactly like a block) and land on the
+   restricted login sheet. Existing accounts never reach this —
+   acctAdminSync only enforces for a fresh local record. */
+function deviceLimitEnforce(){
+  deviceLimitActive=true;
+  try{localStorage.removeItem('movai-session');}catch(e){}
+  try{acctRender();}catch(e){}
+  try{histOnAccountChange();}catch(e){}
+  ['pwdSheet','savePwdSheet','verifySheet','nameSheet','giftSheet'].forEach(function(id){
+    var s=document.getElementById(id);
+    if(s&&s.style.display!=='none'){try{sheetHideAnim(s);}catch(e){s.style.display='none';}}
+  });
+  loginSheetOpen();
+}
+function deviceBuyMsg(t,ok){
+  var m=document.getElementById('deviceBuyMsg');
+  if(m){m.textContent=t||'';m.style.color=ok?'var(--accent-text)':'#f87171';}
+}
+function deviceSlotRender(){
+  var c=document.getElementById('deviceSlotCount');if(c)c.textContent=String(deviceSlotCount);
+  var p=document.getElementById('deviceSlotPrice');if(p)p.textContent='$'+deviceSlotCount.toFixed(2);
+  var b=document.getElementById('deviceBuyBtn');if(b)b.textContent=tx('deviceLimitBuy')+' · $'+deviceSlotCount.toFixed(2);
+}
+function deviceSlotStep(d){
+  deviceSlotCount=Math.max(1,Math.min(50,deviceSlotCount+(d||0)));
+  deviceBuyMsg('',true);
+  deviceSlotRender();
+}
+/* Buy extra registration slots for THIS device at $1 each, paid
+   from the wallet balance of the Gmail in the form (or of the
+   signed-in account). On success the restriction lifts and the
+   user can sign up with the new Gmail right away. */
+function deviceBuySlots(){
+  var email='';
+  try{var u=acctCurrent();if(u&&u.email)email=u.email;}catch(e){}
+  if(!email){
+    var em=document.getElementById('authEmail');
+    if(em)email=String(em.value||'').trim().toLowerCase();
+  }
+  if(!email||email.indexOf('@')<0){deviceBuyMsg(tx('deviceLimitNeedEmail'),false);return;}
+  var btn=document.getElementById('deviceBuyBtn');if(btn)btn.disabled=true;
+  deviceBuyMsg('',true);
+  authFetchJson('/api/public/device/buy-slot','POST',movaiWithDevice({email:email,count:deviceSlotCount}),30000).then(function(data){
+    if(btn)btn.disabled=false;
+    if(!data){deviceBuyMsg(tx('authErrNet'),false);return;}
+    if(data.ok!==true){deviceBuyMsg(authErrText(data,'deviceLimitFail'),false);return;}
+    deviceLimitClear();
+    var m=document.getElementById('authFormMsg');
+    if(m){m.textContent=tx('deviceLimitOk');m.style.color='var(--accent-text)';}
+  });
+}
+/* Mint the device ID (and start the model lookup) at load, so the
+   very first sync / sign-in already carries the full fingerprint. */
+try{movaiDeviceId();movaiDeviceModel();}catch(e){}
+
 /* ===== Gmail + password sign-in · Sign-up · Save password =====
    Owner flow (2026-11-17), built on the movai-proxy auth endpoints
    (same host as ACCT_SYNC_URL — reached through authFetchJson /
@@ -13864,10 +14365,15 @@ function authSigninSubmit(){
   if(!pw){authFormMsg(tx('authErrPassEmpty'));return;}
   authFormMsg('');
   var btn=document.getElementById('authSigninBtn');if(btn)btn.disabled=true;
-  authFetchJson('/api/auth/signin','POST',{email:email,password:pw},30000).then(function(data){
+  authFetchJson('/api/auth/signin','POST',movaiWithDevice({email:email,password:pw}),30000).then(function(data){
     if(btn)btn.disabled=false;
     if(!data){authFormMsg(tx('authErrNet'));return;}
     if(data.ok!==true){
+      /* Device limit (defensive): a sign-in is a login, not a
+         registration, but if the server ever answers it with
+         deviceLimitReached, land on the restricted sheet with
+         the Upgrade box instead of a bare error. */
+      if(deviceLimitDetect(data)){deviceLimitShow();return;}
       /* noAccount: localized one-language message + the Google
          button + 8s auto-dismiss — never the server's bilingual
          text. Every other error shows exactly as before. */
@@ -13887,9 +14393,13 @@ function authSigninSubmit(){
    and read hasPassword off the server's answer. */
 function authSignupGoogleFlow(prof){
   loginBusy(true);
-  var payload={email:prof.email,name:prof.name||'',picture:prof.picture||'',id:'',firstName:prof.firstName||'',lastName:prof.lastName||'',credits:0,songCredits:0,plan:null,songPlan:null,model:''};
+  var payload={email:prof.email,name:prof.name||'',picture:prof.picture||'',id:'',firstName:prof.firstName||'',lastName:prof.lastName||'',credits:0,songCredits:0,plan:null,songPlan:null,model:movaiDeviceModel()};
+  movaiWithDevice(payload);
   authFetchJson('/api/admin/sync','POST',payload,30000).then(function(data){
     loginBusy(false);
+    /* Registration refused — this device already has 3 accounts:
+       show only the login form + the Upgrade box. */
+    if(data&&deviceLimitDetect(data)){deviceLimitShow();return;}
     if(data){
       var br='';try{br=acctBlockDetect(data);}catch(e){}
       if(br){try{acctBlockedEnforce(br);}catch(e){}return;}
@@ -13942,10 +14452,20 @@ function pwdCreateSubmit(){
   if(pw.length<6){pwdMsg(tx('pwdErrShort'),false);return;}
   if(pw!==cf){pwdMsg(tx('pwdErrMismatch'),false);return;}
   var btn=document.getElementById('pwdCreateBtn');if(btn)btn.disabled=true;
-  authFetchJson('/api/auth/set-password','POST',{idToken:authPendingIdToken,password:pw,passwordConfirm:cf},30000).then(function(data){
+  authFetchJson('/api/auth/set-password','POST',movaiWithDevice({idToken:authPendingIdToken,password:pw,passwordConfirm:cf}),30000).then(function(data){
     if(btn)btn.disabled=false;
     if(!data){pwdMsg(tx('authErrNet'),false);return;}
-    if(data.ok!==true){pwdMsg(authErrText(data,'pwdErrFail'),false);return;}
+    if(data.ok!==true){
+      /* Registration refused by the device limit: leave the
+         Create Password sheet and land on the restricted login
+         sheet (login form + Upgrade box). */
+      if(deviceLimitDetect(data)){
+        var s2=document.getElementById('pwdSheet');if(s2)sheetHideAnim(s2);
+        deviceLimitShow();
+        return;
+      }
+      pwdMsg(authErrText(data,'pwdErrFail'),false);return;
+    }
     authPendingIdToken='';
     if(a)a.value='';if(b)b.value='';
     var s=document.getElementById('pwdSheet');if(s)sheetHideAnim(s);
@@ -14012,7 +14532,7 @@ function authSavedRender(){
 function authSavedTap(){
   var sv=authSavedGet();if(!sv)return;
   loginBusy(true);
-  authFetchJson('/api/auth/remember-login','POST',{email:sv.email,rememberToken:sv.rememberToken},30000).then(function(data){
+  authFetchJson('/api/auth/remember-login','POST',movaiWithDevice({email:sv.email,rememberToken:sv.rememberToken}),30000).then(function(data){
     loginBusy(false);
     if(data&&data.ok===true&&data.user){
       loginSheetClose();
@@ -15266,6 +15786,65 @@ function notifSheetOpen(){
   notifLoad();
 }
 function notifSheetClose(){var s=document.getElementById('notifSheet');sheetHideAnim(s);}
+/* ===== App version + Version History =====
+   APP_VERSIONS is the ONE place the release record lives, NEWEST
+   FIRST. To ship a new version, PREPEND one entry at the top of
+   this array — the drawer badge, the Settings «Version» row and
+   the Version History sheet all read from here, and every older
+   entry stays visible below the new one. */
+var APP_VERSIONS=[
+  {v:'1.5.0',date:'18 Nov 2026',dateKm:'១៨ វិច្ឆិកា ២០២៦',
+   changes:[
+    'Studio DAW rebuilt — stem controls attached to their waveform lanes, FL Studio style, compact rows',
+    'Per-stem Effects: EQ (Normal / Crisp / Soft / Bass / Treble), Reverb, Echo — live and in Export',
+    'Mic Record: sing and add a Voice lane',
+    'Per-stem Download + Export WAV',
+    'Split (AI) now returns 6 stems — Vocals, Drums, Bass, Other, Piano, Guitar',
+    'Split progress is animated — ticking seconds, real %, wave bars',
+    'Re-splitting a song is instant from cache (~1–2s)',
+    'Keys use failover — one key until exhausted, then auto-move to the next'
+   ],
+   changesKm:[
+    'Studio DAW ធ្វើថ្មី — កន្លែងគ្រប់គ្រង Stem នៅជាប់នឹង Waveform របស់វា បែប FL Studio ជួរតូចជាប់គ្នា',
+    'Effects តាម Stem នីមួយៗ៖ EQ (Normal / Crisp / Soft / Bass / Treble), Reverb, Echo — ដើរទាំងពេលចាក់ និងពេល Export',
+    'Mic Record៖ ច្រៀងបញ្ចូលសំឡេង បន្ថែម Lane «Voice»',
+    'Download តាម Stem នីមួយៗ + Export WAV',
+    'Split (AI) ឥឡូវបាន 6 Stems — Vocals, Drums, Bass, Other, Piano, Guitar',
+    'Progress ពេលបំបែកមានចលនា — វិនាទីកំពុងរត់, % ពិត, រលកសំឡេង',
+    'បំបែកបទដដែលម្ដងទៀតលឿនភ្លាមពី Cache (~1–2 វិនាទី)',
+    'Key ប្រើបែប Failover — ប្រើ Key តែមួយរហូតដល់អស់ ទើបអូតូទៅ Key បន្ទាប់'
+   ]}
+];
+function versionSync(){
+  if(!APP_VERSIONS.length)return;
+  var v='v'+APP_VERSIONS[0].v;
+  var b=document.getElementById('verBadge');if(b)b.textContent=v;
+  var r=document.getElementById('verRowVal');if(r)r.textContent=v;
+}
+function versionRender(){
+  var box=document.getElementById('versionList');if(!box)return;
+  var en=(typeof LANG!=='undefined'&&LANG==='en');
+  var h='';
+  APP_VERSIONS.forEach(function(it,i){
+    var chs=(en?it.changes:it.changesKm)||it.changes||[];
+    h+='<div class="ver-entry">';
+    h+='<div class="ver-entry-head"><span class="ver-num">v'+escHtml(it.v)+'</span>';
+    if(i===0)h+='<span class="ver-latest">'+escHtml(tx('verLatest'))+'</span>';
+    h+='<span class="ver-date">'+escHtml(en?it.date:(it.dateKm||it.date))+'</span></div>';
+    h+='<ul class="ver-changes">';
+    chs.forEach(function(c){h+='<li>'+escHtml(c)+'</li>';});
+    h+='</ul></div>';
+  });
+  box.innerHTML=h;
+}
+function versionSheetOpen(){
+  featureUsage('version_history_view');
+  versionSync();versionRender();
+  var s=document.getElementById('versionSheet');if(s)sheetShowAnim(s);
+}
+function versionSheetClose(){var s=document.getElementById('versionSheet');sheetHideAnim(s);}
+function versionOpenFromDrawer(){closeMenu();versionSheetOpen();}
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',versionSync);else versionSync();
 function notifReset(){
   notifItems=[];notifLoaded=false;notifReadIds={};
   notifRenderAll();
@@ -15781,7 +16360,10 @@ document.addEventListener('visibilitychange',function(){
      font size, glass clear/blur/shine, text shadow, text blur,
      background brightness, brand fx, day/night mode — through the
      SAME setter functions the old Settings panel used, so the values
-     land in the same localStorage keys. If smoothModeAuto is true,
+     land in the same localStorage keys. ONE exception: day/night
+     mode — once the user has picked Day / Night / Auto themself,
+     their choice is LOCKED (see modeUserLocked) and the Admin mode
+     is never applied over it again. If smoothModeAuto is true,
      Smooth mode is switched ON for everyone — and LOCKED on for
      weak phones (RAM <= 4GB or CPU cores <= 4), whose Settings
      toggle is disabled; strong phones and browsers that report no
@@ -15910,11 +16492,16 @@ function adminApplySettings(raw){
     }
     if(ti!==null&&ti>=0&&ti<THEMES.length)setTheme(Math.floor(ti));
   }
-  /* Day / night mode. */
+  /* Day / night mode. The Admin value is only a DEFAULT: it is
+     applied WITHOUT saving, and only while the user has never
+     picked a mode themself. Once the user taps Day / Night / Auto,
+     modeUserLocked() is set and the Admin mode is skipped for
+     good — a re-fetch (app open, account sync every minute) can
+     never flip the user's locked choice back to Night again. */
   var mode=adminPick(st,['mode','dayNight','daynight','appearance']);
-  if(typeof mode==='string'){
+  if(typeof mode==='string'&&!modeUserLocked()){
     var mm=mode.toLowerCase();
-    if(mm==='dark'||mm==='light'||mm==='auto')setMode(mm);
+    if(mm==='dark'||mm==='light'||mm==='auto')setMode(mm,false);
   }
   /* Font size. */
   var font=adminNum(adminPick(st,['fontSize','font','fontScale']));
@@ -22209,28 +22796,128 @@ function stWavBlob(buffer){
   }
   return new Blob([ab],{type:'audio/wav'});
 }
-async function stExport(){
-  if(ST.busy)return;
-  if(!ST.tracks.length){stMsg('មិនទាន់មាន Track · No tracks to export — load a song first',true);return;}
+/* ---- Export format choice: WAV or MP3 (owner order 2026-11-18) ----
+   Tapping Export opens a small sheet asking which file the
+   owner wants — Export WAV or Export MP3. Both choices render
+   the SAME mixdown (stRenderMix: volume, mute, solo, trim,
+   master and per-stem effects all respected); only the final
+   encoding differs. WAV keeps the original behaviour exactly
+   (stWavBlob, «<song name> - MOVAI Studio.wav»). MP3 encodes
+   the rendered buffer in the browser with lamejs at 192 kbps
+   («<song name> - MOVAI Studio.mp3»), encoded in chunks that
+   yield to the UI so the live progress (% + elapsed seconds)
+   keeps ticking in the Studio progress bar AND in the sheet. */
+var stExpTimer=null;
+function stExportCheck(){
+  if(!ST.tracks.length){stMsg('មិនទាន់មាន Track · No tracks to export — load a song first',true);return false;}
   var anyAud=false,i;
   for(i=0;i<ST.tracks.length;i++)if(stAudible(ST.tracks[i]))anyAud=true;
-  if(!anyAud){stMsg('Track ទាំងអស់ត្រូវបិទសំឡេង · All tracks are muted or soloed off',true);return;}
+  if(!anyAud){stMsg('Track ទាំងអស់ត្រូវបិទសំឡេង · All tracks are muted or soloed off',true);return false;}
+  return true;
+}
+function stExportOpen(){
+  if(ST.busy)return;
+  if(!stExportCheck())return;
+  var ch=document.getElementById('stExpChoices');if(ch)ch.style.display='';
+  var pw=document.getElementById('stExpProgWrap');if(pw)pw.style.display='none';
+  var ttl=document.getElementById('stExpTitle');if(ttl)ttl.textContent='Export · ទាញយក';
+  var s=document.getElementById('stExpSheet');if(s)s.classList.add('on');
+}
+function stExportClose(){
+  if(ST.busy)return;/* an export in progress finishes first */
+  var s=document.getElementById('stExpSheet');if(s)s.classList.remove('on');
+}
+function stExpPaint(){
+  var f=document.getElementById('stExpProgFill'),t=document.getElementById('stExpProgTxt');
+  if(f)f.style.width=ST.progPct+'%';
+  if(t)t.textContent=ST.progLabel+' · '+Math.round(ST.progPct)+'% · '+stFmt((Date.now()-ST.progT0)/1000);
+}
+function stExpTimerStart(){
+  stExpPaint();
+  if(stExpTimer)clearInterval(stExpTimer);
+  stExpTimer=setInterval(stExpPaint,250);
+}
+function stExpTimerStop(){if(stExpTimer){clearInterval(stExpTimer);stExpTimer=null;}}
+function stEnsureLame(){
+  return new Promise(function(resolve,reject){
+    if(window.lamejs&&window.lamejs.Mp3Encoder){resolve();return;}
+    var done=false;
+    var sc=document.createElement('script');
+    sc.src='https://cdn.jsdelivr.net/npm/lamejs@1.2.1/lame.min.js';
+    sc.onload=function(){if(done)return;done=true;if(window.lamejs&&window.lamejs.Mp3Encoder)resolve();else reject(new Error('lame-missing'));};
+    sc.onerror=function(){if(done)return;done=true;reject(new Error('lame-load'));};
+    document.head.appendChild(sc);
+    setTimeout(function(){if(done)return;done=true;reject(new Error('lame-timeout'));},20000);
+  });
+}
+async function stMp3Blob(buffer){
+  await stEnsureLame();
+  var sr=buffer.sampleRate;
+  var L=buffer.getChannelData(0);
+  var R=buffer.numberOfChannels>1?buffer.getChannelData(1):L;
+  var enc=new window.lamejs.Mp3Encoder(2,sr,192);
+  var parts=[];
+  var block=1152,total=L.length,yieldEvery=block*240;
+  for(var i=0;i<total;i+=block){
+    var end=Math.min(i+block,total);
+    var li=new Int16Array(end-i),ri=new Int16Array(end-i);
+    for(var j=i;j<end;j++){
+      var a=Math.max(-1,Math.min(1,L[j]));li[j-i]=a<0?a*0x8000:a*0x7FFF;
+      var b=Math.max(-1,Math.min(1,R[j]));ri[j-i]=b<0?b*0x8000:b*0x7FFF;
+    }
+    var d=enc.encodeBuffer(li,ri);
+    if(d.length)parts.push(d);
+    if(i>0&&i%yieldEvery===0){
+      stProgSet(90+9*(i/total));
+      await new Promise(function(r){setTimeout(r,0);});
+    }
+  }
+  var tail=enc.flush();
+  if(tail.length)parts.push(tail);
+  stProgSet(99);
+  return new Blob(parts,{type:'audio/mpeg'});
+}
+async function stExport(format){
+  if(ST.busy)return;
+  format=(format==='mp3')?'mp3':'wav';
+  if(!stExportCheck())return;
+  featureUsage(format==='mp3'?'export_mp3':'export_wav');
   ST.busy=true;
   stPause(false);
+  var ch=document.getElementById('stExpChoices');if(ch)ch.style.display='none';
+  var pw=document.getElementById('stExpProgWrap');if(pw)pw.style.display='';
+  var ttl=document.getElementById('stExpTitle');if(ttl)ttl.textContent=(format==='mp3'?'Export MP3 · ទាញយក MP3':'Export WAV · ទាញយក WAV');
+  var sheet=document.getElementById('stExpSheet');if(sheet)sheet.classList.add('on');
   stProgBegin('កំពុង Export · Exporting');
+  stExpTimerStart();
   try{
     var buf=await stRenderMix();
+    var blob,fname;
+    if(format==='mp3'){
+      ST.progLabel='កំពុងបម្លែង MP3 · Encoding MP3';
+      stProgSet(90);
+      blob=await stMp3Blob(buf);
+      fname=(ST.songName||'Song')+' - MOVAI Studio.mp3';
+    }else{
+      blob=stWavBlob(buf);
+      fname=(ST.songName||'Song')+' - MOVAI Studio.wav';
+    }
     stProgSet(100);
-    var blob=stWavBlob(buf);
+    stExpPaint();
     var a=document.createElement('a');
     a.href=URL.createObjectURL(blob);
-    a.download=(ST.songName||'Song')+' - MOVAI Studio.wav';
+    a.download=fname;
     document.body.appendChild(a);
     a.click();
     setTimeout(function(){try{URL.revokeObjectURL(a.href);a.remove();}catch(e){}},4000);
     stMsg('Export រួច · Export done ✓');
+    stExpTimerStop();
+    setTimeout(function(){if(sheet)sheet.classList.remove('on');},700);
   }catch(e){
-    stMsg('Export មិនបាន · Export failed',true);
+    stExpTimerStop();
+    if(sheet)sheet.classList.remove('on');
+    if(format==='mp3')stMsg('Export MP3 មិនបាន — បញ្ហាបណ្ដាញ ឬ Encoder · MP3 export failed — network or encoder problem',true);
+    else stMsg('Export មិនបាន · Export failed',true);
   }
   stProgEnd();
   ST.busy=false;
