@@ -3893,6 +3893,51 @@ function sunoErrText(j, fb) {
   if (j && typeof j.msg === 'string' && j.msg) return j.msg;
   return genErrText(j, fb);
 }
+// sunoapi.org credit endpoint: GET {endpoint}/api/v1/generate/credit
+// answers {code:200, data:<remaining integer>}. The API returns ONLY
+// the remaining balance — no total/used. Parse defensively.
+function sunoCreditFrom(j) {
+  if (typeof j === 'number' && isFinite(j)) return Math.floor(j);
+  if (!j || typeof j !== 'object') return null;
+  if (typeof j.data === 'number' && isFinite(j.data)) return Math.floor(j.data);
+  if (j.data && typeof j.data === 'object') {
+    if (typeof j.data.credits === 'number' && isFinite(j.data.credits)) return Math.floor(j.data.credits);
+    if (typeof j.data.remaining === 'number' && isFinite(j.data.remaining)) return Math.floor(j.data.remaining);
+    if (typeof j.data.balance === 'number' && isFinite(j.data.balance)) return Math.floor(j.data.balance);
+  }
+  if (typeof j.credits === 'number' && isFinite(j.credits)) return Math.floor(j.credits);
+  if (typeof j.remaining === 'number' && isFinite(j.remaining)) return Math.floor(j.remaining);
+  if (typeof j.balance === 'number' && isFinite(j.balance)) return Math.floor(j.balance);
+  return null;
+}
+// ---- Free image generations (owner order 2026-11-18) ----
+// Every user gets 10 FREE image generations per day (NovAI + Agnes +
+// thumbnails — all through POST /api/gen/image). 0 MovAi credits; a
+// COUNT cap, not a charge. Stored on the user record as
+// imgDaily:{date:'YYYY-MM-DD', used:N}; the date is Phnom Penh time
+// and rolls over at midnight. A failed provider call refunds the slot.
+const IMG_FREE_DAILY_LIMIT = 10;
+function imgFreeTodayDate() {
+  return new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Phnom_Penh' });
+}
+// Give one free-image slot back (provider call failed before any
+// image was produced). Never lets the count go below 0.
+async function imgFreeRefund(email) {
+  try {
+    const em = normEmail(email);
+    if (!em) return;
+    const users = await loadUsers();
+    const u = users[em];
+    if (!u || !u.imgDaily || typeof u.imgDaily !== 'object') return;
+    const today = imgFreeTodayDate();
+    if (u.imgDaily.date !== today) return;
+    const used = Math.max(0, Math.floor(Number(u.imgDaily.used) || 0));
+    if (used <= 0) return;
+    u.imgDaily = { date: today, used: used - 1 };
+    users[em] = u;
+    await saveUsers(users);
+  } catch (e) {}
+}
 // Extract playable songs from a record-info / callback data object.
 function sunoSongsFromData(d) {
   const resp = (d && d.response) || {};
@@ -3960,6 +4005,30 @@ async function apiRoute(req, res, urlPath) {
         if (_gateErr) return sendJSON(res, 200, { ok: false, error: _gateErr });
         const _blkErr = await genBlockedCheck(normEmail(body.email), req);
         if (_blkErr) return sendJSON(res, 200, { ok: false, error: _blkErr });
+        // Free 10 images/day (owner order 2026-11-18): NovAI + Agnes
+        // (0 MovAi credits) — and thumbnails, which use this same
+        // endpoint. A COUNT cap, not a credit charge. Paid/own-key
+        // paths (magichour, cloudflare, gemini, hf) are NOT capped
+        // here — media credits / the user's own key already govern
+        // them. The slot is taken BEFORE the provider call and given
+        // back if the provider fails (see imgFreeRefund in the
+        // novai/agnes catch blocks below).
+        let _imgFree = null;
+        if (provider === 'novai' || provider === 'agnes') {
+          const _freeEm = normEmail(body.email);
+          const _freeUsers = await loadUsers();
+          const _freeU = _freeUsers[_freeEm];
+          if (!_freeU) return sendJSON(res, 200, { ok: false, error: 'សូមចូលគណនេយ្យជាមុនសិន · Please sign in first', needLogin: true });
+          const _freeToday = imgFreeTodayDate();
+          const _freeUsed = (_freeU.imgDaily && typeof _freeU.imgDaily === 'object' && _freeU.imgDaily.date === _freeToday) ? Math.max(0, Math.floor(Number(_freeU.imgDaily.used) || 0)) : 0;
+          if (_freeUsed >= IMG_FREE_DAILY_LIMIT) {
+            return sendJSON(res, 200, { ok: false, error: 'រូប Free អស់ហើយថ្ងៃនេះ (10/10) — សូមត្រឡប់មកវិញថ្ងៃស្អែក · Free images used up for today (10/10). Come back tomorrow.', code: 'image_free_daily_limit', imgFree: { date: _freeToday, limit: IMG_FREE_DAILY_LIMIT, used: _freeUsed, left: 0 } });
+          }
+          _freeU.imgDaily = { date: _freeToday, used: _freeUsed + 1 };
+          _freeUsers[_freeEm] = _freeU;
+          await saveUsers(_freeUsers);
+          _imgFree = { date: _freeToday, limit: IMG_FREE_DAILY_LIMIT, used: _freeUsed + 1, left: Math.max(0, IMG_FREE_DAILY_LIMIT - _freeUsed - 1) };
+        }
         const key = typeof body.key === 'string' ? body.key : '';
         const prompt = body.prompt.trim().slice(0, 2000);
         const width = Math.max(64, Math.min(2048, Number(body.width) || 768));
@@ -4025,11 +4094,12 @@ async function apiRoute(req, res, urlPath) {
               throw rotErr('NovAI: ' + genErrText(j, 'HTTP ' + r.status), r.status);
             }, key);
           } catch (e) {
+            if (_imgFree) await imgFreeRefund(body.email);
             if (e && e.noKey) return sendJSON(res, 200, { ok: false, error: 'Admin មិនទាន់ដាក់ NovAI Key ទេ' });
             return sendJSON(res, 200, { ok: false, error: (e && e.message) || 'NovAI: request failed' });
           }
-          if (out.done) return sendJSON(res, 200, { ok: true, done: true, imageUrl: out.imageUrl });
-          return sendJSON(res, 200, { ok: true, jobId: out.jobId });
+          if (out.done) return sendJSON(res, 200, { ok: true, done: true, imageUrl: out.imageUrl, imgFree: _imgFree });
+          return sendJSON(res, 200, { ok: true, jobId: out.jobId, imgFree: _imgFree });
         }
         if (provider === 'agnes') {
           // Agnes image via the admin-stored keys (browser sends no
@@ -4063,11 +4133,12 @@ async function apiRoute(req, res, urlPath) {
               throw rotErr('Agnes: ' + genErrText(j, 'HTTP ' + r.status), r.status);
             }, key);
           } catch (e) {
+            if (_imgFree) await imgFreeRefund(body.email);
             if (e && e.noKey) return sendJSON(res, 200, { ok: false, error: 'Admin មិនទាន់ដាក់ Agnes Key ទេ' });
             return sendJSON(res, 200, { ok: false, error: (e && e.message) || 'Agnes: request failed' });
           }
-          if (out.done) return sendJSON(res, 200, { ok: true, done: true, imageUrl: out.imageUrl });
-          return sendJSON(res, 200, { ok: true, jobId: out.jobId });
+          if (out.done) return sendJSON(res, 200, { ok: true, done: true, imageUrl: out.imageUrl, imgFree: _imgFree });
+          return sendJSON(res, 200, { ok: true, jobId: out.jobId, imgFree: _imgFree });
         }
         if (provider === 'cloudflare') {
           const accountId = String(body.accountId || '').trim();
@@ -5853,6 +5924,35 @@ async function apiRoute(req, res, urlPath) {
     if (!a.ok) return sendJSON(res, 200, { ok: false, error: a.error });
     const u = await mvsepUsageList();
     return sendJSON(res, 200, { ok: true, provider: 'mvsep', date: u.date, dailyLimit: u.dailyLimit, keys: u.keys });
+  }
+  // GET /api/admin/suno-balance — admin key required. Live Suno credit
+  // balance per stored Suno key for the Admin → API Keys display:
+  // GET {endpoint}/api/v1/generate/credit (sunoapi.org) answers
+  // {code:200, data:<remaining integer>}. The API returns ONLY the
+  // remaining balance — no total/used. Keys are 1-based indexes only —
+  // key values are never returned.
+  if (req.method === 'GET' && urlPath === '/api/admin/suno-balance') {
+    const a = await adminKeyOk(req);
+    if (!a.ok) return sendJSON(res, 200, { ok: false, error: a.error });
+    const list = await adminProviderKeyList('suno');
+    if (!list.length) return sendJSON(res, 200, { ok: false, error: 'Admin មិនទាន់ដាក់ Suno Key ទេ' });
+    const keys = [];
+    let totalRemaining = 0;
+    for (let i = 0; i < list.length; i++) {
+      const ep = (list[i].endpoint || '').replace(/\/+$/, '');
+      if (!ep) { keys.push({ key: i + 1, remaining: null, status: 'unknown', message: 'មិនមាន gateway endpoint' }); continue; }
+      try {
+        const r = await fetch(ep + '/api/v1/generate/credit', { headers: { 'Authorization': 'Bearer ' + list[i].key }, signal: AbortSignal.timeout(15000) });
+        const j = await r.json().catch(() => null);
+        if (r.status === 401 || r.status === 403) { keys.push({ key: i + 1, remaining: null, status: 'blocked', message: 'Key មិនត្រឹមត្រូវ ឬត្រូវបានប្លុក (HTTP ' + r.status + ')' }); continue; }
+        const rem = sunoCreditFrom(j);
+        if (typeof rem === 'number') { keys.push({ key: i + 1, remaining: rem, status: rem > 0 ? 'green' : 'red' }); totalRemaining += rem; }
+        else keys.push({ key: i + 1, remaining: null, status: 'error', message: 'Suno ឆ្លើយ HTTP ' + r.status });
+      } catch (e) {
+        keys.push({ key: i + 1, remaining: null, status: 'error', message: 'មិនអាចភ្ជាប់បាន — ' + String((e && e.message) || e).slice(0, 120) });
+      }
+    }
+    return sendJSON(res, 200, { ok: true, provider: 'suno', totalRemaining, keys });
   }
   // GET /api/admin/feature-usage — admin key required. Feature-usage
   // counts for the Admin (how many times each new function was used):
@@ -9560,6 +9660,20 @@ async function apiRoute(req, res, urlPath) {
     return;
   }
   // ---- "Free 2 + package allowance" limits (Download MP3, MV, Vocal Studio, Post to Public) ----
+  // GET /api/public/image-free?email= — PUBLIC. Read-only; never
+  // creates a user. Free image allowance today for one user (owner
+  // order 2026-11-18 — 10 free NovAI/Agnes images per day):
+  // {ok:true, date, limit:10, used, left}. Unknown email ->
+  // {ok:false, error:'no_account'}.
+  if (req.method === 'GET' && urlPath === '/api/public/image-free') {
+    const email = normEmail(new URL(req.url, 'http://localhost').searchParams.get('email') || '');
+    if (!email) return sendJSON(res, 200, { ok: false, error: 'no_account' });
+    const u = (await loadUsers())[email];
+    if (!u) return sendJSON(res, 200, { ok: false, error: 'no_account' });
+    const today = imgFreeTodayDate();
+    const used = (u.imgDaily && typeof u.imgDaily === 'object' && u.imgDaily.date === today) ? Math.max(0, Math.floor(Number(u.imgDaily.used) || 0)) : 0;
+    return sendJSON(res, 200, { ok: true, date: today, limit: IMG_FREE_DAILY_LIMIT, used, left: Math.max(0, IMG_FREE_DAILY_LIMIT - used) });
+  }
   // GET /api/public/feature-limits?email= — PUBLIC. Read-only; never
   // creates a user. Returns the Free-2 + package-allowance state:
   // {ok:true, email, download:{free:2, used, freeLeft, unlimited},
