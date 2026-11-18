@@ -5561,23 +5561,31 @@ function genSetSongModel(key){
   if(gen.mode==='song')songRenderOpts();
 }
 /* ===== Image model selector (owner order 2026-11-18: ADD Agnes
-   alongside NovAI) =====
-   Image mode shows ONE compact dropdown with exactly TWO models —
-   NovAI and Agnes. Picking a model selects its provider
-   automatically (NovAI → cogview-3-flash, Agnes →
-   agnes-image-2.5-flash); both are free ($0, no MovAi credits).
+   alongside NovAI; extended same day: ALL Agnes image models) =====
+   Image mode shows ONE compact dropdown with exactly FOUR models —
+   NovAI and the three Agnes image models. Each is named SIMPLY by
+   its own name (owner order: no messy extra labels). Picking a
+   model selects its provider automatically (NovAI → cogview-3-flash,
+   Agnes 2.0 → agnes-image-2.0-flash, Agnes 2.1 →
+   agnes-image-2.1-flash, Agnes 2.5 → agnes-image-2.5-flash).
    NovAI is the pinned default and the last pick is remembered in
    localStorage ('movai-img-model'). The Admin providers.image
    setting is not used for the generate path, except when it names
    Magic Hour (the paid image path) — that keeps working exactly
-   as before. */
+   as before. NOTE on cost: the Agnes docs list 2.5-flash as free
+   ($0) but 2.0/2.1-flash as paid ($0.015/image at 1K); other
+   sources say all three are $0. All three are charged 0 MovAi
+   credits here — a paid-model failure is reported, never charged. */
 var IMG_MODELS=[
  {key:'novai',label:'NovAI',provider:'novai',model:'cogview-3-flash'},
- {key:'agnes',label:'Agnes',provider:'agnes',model:'agnes-image-2.5-flash'}
+ {key:'agnes-2.0',label:'Agnes 2.0',provider:'agnes',model:'agnes-image-2.0-flash'},
+ {key:'agnes-2.1',label:'Agnes 2.1',provider:'agnes',model:'agnes-image-2.1-flash'},
+ {key:'agnes-2.5',label:'Agnes 2.5',provider:'agnes',model:'agnes-image-2.5-flash'}
 ];
 function imgModelByKey(k){for(var i=0;i<IMG_MODELS.length;i++)if(IMG_MODELS[i].key===k)return IMG_MODELS[i];return null;}
 function imgModelCurKey(){
   var k=null;try{k=localStorage.getItem('movai-img-model');}catch(e){}
+  if(k==='agnes')k='agnes-2.5'; /* old single Agnes pick = 2.5, same model */
   return imgModelByKey(k)?k:'novai';
 }
 function imgModelApplyKey(k){
@@ -7735,11 +7743,13 @@ async function genGenerate(){
     }
     if(gen.mode==='image'){
       /* Image: the MODEL picks the provider (owner order 2026-11-18 —
-         ADD Agnes alongside NovAI): NovAI → cogview-3-flash,
-         Agnes → agnes-image-2.5-flash. Both are free ($0). The
-         Admin providers.image setting is not used for the generate
-         path, except when it names Magic Hour (the paid image
-         path) — that keeps working exactly as before. */
+         ADD Agnes alongside NovAI; all three Agnes image models):
+         NovAI → cogview-3-flash, Agnes 2.0 → agnes-image-2.0-flash,
+         Agnes 2.1 → agnes-image-2.1-flash, Agnes 2.5 →
+         agnes-image-2.5-flash. The Admin providers.image setting is
+         not used for the generate path, except when it names Magic
+         Hour (the paid image path) — that keeps working exactly as
+         before. */
       var imgM=imgModelByKey(imgModelCurKey())||IMG_MODELS[0];
       if(!cfg||cfg.provider==='novai'||cfg.provider==='agnes'||cfg.provider==='pollinations'){
         cfg={provider:imgM.provider, model:imgM.model};
