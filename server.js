@@ -6182,8 +6182,14 @@ function apiRoute(req, res, urlPath) {
       const email = normEmail(body && body.email);
       if (!email) return sendJSON(res, 200, { ok: false, error: 'សូមដាក់ Gmail' });
       if (!body || !Array.isArray(body.items)) return sendJSON(res, 200, { ok: false, error: 'ទិន្នន័យមិនត្រឹមត្រូវទេ' });
-      await ghResyncPublicHistoryThrottled();
+      // Unthrottled merge (tombstone fix 2026-11-18): the throttled merge
+      // is skipped when it ran <60s ago, so a sync could re-save STALE
+      // local history (still holding GitHub-deleted items) back to GitHub
+      // and undo the deletion before the merge ever runs. Await the full
+      // merge here so local is fresh from GitHub before the union below.
+      await ghMergePublicHistoryFromGitHub();
       const tombs = loadDeletedItems();
+      let tombsChanged = false;
       const h = loadHistory();
       const byKey = {};
       const stored = Array.isArray(h[email]) ? h[email] : [];
@@ -6230,6 +6236,24 @@ function apiRoute(req, res, urlPath) {
         const clean = Object.assign({}, it);
         delete clean.thumb;
         const prev = byKey[k];
+        if (!prev) {
+          // Resurrection guard (tombstone fix 2026-11-18): the merge only
+          // tombstones items it OBSERVES being dropped from local storage.
+          // After a restart, ghRestoreAll already makes local == GitHub,
+          // so the merge never sees the deleted items — they live only on
+          // the phone. An incoming item NOT already stored whose timestamp
+          // is older than the 5-minute grace was deleted on GitHub (or
+          // never existed there): a genuinely new item is synced within
+          // minutes of creation. Refuse it and tombstone it so it can
+          // never come back (and so the save below cannot push it back
+          // to GitHub and undo the deletion).
+          const ts = numOr(clean.ts, 0);
+          const graceMs = 5 * 60 * 1000;
+          if (!Number.isFinite(ts) || ts <= 0 || Date.now() - ts >= graceMs) {
+            if (!tombs.history[k]) { tombs.history[k] = new Date().toISOString(); tombsChanged = true; }
+            continue;
+          }
+        }
         if (!prev || numOr(clean.ts, 0) > numOr(prev.ts, 0)) byKey[k] = clean;
       }
       const merged = Object.values(byKey).sort((a, b) => numOr(b.ts, 0) - numOr(a.ts, 0)).slice(0, 300);
@@ -6239,6 +6263,7 @@ function apiRoute(req, res, urlPath) {
       // returning success, so a restart cannot lose History already
       // reported as saved.
       await ghFlushFile(HISTORY_FILE);
+      if (tombsChanged) { saveDeletedItems(tombs); await ghFlushFile(DELETED_ITEMS_FILE); }
       return sendJSON(res, 200, { ok: true, email, items: merged });
     }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
     return;
@@ -8908,6 +8933,21 @@ function apiRoute(req, res, urlPath) {
       if (clientId) {
         if (loadDeletedItems().posts[clientId]) return sendJSON(res, 200, { ok: false, error: 'Post នេះត្រូវបានលុបហើយ · This post was deleted and cannot be re-posted' });
         if (posts.some((x) => x && x.id === clientId)) return sendJSON(res, 200, { ok: false, error: 'Post នេះមានរួចហើយ · This post already exists' });
+        // Resurrection guard (tombstone fix 2026-11-18): a client-provided
+        // id embeds its creation time (pub_<base36 ms><6 random chars>).
+        // An id whose embedded time is older than the 5-minute grace, and
+        // which is absent from local posts, is a deleted post being
+        // re-posted (the merge never tombstoned it because local == GitHub
+        // after a restart). Refuse it and tombstone it. Unparseable ids
+        // are accepted (fail-open).
+        if (/^pub_[0-9a-z]+$/.test(clientId) && clientId.length >= 11) {
+          const idTs = parseInt(clientId.slice(4, -6), 36);
+          if (Number.isFinite(idTs) && idTs > 1577836800000 && idTs < 1893456000000 && Date.now() - idTs >= 5 * 60 * 1000) {
+            tombstonePostIdNow(clientId);
+            await ghFlushFile(DELETED_ITEMS_FILE).catch(() => {});
+            return sendJSON(res, 200, { ok: false, error: 'Post នេះត្រូវបានលុបហើយ · This post was deleted and cannot be re-posted' });
+          }
+        }
       }
       const p = {
         id: clientId || newPublicId(), email,
