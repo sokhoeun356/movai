@@ -10000,12 +10000,20 @@ async function apiRoute(req, res, urlPath) {
   // admin key ONLY (Authorization: Bearer <MOVAI_ADMIN_KEY>; the
   // x-admin-key header is REJECTED, same as every other admin
   // endpoint — adminKeyOk checks the Bearer header only). targetId is
-  // the user's User ID (e.g. "3Z96CSY5N4"). FREE — no payment, no
-  // deduction. For 'views', postId is REQUIRED. Success: {ok:true,
-  // type, amount, views, watchHours, email, name} — views = post's NEW
-  // view count (hours without postId: null), watchHours = user's NEW
-  // total watch hours IN HOURS. Errors: user_not_found / post_not_found
-  // / not_public / invalid_amount / invalid_type / unauthorized.
+  // the user's User ID (e.g. "3Z96CSY5N4"). PAID — deducts the price
+  // from the TARGET user's spendable Wallet balance BEFORE adding
+  // (owner correction 2026-11-19: the admin sets the money, the grant
+  // must charge it, never grant free). Price: views amount * $0.0001,
+  // hours amount * $0.016, rounded to 2 decimals (promoPriceFor, same
+  // as the buy endpoint). For 'views', postId is REQUIRED. Success:
+  // {ok:true, type, amount, price, balance, views, watchHours, email,
+  // name} — price = dollars charged (2 decimals), balance = target
+  // user's NEW spendable balance, views = post's NEW view count
+  // (hours without postId: null), watchHours = user's NEW total watch
+  // hours IN HOURS. Errors: insufficient_balance (carries balance +
+  // price) / user_not_found / post_not_found / not_public /
+  // invalid_amount / invalid_type / unauthorized. Add-failure after
+  // deduction refunds and returns {ok:false, error:'failed'}.
   if (req.method === 'POST' && urlPath === '/api/admin/promo/grant') {
     const a = await adminKeyOk(req);
     if (!a.ok) return sendJSON(res, 200, { ok: false, error: 'unauthorized' });
@@ -10037,11 +10045,31 @@ async function apiRoute(req, res, urlPath) {
         if (normEmail(post.email) !== email) return sendJSON(res, 200, { ok: false, error: 'post_not_found' });
         if (post.visibility !== 'public') return sendJSON(res, 200, { ok: false, error: 'not_public' });
       }
-      const applied = await promoApplyBoost(email, post, type, amount);
+      const price = promoPriceFor(type, amount);
+      const bal = walletBalance(target);
+      if (price > bal) return sendJSON(res, 200, { ok: false, error: 'insufficient_balance', balance: bal, price });
+      // Deduct from the TARGET user's spendable Wallet balance BEFORE
+      // adding (same pattern as the buy endpoint / wallet package buy).
       const now = new Date().toISOString();
-      await logGrant({ email, credits: 0, songCredits: 0, note: 'promo-grant:' + type + ':' + amount + (post ? ' post:' + post.id : ''), at: now });
-      await addNotification('grant', email, '➕ Promo Free · ' + (type === 'views' ? 'Views' : 'Watch hours') + ' +' + amount, 'Admin បានបន្ថែម Promo ' + (type === 'views' ? 'Views' : 'Watch hours') + ' +' + amount + ' ឲ្យ ' + email + ' · ID: ' + (target.id || '—') + (post ? ' — «' + (post.title || '') + '»' : ''), { extra: { promo: true, type, amount, buyerId: target.id || '—' } });
-      return sendJSON(res, 200, { ok: true, type, amount, views: applied.views, watchHours: applied.watchHours, email, name: target.name || '' });
+      target.balance = walletMoney(bal - price);
+      target.updatedAt = now;
+      await saveUsers(users);
+      scheduleBackup('users.json');
+      let applied;
+      try {
+        applied = await promoApplyBoost(email, post, type, amount);
+      } catch (e) {
+        // Add failed after deduction — REFUND the deduction.
+        try {
+          const users2 = await loadUsers();
+          const u2 = users2[email];
+          if (u2) { u2.balance = walletMoney(walletBalance(u2) + price); u2.updatedAt = new Date().toISOString(); await saveUsers(users2); scheduleBackup('users.json'); }
+        } catch (e2) {}
+        return sendJSON(res, 200, { ok: false, error: 'failed' });
+      }
+      await logGrant({ email, credits: 0, songCredits: 0, note: 'promo-grant:' + type + ':' + amount + ':$' + price.toFixed(2) + (post ? ' post:' + post.id : ''), at: now });
+      await addNotification('grant', email, '➕ Promo · ' + (type === 'views' ? 'Views' : 'Watch hours') + ' +' + amount, 'Admin បានបន្ថែម Promo ' + (type === 'views' ? 'Views' : 'Watch hours') + ' +' + amount + ' ឲ្យ ' + email + ' · ID: ' + (target.id || '—') + ' តម្លៃ $' + price.toFixed(2) + (post ? ' — «' + (post.title || '') + '»' : '') + ' (នៅសល់ $' + target.balance.toFixed(2) + ')', { extra: { promo: true, type, amount, price, balance: target.balance, buyerId: target.id || '—' } });
+      return sendJSON(res, 200, { ok: true, type, amount, price, balance: target.balance, views: applied.views, watchHours: applied.watchHours, email, name: target.name || '' });
     }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
     return;
   }
