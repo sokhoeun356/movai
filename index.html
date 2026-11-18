@@ -3151,7 +3151,11 @@ input[type=range].st-range{accent-color:var(--accent);min-height:32px;cursor:poi
     </div>
     <div id="thumbBox" style="display:none;margin-top:14px;border-top:1px solid var(--line);padding-top:12px">
       <h3 style="font-size:1rem;font-weight:800" data-i18n="thumbTitle">Thumbnail · រូបតូច</h3>
-      <p style="font-size:0.8125rem;color:var(--muted);margin-top:4px" data-i18n="thumbDesc">រូប 16:9 + ចំណងជើងលើរូប — ដាក់លើបទ/វីដេអូដូច YouTube</p>
+      <p style="font-size:0.8125rem;color:var(--muted);margin-top:4px" data-i18n="thumbDesc">រូប 1:1 · 16:9 · 9:16 + ចំណងជើងលើរូប — ដាក់លើបទ/វីដេអូដូច YouTube</p>
+      <div style="margin-top:10px">
+        <span class="chip-label" data-i18n="thumbRatioLbl">ទំហំ · Ratio</span>
+        <div id="thumbRatioRow" style="display:flex;gap:8px;margin-top:6px"></div>
+      </div>
       <div style="margin-top:10px">
         <span class="chip-label" data-i18n="thumbTitleLbl">ចំណងជើង</span>
         <input type="text" class="input" id="thumbTitle" data-i18n-ph="thumbTitlePh" placeholder="ឧ. ឈ្មោះបទចម្រៀងរបស់អ្នក..." maxlength="120" oninput="thumbRetitleSoon()" style="width:100%;min-height:44px;padding:10px 14px">
@@ -4307,7 +4311,7 @@ km:{
  keyRotate:'Key នេះអស់ Credit — ប្ដូរទៅ Key បន្ទាប់…',
  msgAutoFallback:'{name} បង្កើតមិនបានទេ — បានប្តូរទៅ Pollinations ឲ្យដោយស្វ័យប្រវត្តិ ហើយបង្កើតរូបឲ្យនៅទីនេះហើយ',progFallback:'កំពុងប្តូរទៅ Pollinations…',
  dlImage:'ទាញយករូបភាព',dlVideo:'ទាញយកវីដេអូ',dlPrefix:'ទាញយក ',
- thumbTitle:'Thumbnail · រូបតូច',thumbDesc:'រូប 16:9 + ចំណងជើងលើរូប — ដាក់លើបទ/វីដេអូដូច YouTube',thumbTitleLbl:'ចំណងជើង',thumbTitlePh:'ឧ. ឈ្មោះបទចម្រៀងរបស់អ្នក...',thumbPromptLbl:'រូបផ្ទៃខាងក្រោយ',thumbPromptPh:'ពណ៌នារូបផ្ទៃខាងក្រោយ...',thumbGen:'បង្កើត Thumbnail',thumbUseCover:'ប្រើជា Cover',thumbCoverReady:'Thumbnail រួចរាល់ជា Cover — បើក Post to Public លើបទ/វីដេអូរបស់អ្នក វានឹងប្រើរូបនេះ',thumbCoverFail:'ធ្វើ Thumbnail ជា Cover មិនបានទេ — សូមព្យាយាមម្ដងទៀត',
+ thumbTitle:'Thumbnail · រូបតូច',thumbDesc:'រូប 1:1 · 16:9 · 9:16 + ចំណងជើងលើរូប — ដាក់លើបទ/វីដេអូដូច YouTube',thumbRatioLbl:'ទំហំ · Ratio',thumbTitleLbl:'ចំណងជើង',thumbTitlePh:'ឧ. ឈ្មោះបទចម្រៀងរបស់អ្នក...',thumbPromptLbl:'រូបផ្ទៃខាងក្រោយ',thumbPromptPh:'ពណ៌នារូបផ្ទៃខាងក្រោយ... (ទុកចោល = ប្រើចំណងជើង)',thumbGen:'បង្កើត Thumbnail',thumbUseCover:'ប្រើជា Cover',thumbCoverReady:'Thumbnail រួចរាល់ជា Cover — បើក Post to Public លើបទ/វីដេអូរបស់អ្នក វានឹងប្រើរូបនេះ',thumbCoverFail:'ធ្វើ Thumbnail ជា Cover មិនបានទេ — សូមព្យាយាមម្ដងទៀត',
  imgAltCreated:'រូបភាពដែលបានបង្កើត',alt3dPreview:'រូបមើលមុនរបស់ 3D model',
  noKeyNeeded:'មិនបាច់ Key',
  pollinationsBody:'មិនត្រូវការ API key — បង្កើតបានភ្លាម។',
@@ -4611,7 +4615,7 @@ en:{
  keyRotate:'This key is out of credits — switching to the next key…',
  msgAutoFallback:'{name} could not generate — automatically switched to Pollinations and created your image right here',progFallback:'Switching to Pollinations…',
  dlImage:'Download Image',dlVideo:'Download Video',dlPrefix:'Download ',
- thumbTitle:'Thumbnail',thumbDesc:'16:9 image + title text on it — for your song/video, like YouTube',thumbTitleLbl:'Title',thumbTitlePh:'e.g. Your song title...',thumbPromptLbl:'Background image',thumbPromptPh:'Describe the background image...',thumbGen:'Create Thumbnail',thumbUseCover:'Use as cover',thumbCoverReady:'Thumbnail saved as cover — open Post to Public on your song/video and it will use this image',thumbCoverFail:'Could not use thumbnail as cover — please try again',
+ thumbTitle:'Thumbnail',thumbDesc:'1:1 · 16:9 · 9:16 image + title text — for your song/video, like YouTube',thumbRatioLbl:'Size · Ratio',thumbTitleLbl:'Title',thumbTitlePh:'e.g. Your song title...',thumbPromptLbl:'Background image',thumbPromptPh:'Describe the background image... (leave empty to use the title)',thumbGen:'Create Thumbnail',thumbUseCover:'Use as cover',thumbCoverReady:'Thumbnail saved as cover — open Post to Public on your song/video and it will use this image',thumbCoverFail:'Could not use thumbnail as cover — please try again',
  imgAltCreated:'Generated image',alt3dPreview:'3D model preview',
  noKeyNeeded:'No key needed',
  pollinationsBody:'No API key needed — generate right away.',
@@ -7525,6 +7529,7 @@ function genSetMode(m){
   var ag=document.getElementById('genAspectGroup');if(ag)ag.style.display=m==='song'?'none':'flex';
   var sb=document.getElementById('storyBox');if(sb)sb.style.display=m==='video'?'block':'none';
   var tb=document.getElementById('thumbBox');if(tb)tb.style.display=m==='image'?'block':'none';
+  if(m==='image'){try{thumbRenderRatio();}catch(e){}}
   var ifn=document.getElementById('genImgFreeNote');if(ifn)ifn.style.display=m==='image'?'block':'none';
   if(m==='image'){try{imgFreeLoad();}catch(e){}}
   genRenderProviders();genCloseProviders();genRenderOptions();
@@ -8136,24 +8141,59 @@ var thumbLastUrl='';
 var thumbLastTitle='';
 var thumbLastImg=null;
 function thumbMsg(t){var el=document.getElementById('thumbMsg');if(el)el.textContent=t;}
+/* Thumbnail ratios: 1:1 (square, Facebook/Instagram), 16:9 (wide,
+   YouTube), 9:16 (vertical, TikTok/Reels/Shorts). w/h = the size
+   sent to POST /api/gen/image (Agnes maps the dimensions to its
+   closest supported ratio: 1:1, 16:9, 9:16 are all supported);
+   cw/ch = the canvas the title is drawn on. Choice persists in
+   localStorage 'movai-thumb-ratio'; default 16:9. */
+var THUMB_RATIOS={'1:1':{w:768,h:768,cw:1024,ch:1024},'16:9':{w:768,h:432,cw:1280,ch:720},'9:16':{w:432,h:768,cw:720,ch:1280}};
+var thumbRatio='16:9';
+var thumbCurCW=1280,thumbCurCH=720;
+try{var _tr0=localStorage.getItem('movai-thumb-ratio');if(_tr0&&THUMB_RATIOS[_tr0])thumbRatio=_tr0;}catch(e){}
+function thumbSetRatio(r){
+  if(!THUMB_RATIOS[r])return;
+  thumbRatio=r;
+  try{localStorage.setItem('movai-thumb-ratio',r);}catch(e){}
+  thumbRenderRatio();
+}
+function thumbRenderRatio(){
+  var row=document.getElementById('thumbRatioRow');if(!row)return;
+  row.innerHTML=Object.keys(THUMB_RATIOS).map(function(r){
+    return '<button type="button" class="kbtn '+(thumbRatio===r?'kbtn-black':'kbtn-white')+'" onclick="thumbSetRatio(\''+r+'\')" style="flex:1">'+r+'</button>';
+  }).join('');
+}
+try{thumbRenderRatio();}catch(e){}
+/* Cinematic / emotional thumbnail style, learned from the owner's
+   example thumbnails (rainy night, city lights, deep blue + warm
+   streetlight glow, red rose / broken heart accents, bold
+   brush-stroke title). Appended to the user's background prompt —
+   the user's words drive the CONTENT, this only makes it look
+   cinematic and thumbnail-ready. Never hardcodes a specific song
+   or a heartbreak theme. */
+function thumbStyleSuffix(){
+  return ', cinematic, dramatic lighting, emotional atmosphere, photorealistic, ultra detailed, high contrast, rich saturated colors, striking composition, professional YouTube thumbnail quality, eye-catching, sharp focus';
+}
 async function thumbGenerate(){
   if(!requireLogin())return;
   if(!genUserEmail()){thumbMsg(tx('acctLoading'));return;}
   if(genAnyBusy)return;
-  var prompt=(document.getElementById('thumbPrompt').value||'').trim();
-  if(!prompt){thumbMsg(tx('msgEnterPrompt'));return;}
   var title=(document.getElementById('thumbTitle').value||'').trim();
+  var prompt=(document.getElementById('thumbPrompt').value||'').trim();
+  if(!prompt)prompt=title;
+  if(!prompt){thumbMsg(tx('msgEnterPrompt'));return;}
   var btn=document.getElementById('thumbGenBtn');if(btn)btn.disabled=true;
   genAnyBusy=true;epSyncButtons();
   var box=document.getElementById('thumbResult');if(box)box.innerHTML='';
   thumbMsg('');genMsg('');
   genStartProg();
-  var _bs=document.getElementById('genBlurStage');if(_bs)_bs.style.aspectRatio='16 / 9';
+  var _bs=document.getElementById('genBlurStage');if(_bs)_bs.style.aspectRatio=thumbRatio.replace(':',' / ');
   try{
     var imgPick=imgPickCur();
     var cfg={provider:imgPick.provider,model:imgPick.model};
     histCtx={prompt:prompt,provider:cfg.provider};
-    var j=await adminGenPost('/api/gen/image',{provider:cfg.provider,prompt:genEnhanceImgPrompt(prompt),model:cfg.model,width:768,height:432},60000);
+    var _tr=THUMB_RATIOS[thumbRatio]||THUMB_RATIOS['16:9'];
+    var j=await adminGenPost('/api/gen/image',{provider:cfg.provider,prompt:genEnhanceImgPrompt(prompt)+thumbStyleSuffix(),model:cfg.model,width:_tr.w,height:_tr.h},60000);
     var url=j.imageUrl||j.image_url||j.url||null;
     if(!url){
       var jobId=adminJobId(j);
@@ -8240,7 +8280,9 @@ async function thumbShowImage(url,title){
   var box=document.getElementById('thumbResult');if(!box)return;
   thumbLastUrl=url;thumbLastTitle=title||'';
   var img=await thumbLoadImage(url);
-  var c=document.createElement('canvas');c.id='thumbCanvas';c.width=1280;c.height=720;
+  var _tr=THUMB_RATIOS[thumbRatio]||THUMB_RATIOS['16:9'];
+  thumbCurCW=_tr.cw;thumbCurCH=_tr.ch;
+  var c=document.createElement('canvas');c.id='thumbCanvas';c.width=_tr.cw;c.height=_tr.ch;
   c.style.cssText='width:100%;border-radius:14px;display:block';
   var x=c.getContext('2d');
   if(!x)throw new Error(tx('genFailed'));
@@ -8255,8 +8297,8 @@ async function thumbShowImage(url,title){
     if(!img||!img.naturalWidth)throw new Error(tx('badImgUrl'));
   }
   thumbLastImg=img;
-  thumbDrawCover(x,img,1280,720);
-  if(title)thumbDrawTitle(x,title,1280,720);
+  thumbDrawCover(x,img,_tr.cw,_tr.ch);
+  if(title)thumbDrawTitle(x,title,_tr.cw,_tr.ch);
   box.innerHTML='';
   box.appendChild(c);
   var row=document.createElement('div');
@@ -8308,9 +8350,9 @@ function thumbRetitle(){
   thumbLastTitle=title;
   var c=document.getElementById('thumbCanvas');if(!c)return;
   var x=c.getContext('2d');if(!x)return;
-  x.clearRect(0,0,1280,720);
-  thumbDrawCover(x,thumbLastImg,1280,720);
-  if(title)thumbDrawTitle(x,title,1280,720);
+  x.clearRect(0,0,thumbCurCW,thumbCurCH);
+  thumbDrawCover(x,thumbLastImg,thumbCurCW,thumbCurCH);
+  if(title)thumbDrawTitle(x,title,thumbCurCW,thumbCurCH);
 }
 /* ===== In-page downloads (owner rule 2026-11-16) =====
    Every Download tap saves the file FROM this page, under the
