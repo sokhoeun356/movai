@@ -871,6 +871,23 @@ img.hist-media,.d3-preview{cursor:zoom-in}
    Song History row, marking them as AI features. It never takes
    taps and never shifts the button's icon. */
 .hist-song-lg .song-ai-badge{position:absolute;top:4px;left:4px;z-index:1;padding:1px 5px;border-radius:999px;background:var(--accent);color:#101216;font-size:0.5625rem;font-weight:900;line-height:1.35;letter-spacing:.04em;pointer-events:none;box-shadow:0 1px 4px rgba(0,0,0,.25)}
+/* Free 2 + package allowance badge (owner order 2026-11-18):
+   a small pill pinned to the TOP-RIGHT corner of the Download /
+   MV / Vocal Studio buttons (History + Feed) and of the same
+   three rows in the song menu sheet — NEXT TO the green «AI»
+   badge, which stays on the top-left. «Free» is small, the
+   remaining count a bit bigger; a package-only remainder shows
+   just the number; unlimited Download shows «∞»; locked (0
+   left) shows «អស់» / «Out» and the host button greys out. */
+.feat-limit-badge{position:absolute;top:4px;right:4px;z-index:1;padding:1px 6px;border-radius:999px;background:rgba(16,18,22,.78);color:#fff;font-size:0.5625rem;font-weight:800;line-height:1.5;letter-spacing:.02em;pointer-events:none;box-shadow:0 1px 4px rgba(0,0,0,.3);white-space:nowrap;font-variant-numeric:tabular-nums}
+.feat-limit-badge .fl-num{font-size:0.75rem;font-weight:900}
+.feat-limit-badge.fl-pkg{background:var(--accent);color:#101216}
+.feat-limit-badge.fl-out{background:#7f1d1d;color:#fff}
+.pub-pill,.pub-act{position:relative}
+.song-menu-item{position:relative}
+.song-menu-item .feat-limit-badge{top:6px;right:8px}
+.feat-locked{opacity:.45;filter:grayscale(.55)}
+.song-act:has(>.feat-limit-badge.fl-out),.pub-pill:has(>.feat-limit-badge.fl-out),.pub-act:has(>.feat-limit-badge.fl-out),.song-menu-item:has(>.feat-limit-badge.fl-out){opacity:.45;filter:grayscale(.55)}
 .hist-song-lg .song-seek{height:22px;margin-top:8px}
 /* Song menu — bottom sheet listing EVERY action of one Song
    History song, icon + text label, opened by the row's ☰ button. */
@@ -1089,6 +1106,18 @@ html[data-mode="light"] .pkg-tab.media.on{color:#8f27c9}
 .khqr-card h3{font-size:1.0625rem;font-weight:900}
 .khqr-img{display:block;width:100%;max-width:320px;height:auto;margin:12px auto 0;border-radius:12px;background:#fff}
 .khqr-note{font-size:0.875rem;color:var(--muted);line-height:1.7;margin-top:12px}
+/* ===== Two-QR payment block (owner order 2026-11-18): Top up AND
+   Buy Package show ONLY two sections — KHQR 🇰🇭 | KHQR USDT — with
+   the QR images shown directly (scannable), no nested «Show» buttons,
+   no Canadia link, no extra names. Tap a section to pick it (Top up
+   sets the payment method); tap a QR image to enlarge it. */
+.pay-qr{border:1px solid var(--line2);border-radius:14px;padding:14px;margin-top:10px;background:var(--card2);cursor:pointer}
+.pay-qr.on{border-color:#a3e635;box-shadow:0 0 0 2px rgba(163,230,53,.45)}
+.pay-qr-head{font-size:0.9375rem;font-weight:900;display:flex;align-items:center;justify-content:space-between;gap:8px}
+.pay-qr-check{display:none;font-size:0.875rem;font-weight:900;color:#65a30d}
+.pay-qr.on .pay-qr-check{display:inline}
+.pay-qr img{display:block;width:100%;max-width:300px;height:auto;margin:10px auto 0;border-radius:12px;background:#fff}
+.pay-qr-note{font-size:0.8125rem;color:var(--muted);line-height:1.65;margin-top:8px}
 @media (prefers-reduced-motion:reduce){.khqr-modal.blur-in,.khqr-modal.blur-out{animation:none}}
 /* Payment receipt upload (inside the buy sheet, below the payment
    options): the buyer MUST attach a receipt screenshot before
@@ -3424,8 +3453,11 @@ input[type=range].st-range{accent-color:var(--accent);min-height:32px;cursor:poi
 </div>
 <!-- Top-up sheet: SMALL popup opened by the «Top up» row in My
      Profile. Holds the Top-up form (same ids / handlers as
-     before): Khmer/Foreign choice, amount min $5, receipt
-     upload, Submit -> POST /api/public/wallet/topup-request. -->
+     before): the TWO payment sections (KHQR 🇰🇭 | KHQR USDT, QR
+     images shown directly — owner order 2026-11-18, the sheet had
+     NO way to pay), amount min $5, receipt upload, Submit ->
+     POST /api/public/wallet/topup-request. Tapping a QR section
+     picks the payment method (walletSetMethod). -->
 <div id="walletTopupSheet" class="pkg-sheet" style="display:none" role="dialog" aria-modal="true" onclick="if(event.target===this)walletTopupClose()">
   <div class="pkg-sheet-card">
     <div style="display:flex;align-items:center;justify-content:space-between;gap:10px">
@@ -3433,10 +3465,8 @@ input[type=range].st-range{accent-color:var(--accent);min-height:32px;cursor:poi
       <button type="button" class="drawer-close" style="background:var(--card2);color:var(--text);border-color:var(--line2)" onclick="walletTopupClose()" aria-label="Close">✕</button>
     </div>
     <div class="wallet-sec">
-      <div class="wallet-methods" role="group" aria-label="Payment method">
-        <button type="button" class="wallet-method on" id="walletMethodKhmer" onclick="walletSetMethod('khmer')" data-i18n="walletMethodKhmer">ខ្មែរ · Khmer</button>
-        <button type="button" class="wallet-method" id="walletMethodForeign" onclick="walletSetMethod('foreign')" data-i18n="walletMethodForeign">បរទេស · Foreign</button>
-      </div>
+      <p class="wallet-note" style="font-weight:800;color:var(--text)" data-i18n="walletPayVia">បង់តាម · Pay via</p>
+      <div id="walletTopupQr"></div>
       <div class="auth-field">
         <label for="walletTopupAmount" data-i18n="walletAmount">ចំនួនលុយ (USD) · Amount (USD)</label>
         <input class="input" id="walletTopupAmount" type="number" inputmode="decimal" min="5" step="0.01" placeholder="5.00">
@@ -4019,7 +4049,7 @@ km:{
  walletTitle:'កាបូបលុយ · Wallet',walletBalanceLbl:'សមតុល្យ Wallet · Wallet balance',
  walletBalanceTitle:'សមតុល្យ Wallet · Wallet Balance',earnMoneyTitle:'លុយរកបាន · Earn Money',earnCashbackLbl:'Cashback ពីកញ្ចប់ · Package cashback',earnViewsLbl:'ចំណូលពីការមើល · View earnings',earnWithdrawOnlyNote:'ដកបានតែប៉ុណ្ណោះ — ទិញអ្វីមិនបានទេ · Withdraw only — cannot be used to buy anything',walletSpendableNote:'លុយបញ្ចូល — អាចចាយ / ទិញកញ្ចប់បាន · Top-up money — can be spent / buy packages',walletWithdrawFrom:'ដកពី · Withdraw from',walletSourceEarn:'Earn Money · លុយរកបាន',walletSourceWallet:'Wallet Balance · សមតុល្យ Wallet',
  walletTopupTitle:'បញ្ចូលលុយ · Top up',walletWithdrawTitle:'ដកលុយ · Withdraw',
- walletMethodKhmer:'ខ្មែរ · Khmer',walletMethodForeign:'បរទេស · Foreign',
+ walletMethodKhmer:'ខ្មែរ · Khmer',walletMethodForeign:'បរទេស · Foreign',walletPayVia:'បង់តាម · Pay via',
  walletAmount:'ចំនួនលុយ (USD) · Amount (USD)',walletMinNote:'អប្បបរមា $5.00 · Minimum $5.00',
  walletReceiptPick:'ភ្ជាប់រូបវិក្កយបត្រ (បើមាន) · Attach receipt image (optional)',
  walletKhqrPick:'ភ្ជាប់រូប KHQR របស់អ្នក · Attach your KHQR image',
@@ -4198,7 +4228,7 @@ km:{
  pkgPremium:'Premium',mhPerSec:'Credit/វិនាទី',adminLock:'🔐 ចាក់សោ',mhVerAuto:'កំណត់ស្វ័យប្រវត្តិ',provOnline:'Online Live',provBusy:'រវល់',provProblem:'មានបញ្ហា',apiWorking:'API ដំណើរការ',apiExhausted:'API អស់ហើយ',apiUnused:'មិនទាន់ប្រើ',apiKeyW:'Key',
  pkgSheetTitle:'សំណើរទិញ',pkgSheetPlan:'កញ្ចប់',pkgCreditsLbl:'Credit ដែលទទួលបាន',pkgTotal:'តម្លៃសរុប',
  pkgConfirm:'បញ្ជាក់ការទិញ',pkgCancel:'បោះបង់',
- payTitle:'របៀបបង់លុយ — ជ្រើសមួយ',payLocal:'🇰🇭 ក្នុងស្រុក',payLocalNote:'ជ្រើសរបៀបបង់មួយ — បង្ហាញ KHQR ដើម្បីស្កេនបង់ ឬបើកក្នុង App Canadia Bank',payShowKhqrBtn:'🇰🇭 បង្ហាញ KHQR · Show KHQR',payCanadiaBtn:'🏦 បើកក្នុង App Canadia Bank · Open in Canadia Bank App',payKhqrTitle:'🇰🇭 KHQR',payKhqrNote:'ស្កេន QR នេះជាមួយ app ធនាគារណាក៏បាន (ABA, Wing, Canadia…) — QR នេះមិនមានចំនួនលុយថេរទេ សូមបញ្ចូលចំនួនលុយតាមកញ្ចប់ដែលអ្នកទិញដោយខ្លួនឯង',payKhqrClose:'បិទ · Close',payIntl:'🌍 ក្រៅស្រុក',payUsdtNote:'បង់ USDT (Binance) មកអាសយដ្ឋាននេះ៖',payUsdtEmpty:'អាសយដ្ឋាន USDT មិនទាន់មានទេ — សូមទាក់ទង Admin ដើម្បីបង់លុយ',payCopyAddr:'ចម្លង',payPaidBtn:'ខ្ញុំបានបង់រួចហើយ',payLoading:'កំពុងផ្ទុករបៀបបង់លុយ…',payNone:'មិនទាន់មានរបៀបបង់លុយទេ — សូមទាក់ទង Admin',
+ payTitle:'របៀបបង់លុយ — ជ្រើសមួយ',payQrKhmer:'KHQR 🇰🇭',payQrUsdt:'KHQR USDT',payQrKhmerNote:'ស្កេនជាមួយ app ធនាគារណាក៏បាន (ABA, Wing, Canadia…) — បញ្ចូលចំនួនលុយដោយខ្លួនឯង',payQrUsdtNote:'TRC20 តែប៉ុណ្ណោះ · Min >0.01 USDT',payLocal:'🇰🇭 ក្នុងស្រុក',payLocalNote:'ជ្រើសរបៀបបង់មួយ — បង្ហាញ KHQR ដើម្បីស្កេនបង់ ឬបើកក្នុង App Canadia Bank',payShowKhqrBtn:'🇰🇭 បង្ហាញ KHQR · Show KHQR',payCanadiaBtn:'🏦 បើកក្នុង App Canadia Bank · Open in Canadia Bank App',payKhqrTitle:'🇰🇭 KHQR',payKhqrNote:'ស្កេន QR នេះជាមួយ app ធនាគារណាក៏បាន (ABA, Wing, Canadia…) — QR នេះមិនមានចំនួនលុយថេរទេ សូមបញ្ចូលចំនួនលុយតាមកញ្ចប់ដែលអ្នកទិញដោយខ្លួនឯង',payKhqrClose:'បិទ · Close',payIntl:'🌍 ក្រៅស្រុក',payUsdtNote:'បង់ USDT (Binance) មកអាសយដ្ឋាននេះ៖',payUsdtEmpty:'អាសយដ្ឋាន USDT មិនទាន់មានទេ — សូមទាក់ទង Admin ដើម្បីបង់លុយ',payCopyAddr:'ចម្លង',payPaidBtn:'ខ្ញុំបានបង់រួចហើយ',payLoading:'កំពុងផ្ទុករបៀបបង់លុយ…',payNone:'មិនទាន់មានរបៀបបង់លុយទេ — សូមទាក់ទង Admin',
  payUsdtNet:'⚠️ ផ្ញើតាមបណ្ដាញ TRC20 តែប៉ុណ្ណោះ — កុំផ្ញើតាមបណ្ដាញផ្សេង',payShowUsdtQrBtn:'₮ បង្ហាញ QR USDT · Show USDT QR',payUsdtQrTitle:'₮ USDT QR · Binance',payUsdtQrNote:'ស្កេន QR នេះដើម្បីបង់ USDT តាម wallet ណាក៏បាន (Binance, Trust Wallet…) — TRC20 តែប៉ុណ្ណោះ · Min >0.01 USDT',
  payReceiptTitle:'🧾 Payment receipt · វិក្កយបត្រ',payReceiptNote:'សូមបង្ហោះ screenshot វិក្កយបត្របង់លុយរបស់អ្នក ដើម្បីឲ្យ Admin ពិនិត្យមុនពេលអនុម័ត',payReceiptPick:'📷 ជ្រើសរូបវិក្កយបត្រ · Choose receipt image',payReceiptRemove:'លុបរូប',payReceiptOk:'បានជ្រើសរួច ✓',payReceiptNeed:'សូមបង្ហោះរូបវិក្កយបត្រសិន',payReceiptBadImg:'សូមជ្រើសឯកសាររូបភាព (screenshot វិក្កយបត្រ)',payReceiptTooBig:'រូបធំពេក — អតិបរមា 8MB',payReceiptUploading:'កំពុងបង្ហោះវិក្កយបត្រ…',payReceiptFail:'បង្ហោះវិក្កយបត្រមិនបានទេ — សូមព្យាយាមម្ដងទៀត (សំណើរទិញមិនទាន់បានផ្ញើទេ)',payReceiptRetry:'សាកម្ដងទៀត',
  pkgNeedLogin:'សូមចូលគណនី ឬចុះឈ្មោះជាមុនសិន — ដើម្បីឲ្យ Credit និងកញ្ចប់ចូលគណនីរបស់អ្នក',
@@ -4262,7 +4292,7 @@ km:{
  histEmptySong:'មិនទាន់មានបទចម្រៀងទេ — បទចម្រៀងដែលអ្នកបង្កើតនឹងរក្សាទុកនៅទីនេះជាប់រហូត',
  histEmpty3d:'មិនទាន់មាន 3D ទេ — ម៉ូដែល 3D ដែលអ្នកបង្កើតនឹងរក្សាទុកនៅទីនេះជាប់រហូត',
  histEmptyStory:'មិនទាន់មាន Story ទេ — Story ដែលអ្នកបង្កើតនឹងរក្សាទុកនៅទីនេះជាប់រហូត',
- mvBtn:'MV',mvFormat:'ទម្រង់អេក្រង់ · Screen format',mvFmtPortrait:'បញ្ឈរ',mvFmtLandscape:'ផ្ដេក',mvFmtSquare:'ការ៉េ',mvFmtWide:'ធំទូលាយ',
+ mvBtn:'MV',featFree:'Free',featOut:'អស់',featLockedDl:'អស់ Free Download ហើយ — ទិញ Package ដើម្បី Download មិនកំណត់',featLockedMv:'អស់ Free MV ហើយ — ទិញ Package ដើម្បីបង្កើត MV បន្ថែម',featLockedVs:'អស់ Free Vocal Studio ហើយ — ទិញ Package ដើម្បីបំបែកបទបន្ថែម',mvFormat:'ទម្រង់អេក្រង់ · Screen format',mvFmtPortrait:'បញ្ឈរ',mvFmtLandscape:'ផ្ដេក',mvFmtSquare:'ការ៉េ',mvFmtWide:'ធំទូលាយ',
  mvBg:'ផ្ទៃខាងក្រោយ · Background',mvBgAuto:'អូតូ',mvBgUpload:'Upload វីដេអូ / រូបភាព',mvBgAutoNote:'អូតូ — ប្រើរូប cover របស់បទ ឬផ្ទៃ MovAi ដែលបង្កើតឲ្យ',
  mvLyricsLbl:'អត្ថបទចម្រៀង · Lyrics',mvLyricsHave:'មានអត្ថបទរួច — អក្សរនឹងរត់តាមពេលច្រៀង (karaoke)',mvLyricsNone:'បទនេះមិនទាន់មានអត្ថបទទេ — ឲ្យ AI ស្ដាប់ហើយសរសេរឲ្យ',mvTrTitle:'🎧 Transcript · អត្ថបទតាមពេលច្រៀង',mvTrHint:'បន្ទាត់នីមួយៗមានវិនាទីដែលគេច្រៀងពិត — ចុចលើបន្ទាត់ ដើម្បីលោតទៅវិនាទីនោះ',
  mvAiBtn:'AI ស្ដាប់ + សរសេរអត្ថបទ',mvAiBusy:'AI កំពុងស្ដាប់… {s} វិនាទី',mvAiDone:'AI សរសេរអត្ថបទរួចរាល់ ✓',mvAiFail:'AI ស្ដាប់មិនបានទេ — server អាចមិនទាន់មានមុខងារនេះ ឬអ៊ីនធឺណិតមានបញ្ហា។ សូមព្យាយាមម្ដងទៀត',
@@ -4322,7 +4352,7 @@ en:{
  walletTitle:'Wallet · កាបូបលុយ',walletBalanceLbl:'Wallet balance · សមតុល្យ Wallet',
  walletBalanceTitle:'Wallet Balance · សមតុល្យ Wallet',earnMoneyTitle:'Earn Money · លុយរកបាន',earnCashbackLbl:'Package cashback · Cashback ពីកញ្ចប់',earnViewsLbl:'View earnings · ចំណូលពីការមើល',earnWithdrawOnlyNote:'Withdraw only — cannot be used to buy anything · ដកបានតែប៉ុណ្ណោះ — ទិញអ្វីមិនបានទេ',walletSpendableNote:'Top-up money — can be spent / buy packages · លុយបញ្ចូល — អាចចាយ / ទិញកញ្ចប់បាន',walletWithdrawFrom:'Withdraw from · ដកពី',walletSourceEarn:'Earn Money · លុយរកបាន',walletSourceWallet:'Wallet Balance · សមតុល្យ Wallet',
  walletTopupTitle:'Top up · បញ្ចូលលុយ',walletWithdrawTitle:'Withdraw · ដកលុយ',
- walletMethodKhmer:'Khmer · ខ្មែរ',walletMethodForeign:'Foreign · បរទេស',
+ walletMethodKhmer:'Khmer · ខ្មែរ',walletMethodForeign:'Foreign · បរទេស',walletPayVia:'Pay via · បង់តាម',
  walletAmount:'Amount (USD) · ចំនួនលុយ (USD)',walletMinNote:'Minimum $5.00 · អប្បបរមា $5.00',
  walletReceiptPick:'Attach receipt image (optional) · ភ្ជាប់រូបវិក្កយបត្រ (បើមាន)',
  walletKhqrPick:'Attach your KHQR image · ភ្ជាប់រូប KHQR របស់អ្នក',
@@ -4501,7 +4531,7 @@ en:{
  pkgPremium:'Premium',mhPerSec:'credits/sec',adminLock:'🔐 Locked',mhVerAuto:'Auto',provOnline:'Online Live',provBusy:'Busy',provProblem:'Problem',apiWorking:'API working',apiExhausted:'API exhausted',apiUnused:'Not used yet',apiKeyW:'Key',
  pkgSheetTitle:'Purchase request',pkgSheetPlan:'Package',pkgCreditsLbl:'Credits you receive',pkgTotal:'Total',
  pkgConfirm:'Confirm purchase',pkgCancel:'Cancel',
- payTitle:'How to pay — choose one',payLocal:'🇰🇭 Local (Cambodia)',payLocalNote:'Choose how to pay — show the KHQR to scan, or open in the Canadia Bank app',payShowKhqrBtn:'🇰🇭 បង្ហាញ KHQR · Show KHQR',payCanadiaBtn:'🏦 បើកក្នុង App Canadia Bank · Open in Canadia Bank App',payKhqrTitle:'🇰🇭 KHQR',payKhqrNote:'Scan this QR with any bank app (ABA, Wing, Canadia…) — this QR has no fixed amount, so enter the amount of the package you are buying yourself',payKhqrClose:'បិទ · Close',payIntl:'🌍 International',payUsdtNote:'Send USDT (Binance) to this address:',payUsdtEmpty:'No USDT address yet — please contact the Admin to pay',payCopyAddr:'Copy',payPaidBtn:'I have paid',payLoading:'Loading payment options…',payNone:'No payment method yet — please contact the Admin',
+ payTitle:'How to pay — choose one',payQrKhmer:'KHQR 🇰🇭',payQrUsdt:'KHQR USDT',payQrKhmerNote:'Scan with any bank app (ABA, Wing, Canadia…) — enter the amount yourself',payQrUsdtNote:'TRC20 only · Min >0.01 USDT',payLocal:'🇰🇭 Local (Cambodia)',payLocalNote:'Choose how to pay — show the KHQR to scan, or open in the Canadia Bank app',payShowKhqrBtn:'🇰🇭 បង្ហាញ KHQR · Show KHQR',payCanadiaBtn:'🏦 បើកក្នុង App Canadia Bank · Open in Canadia Bank App',payKhqrTitle:'🇰🇭 KHQR',payKhqrNote:'Scan this QR with any bank app (ABA, Wing, Canadia…) — this QR has no fixed amount, so enter the amount of the package you are buying yourself',payKhqrClose:'បិទ · Close',payIntl:'🌍 International',payUsdtNote:'Send USDT (Binance) to this address:',payUsdtEmpty:'No USDT address yet — please contact the Admin to pay',payCopyAddr:'Copy',payPaidBtn:'I have paid',payLoading:'Loading payment options…',payNone:'No payment method yet — please contact the Admin',
  payUsdtNet:'⚠️ Send on the TRC20 network ONLY — do not use any other network',payShowUsdtQrBtn:'₮ បង្ហាញ QR USDT · Show USDT QR',payUsdtQrTitle:'₮ USDT QR · Binance',payUsdtQrNote:'Scan this QR to pay USDT from any wallet (Binance, Trust Wallet…) — TRC20 only · Min >0.01 USDT',
  payReceiptTitle:'🧾 Payment receipt · វិក្កយបត្រ',payReceiptNote:'Please upload a screenshot of your payment receipt so the Admin can check it before approving',payReceiptPick:'📷 Choose receipt image · ជ្រើសរូបវិក្កយបត្រ',payReceiptRemove:'Remove',payReceiptOk:'Selected ✓',payReceiptNeed:'Please upload your payment receipt first',payReceiptBadImg:'Please pick an image file (receipt screenshot)',payReceiptTooBig:'Image too large — max 8 MB',payReceiptUploading:'Uploading receipt…',payReceiptFail:'Could not upload the receipt — please try again (your purchase request was NOT sent)',payReceiptRetry:'Try again',
  pkgNeedLogin:'Please log in or sign up first — so the credits and the package land in your account',
@@ -4565,7 +4595,7 @@ en:{
  histEmptySong:'No songs yet — songs you create will be saved here permanently',
  histEmpty3d:'No 3D models yet — 3D models you create will be saved here permanently',
  histEmptyStory:'No stories yet — stories you create will be saved here permanently',
- mvBtn:'MV',mvFormat:'Screen format',mvFmtPortrait:'Portrait',mvFmtLandscape:'Landscape',mvFmtSquare:'Square',mvFmtWide:'Ultra-wide',
+ mvBtn:'MV',featFree:'Free',featOut:'Out',featLockedDl:'Free downloads are out — buy a package for unlimited downloads',featLockedMv:'Free MV uses are out — buy a package to make more MVs',featLockedVs:'Free Vocal Studio uses are out — buy a package to split more songs',mvFormat:'Screen format',mvFmtPortrait:'Portrait',mvFmtLandscape:'Landscape',mvFmtSquare:'Square',mvFmtWide:'Ultra-wide',
  mvBg:'Background',mvBgAuto:'Auto',mvBgUpload:'Upload video / image',mvBgAutoNote:'Auto — uses the song cover, or a generated MovAi backdrop',
  mvLyricsLbl:'Lyrics',mvLyricsHave:'Lyrics found — they will run karaoke-style with the singing',mvLyricsNone:'This song has no lyrics yet — let AI listen and write them',mvTrTitle:'🎧 Transcript · lyrics by sung time',mvTrHint:'Every line carries the exact second it is sung — tap a line to jump to that second',
  mvAiBtn:'AI listen + write lyrics',mvAiBusy:'AI is listening… {s}s',mvAiDone:'AI wrote the lyrics ✓',mvAiFail:'AI could not listen — the server may not have this feature yet, or the connection failed. Please try again',
@@ -5843,25 +5873,41 @@ function payLoadConfig(){
   }).catch(function(){PAY_CFG_LOADED=true;PAY_CFG_PROMISE=null;return PAY_CFG;});
   return PAY_CFG_PROMISE;
 }
+/* Two-QR payment block (owner order 2026-11-18): ONLY two sections —
+   KHQR 🇰🇭 | KHQR USDT — QR images shown directly so the buyer can
+   scan and pay at once. `prefix` is 'buy' (Buy Package sheet) or
+   'topup' (Top-up sheet). The USDT address falls back to the Admin's
+   published address when the server settings have not loaded yet
+   (same address the USDT QR modal already shows). KHQR is picked by
+   default; tapping a section picks it (Top up also sets the wallet
+   payment method); tapping a QR image enlarges it in its modal. */
+function payTwoQrHtml(prefix){
+  var usdtAddr=(PAY_CFG&&PAY_CFG.binanceUsdtAddress)||'TPHu2Z45PZ9xUB7AzqMehWKv72HysE9Vzd';
+  var h='';
+  h+='<div class="pay-qr on" id="'+prefix+'QrKhmer" onclick="payQrPick(\''+prefix+'\',\'khmer\')">';
+  h+='<div class="pay-qr-head"><span>'+escHtml(tx('payQrKhmer'))+'</span><span class="pay-qr-check">✓</span></div>';
+  h+='<img src="https://movai-proxy.onrender.com/uploads/mwj37gxh-786666.jpg" alt="KHQR — YEM SOKHOEUN" onclick="event.stopPropagation();payKhqrOpen()">';
+  h+='<p class="pay-qr-note">'+escHtml(tx('payQrKhmerNote'))+'</p>';
+  h+='</div>';
+  h+='<div class="pay-qr" id="'+prefix+'QrUsdt" onclick="payQrPick(\''+prefix+'\',\'foreign\')">';
+  h+='<div class="pay-qr-head"><span>'+escHtml(tx('payQrUsdt'))+'</span><span class="pay-qr-check">✓</span></div>';
+  h+='<img src="https://movai-proxy.onrender.com/uploads/mwj3uxt6-822800.jpg" alt="USDT QR — TRC20" onclick="event.stopPropagation();payUsdtQrOpen()">';
+  h+='<div class="pay-addr"><code>'+escHtml(usdtAddr)+'</code><button type="button" class="pay-copy" onclick="event.stopPropagation();payCopyUsdt(this)">'+escHtml(tx('payCopyAddr'))+'</button></div>';
+  h+='<p class="pay-qr-note">'+escHtml(tx('payQrUsdtNote'))+'</p>';
+  h+='</div>';
+  return h;
+}
+function payQrPick(prefix,method){
+  if(prefix==='topup'){try{walletSetMethod(method);}catch(e){}}
+  var k=document.getElementById(prefix+'QrKhmer');
+  var u=document.getElementById(prefix+'QrUsdt');
+  if(k)k.classList.toggle('on',method==='khmer');
+  if(u)u.classList.toggle('on',method==='foreign');
+}
 function paySectionHtml(confirmFn){
   var h='<div class="pay-title">'+escHtml(tx('payTitle'))+'</div>';
   var any=true;
-  var canadiaLink=PAY_CFG.khqrLink||'https://pay.canadiabank.com.kh/K6EkJR30W0BM3VVK';
-  h+='<div class="pay-opt"><div class="pay-opt-head">'+escHtml(tx('payLocal'))+'</div>';
-  h+='<p class="pay-opt-note">'+escHtml(tx('payLocalNote'))+'</p>';
-  h+='<button type="button" class="btn btn-green btn-block" style="margin-top:10px" onclick="payKhqrOpen()">'+escHtml(tx('payShowKhqrBtn'))+'</button>';
-  h+='<a class="kbtn kbtn-white" style="display:flex;width:100%;margin-top:8px;text-decoration:none" href="'+escHtml(canadiaLink)+'" target="_blank" rel="noopener noreferrer">'+escHtml(tx('payCanadiaBtn'))+'</a></div>';
-  any=true;
-  h+='<div class="pay-opt"><div class="pay-opt-head">'+escHtml(tx('payIntl'))+'</div>';
-  if(PAY_CFG.binanceUsdtAddress){
-    h+='<p class="pay-opt-note">'+escHtml(tx('payUsdtNote'))+'</p>';
-    h+='<div class="pay-addr"><code>'+escHtml(PAY_CFG.binanceUsdtAddress)+'</code><button type="button" class="pay-copy" onclick="payCopyUsdt(this)">'+escHtml(tx('payCopyAddr'))+'</button></div>';
-    h+='<button type="button" class="btn btn-green btn-block" style="margin-top:10px" onclick="payUsdtQrOpen()">'+escHtml(tx('payShowUsdtQrBtn'))+'</button>';
-    h+='<p class="pay-opt-note" style="margin-top:8px;font-weight:800">'+escHtml(tx('payUsdtNet'))+'</p>';
-  }else{
-    h+='<p class="pay-opt-note">'+escHtml(tx('payUsdtEmpty'))+'</p>';
-  }
-  h+='</div>';
+  h+=payTwoQrHtml('buy');
   /* Receipt upload — REQUIRED before «I have paid» sends anything. */
   h+='<div class="pay-opt" id="payReceiptBox"><div class="pay-opt-head">'+escHtml(tx('payReceiptTitle'))+'</div>';
   h+='<p class="pay-opt-note">'+escHtml(tx('payReceiptNote'))+'</p>';
@@ -5996,7 +6042,7 @@ function payKhqrClose(){var m=document.getElementById('khqrModal');if(m)sheetHid
 function payUsdtQrOpen(){var m=document.getElementById('usdtQrModal');if(m)sheetShowAnim(m);}
 function payUsdtQrClose(){var m=document.getElementById('usdtQrModal');if(m)sheetHideAnim(m);}
 function payCopyUsdt(btn){
-  var addr=PAY_CFG.binanceUsdtAddress;if(!addr)return;
+  var addr=(PAY_CFG&&PAY_CFG.binanceUsdtAddress)||'TPHu2Z45PZ9xUB7AzqMehWKv72HysE9Vzd';if(!addr)return;
   function done(ok){
     if(btn){btn.textContent=ok?tx('copiedOk'):tx('payCopyAddr');setTimeout(function(){btn.textContent=tx('payCopyAddr');},2500);}
   }
@@ -6197,10 +6243,10 @@ function profileFreshRefresh(reason){
 function postPurchaseRefetch(){try{profileFreshRefresh('post-purchase');}catch(e){}}
 function walletSetMethod(m){
   WALLET.method=(m==='foreign')?'foreign':'khmer';
-  var k=document.getElementById('walletMethodKhmer');
-  var f=document.getElementById('walletMethodForeign');
-  if(k)k.classList.toggle('on',WALLET.method==='khmer');
-  if(f)f.classList.toggle('on',WALLET.method==='foreign');
+  var qk=document.getElementById('topupQrKhmer');
+  var qu=document.getElementById('topupQrUsdt');
+  if(qk)qk.classList.toggle('on',WALLET.method==='khmer');
+  if(qu)qu.classList.toggle('on',WALLET.method==='foreign');
 }
 /* Receipt / KHQR image pick — same rules as the package receipt
    (image only, max 8 MB), kept per form ('topup' / 'withdraw'). */
@@ -6309,6 +6355,8 @@ function walletTopupSubmit(){
    submit handlers as before — presentation only). */
 function walletTopupOpen(){
   if(!walletEmail()){loginSheetOpen();return;}
+  var q=document.getElementById('walletTopupQr');
+  if(q){try{q.innerHTML=payTwoQrHtml('topup');}catch(e){}}
   try{walletSetMethod(WALLET.method);}catch(e){}
   var s=document.getElementById('walletTopupSheet');if(s)sheetShowAnim(s);
 }
@@ -8101,6 +8149,12 @@ function dlCloudinaryAttach(url,title){
 }
 async function dlSaveSongMp3(src,title,fallback,anchorEl){
   if(!src||mp3Busy)return;
+  /* Free 2 + package allowance (owner order 2026-11-18): a
+     download the limits already know is locked never starts —
+     the locked message shows instead. (Only when the limits
+     have actually loaded; before the first fetch the server
+     still enforces on its own endpoint below.) */
+  if(featLimitsLocked('download')){featLockedShow('download');return;}
   mp3Busy=true;
   var fname=dlCleanName(title,fallback||'movai-song')+'.mp3';
   /* The download progress runs on the song's OWN card (owner order
@@ -8123,7 +8177,7 @@ async function dlSaveSongMp3(src,title,fallback,anchorEl){
         var ra=await fetch(attachUrl);
         if(ra.ok){
           var ba=await mp3ReadBody(ra);
-          if(ba&&ba.size){mp3ProgSet(100);dlBlobSave(ba,fname);mp3ProgDone();return;}
+          if(ba&&ba.size){mp3ProgSet(100);dlBlobSave(ba,fname);mp3ProgDone();featLimitsRefresh();return;}
         }
       }catch(ea){/* direct Cloudinary fetch failed — server path below */}
     }
@@ -8132,7 +8186,7 @@ async function dlSaveSongMp3(src,title,fallback,anchorEl){
        sometimes fails for just a moment, and a second attempt a
        second later succeeds. The progress keeps running on the
        card across the retry. */
-    var lastReason='',lastNet=false;
+    var lastReason='',lastNet=false,lastOut=false;
     for(var attempt=0;attempt<2;attempt++){
       if(attempt>0){
         mp3ProgSet(null);
@@ -8158,11 +8212,16 @@ async function dlSaveSongMp3(src,title,fallback,anchorEl){
           if(bodyTxt.trim()){
             try{
               var ej=JSON.parse(bodyTxt);
+              if(ej&&ej.error==='download_out')lastOut=true;
               lastReason=errToText(ej&&(ej.error||ej.message||ej.detail))||errToText(ej);
             }catch(pe){lastReason=bodyTxt.trim();}
           }
         }catch(e){}
         lastReason=String(lastReason||'').slice(0,200);
+        /* Free 2 + package allowance (owner order 2026-11-18):
+           the server says the free downloads are out — no retry,
+           no save, just the locked message and a badge refresh. */
+        if(lastOut){mp3ProgDone();featLimitsRefresh();featLockedShow('download');return;}
         if(attempt<1)continue;
         mp3ProgDone();
         if(lastReason)mp3FailText(tx('mp3FailServer')+' — '+lastReason);
@@ -8178,6 +8237,7 @@ async function dlSaveSongMp3(src,title,fallback,anchorEl){
       mp3ProgSet(100);
       dlBlobSave(blob,fname);
       mp3ProgDone();
+      featLimitsRefresh();
       return;
     }
   }catch(e){
@@ -8842,6 +8902,7 @@ function studioPillBtn(url,title){
   b.type='button';b.className='pub-pill';
   b.innerHTML=SONG_SVG_STUDIO+'<span>'+escHtml(tx('studioOpen'))+'</span>';
   b.setAttribute('aria-label',tx('studioOpen'));
+  b.appendChild(featLimitBadge('vs'));
   b.addEventListener('click',function(){studioOpenSong(url,title||'');});
   return b;
 }
@@ -8860,6 +8921,184 @@ function songAiBadge(){
   s.className='song-ai-badge';s.textContent='AI';s.setAttribute('aria-hidden','true');
   return s;
 }
+/* ===== Free 2 + package allowance limits — Download / MV / Vocal Studio =====
+   (owner order 2026-11-18) Every account gets 2 FREE uses of each
+   feature — Download MP3, MV, Vocal Studio — then package
+   allowances take over ($5 song-trial MV+5/VS+10, $10 song-popular
+   MV+10/VS+20, $22 song-pro MV+22/VS+33; Download is UNLIMITED
+   while any package is active). EXPIRY RULE (owner correction
+   2026-11-18): the Free 2 are LIFETIME — they survive any package
+   expiry — but EVERY package-granted benefit ends the moment the
+   package expires: Download is unlimited ONLY while a package is
+   active, and any remaining mvLeft / vsLeft is LOST at expiry
+   (treated as 0). Buying a new package re-enables them. The
+   server is the truth: GET /api/public/feature-limits?email=
+   returns the expiry-aware remaining counts (the same five
+   counters also ride the sync user object, but WITHOUT any
+   expiry — see featLimitsApplyUser — so only the free counters
+   may be taken from sync; package counts come only from this
+   fetch), POST /api/public/mv-use consumes one MV use, and the
+   download + separate endpoints answer download_out / vs_out
+   when locked. This module only paints the badges and gates the
+   taps — it never counts locally. Until the first fetch lands,
+   badges show the default «Free 2» and taps are NOT blocked
+   client-side (fail open — the server still enforces). */
+var FEAT_LIMIT_FREE=2;
+var featLimits={loaded:false,fetching:false,
+  download:{freeLeft:FEAT_LIMIT_FREE,unlimited:false},
+  mv:{freeLeft:FEAT_LIMIT_FREE,pkgLeft:0,left:FEAT_LIMIT_FREE},
+  vs:{freeLeft:FEAT_LIMIT_FREE,pkgLeft:0,left:FEAT_LIMIT_FREE}};
+function featLimitsEmail(){try{return genUserEmail()||'';}catch(e){return '';}}
+function featLimitsApply(d){
+  if(!d||typeof d!=='object')return;
+  var dl=d.download||{},mv=d.mv||{},vs=d.vs||{};
+  featLimits.download.freeLeft=Math.max(0,parseInt(dl.freeLeft,10)||0);
+  featLimits.download.unlimited=dl.unlimited===true;
+  featLimits.mv.freeLeft=Math.max(0,parseInt(mv.freeLeft,10)||0);
+  /* `left` is always rebuilt as freeLeft + pkgLeft (never trusted
+     as a separate total), so the badge can never show a total
+     divorced from its two parts — after expiry the fetch sends
+     pkgLeft 0 and left collapses to the free remainder alone. */
+  featLimits.mv.pkgLeft=(mv.pkgLeft===undefined&&mv.left!==undefined)?Math.max(0,(parseInt(mv.left,10)||0)-featLimits.mv.freeLeft):Math.max(0,parseInt(mv.pkgLeft,10)||0);
+  featLimits.mv.left=featLimits.mv.freeLeft+featLimits.mv.pkgLeft;
+  featLimits.vs.freeLeft=Math.max(0,parseInt(vs.freeLeft,10)||0);
+  featLimits.vs.pkgLeft=(vs.pkgLeft===undefined&&vs.left!==undefined)?Math.max(0,(parseInt(vs.left,10)||0)-featLimits.vs.freeLeft):Math.max(0,parseInt(vs.pkgLeft,10)||0);
+  featLimits.vs.left=featLimits.vs.freeLeft+featLimits.vs.pkgLeft;
+  featLimits.loaded=true;
+  featLimitsPaint();
+}
+/* Sync user object (POST /api/admin/sync → pubUser) — FREE
+   counters ONLY. The five counters ride the sync object
+   (freeDlUsed / freeMvUsed / freeVsUsed / mvLeft / vsLeft), but
+   the sync object carries NO expiry: its plan / songPlan are bare
+   package-id strings with no expiry date (no planExpiresAt /
+   songPlanExpiresAt, no .until — verified against the server's
+   pubUser), so a stale mvLeft / vsLeft can still be non-zero
+   after the package has expired. Those leftovers are LOST at
+   expiry and must never reach the badges or the gates, so they
+   are deliberately NOT read here. Free 2 is LIFETIME (it survives
+   any expiry), so only the three free counters are applied.
+   Package counts (pkgLeft / left) and Download-unlimited belong
+   ONLY to the expiry-aware GET /api/public/feature-limits, which
+   is re-fetched at once below so an expired package flips the
+   badges to «អស់» as soon as that fetch lands. */
+function featLimitsApplyUser(u){
+  if(!u||typeof u!=='object')return;
+  if(u.freeDlUsed===undefined&&u.freeMvUsed===undefined&&u.freeVsUsed===undefined)return;
+  if(u.freeDlUsed!==undefined)featLimits.download.freeLeft=Math.max(0,FEAT_LIMIT_FREE-(parseInt(u.freeDlUsed,10)||0));
+  if(u.freeMvUsed!==undefined)featLimits.mv.freeLeft=Math.max(0,FEAT_LIMIT_FREE-(parseInt(u.freeMvUsed,10)||0));
+  if(u.freeVsUsed!==undefined)featLimits.vs.freeLeft=Math.max(0,FEAT_LIMIT_FREE-(parseInt(u.freeVsUsed,10)||0));
+  /* Totals keep the package counts the last feature-limits fetch
+     owned — this function never writes pkgLeft / unlimited, so a
+     stale mvLeft / vsLeft from the sync object cannot resurrect
+     an expired package's allowance. */
+  featLimits.mv.left=featLimits.mv.freeLeft+featLimits.mv.pkgLeft;
+  featLimits.vs.left=featLimits.vs.freeLeft+featLimits.vs.pkgLeft;
+  featLimits.loaded=true;
+  featLimitsPaint();
+  featLimitsRefresh();
+}
+function featLimitsFetch(){
+  var em=featLimitsEmail();
+  if(!em||featLimits.fetching)return;
+  featLimits.fetching=true;
+  var base=(typeof GEN_API!=='undefined'&&GEN_API)?GEN_API:'https://movai-proxy.onrender.com/api';
+  fetch(base+'/public/feature-limits?email='+encodeURIComponent(em)).then(function(r){return r.json().catch(function(){return null;});}).then(function(d){
+    featLimits.fetching=false;
+    if(d&&d.ok)featLimitsApply(d);
+  }).catch(function(){featLimits.fetching=false;});
+}
+function featLimitsRefresh(){try{featLimitsFetch();}catch(e){}}
+function featLimitsLeft(kind){
+  if(kind==='download')return featLimits.download.unlimited?Infinity:featLimits.download.freeLeft;
+  if(kind==='mv')return featLimits.mv.left;
+  return featLimits.vs.left;
+}
+function featLimitsLocked(kind){
+  if(!featLimits.loaded)return false;
+  if(kind==='download')return !featLimits.download.unlimited&&featLimits.download.freeLeft<=0;
+  return featLimitsLeft(kind)<=0;
+}
+function featLimitBadgeHtml(kind){
+  if(kind==='download'){
+    if(featLimits.download.unlimited)return '<span class="fl-num">∞</span>';
+    if(featLimits.download.freeLeft>0)return '<span class="fl-free">'+escHtml(tx('featFree'))+'</span> <span class="fl-num">'+featLimits.download.freeLeft+'</span>';
+    return escHtml(tx('featOut'));
+  }
+  var f=kind==='mv'?featLimits.mv:featLimits.vs;
+  if(f.freeLeft>0)return '<span class="fl-free">'+escHtml(tx('featFree'))+'</span> <span class="fl-num">'+f.freeLeft+'</span>';
+  if(f.pkgLeft>0)return '<span class="fl-num">'+f.pkgLeft+'</span>';
+  return escHtml(tx('featOut'));
+}
+function featLimitBadgePaintOne(b){
+  var kind=b.getAttribute('data-feat-badge');if(!kind)return;
+  var locked=featLimitsLocked(kind);
+  b.innerHTML=featLimitBadgeHtml(kind);
+  var cls='feat-limit-badge';
+  if(locked)cls+=' fl-out';
+  else if(kind!=='download'){
+    var f=kind==='mv'?featLimits.mv:featLimits.vs;
+    if(f.freeLeft<=0&&f.pkgLeft>0)cls+=' fl-pkg';
+  }
+  b.className=cls;
+  var host=b.parentElement;
+  if(host&&host.classList)host.classList.toggle('feat-locked',locked);
+}
+function featLimitsPaint(){
+  var els=document.querySelectorAll('[data-feat-badge]');
+  for(var i=0;i<els.length;i++){try{featLimitBadgePaintOne(els[i]);}catch(e){}}
+}
+function featLimitBadge(kind){
+  var s=document.createElement('span');
+  s.className='feat-limit-badge';s.setAttribute('data-feat-badge',kind);s.setAttribute('aria-hidden','true');
+  try{featLimitBadgePaintOne(s);}catch(e){s.innerHTML=featLimitBadgeHtml(kind);}
+  return s;
+}
+/* Locked message — the red pill toast the download-failure path
+   already uses, in the page's language. */
+function featLockedShow(kind){
+  var key=kind==='mv'?'featLockedMv':(kind==='vs'?'featLockedVs':'featLockedDl');
+  try{mp3FailText(tx(key));}catch(e){}
+}
+var mvUseBusy=false;
+/* MV gate (owner order 2026-11-18): consume one MV use FIRST —
+   only on ok:true does the MV sheet open, with the badge repainted
+   from the returned remainder. mv_out (or a locked reply) shows
+   the locked message and opens nothing. Guests have no email to
+   count against, so they open directly; a network failure also
+   opens (fail open — the server still enforces where it can). */
+function mvOpenGated(song){
+  if(!song||!song.url)return;
+  var em=featLimitsEmail();
+  if(!em||mvUseBusy){if(!em)mvOpen(song);return;}
+  mvUseBusy=true;
+  var base=(typeof GEN_API!=='undefined'&&GEN_API)?GEN_API:'https://movai-proxy.onrender.com/api';
+  fetch(base+'/public/mv-use',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:em})}).then(function(r){return r.json().catch(function(){return null;});}).then(function(d){
+    mvUseBusy=false;
+    if(d&&d.ok===true){
+      if(typeof d.left==='number'){
+        if(d.source==='free')featLimits.mv.freeLeft=Math.max(0,featLimits.mv.freeLeft-1);
+        else featLimits.mv.pkgLeft=Math.max(0,featLimits.mv.pkgLeft-1);
+        featLimits.mv.left=Math.max(0,Math.floor(d.left));
+        featLimits.loaded=true;
+        featLimitsPaint();
+      }else{featLimitsRefresh();}
+      mvOpen(song);
+      return;
+    }
+    if(d&&d.error==='mv_out'){
+      featLimitsRefresh();
+      featLockedShow('mv');
+      return;
+    }
+    mvOpen(song);
+  }).catch(function(){mvUseBusy=false;mvOpen(song);});
+}
+/* First paint of the limits: on page load (and on every sign-in /
+   account change via histOnAccountChange below). Guests have no
+   email, so the fetch no-ops and badges keep the default. */
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',function(){featLimitsRefresh();});
+else featLimitsRefresh();
 /* The placeholder cards shown while a song generation runs — one
    per expected song (Suno / MusicAPI return 2, Magic Hour / ACE
    Music return 1), side by side in the same grid the finished
@@ -9131,7 +9370,7 @@ function genSongCard(song,n,it,title,prov,prompt,streaming){
   dl.addEventListener('click',function(){genDownloadSong(u,n,title,dl);});
   acts.appendChild(dl);
   var mvb=songIcoBtn(tx('mvBtn'),SONG_SVG_MV);
-  mvb.addEventListener('click',function(){mvOpen({url:u,title:title||'',lyrics:prompt||'',image:(song&&song.image)||''});});
+  mvb.addEventListener('click',function(){mvOpenGated({url:u,title:title||'',lyrics:prompt||'',image:(song&&song.image)||''});});
   acts.appendChild(mvb);
   acts.appendChild(studioIcoBtn(u,title||''));
   var sh=songIcoBtn(tx('histShare'),SONG_SVG_SHARE);
@@ -9264,6 +9503,10 @@ function histOnAccountChange(){
      phone only. */
   try{histPullFor(histKey());histStoreSweep(histKey());}catch(e){}
   histRender();
+  /* Free 2 + package allowance (owner order 2026-11-18): the new
+     account's remaining counts load at once, so the badges on
+     every song card repaint for whoever just signed in. */
+  try{featLimitsRefresh();}catch(e){}
   try{plRender();plSyncSaveBtns();}catch(e){}
   /* The Create results are per-account too: a sign in / out
      clears the previous account's restored results (and stops
@@ -9820,9 +10063,12 @@ function songMenuOpen(it,lkBtn,dlBtn,shBtn,ownerName){
   }
   add(SONG_SVG_PLAY,tx('histPlay'),false,function(){songMenuClose();histPlayToggle(it);});
   add(histHeartSvg(!!it.liked),tx('histLike'),false,function(){histToggleLike(it.id,lkBtn);songMenuClose();});
-  add(SONG_SVG_DL,tx('histDownload'),false,function(){songMenuClose();histDownload(it,dlBtn);});
-  add(SONG_SVG_MV,tx('mvBtn'),false,function(){songMenuClose();featureUsage('history_mv');mvOpen({url:it.url,title:it.title||'',lyrics:it.prompt||'',image:it.image||''});});
-  add(SONG_SVG_STUDIO,tx('vocalStudio'),false,function(){songMenuClose();featureUsage('history_vocal_studio');studioOpenSong(it.url,it.title||'');});
+  var dlRow=add(SONG_SVG_DL,tx('histDownload'),false,function(){songMenuClose();histDownload(it,dlBtn);});
+  dlRow.appendChild(featLimitBadge('download'));
+  var mvRow=add(SONG_SVG_MV,tx('mvBtn'),false,function(){songMenuClose();featureUsage('history_mv');mvOpenGated({url:it.url,title:it.title||'',lyrics:it.prompt||'',image:it.image||''});});
+  mvRow.appendChild(featLimitBadge('mv'));
+  var vsRow=add(SONG_SVG_STUDIO,tx('vocalStudio'),false,function(){songMenuClose();featureUsage('history_vocal_studio');studioOpenSong(it.url,it.title||'');});
+  vsRow.appendChild(featLimitBadge('vs'));
   add(SONG_SVG_SHARE,tx('histShare'),false,function(){songMenuClose();histShare(it,shBtn);});
   add(plBookmarkSvg(plHas(it.url)),plHas(it.url)?tx('plSaved'):tx('plSave'),false,function(){featureUsage('history_save');plToggle({url:it.url,title:it.title||'',image:it.image||'',name:ownerName||''});songMenuClose();});
   add(SONG_SVG_POST,(it.pubPost==='public')?tx('pubPostedAlready'):tx('pubPostBtn'),false,function(){songMenuClose();featureUsage('history_post_public');pubOpenSheet(it);});
@@ -9930,16 +10176,19 @@ function histSongCard(it){
     acts.appendChild(lk);
     var dl=songIcoBtn(tx('histDownload'),SONG_SVG_DL);
     dl.classList.add('song-act');
+    dl.appendChild(featLimitBadge('download'));
     dl.addEventListener('click',function(){histDownload(it,dl);});
     acts.appendChild(dl);
     var mvb=songIcoBtn(tx('mvBtn'),SONG_SVG_MV);
     mvb.classList.add('song-act');
     mvb.appendChild(songAiBadge());
-    mvb.addEventListener('click',function(){featureUsage('history_mv');mvOpen({url:it.url,title:it.title||'',lyrics:it.prompt||'',image:it.image||''});});
+    mvb.appendChild(featLimitBadge('mv'));
+    mvb.addEventListener('click',function(){featureUsage('history_mv');mvOpenGated({url:it.url,title:it.title||'',lyrics:it.prompt||'',image:it.image||''});});
     acts.appendChild(mvb);
     var stb=songIcoBtn(tx('vocalStudio'),SONG_SVG_STUDIO);
     stb.classList.add('song-act');
     stb.appendChild(songAiBadge());
+    stb.appendChild(featLimitBadge('vs'));
     stb.addEventListener('click',function(){featureUsage('history_vocal_studio');studioOpenSong(it.url,it.title||'');});
     acts.appendChild(stb);
     var menuB=songIcoBtn(tx('menuLabel'),SONG_SVG_MENU);
@@ -12231,7 +12480,7 @@ function plRowEl(en){
   dur.className='song-dur pl-dur';dur.textContent='0:00';
   rowEl.appendChild(dur);
   var mvb=songIcoBtn(tx('mvBtn'),SONG_SVG_MV);
-  mvb.addEventListener('click',function(){mvOpen({url:en.url,title:en.title||'',lyrics:'',image:en.image||''});});
+  mvb.addEventListener('click',function(){mvOpenGated({url:en.url,title:en.title||'',lyrics:'',image:en.image||''});});
   rowEl.appendChild(mvb);
   rowEl.appendChild(studioIcoBtn(en.url,en.title||''));
   var rm=songIcoBtn(tx('plRemove'),SONG_SVG_DEL,true);
@@ -12689,13 +12938,15 @@ function pubSongRowEl(it){
   rdl.type='button';rdl.className='pub-act';
   rdl.innerHTML=pubDlSvg()+'<span data-pub-downloads="'+escHtml(it.id)+'">'+acctFmtBal(it.downloads)+'</span>';
   rdl.setAttribute('aria-label',tx('histDownload'));
+  rdl.appendChild(featLimitBadge('download'));
   rdl.addEventListener('click',function(){pubDownloadPost(it,rdl);});
   if(pubIsOwn(it))acts.appendChild(rdl);
   var rmv=document.createElement('button');
   rmv.type='button';rmv.className='pub-pill';
   rmv.innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2.5" y="5" width="19" height="14" rx="3"/><path d="M10 9.5l5 2.5-5 2.5z" fill="currentColor" stroke="none"/></svg><span>'+escHtml(tx('mvBtn'))+'</span>';
   rmv.setAttribute('aria-label',tx('mvBtn'));
-  rmv.addEventListener('click',function(){mvOpen({url:it.url,title:it.title||'',lyrics:it.lyrics||it.prompt||'',image:it.image||''});});
+  rmv.appendChild(featLimitBadge('mv'));
+  rmv.addEventListener('click',function(){mvOpenGated({url:it.url,title:it.title||'',lyrics:it.lyrics||it.prompt||'',image:it.image||''});});
   if(pubIsOwn(it))acts.appendChild(rmv);
   if(pubIsOwn(it))acts.appendChild(studioPillBtn(it.url,it.title||''));
   acts.appendChild(plPillBtn({url:it.url,title:it.title||'',image:it.image||'',name:pubDisplayName(it)}));
@@ -13065,13 +13316,15 @@ function pubCardEl(it){
     adl.type='button';adl.className='pub-pill';
     adl.innerHTML=pubDlSvg()+'<span>'+escHtml(tx('histDownload'))+'</span><span data-pub-downloads="'+escHtml(it.id)+'">'+acctFmtBal(it.downloads)+'</span>';
     adl.setAttribute('aria-label',tx('histDownload'));
+    adl.appendChild(featLimitBadge('download'));
     adl.addEventListener('click',function(){pubDownloadPost(it,adl);});
     if(pubIsOwn(it))arow.appendChild(adl);
     var amv=document.createElement('button');
     amv.type='button';amv.className='pub-pill';
     amv.innerHTML='<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2.5" y="5" width="19" height="14" rx="3"/><path d="M10 9.5l5 2.5-5 2.5z" fill="currentColor" stroke="none"/></svg><span>'+escHtml(tx('mvBtn'))+'</span>';
     amv.setAttribute('aria-label',tx('mvBtn'));
-    amv.addEventListener('click',function(){mvOpen({url:it.url,title:it.title||'',lyrics:it.lyrics||it.prompt||'',image:it.image||''});});
+    amv.appendChild(featLimitBadge('mv'));
+    amv.addEventListener('click',function(){mvOpenGated({url:it.url,title:it.title||'',lyrics:it.lyrics||it.prompt||'',image:it.image||''});});
     if(pubIsOwn(it))arow.appendChild(amv);
     if(pubIsOwn(it))arow.appendChild(studioPillBtn(it.url,it.title||''));
     arow.appendChild(plPillBtn({url:it.url,title:it.title||'',image:it.image||'',name:pubDisplayName(it)}));
@@ -13527,6 +13780,10 @@ function pubCountDownload(it){
 }
 function pubDownloadPost(it,btn){
   if(!it||!it.url)return;
+  /* Free 2 + package allowance (owner order 2026-11-18): a song
+     download the limits already know is locked never starts —
+     nothing is counted or bumped, just the locked message. */
+  if(it.type==='song'&&featLimitsLocked('download')){featLockedShow('download');return;}
   if(it.type==='song'&&!pubHasSongPlan()){
     var bucket=pubSongBucket(it);
     if(pubSongDlLeft(bucket)<=0){
@@ -14685,6 +14942,13 @@ function acctApplyServerData(data){
   var ssp=acctSyncPlanCopy(srv.songPlan);
   if(ssp&&(ssp.until>Date.now())){rec.songPlan=ssp;try{localStorage.setItem('movai-song-plan',JSON.stringify({id:ssp.id,until:ssp.until,email:rec.email}));}catch(e){}changed=true;}
   else if(ssp&&ssp.id){if(rec.songPlan){delete rec.songPlan;changed=true;}try{localStorage.removeItem('movai-song-plan');}catch(e){}}
+  /* Free 2 counters ride the same sync user object
+     (freeDlUsed / freeMvUsed / freeVsUsed) — apply ONLY those to
+     the badges at once. The sync object's mvLeft / vsLeft carry
+     no expiry and are deliberately ignored here (see
+     featLimitsApplyUser): package counts come only from the
+     expiry-aware feature-limits fetch it triggers. */
+  try{featLimitsApplyUser(srv);}catch(e){}
   /* Every balance surface re-renders at the server's number at
      the same moment — header, Profile, drawer, Create, Packages. */
   if(changed){acctUsersSave(us);try{balRenderAll();}catch(e){}}
@@ -23112,6 +23376,12 @@ function stLoadUrl(){
    load that song's audio URL into it. */
 function studioOpenSong(url,title){
   if(!url)return;
+  /* Free 2 + package allowance (owner order 2026-11-18): a split
+     the limits already know is locked never starts — the locked
+     message shows instead of switching to the Studio. (Only when
+     the limits have actually loaded; otherwise the separate
+     endpoint still enforces with vs_out below.) */
+  if(featLimitsLocked('vs')){featLockedShow('vs');return;}
   appSetView('studio');
   window.scrollTo(0,0);
   /* Same one-tap path as the AI Studio song list: load the song
@@ -23810,6 +24080,7 @@ async function stSplitAI(){
     if(token!==ST.autoToken)return;/* owner loaded/cleared while the POST was in flight — abort silently, show nothing */
     if(!d){stMsg('បំបែក AI មិនបាន — Server មិនឆ្លើយតប · AI split failed — server did not respond',true);return;}
     if(d.ok&&d.stems&&d.stems.length){stems=d.stems;hash=d.hash||'';}
+    else if(!d.ok&&d.error==='vs_out'){featLimitsRefresh();stMsg(tx('featLockedVs'),true);return;}
     else if(!d.ok&&d.error==='mvsep_timeout'&&d.hash){
       /* Still processing after the server-side wait — resume
          the SAME separation (no extra quota) by polling the
@@ -23825,7 +24096,7 @@ async function stSplitAI(){
         }catch(e){sd=null;}
         if(!sd)continue;/* transient status failure — keep waiting */
         if(sd.ok&&sd.done&&sd.stems&&sd.stems.length){stems=sd.stems;hash=sd.hash||d.hash;break;}
-        if(!sd.ok){stMsg(stAIErrorText(sd),true);return;}
+        if(!sd.ok){if(sd.error==='vs_out'){featLimitsRefresh();stMsg(tx('featLockedVs'),true);}else stMsg(stAIErrorText(sd),true);return;}
         /* still processing — keep waiting, seconds keep ticking */
       }
       if(!stems){stMsg('បំបែក AI យូរពេក — សូមសាកល្បងម្តងទៀតនៅពេលក្រោយ · AI split timed out — please try again later',true);return;}
@@ -23874,6 +24145,7 @@ async function stSplitAI(){
     stSetAIStemProject(ST.songName,ST.mainBuffer,loaded,'ai-'+(hash||ST.projectKey||''));
     if(failed.length)stMsg('បំបែក AI រួច ✓ — Stem ខ្លះបើកមិនបាន: '+failed.join(', ')+' · AI split done ✓ — some stems could not be loaded: '+failed.join(', '),true);
     else stMsg('បំបែក AI រួច · AI split done ✓');
+    try{featLimitsRefresh();}catch(e){}
   }catch(e){
     if(token!==ST.autoToken)return;/* aborted by a manual load / Clear — stay silent */
     stMsg('បំបែក AI មិនបាន — សូមពិនិត្យអ៊ីនធឺណិត ហើយសាកល្បងម្តងទៀត · AI split failed — check your connection and try again',true);
