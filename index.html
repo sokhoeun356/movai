@@ -9683,12 +9683,34 @@ function histPullFor(key){
   var em=histKeyEmail(key);
   if(!em)return;
   fetch(HIST_API+'?email='+encodeURIComponent(em)).then(function(r){return r&&r.ok?r.json():null;}).then(function(j){
-    if(!j||!Array.isArray(j.items)||!j.items.length)return;
+    if(!j||!Array.isArray(j.items))return;
     var tomb=histTombGet(key);
     var cur=histGetFrom(key);
+    /* Server tombstones: DROP local items the server deleted
+       (owner 2026-11-18 — a deleted broken song stayed in the
+       phone's localStorage because pull only ADDED). Record them
+       locally too, so they can never be re-pushed. Runs even when
+       the server returns no items. */
+    var delIds=Array.isArray(j.deletedIds)?j.deletedIds:[];
+    var delUrls=Array.isArray(j.deletedUrls)?j.deletedUrls:[];
+    var droppedIds=[];
+    var dropped=false;
+    if(delIds.length||delUrls.length){
+      var kept=cur.filter(function(it){
+        if(!it)return false;
+        var drop=false;
+        if(it.id&&delIds.indexOf(it.id)>=0)drop=true;
+        var u=it.src||it.url||'';
+        if(!drop&&u&&delUrls.indexOf(u)>=0)drop=true;
+        if(drop&&it.id)droppedIds.push(it.id);
+        return !drop;
+      });
+      if(kept.length!==cur.length){cur=kept;dropped=true;}
+      try{histTombAdd(key,delIds.concat(droppedIds));}catch(e){}
+    }
     var seen={};cur.forEach(function(it){if(it&&it.id)seen[it.id]=1;});
     var add=j.items.filter(function(it){return it&&it.id&&it.type&&!seen[it.id]&&tomb.indexOf(it.id)<0;});
-    if(!add.length)return;
+    if(!add.length&&!dropped)return;
     var merged=cur.concat(add).sort(function(x,y){return (y.ts||0)-(x.ts||0);}).slice(0,300);
     histSaveTo(key,merged);
     if(key===histKey()){try{histRender();}catch(e){}}
