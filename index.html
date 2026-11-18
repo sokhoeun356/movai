@@ -1020,22 +1020,41 @@ html[data-mode="light"] #genSunoModelDrop .dd-opt{color:#fff;border-top-color:rg
    list scrolls inside the panel. */
 #page-packages{position:fixed;inset:0;z-index:85;display:none;align-items:center;justify-content:center;padding:18px}
 #page-packages.open{display:flex;pointer-events:auto}
-/* Auto popup: only ONE single package shows — never the whole
-   group bunched together. The manual two-group tab row, the group
-   headings and the account-status line are hidden while the cycle
-   runs, the swipe carousel becomes a plain single-card stack, and
-   the pop-s1 / pop-s2 / pop-s3 class (set by pkgPopShow) picks the
-   one visible card: s1 = Song Popular (2nd song card), s2 = Monthly
-   (2nd media card), s3 = Yearly (1st media card). Positional
-   selectors, so a price re-render can never un-hide the others. */
-#page-packages.pop-auto .pkg-tabs{display:none}
-#page-packages.pop-auto .pkg-group-head{display:none !important}
-#page-packages.pop-auto #pkgStatus{display:none !important}
-#page-packages.pop-auto .pkg-grid{display:block;overflow:visible;padding:2px 0 4px}
-#page-packages.pop-auto .pkg-grid>.pkg-card{width:100%}
-#page-packages.pop-s1 #songPkgGrid>.pkg-card:not(:nth-child(2)){display:none}
-#page-packages.pop-s2 #pkgPaneMedia .pkg-card:not(:nth-child(2)){display:none}
-#page-packages.pop-s3 #pkgPaneMedia .pkg-card:not(:nth-child(1)){display:none}
+/* Auto popup (owner order 2026-11-18): ONE popup, ONCE per session,
+   with ALL packages inside, most expensive first. The manual
+   two-group tab row, the group headings, the account-status line
+   and the two tabbed panes are hidden while it shows; the
+   dedicated auto grid (built by pkgAutoRender, class pkg-auto-pop
+   on #page-packages) replaces them. Phone: the grid is a
+   horizontal snap carousel — one card at a time — that
+   auto-scrolls by itself (see pkgAutoStart). Desktop ≥1024px:
+   the grid shows EVERY package at once in 3 columns inside the
+   same compact card — never full screen, never stretched wide
+   (the card stays ~640px even on a big screen). */
+#page-packages.pkg-auto-pop .pkg-tabs{display:none}
+#page-packages.pkg-auto-pop .pkg-group-head{display:none !important}
+#page-packages.pkg-auto-pop #pkgStatus{display:none !important}
+#page-packages.pkg-auto-pop #pkgPaneSong,#page-packages.pkg-auto-pop #pkgPaneMedia{display:none !important}
+.pkg-auto-grid{display:none;margin-top:6px}
+#page-packages.pkg-auto-pop .pkg-auto-grid{display:flex;gap:8px;overflow-x:auto;overflow-y:hidden;scroll-snap-type:x mandatory;padding:6px 2px 8px;-webkit-overflow-scrolling:touch;overscroll-behavior-x:contain;scrollbar-width:none}
+.pkg-auto-grid::-webkit-scrollbar{display:none}
+#page-packages.pkg-auto-pop .pkg-auto-grid>.pkg-card{flex:0 0 88%;scroll-snap-align:center}
+@media(min-width:1024px){
+ #page-packages.pkg-auto-pop .pkg-pop-wrap{width:min(92vw,640px)}
+ #page-packages.pkg-auto-pop .pkg-auto-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;overflow:visible;scroll-snap-type:none;padding:6px 2px 8px}
+ #page-packages.pkg-auto-pop .pkg-auto-grid>.pkg-card{flex:none}
+}
+/* Premium price (owner order 2026-11-18): gold gradient text with
+   a slow shine sweep, so the price looks expensive and
+   eye-catching, not plain. Only the number itself is gold — the
+   small per-month note, the struck-through original and the
+   discount badge keep their own colours (the number is wrapped
+   in .pkg-price-num by pkgPriceHtml). */
+#page-packages.pkg-auto-pop .pkg-price-num{background:linear-gradient(100deg,#b8860b,#d4af37 30%,#f9e08a 50%,#d4af37 70%,#b8860b);background-size:200% auto;-webkit-background-clip:text;background-clip:text;color:transparent;-webkit-text-fill-color:transparent;animation:pkgPriceShine 3.5s linear infinite}
+@keyframes pkgPriceShine{to{background-position:200% center}}
+@media (prefers-reduced-motion:reduce){#page-packages.pkg-auto-pop .pkg-price-num{animation:none}}
+/* Most-expensive card: a touch more premium — gold border + glow. */
+#page-packages.pkg-auto-pop .pkg-card.pkg-auto-top{border:1.5px solid rgba(212,175,55,.8);box-shadow:0 0 0 1px rgba(212,175,55,.25),0 10px 26px rgba(212,175,55,.18)}
 .pkg-pop-wrap{position:relative;width:min(88vw,380px);max-height:84vh;display:flex}
 #page-packages .panel{margin:0;width:100%;max-height:84vh;overflow-y:auto;border-radius:22px;box-shadow:0 24px 60px rgba(0,0,0,.55);-webkit-overflow-scrolling:touch;overscroll-behavior:contain;padding:12px 12px 14px}
 /* Floating decorations on BOTH sides of the popup card — stars,
@@ -2654,10 +2673,11 @@ main{padding-top:calc(3.75rem + env(safe-area-inset-top,0px))}
  .hist-carousel{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;overflow:visible;padding:14px 0 12px;scroll-snap-type:none}
  .hist-carousel>.hist-card{flex:none;transform:none;opacity:1;margin-top:0;min-width:0}
  .hist-carousel .hist-media{width:100%;max-width:100%;margin-left:0;margin-right:0}
- /* Packages popup: wide, cards side by side (auto popup stays single) */
+ /* Packages popup: wide, cards side by side (the auto popup uses
+    its own compact grid, capped ~640px, never the 920px panel) */
  .pkg-pop-wrap{width:min(94vw,920px)}
- #page-packages:not(.pop-auto) .pkg-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;overflow:visible;padding:6px 0 10px}
- #page-packages:not(.pop-auto) .pkg-grid>.pkg-card{flex:none;width:auto}
+ #page-packages:not(.pkg-auto-pop) .pkg-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;overflow:visible;padding:6px 0 10px}
+ #page-packages:not(.pkg-auto-pop) .pkg-grid>.pkg-card{flex:none;width:auto}
  .pkg-sheet-card{max-width:540px}
  /* Toasts + wake pill centre over the content column */
  .mini-drop{left:calc(50% - 32px)}
@@ -3172,6 +3192,7 @@ input[type=range].st-range{accent-color:var(--accent);min-height:32px;cursor:poi
   <div class="pkg-decor right" aria-hidden="true"><span>🚀</span><span>⭐</span><span>🎁</span></div>
   <div class="panel" id="sec-packages">
     <div style="display:flex;justify-content:flex-end;margin-bottom:2px"><button type="button" class="pkg-close" onclick="packagesHide()" aria-label="Close · បិទ">✕</button></div>
+    <div id="pkgAutoGrid" class="pkg-auto-grid" aria-label="All packages · កញ្ចប់ទាំងអស់"></div>
     <p id="pkgStatus" style="font-size:0.78rem;margin-top:6px;line-height:1.5"></p>
     <div class="pkg-tabs" role="tablist" aria-label="Package type">
       <button type="button" class="pkg-tab song on" id="pkgTabSong" role="tab" aria-selected="true" onclick="pkgSetTab('song')"><span data-i18n="pkgTabSong">Create Music</span></button>
@@ -5655,7 +5676,7 @@ function pkgPriceHtml(pl,suffixHtml){
   var baseDisp=(pl.id==='yearly')?base/12:base;
   var h='';
   if(off>0)h+='<s class="pkg-was">$'+pkgFmtPrice(baseDisp)+'</s> ';
-  h+='$'+pkgFmtPrice(disp);
+  h+='<span class="pkg-price-num">$'+pkgFmtPrice(disp)+'</span>';
   if(suffixHtml)h+=suffixHtml;
   if(off>0)h+=' <span class="pkg-off">-'+off+'%</span>';
   return h;
@@ -5679,6 +5700,7 @@ function pkgPricesRender(){
     }
   }
   try{songPkgRender();}catch(e){}
+  try{pkgAutoRender();}catch(e){} /* auto popup grid keeps live prices too */
 }
 function pkgPricesCollect(src,out){
   if(!src)return;
@@ -11035,43 +11057,105 @@ function closeMenu(){
    on hide it blurs/fades back out (~250 ms) before the .open
    classes come off (pkgAnimTimer guards a re-show mid-exit). */
 var pkgAnimTimer=null;
-/* Rotating package popup (owner order 2026-11-17): the popup shows
-   ONE single package at a time as a small centred card — never the
-   whole group. Cycle: (1) Song Popular — $10 → 1,500 song credits;
-   close it (✕ / backdrop) and 7 s later (2) Monthly — $25 → 11,000
-   media credits; close it and 7 s later (3) Yearly — $180/year →
-   140,000 media credits; close that one and the cycle stops for
-   this session. Nothing is stored — closing and reopening the app
-   starts the cycle again. The pop-s1/pop-s2/pop-s3 classes pick the
-   single visible card (see the pop-auto CSS above). */
-var pkgPopStep=0;
+/* Single auto package popup (owner order 2026-11-18): ONE popup,
+   ONCE per session, with ALL packages inside, most expensive
+   first. ~10 s after app open it shows once (see the trigger
+   below); closing it (✕ / backdrop) ends it for the session —
+   it never pops a 2nd or 3rd time. Nothing is stored, so the
+   next app open shows it again. It opens through packagesShow(),
+   so it fades in blur → sharp, and packagesHide() fades it
+   sharp → blur before it disappears. */
+var pkgPopStep=0; /* 0 = not shown yet this session, 1 = shown */
 var pkgPopShowing=false;
-var pkgPopTimer=null;
-function pkgPopShow(step){
-  pkgPopStep=step;pkgPopShowing=true;
+function pkgPopShow(){
+  if(pkgPopStep!==0)return; /* once per session */
+  pkgPopStep=1;pkgPopShowing=true;
+  try{pkgAutoRender();}catch(e){}
   var pp=document.getElementById('page-packages');
-  if(pp){pp.classList.add('pop-auto');pp.classList.remove('pop-s1','pop-s2','pop-s3');pp.classList.add('pop-s'+step);}
-  try{pkgSetTab(step===1?'song':'media');}catch(e){}
+  if(pp)pp.classList.add('pkg-auto-pop');
   packagesShow();
+  try{pkgAutoStart();}catch(e){}
 }
-function pkgPopScheduleNext(){
-  if(pkgPopTimer)clearTimeout(pkgPopTimer);
-  var from=pkgPopStep,next=pkgPopStep+1;
-  pkgPopTimer=setTimeout(function(){
-    pkgPopTimer=null;
-    var pp=document.getElementById('page-packages');
-    if(pkgPopStep===from&&pp&&!pp.classList.contains('open'))pkgPopShow(next);
-    else if(pkgPopStep===from)pkgPopStep=4;
-  },7000);
+/* Auto popup grid (owner order 2026-11-18): ALL packages in ONE
+   popup, most expensive first — Yearly $180, Monthly $25, Song
+   Pro $22, Song Popular $10, Song Trial $5, Free last. Reuses
+   the same plan data and the same buy buttons/flows as the
+   manual page (pkgBuyAsk / songPkgBuyAsk / walletBuyAsk), so
+   buying works exactly as before. No duplicate element ids —
+   the live price updater targets the manual cards by id, and
+   pkgPricesRender re-renders this grid too. */
+function pkgAutoRender(){
+  var g=document.getElementById('pkgAutoGrid');if(!g)return;
+  var plan=songPkgGet();
+  var h='';
+  PKG_PLANS.forEach(function(pl,i){
+    h+='<div class="pkg-card media'+(i===0?' pkg-auto-top':'')+'">';
+    h+='<span class="pkg-name">'+escHtml(loc(pl.name))+'</span>';
+    h+='<div class="pkg-price">'+pkgPriceHtml(pl,'<small>'+escHtml(tx('pkgPerMonth'))+'</small>')+'</div>';
+    h+='<div class="pkg-credits">'+pkgFmtNum(pl.credits)+' Credit</div>';
+    h+='<button type="button" class="btn btn-green" onclick="pkgBuyAsk(\''+pl.id+'\')">'+escHtml(tx('pkgBuy'))+'</button>';
+    h+='<button type="button" class="btn wallet-btn" onclick="walletBuyAsk(\''+pl.id+'\')">'+escHtml(tx('walletBuyBtn'))+'</button>';
+    h+='</div>';
+  });
+  SONG_PKG_PLANS.forEach(function(pl){
+    var active=!!(plan&&plan.id===pl.id);
+    h+='<div class="pkg-card song">';
+    h+='<span class="pkg-name">'+escHtml(loc(pl.name))+'</span>';
+    h+='<div class="pkg-price">'+(pl.free?('<span class="pkg-price-num">$'+pl.price+'</span>'):pkgPriceHtml(pl,'<small>'+escHtml(tx('pkgPerMonth'))+'</small>'))+'</div>';
+    h+='<div class="pkg-credits">'+pkgFmtNum(pl.credits)+' Credit</div>';
+    if(pl.free){
+      h+='<button type="button" class="btn btn-free" disabled>'+escHtml(tx('songFreeAuto'))+'</button>';
+    }else{
+      h+='<button type="button" class="btn btn-green" onclick="songPkgBuyAsk(\''+pl.id+'\')"'+(active?' disabled':'')+'>'+escHtml(active?tx('pkgActive'):tx('pkgBuy'))+'</button>';
+      if(!active)h+='<button type="button" class="btn wallet-btn" onclick="walletBuyAsk(\''+pl.id+'\')">'+escHtml(tx('walletBuyBtn'))+'</button>';
+    }
+    h+='</div>';
+  });
+  g.innerHTML=h;
+}
+/* Auto-scroll (owner order 2026-11-18): on a phone the auto
+   popup carousel advances one card every ~3 s by itself and loops
+   back to the start. It pauses while the user is dragging/swiping
+   (pointer down) and resumes a moment after they let go. On
+   desktop (≥1024px) the grid shows every package at once, so
+   there is nothing to scroll. */
+var pkgAutoTimer=null;
+var pkgAutoPaused=false;
+var pkgAutoResumeTimer=null;
+function pkgAutoStop(){if(pkgAutoTimer){clearInterval(pkgAutoTimer);pkgAutoTimer=null;}}
+function pkgAutoAdvance(){
+  var g=document.getElementById('pkgAutoGrid');if(!g)return;
+  if(window.matchMedia&&window.matchMedia('(min-width:1024px)').matches)return;
+  if(pkgAutoPaused)return;
+  var card=g.querySelector('.pkg-card');if(!card)return;
+  var step=card.offsetWidth+8;
+  var max=g.scrollWidth-g.clientWidth;
+  if(max<=0)return;
+  var next=g.scrollLeft+step;
+  if(next>max-8)next=0;
+  try{g.scrollTo({left:next,behavior:'smooth'});}catch(e){g.scrollLeft=next;}
+}
+function pkgAutoStart(){
+  pkgAutoStop();
+  if(window.matchMedia&&window.matchMedia('(min-width:1024px)').matches)return;
+  if(!pkgPopShowing)return;
+  var g=document.getElementById('pkgAutoGrid');
+  if(g){
+    /* Pause while the user drags, resume shortly after release. */
+    g.onpointerdown=function(){pkgAutoPaused=true;pkgAutoStop();if(pkgAutoResumeTimer){clearTimeout(pkgAutoResumeTimer);pkgAutoResumeTimer=null;}};
+    g.onpointerup=function(){pkgAutoPaused=false;if(pkgAutoResumeTimer)clearTimeout(pkgAutoResumeTimer);pkgAutoResumeTimer=setTimeout(function(){pkgAutoResumeTimer=null;if(pkgPopShowing)pkgAutoStart();},2500);};
+    g.onpointercancel=function(){pkgAutoPaused=false;if(pkgAutoResumeTimer)clearTimeout(pkgAutoResumeTimer);pkgAutoResumeTimer=setTimeout(function(){pkgAutoResumeTimer=null;if(pkgPopShowing)pkgAutoStart();},2500);};
+  }
+  pkgAutoTimer=setInterval(pkgAutoAdvance,3000);
 }
 function packagesShow(){
   try{planExpireSweep();}catch(e){}
   var p=document.getElementById('page-packages');
   /* A manual open (drawer / dock / Profile / locked-model notice)
-     always shows the FULL panel — clear any single-package filter
-     left by the auto popup. pkgPopShow sets pkgPopShowing first,
-     so its own open keeps the filter. */
-  if(p&&!pkgPopShowing)p.classList.remove('pop-s1','pop-s2','pop-s3');
+     always shows the FULL panel — clear any auto-popup state left
+     behind. pkgPopShow sets pkgPopShowing first, so its own open
+     keeps the auto grid. */
+  if(p&&!pkgPopShowing)p.classList.remove('pkg-auto-pop');
   var wasOpen=!!(p&&p.classList.contains('open'));
   if(pkgAnimTimer){clearTimeout(pkgAnimTimer);pkgAnimTimer=null;}
   if(p){
@@ -11089,21 +11173,20 @@ function packagesShow(){
   /* Every open starts each package row back at its FIRST card —
      the most expensive package (owner order 2026-11-16) — even if
      the user had swiped through to Free last time. */
-  var pgrids=document.querySelectorAll('#page-packages .pkg-grid');
+  var pgrids=document.querySelectorAll('#page-packages .pkg-grid, #page-packages .pkg-auto-grid');
   for(var pg=0;pg<pgrids.length;pg++)pgrids[pg].scrollLeft=0;
   if(!wasOpen){PKG_EVT_OPEN=true;PKG_EVT_REQUESTED=false;pkgEvent('view','');}
 }
 function packagesHide(){
-  if(pkgPopShowing){
-    pkgPopShowing=false;
-    if(pkgPopStep===1||pkgPopStep===2){pkgPopScheduleNext();}
-    else if(pkgPopStep===3){pkgPopStep=4;if(pkgPopTimer){clearTimeout(pkgPopTimer);pkgPopTimer=null;}}
-  }
+  /* Single auto popup: closing ends it for the session (pkgPopStep
+     stays 1, so the 10 s trigger never re-fires). No re-schedule. */
+  if(pkgPopShowing)pkgPopShowing=false;
+  try{pkgAutoStop();}catch(e){}
   var wasOpen=PKG_EVT_OPEN;var lastId=PKG_EVT_LAST;var requested=PKG_EVT_REQUESTED;
   var p=document.getElementById('page-packages');var b=document.getElementById('pkgBackdrop');
   var finish=function(){
     pkgAnimTimer=null;
-    if(p){p.classList.remove('open');p.classList.remove('blur-in');p.classList.remove('blur-out');p.classList.remove('pop-auto');p.classList.remove('pop-s1','pop-s2','pop-s3');p.style.transform='';}
+    if(p){p.classList.remove('open');p.classList.remove('blur-in');p.classList.remove('blur-out');p.classList.remove('pkg-auto-pop');p.style.transform='';}
     if(b){b.classList.remove('open');b.classList.remove('blur-in');b.classList.remove('blur-out');}
     if(document.body.style.overflow==='hidden'&&!document.getElementById('drawer').classList.contains('shown'))document.body.style.overflow='';
   };
@@ -18367,16 +18450,14 @@ function genInit(){
   setInterval(function(){try{planExpireSweep();}catch(e){}},30000);
   try{nameGateCheck();}catch(e){}
   try{giftSchedule();}catch(e){}
-  /* Packages popup (owner order 2026-11-17): ~10 s after every
-     app open the popup shows ONE package as a small centred card —
-     Song Popular ($10); closing it brings the Monthly package
-     ($25) back 7 s later; closing that brings the Yearly package
-     ($180/year) 7 s later; closing that stops the cycle for this
-     session. Nothing is stored, so the next app open restarts the
-     cycle. It opens through packagesShow(), so it fades in
-     blur → sharp, and packagesHide() fades it sharp → blur before
-     it disappears. */
-  try{setTimeout(function(){try{var _pp=document.getElementById('page-packages');if(_pp&&!_pp.classList.contains('open')&&pkgPopStep===0)pkgPopShow(1);}catch(e){}},10000);}catch(e){}
+  /* Packages popup (owner order 2026-11-18): ~10 s after every
+     app open ONE popup shows with ALL packages inside, most
+     expensive first; closing it ends it for the session — it
+     never pops again. Nothing is stored, so the next app open
+     shows it again. It opens through packagesShow(), so it fades
+     in blur → sharp, and packagesHide() fades it sharp → blur
+     before it disappears. */
+  try{setTimeout(function(){try{var _pp=document.getElementById('page-packages');if(_pp&&!_pp.classList.contains('open')&&pkgPopStep===0)pkgPopShow();}catch(e){}},10000);}catch(e){}
   try{notifInit();}catch(e){}
   try{songStyleRenderPresets();}catch(e){}
   try{pushInit();}catch(e){}
