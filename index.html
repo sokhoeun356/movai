@@ -7075,6 +7075,28 @@ async function mp3ReadBody(rp){
   var b=await rp.blob();
   return new Blob([b],{type:'audio/mpeg'});
 }
+/* Playback URL cleaner: a stored Cloudinary song URL may carry
+   a bare fl_attachment transformation (e.g.
+   .../upload/ac_mp3,br_192k,fl_attachment/v1/movai/songs/x.mp3).
+   Cloudinary answers such a URL with
+   Content-Disposition: attachment, so an <audio> element never
+   fires loadedmetadata — the song will not play and its
+   duration stays 0:00. playUrl strips every fl_attachment /
+   fl_attachment:<value> piece — whether it sits in a
+   comma-joined transformation group or as its own path
+   segment — and leaves the rest of the URL (including any
+   ?_a= token) untouched. Use it for EVERY URL put into an
+   <audio> element for playback or duration probing. Downloads
+   are the opposite: dlCloudinaryAttach below ADDS
+   fl_attachment:<title> on purpose and must not use this. */
+function playUrl(url){
+  var u=String(url||'');
+  if(u.indexOf('fl_attachment')<0)return u;
+  u=u.replace(/,fl_attachment(:[^,\/]*)?/g,'');
+  u=u.replace(/\/fl_attachment(:[^\/]*)?(?=\/)/g,'');
+  u=u.replace(/fl_attachment(:[^,\/]*)?,/g,'');
+  return u;
+}
 /* Cloudinary song URLs (owner order 2026-11-17): the downloaded
    file must carry the SONG'S OWN title, never the provider's
    stored file name («output.mp3»). When the song's URL is a
@@ -8048,7 +8070,7 @@ function genSongCard(song,n,it,title,prov,prompt,streaming){
      Player: this card's own Audio element, so each song plays on its
      own Play button; starting one card pauses the other result cards. */
   var au=new Audio();
-  au.src=u;au.preload='metadata';
+  au.src=playUrl(u);au.preload='metadata';
   genSongAudios.push(au);
   /* Mini-player hook (owner rule 2026-11-16): a Create-results
      song that starts playing hands itself to the floating
@@ -8908,7 +8930,7 @@ function histSongCard(it){
     dur.textContent='0:00';
     rowEl.appendChild(dur);
     var mAu=new Audio();
-    mAu.preload='metadata';mAu.src=it.url;
+    mAu.preload='metadata';mAu.src=playUrl(it.url);
     mAu.addEventListener('loadedmetadata',function(){
       if(isFinite(mAu.duration)&&mAu.duration>0)dur.textContent=histFmtTime(mAu.duration);
       try{mAu.removeAttribute('src');mAu.load();}catch(e){}
@@ -9190,7 +9212,7 @@ function histPlayToggle(it){
     return;
   }
   histAudioId=it.id;
-  au.src=it.url;
+  au.src=playUrl(it.url);
   var card=histCardEl(it.id);
   if(card){
     var v=card.querySelector('.hist-vol');if(v)au.volume=(parseInt(v.value,10)||0)/100;
@@ -11136,7 +11158,7 @@ function plPlay(entry){
   try{if(histAudio)histAudio.pause();}catch(e){}
   try{var all=document.querySelectorAll('#pubFeed audio');for(var i=0;i<all.length;i++){try{all[i].pause();}catch(e){}}}catch(e){}
   plAudioUrl=entry.url;
-  au.src=entry.url;
+  au.src=playUrl(entry.url);
   au.loop=(pubPlayMode==='one');
   var p2=au.play();if(p2&&p2.catch)p2.catch(function(){});
   plPlayerSync();
@@ -11233,7 +11255,7 @@ function plRowEl(en){
   /* Duration read from the file's own metadata once, lightly —
      the same trick the History song cards use. */
   var mAu=new Audio();
-  mAu.preload='metadata';mAu.src=en.url;
+  mAu.preload='metadata';mAu.src=playUrl(en.url);
   mAu.addEventListener('loadedmetadata',function(){
     if(isFinite(mAu.duration)&&mAu.duration>0&&plAudioUrl!==en.url)dur.textContent=histFmtTime(mAu.duration);
     try{mAu.removeAttribute('src');mAu.load();}catch(e){}
@@ -11691,7 +11713,7 @@ function pubSongRowEl(it){
      below, so it stretches as ONE full-width row under the
      cover + title / views / duration area. */
   var au=document.createElement('audio');
-  au.src=it.url;au.preload='metadata';au.style.display='none';
+  au.src=playUrl(it.url);au.preload='metadata';au.style.display='none';
   var sync=function(){
     pb.innerHTML=au.paused?pubPlaySvg():pubPauseSvg();
     pb.setAttribute('aria-label',au.paused?'Play':'Pause');
@@ -12078,7 +12100,7 @@ function pubCardEl(it){
     /* The #1 (newest) song preloads its audio so pressing Play
        starts it as fast as the connection allows; the other
        cards keep the light metadata preload. */
-    au.src=it.url;au.preload=(it._dispRank===1)?'auto':'metadata';au.style.display='none';
+    au.src=playUrl(it.url);au.preload=(it._dispRank===1)?'auto':'metadata';au.style.display='none';
     au.loop=(pubPlayMode==='one');
     /* Play button (SONAR style): a SMALL gradient CIRCLE in the
        player row carrying ONLY the play/pause icon — no «PLAY»
@@ -19232,7 +19254,7 @@ function mvStart(){
     mvAudio.addEventListener('pause',function(){mvSyncBtns();mvBeatSyncToMain(false);});
     mvAudio.addEventListener('ended',function(){mvSyncBtns();mvBeatSyncToMain(false);});
   }
-  if(mvAudio.getAttribute('src')!==song.url){mvAudio.src=song.url;mvAudio.currentTime=0;}
+  if(mvAudio.getAttribute('src')!==playUrl(song.url)){mvAudio.src=playUrl(song.url);mvAudio.currentTime=0;}
   mvPauseOthers();
   mvFitStage();mvFitTitle();mvSync();mvSyncBtns();mvFxStep();
   var pr=mvAudio.play();if(pr&&pr.catch)pr.catch(function(){mvSyncBtns();});
@@ -20564,7 +20586,7 @@ function mvExpStart(song,mime){
   mvExp.earlyCtx=null;
   mvExp.ctx=ctx;
   var au=new Audio();
-  au.crossOrigin='anonymous';au.preload='auto';au.src=song.url;
+  au.crossOrigin='anonymous';au.preload='auto';au.src=playUrl(song.url);
   mvExp.audio=au;
   var srcNode=ctx.createMediaElementSource(au);
   var dest=ctx.createMediaStreamDestination();
@@ -22314,7 +22336,7 @@ function stPickRender(){
        History song cards do. */
     try{
       var mAu=new Audio();
-      mAu.preload='metadata';mAu.src=it.url;
+      mAu.preload='metadata';mAu.src=playUrl(it.url);
       mAu.addEventListener('loadedmetadata',function(){
         if(isFinite(mAu.duration)&&mAu.duration>0)dur.textContent=stFmt(mAu.duration);
         try{mAu.removeAttribute('src');mAu.load();}catch(e){}
