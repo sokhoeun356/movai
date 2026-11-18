@@ -2514,50 +2514,71 @@ main{padding-top:calc(3.75rem + env(safe-area-inset-top,0px))}
 .st-prog-fill.indet{width:40%!important;transition:none;animation:stProgIndet 1.1s ease-in-out infinite alternate}
 @keyframes stProgIndet{from{margin-left:0}to{margin-left:60%}}
 .st-prog-txt{font-size:0.8125rem;color:var(--text2);margin-top:6px;font-variant-numeric:tabular-nums}
-/* ===== Studio DAW layout (owner order 2026-11-18) =====
-   DropCue-style: a top bar (song title + Export), a STEMS
-   panel (colour icon, name, M / S, volume, a ⋮ menu holding
-   Trim + Remove), ONE shared timeline (one time ruler, every
-   stem waveform as a lane on the SAME time scale in its stem
-   colour, ONE shared playhead, tap / drag to seek) and a
-   bottom transport bar (master left, big round play centre,
-   time + Loop right). Desktop: stems beside the timeline.
-   Phone: stems stack above a full-width timeline. */
-#stDaw{margin-top:16px;border:1px solid var(--line);border-radius:14px;background:var(--card2);overflow:hidden}
-.st-daw-top{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:10px 12px;border-bottom:1px solid var(--line)}
-.st-daw-titles{flex:1 1 140px;min-width:0}
+/* ===== Animated Split (AI) progress (owner order 2026-11-18) =====
+   While Split (AI) runs, the progress area is ALIVE from second
+   0: the fill shimmers in the MovAi accent, a row of sound-wave
+   bars bounces under it, and the text ticks elapsed seconds +
+   % + state (Working / Almost there) — never a static wait. */
+.st-prog.ai .st-prog-fill{background:linear-gradient(90deg,var(--accent-fill) 0%,#e6ff70 25%,var(--accent-fill) 50%,#e6ff70 75%,var(--accent-fill) 100%);background-size:200% 100%;animation:stProgShimmer 1.4s linear infinite;transition:width .3s ease}
+@keyframes stProgShimmer{from{background-position:0 0}to{background-position:-200% 0}}
+.st-prog-eq{display:none;gap:3px;align-items:flex-end;height:16px;margin-top:8px}
+.st-prog.ai .st-prog-eq{display:flex}
+.st-prog-eq span{width:4px;height:6px;border-radius:2px;background:var(--accent-fill);animation:stEqBounce .9s ease-in-out infinite}
+.st-prog-eq span:nth-child(2){animation-delay:.12s}
+.st-prog-eq span:nth-child(3){animation-delay:.24s}
+.st-prog-eq span:nth-child(4){animation-delay:.36s}
+.st-prog-eq span:nth-child(5){animation-delay:.48s}
+.st-prog-eq span:nth-child(6){animation-delay:.6s}
+.st-prog-eq span:nth-child(7){animation-delay:.72s}
+@keyframes stEqBounce{0%,100%{height:5px}50%{height:16px}}
+@media(prefers-reduced-motion:reduce){.st-prog.ai .st-prog-fill{animation:none}.st-prog-eq span{animation:none}}
+/* ===== Studio DAW layout (owner order 2026-11-18, attached rows) =====
+   FL Studio style: ONE shared container — a sticky left
+   controls column and the waveform timeline on the right, so
+   every stem's controls sit in the SAME compact row (~58px)
+   as its own waveform lane. One ruler on top of the timeline
+   area only; one playhead line spanning ALL rows. The whole
+   container scrolls vertically together; the timeline scrolls
+   horizontally when zoomed while the controls column stays
+   pinned (position:sticky) and the playhead stays aligned. */
+#stDaw{margin-top:16px;border:1px solid var(--line);border-radius:14px;background:var(--card2);overflow:hidden;--st-ctrl:120px}
+@media(min-width:1024px){#stDaw{--st-ctrl:180px}}
+.st-daw-top{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:10px 12px;border-bottom:1px solid var(--line);background:var(--card)}
+.st-daw-titles{flex:1 1 120px;min-width:0}
 .st-daw-title{font-weight:800;font-size:0.9375rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .st-daw-sub{font-size:0.75rem;color:var(--muted);margin-top:2px;font-variant-numeric:tabular-nums}
 .st-daw-zoom{display:flex;gap:6px;flex:0 0 auto}
 .st-zbtn{width:38px;height:38px;border-radius:9px;border:1px solid var(--line2);background:var(--field);color:var(--text);font-size:1.0625rem;line-height:1;cursor:pointer;font-family:inherit}
+.st-rec-btn{flex:0 0 auto;min-height:42px;padding:9px 13px;border-radius:10px;border:1px solid var(--line2);background:var(--field);color:var(--text);font-weight:800;font-size:0.8125rem;cursor:pointer;font-family:inherit}
+.st-rec-btn.rec{background:#7f1d1d;border-color:#ef4444;color:#fecaca}
+.st-rec-ind{display:none;align-items:center;gap:6px;color:#f87171;font-weight:800;font-size:0.8125rem;font-variant-numeric:tabular-nums;flex:0 0 auto}
+.st-rec-ind.on{display:flex}
+.st-rec-dot{width:10px;height:10px;border-radius:50%;background:#ef4444;animation:stRecBlink 1s ease-in-out infinite}
+@keyframes stRecBlink{50%{opacity:.2}}
 .st-export-btn{flex:0 0 auto;min-height:42px;padding:9px 16px;border:none;border-radius:10px;background:var(--accent-fill);color:#0d1005;font-weight:800;font-size:0.875rem;cursor:pointer;font-family:inherit}
-.st-daw-body{display:flex;align-items:stretch}
-.st-daw-stems{flex:0 0 250px;min-width:0;border-right:1px solid var(--line);display:flex;flex-direction:column}
-.st-daw-stems-head{height:30px;box-sizing:border-box;display:flex;align-items:center;padding:0 12px;font-size:0.6875rem;font-weight:800;letter-spacing:.09em;color:var(--muted);border-bottom:1px solid var(--line)}
-.st-stem{position:relative;box-sizing:border-box;min-height:84px;padding:10px 12px;border-bottom:1px solid var(--line);display:flex;flex-direction:column;justify-content:center}
-.st-stem-main{display:flex;align-items:center;gap:8px}
-.st-stem-ico{flex:0 0 auto;width:34px;height:34px;border-radius:9px;display:flex;align-items:center;justify-content:center;color:#fff}
-.st-stem-ico svg{width:19px;height:19px;display:block}
-.st-stem-name{flex:1 1 auto;min-width:0;font-weight:700;font-size:0.8125rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.st-stem-menu{flex:0 0 auto;width:30px;height:30px;border-radius:8px;border:1px solid transparent;background:transparent;color:var(--muted);font-size:1rem;cursor:pointer;font-family:inherit;line-height:1}
-.st-stem-sub{display:flex;align-items:center;gap:6px;margin-top:9px}
-.st-ms{flex:0 0 auto;width:30px;height:30px;padding:0;border-radius:8px;border:1px solid var(--line2);background:var(--field);color:var(--text2);font-size:0.75rem;font-weight:800;cursor:pointer;font-family:inherit}
+.st-daw-wrap{overflow:auto;max-height:min(64vh,620px);position:relative;-webkit-overflow-scrolling:touch}
+.st-daw-table{position:relative;min-width:100%}
+.st-daw-headrow{display:flex;position:sticky;top:0;z-index:8;background:var(--card2);border-bottom:1px solid var(--line);height:26px}
+.st-daw-corner{flex:0 0 var(--st-ctrl);width:var(--st-ctrl);box-sizing:border-box;position:sticky;left:0;z-index:9;background:var(--card2);border-right:1px solid var(--line)}
+.st-daw-ruler{flex:1 1 auto;min-width:0;height:26px}
+.st-daw-ruler canvas{display:block;width:100%;height:26px}
+.st-daw-row{display:flex;border-bottom:1px solid var(--line);height:58px;box-sizing:border-box}
+.st-ctl{flex:0 0 var(--st-ctrl);width:var(--st-ctrl);box-sizing:border-box;position:sticky;left:0;z-index:5;background:var(--card2);border-right:1px solid var(--line);padding:6px 8px;display:flex;flex-direction:column;justify-content:center;gap:4px}
+.st-ctl-line{display:flex;align-items:center;gap:5px}
+.st-stem-ico{flex:0 0 auto;width:24px;height:24px;border-radius:7px;display:flex;align-items:center;justify-content:center;color:#fff}
+.st-stem-ico svg{width:15px;height:15px;display:block}
+.st-stem-name{flex:1 1 auto;min-width:0;font-weight:700;font-size:0.75rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.st-fx-badge{display:none;flex:0 0 auto;font-size:0.5625rem;font-weight:800;letter-spacing:.04em;background:var(--accent-fill);color:#0d1005;border-radius:5px;padding:1px 4px}
+.st-fx-badge.on{display:inline-block}
+.st-ms{flex:0 0 auto;width:23px;height:23px;padding:0;border-radius:6px;border:1px solid var(--line2);background:var(--field);color:var(--text2);font-size:0.625rem;font-weight:800;cursor:pointer;font-family:inherit;line-height:1}
 .st-ms.on-mute{background:#7f1d1d;border-color:#f87171;color:#fecaca}
 .st-ms.on-solo{background:#713f12;border-color:#eab308;color:#fef9c3}
-.st-stem-vol{flex:1 1 auto;min-width:36px}
-.st-stem-pop{display:none;position:absolute;top:calc(100% - 6px);left:8px;right:8px;z-index:30;background:var(--card);border:1px solid var(--line2);border-radius:12px;padding:12px;box-shadow:0 16px 36px rgba(0,0,0,.55)}
-.st-stem-pop.on{display:block}
-.st-trim{display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-size:0.8125rem;color:var(--muted)}
-.st-trim input{width:74px;padding:8px;border-radius:8px;border:1px solid var(--line2);background:var(--field);color:var(--text);font-family:inherit;font-size:0.875rem;min-height:40px}
-.st-stem-del{margin-top:10px;min-height:40px;padding:8px 14px;border-radius:9px;border:1px solid var(--line2);background:transparent;color:#f87171;font-size:0.8125rem;font-weight:700;cursor:pointer;font-family:inherit}
-.st-daw-tl-scroll{flex:1 1 auto;min-width:0;overflow-x:auto;overflow-y:hidden;-webkit-overflow-scrolling:touch}
-.st-daw-tl-inner{position:relative;min-width:100%;cursor:pointer;touch-action:pan-x pan-y}
-.st-daw-ruler{height:30px;box-sizing:border-box;border-bottom:1px solid var(--line)}
-.st-daw-ruler canvas{display:block;width:100%;height:30px}
-.st-daw-lanes{display:flex;flex-direction:column}
-.st-lane{height:84px;box-sizing:border-box;border-bottom:1px solid var(--line)}
-.st-lane canvas{display:block;width:100%;height:100%}
-.st-daw-playhead{position:absolute;top:0;bottom:0;left:0;width:2px;background:#fff;pointer-events:none;box-shadow:0 0 6px rgba(0,0,0,.65);z-index:6}
+.st-stem-menu{flex:0 0 auto;width:23px;height:23px;border-radius:6px;border:1px solid transparent;background:transparent;color:var(--muted);font-size:0.9375rem;cursor:pointer;font-family:inherit;line-height:1;padding:0}
+.st-ctl-vol{flex:0 0 auto;width:100%;min-height:18px!important;height:18px}
+.st-lane2{flex:1 1 auto;min-width:0;position:relative}
+.st-lane2 canvas{display:block;width:100%;height:100%}
+.st-daw-tloverlay{position:absolute;top:0;bottom:0;left:var(--st-ctrl);right:0;pointer-events:none;z-index:6}
+.st-daw-playhead{position:absolute;top:0;bottom:0;left:0;width:2px;margin-left:-1px;background:#fff;pointer-events:none;box-shadow:0 0 7px rgba(0,0,0,.8)}
 .st-daw-ph-mark{position:absolute;top:0;left:50%;transform:translateX(-50%);width:0;height:0;border-left:6px solid transparent;border-right:6px solid transparent;border-top:8px solid #fff}
 #stExportRow{display:none!important}
 .st-transport{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:12px;padding:10px 12px;background:var(--card2);border:1px solid var(--line);border-radius:14px}
@@ -2570,13 +2591,28 @@ main{padding-top:calc(3.75rem + env(safe-area-inset-top,0px))}
 .st-loop{order:6}
 .st-loop.on{background:rgba(var(--accent-rgb),.18);border-color:var(--accent);color:var(--accent-text)}
 input[type=range].st-range{accent-color:var(--accent);min-height:32px;cursor:pointer}
-@media(max-width:1023px){
- .st-daw-body{flex-direction:column}
- .st-daw-stems{flex:0 0 auto;border-right:none;border-bottom:1px solid var(--line)}
- .st-daw-stems-head{height:auto;padding:8px 12px}
- .st-stem{min-height:0}
- .st-lane{height:72px}
-}
+/* ===== Studio stem ⋮ menu + effects sheet (owner order 2026-11-18) ===== */
+.st-menu{position:fixed;z-index:1250;width:252px;background:var(--card);border:1px solid var(--line2);border-radius:12px;padding:8px;box-shadow:0 16px 36px rgba(0,0,0,.55)}
+.st-menu-item{display:block;width:100%;text-align:left;min-height:40px;padding:8px 10px;border:none;border-radius:8px;background:transparent;color:var(--text);font-size:0.8125rem;font-weight:700;cursor:pointer;font-family:inherit}
+.st-menu-item.danger{color:#f87171}
+.st-menu-trim{display:flex;align-items:center;gap:6px;padding:8px 10px;font-size:0.8125rem;color:var(--muted);border-top:1px solid var(--line);border-bottom:1px solid var(--line);margin:4px 0}
+.st-menu-trim input{width:60px;padding:7px;border-radius:8px;border:1px solid var(--line2);background:var(--field);color:var(--text);font-family:inherit;font-size:0.8125rem;min-height:36px}
+.st-fx-sheet{position:fixed;inset:0;z-index:1300;display:none}
+.st-fx-sheet.on{display:block}
+.st-fx-backdrop{position:absolute;inset:0;background:rgba(0,0,0,.55)}
+.st-fx-card{position:absolute;left:0;right:0;bottom:0;background:var(--card);border-top:1px solid var(--line2);border-radius:18px 18px 0 0;padding:16px;max-width:560px;margin:0 auto;box-shadow:0 -12px 36px rgba(0,0,0,.5)}
+.st-fx-head{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.st-fx-title{font-weight:800;font-size:0.9375rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.st-fx-x{flex:0 0 auto;width:36px;height:36px;border-radius:9px;border:1px solid var(--line2);background:var(--field);color:var(--text);cursor:pointer;font-family:inherit}
+.st-fx-label{font-size:0.6875rem;font-weight:800;letter-spacing:.08em;color:var(--muted);margin-top:14px}
+.st-fx-eqs{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+.st-fx-eqs button{flex:1 1 auto;min-height:40px;padding:8px 10px;border-radius:9px;border:1px solid var(--line2);background:var(--field);color:var(--text);font-size:0.8125rem;font-weight:700;cursor:pointer;font-family:inherit}
+.st-fx-eqs button.on{background:rgba(var(--accent-rgb),.2);border-color:var(--accent);color:var(--accent-text)}
+.st-fx-row{display:block;margin-top:14px;font-size:0.8125rem;color:var(--text2)}
+.st-fx-row input{width:100%}
+.st-fx-actions{display:flex;gap:8px;margin-top:16px}
+.st-fx-reset{flex:0 0 auto;min-height:42px;padding:9px 14px;border-radius:10px;border:1px solid var(--line2);background:transparent;color:var(--text);font-weight:700;cursor:pointer;font-family:inherit;font-size:0.8125rem}
+.st-fx-done{flex:1 1 auto;min-height:42px;padding:9px 14px;border:none;border-radius:10px;background:var(--accent-fill);color:#0d1005;font-weight:800;cursor:pointer;font-family:inherit;font-size:0.875rem}
 /* ===== Studio auto-split additions (owner order 2026-11-18) =====
    The drawer Studio item carries a small live «Preparing
    Studio… X%» pill while a freshly generated song is fetched,
@@ -3014,6 +3050,7 @@ input[type=range].st-range{accent-color:var(--accent);min-height:32px;cursor:poi
     <p class="st-msg" id="stAutoNote" style="display:none"></p>
     <div class="st-prog" id="stProg">
       <div class="st-prog-bar"><div class="st-prog-fill" id="stProgFill"></div></div>
+      <div class="st-prog-eq" id="stProgEq" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span><span></span><span></span></div>
       <div class="st-prog-txt" id="stProgTxt"></div>
     </div>
     <div id="stDaw" style="display:none">
@@ -3027,9 +3064,34 @@ input[type=range].st-range{accent-color:var(--accent);min-height:32px;cursor:poi
           <button type="button" class="st-zbtn" onclick="stZoomBy(-1)" aria-label="Zoom out">−</button>
           <button type="button" class="st-zbtn" onclick="stZoomBy(1)" aria-label="Zoom in">+</button>
         </div>
+        <button type="button" class="st-rec-btn" id="stRecBtn" onclick="stRecToggle()" aria-label="Record · ថតសំឡេង">🎤 Rec</button>
+        <span class="st-rec-ind" id="stRecInd"><span class="st-rec-dot"></span><span id="stRecTime">0:00</span></span>
         <button type="button" class="st-export-btn" onclick="stExport()">Export · ទាញយក WAV</button>
       </div>
       <div id="stTracks"></div>
+    </div>
+    <div class="st-menu" id="stStemMenu" style="display:none">
+      <button type="button" class="st-menu-item" onclick="stMenuFx()">✦ Edit · Effects</button>
+      <button type="button" class="st-menu-item" onclick="stMenuDownload()">⬇ Download stem</button>
+      <div class="st-menu-trim"><span>Trim · កាត់</span><input type="number" id="stMenuTs" min="0" step="0.1" onchange="stMenuTrim()" aria-label="Trim start (seconds)"><span>–</span><input type="number" id="stMenuTe" min="0" step="0.1" onchange="stMenuTrim()" aria-label="Trim end (seconds)"><span>s</span></div>
+      <button type="button" class="st-menu-item danger" onclick="stMenuRemove()">✕ លុប Track · Remove track</button>
+    </div>
+    <div class="st-fx-sheet" id="stFxSheet" role="dialog" aria-modal="true" aria-label="Stem effects">
+      <div class="st-fx-backdrop" onclick="stFxClose()"></div>
+      <div class="st-fx-card">
+        <div class="st-fx-head"><span class="st-fx-title" id="stFxTitle">Effects</span><button type="button" class="st-fx-x" onclick="stFxClose()" aria-label="Close">✕</button></div>
+        <div class="st-fx-label">EQ</div>
+        <div class="st-fx-eqs" id="stFxEqs">
+          <button type="button" data-eq="normal" onclick="stFxSetEq('normal')">Normal</button>
+          <button type="button" data-eq="crisp" onclick="stFxSetEq('crisp')">Crisp · ស្រួយ</button>
+          <button type="button" data-eq="soft" onclick="stFxSetEq('soft')">Soft · ស្រាល</button>
+          <button type="button" data-eq="bass" onclick="stFxSetEq('bass')">Bass</button>
+          <button type="button" data-eq="treble" onclick="stFxSetEq('treble')">Treble</button>
+        </div>
+        <label class="st-fx-row"><span>Reverb · <b id="stFxRevVal">0%</b></span><input type="range" class="st-range" id="stFxRev" min="0" max="100" value="0" oninput="stFxSetRev(this.value)"></label>
+        <label class="st-fx-row"><span>Echo · <b id="stFxEchoVal">0%</b></span><input type="range" class="st-range" id="stFxEcho" min="0" max="100" value="0" oninput="stFxSetEcho(this.value)"></label>
+        <div class="st-fx-actions"><button type="button" class="st-fx-reset" onclick="stFxReset()">Reset · កំណត់ឡើងវិញ</button><button type="button" class="st-fx-done" onclick="stFxClose()">រួចរាល់ · Done</button></div>
+      </div>
     </div>
     <div class="st-transport" id="stTransport">
       <label class="st-master">Master <input type="range" class="st-range" id="stMasterVol" min="0" max="100" value="90" oninput="stSetMaster(this.value)"></label>
@@ -20607,7 +20669,7 @@ function topSearchApply(){
      as «<song name> - MOVAI Studio.wav», with live progress
      (% + elapsed seconds).
    No server, no login, no API keys, no provider calls. */
-var ST={ctx:null,master:null,tracks:[],mainBuffer:null,songName:'',songUrl:'',playing:false,loop:false,pos:0,startAt:0,startPos:0,raf:0,nextId:1,masterVol:0.9,busy:false,progPct:0,progLabel:'',progT0:0,progTimer:null,progSink:null,progNoPct:false,autoToken:0,projectKey:'',autoNote:''};
+var ST={ctx:null,master:null,tracks:[],mainBuffer:null,songName:'',songUrl:'',playing:false,loop:false,pos:0,startAt:0,startPos:0,raf:0,nextId:1,masterVol:0.9,busy:false,progPct:0,progLabel:'',progT0:0,progTimer:null,progSink:null,progNoPct:false,progAi:false,progAiFrac:null,autoToken:0,projectKey:'',autoNote:''};
 function stCtx(){
   if(!ST.ctx){
     var AC=window.AudioContext||window.webkitAudioContext;
@@ -20627,7 +20689,7 @@ function stMsg(txt,err){
 function stFmt(s){s=Math.max(0,Math.floor(s||0));var m=Math.floor(s/60),r=s%60;return m+':'+(r<10?'0':'')+r;}
 function stTotal(){
   var t=0,i;
-  for(i=0;i<ST.tracks.length;i++)if(ST.tracks[i].trimEnd>t)t=ST.tracks[i].trimEnd;
+  for(i=0;i<ST.tracks.length;i++){var te2=(ST.tracks[i].startAt||0)+ST.tracks[i].trimEnd;if(te2>t)t=te2;}
   return t;
 }
 function stAnySolo(){for(var i=0;i<ST.tracks.length;i++)if(ST.tracks[i].solo)return true;return false;}
@@ -20642,10 +20704,30 @@ function stProgBegin(label){
 }
 function stProgPaint(){
   var f=document.getElementById('stProgFill'),t=document.getElementById('stProgTxt');
+  var pw=document.getElementById('stProg');
+  if(ST.progAi){
+    /* Split (AI) live progress (owner order 2026-11-18): the
+       bar is alive from second 0 — while MVSEP processes, the
+       % advances with the ticking elapsed seconds toward the
+       stem-loading phase; once the stems return, the % is the
+       REAL loaded fraction (stems decoded / total). The text
+       always shows label + % + ticking seconds + state. */
+    if(pw)pw.classList.add('ai');
+    var el=(Date.now()-ST.progT0)/1000,pct;
+    if(ST.progAiFrac!=null)pct=88+12*Math.max(0,Math.min(1,ST.progAiFrac));
+    else pct=88*(1-Math.exp(-el/50));
+    ST.progPct=pct;
+    if(f)f.style.width=pct+'%';
+    if(t){
+      var state=(ST.progAiFrac!=null||pct>=70)?'ជិតរួចហើយ · Almost there':'កំពុងដំណើរការ · Working';
+      t.textContent=ST.progLabel+' · '+Math.round(pct)+'% · ⏳ '+stFmt(el)+' · '+state;
+    }
+    if(ST.progSink){try{ST.progSink(pct);}catch(e){}}
+    return;
+  }
+  if(pw)pw.classList.remove('ai');
   if(f)f.style.width=ST.progPct+'%';
   if(t){
-    /* Split (AI) shows NO fake % — the provider gives no real
-       progress, so the honest display is label + ticking seconds. */
     if(ST.progNoPct)t.textContent=ST.progLabel+' · ⏳ '+stFmt((Date.now()-ST.progT0)/1000);
     else t.textContent=ST.progLabel+' · '+Math.round(ST.progPct)+'% · '+stFmt((Date.now()-ST.progT0)/1000);
   }
@@ -20654,6 +20736,9 @@ function stProgSet(pct){ST.progPct=Math.max(0,Math.min(100,pct));if(ST.progSink)
 function stProgEnd(){
   if(ST.progTimer){clearInterval(ST.progTimer);ST.progTimer=null;}
   ST.progNoPct=false;
+  ST.progAi=false;
+  ST.progAiFrac=null;
+  var pw2=document.getElementById('stProg');if(pw2)pw2.classList.remove('ai');
   var fl=document.getElementById('stProgFill');if(fl)fl.classList.remove('indet');
   var p=document.getElementById('stProg');if(p)p.classList.remove('on');
   try{stSyncAISplitBtn();}catch(e){}
@@ -20661,7 +20746,7 @@ function stProgEnd(){
 /* ---- Tracks ---- */
 function stAddTrack(name,buffer,fromSong){
   var ctx=stCtx();
-  var tr={id:ST.nextId++,name:name,buffer:buffer,vol:1,mute:false,solo:false,trimStart:0,trimEnd:buffer.duration,gain:ctx.createGain(),src:null,peaks:null,fromSong:!!fromSong,els:{}};
+  var tr={id:ST.nextId++,name:name,buffer:buffer,vol:1,mute:false,solo:false,trimStart:0,trimEnd:buffer.duration,startAt:0,fx:{eq:'normal',rev:0,echo:0},_live:null,gain:ctx.createGain(),src:null,peaks:null,fromSong:!!fromSong,els:{}};
   tr.gain.gain.value=1;
   tr.gain.connect(ST.master);
   ST.tracks.push(tr);
@@ -20687,9 +20772,10 @@ function stRemoveTrack(tr){
    the same tracks, GainNodes, trim values and export the old
    per-track cards drove. */
 var stZoom=1;
-var ST_STEM_COLORS={vocals:'#8b5cf6',drums:'#3b82f6',bass:'#5cb85c',other:'#e8a33d',instruments:'#e8a33d',piano:'#06b6d4',guitar:'#ec4899',song:'#addc29'};
+var ST_STEM_COLORS={vocals:'#8b5cf6',drums:'#3b82f6',bass:'#5cb85c',other:'#e8a33d',instruments:'#e8a33d',piano:'#06b6d4',guitar:'#ec4899',voice:'#f43f5e',song:'#addc29'};
 function stStemKind(tr){
   var n=(tr&&tr.name?tr.name:'').toLowerCase();
+  if(n.indexOf('voice')>=0||n.indexOf('សំឡេងខ្ញុំ')>=0)return 'voice';
   if(n.indexOf('vocal')>=0||n.indexOf('សំឡេងច្រៀង')>=0)return 'vocals';
   if(n.indexOf('drum')>=0||n.indexOf('ស្គរ')>=0)return 'drums';
   if(n.indexOf('bass')>=0||n.indexOf('បាស')>=0)return 'bass';
@@ -20702,7 +20788,7 @@ function stStemKind(tr){
 function stStemColor(tr){return ST_STEM_COLORS[stStemKind(tr)]||ST_STEM_COLORS.song;}
 function stStemIcon(kind){
   var p='';
-  if(kind==='vocals')p='<rect x="9" y="2.5" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21M8.5 21h7"/>';
+  if(kind==='vocals'||kind==='voice')p='<rect x="9" y="2.5" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21M8.5 21h7"/>';
   else if(kind==='drums')p='<circle cx="12" cy="13.5" r="6.5"/><path d="M4.5 3.5l5 6M19.5 3.5l-5 6"/>';
   else if(kind==='bass')p='<path d="M3 15c2.5-7 4.5-7 7 0M10 15c2.5-7 4.5-7 7 0M17 15c1.2-3.4 2.2-4.6 4-4.6"/>';
   else if(kind==='piano')p='<rect x="3.5" y="4" width="17" height="16" rx="2"/><path d="M8.2 4v9M12 4v9M15.8 4v9M8.2 13h7.6"/>';
@@ -20713,64 +20799,295 @@ function stStemIcon(kind){
 }
 function stZoomBy(d){
   stZoom=Math.max(1,Math.min(4,stZoom+d*0.5));
-  var inner=document.getElementById('stTlInner');
-  if(inner)inner.style.width=(stZoom*100)+'%';
+  var t=document.getElementById('stDawTable');
+  if(t)t.style.width=(stZoom*100)+'%';
   stDrawAllWaves();
   stPaintPlayhead();
 }
-/* Tapping anywhere outside a stem row closes its ⋮ Trim menu. */
+/* ---- Per-stem effects (owner order 2026-11-18) ----
+   Each track carries fx = {eq, rev, echo} in its own state,
+   so effects survive re-renders. One shared chain builder
+   (stChain) wires source → EQ BiquadFilters → stem gain, with
+   a reverb send (ConvolverNode + generated impulse) and an
+   echo send (DelayNode + feedback) — used by BOTH the live
+   playback graph and the OfflineAudioContext export / stem
+   download, so live and export sound the same. */
+function stFxDefault(){return {eq:'normal',rev:0,echo:0};}
+function stFxActive(tr){var f=tr&&tr.fx;return !!(f&&(f.eq!=='normal'||(f.rev||0)>0||(f.echo||0)>0));}
+function stEqVals(eq){
+  if(eq==='crisp')return {low:0,mid:5,high:8};
+  if(eq==='soft')return {low:3,mid:-2,high:-6};
+  if(eq==='bass')return {low:9,mid:0,high:0};
+  if(eq==='treble')return {low:0,mid:2,high:9};
+  return {low:0,mid:0,high:0};
+}
+function stImpulse(ctx){
+  if(ctx._stImp)return ctx._stImp;
+  var sr=ctx.sampleRate,len=Math.max(1,Math.floor(sr*1.8));
+  var buf=ctx.createBuffer(2,len,sr);
+  for(var c=0;c<2;c++){
+    var d=buf.getChannelData(c);
+    for(var i=0;i<len;i++)d[i]=(Math.random()*2-1)*Math.pow(1-i/len,2.6);
+  }
+  ctx._stImp=buf;
+  return buf;
+}
+function stChain(ctx,tr,out){
+  if(!tr.fx)tr.fx=stFxDefault();
+  var low=ctx.createBiquadFilter();low.type='lowshelf';low.frequency.value=200;
+  var mid=ctx.createBiquadFilter();mid.type='peaking';mid.frequency.value=3000;mid.Q.value=1;
+  var high=ctx.createBiquadFilter();high.type='highshelf';high.frequency.value=6000;
+  low.connect(mid);mid.connect(high);high.connect(out);
+  var conv=ctx.createConvolver();conv.buffer=stImpulse(ctx);
+  var revSend=ctx.createGain();high.connect(revSend);revSend.connect(conv);conv.connect(out);
+  var dly=ctx.createDelay(1);dly.delayTime.value=0.27;
+  var fb=ctx.createGain();fb.gain.value=0.34;
+  var echoSend=ctx.createGain();high.connect(echoSend);echoSend.connect(dly);dly.connect(fb);fb.connect(dly);dly.connect(out);
+  var nd={input:low,low:low,mid:mid,high:high,revSend:revSend,echoSend:echoSend,all:[low,mid,high,conv,revSend,dly,fb,echoSend]};
+  stChainApply(tr,nd);
+  return nd;
+}
+function stChainApply(tr,nd){
+  if(!nd)return;
+  var f=tr.fx||stFxDefault(),v=stEqVals(f.eq);
+  nd.low.gain.value=v.low;
+  nd.mid.gain.value=v.mid;
+  nd.high.gain.value=v.high;
+  nd.revSend.gain.value=(f.rev||0)*0.9;
+  nd.echoSend.gain.value=(f.echo||0)*0.75;
+}
+function stFxBadgeSync(tr){
+  if(tr&&tr.els&&tr.els.fxBadge)tr.els.fxBadge.className='st-fx-badge'+(stFxActive(tr)?' on':'');
+}
+/* ---- Effects bottom sheet ---- */
+var stFxTr=null;
+function stFxOpen(tr){
+  if(!tr)return;
+  if(!tr.fx)tr.fx=stFxDefault();
+  stFxTr=tr;
+  stFxPaint();
+  var s=document.getElementById('stFxSheet');if(s)s.classList.add('on');
+}
+function stFxClose(){
+  var s=document.getElementById('stFxSheet');if(s)s.classList.remove('on');
+  if(stFxTr)stFxBadgeSync(stFxTr);
+  stFxTr=null;
+}
+function stFxPaint(){
+  var tr=stFxTr;if(!tr)return;
+  var t=document.getElementById('stFxTitle');if(t)t.textContent=tr.name+' · Effects';
+  var btns=document.querySelectorAll('#stFxEqs button');
+  for(var i=0;i<btns.length;i++)btns[i].classList.toggle('on',btns[i].getAttribute('data-eq')===tr.fx.eq);
+  var rv=document.getElementById('stFxRev');if(rv)rv.value=Math.round((tr.fx.rev||0)*100);
+  var ev=document.getElementById('stFxEcho');if(ev)ev.value=Math.round((tr.fx.echo||0)*100);
+  var rvv=document.getElementById('stFxRevVal');if(rvv)rvv.textContent=Math.round((tr.fx.rev||0)*100)+'%';
+  var evv=document.getElementById('stFxEchoVal');if(evv)evv.textContent=Math.round((tr.fx.echo||0)*100)+'%';
+}
+function stFxLive(){if(stFxTr&&stFxTr._live)stChainApply(stFxTr,stFxTr._live);}
+function stFxSetEq(eq){if(!stFxTr)return;stFxTr.fx.eq=eq;stFxLive();stFxPaint();stFxBadgeSync(stFxTr);}
+function stFxSetRev(v){if(!stFxTr)return;stFxTr.fx.rev=(parseInt(v,10)||0)/100;stFxLive();stFxPaint();}
+function stFxSetEcho(v){if(!stFxTr)return;stFxTr.fx.echo=(parseInt(v,10)||0)/100;stFxLive();stFxPaint();}
+function stFxReset(){if(!stFxTr)return;stFxTr.fx=stFxDefault();stFxLive();stFxPaint();stFxBadgeSync(stFxTr);}
+/* ---- Stem ⋮ menu: Edit · Effects / Download stem / Trim / Remove ---- */
+var stMenuTr=null;
+function stMenuOpen(tr,btn){
+  stMenuTr=tr;
+  var m=document.getElementById('stStemMenu');if(!m)return;
+  var ts=document.getElementById('stMenuTs'),te=document.getElementById('stMenuTe');
+  if(ts)ts.value=tr.trimStart.toFixed(1);
+  if(te)te.value=tr.trimEnd.toFixed(1);
+  m.style.display='block';
+  var r=btn.getBoundingClientRect();
+  var mw=m.offsetWidth||252,mh=m.offsetHeight||220;
+  m.style.left=Math.max(8,Math.min(r.right-mw,window.innerWidth-mw-8))+'px';
+  m.style.top=Math.max(8,Math.min(r.bottom+6,window.innerHeight-mh-8))+'px';
+}
+function stMenuClose(){
+  var m=document.getElementById('stStemMenu');if(m)m.style.display='none';
+  stMenuTr=null;
+}
+function stMenuFx(){var tr=stMenuTr;stMenuClose();stFxOpen(tr);}
+function stMenuDownload(){var tr=stMenuTr;stMenuClose();if(tr)stDownloadStem(tr);}
+function stMenuRemove(){var tr=stMenuTr;stMenuClose();if(tr)stRemoveTrack(tr);}
+function stMenuTrim(){
+  if(!stMenuTr)return;
+  var ts=document.getElementById('stMenuTs'),te=document.getElementById('stMenuTe');
+  if(ts&&te)stApplyTrim(stMenuTr,ts,te);
+}
+/* Tapping anywhere outside a stem control cell / the menu closes it. */
 document.addEventListener('click',function(ev){
-  if(ev.target.closest&&ev.target.closest('.st-stem'))return;
-  var pops=document.querySelectorAll('.st-stem-pop.on');
-  for(var i=0;i<pops.length;i++)pops[i].classList.remove('on');
+  if(ev.target.closest&&(ev.target.closest('.st-ctl')||ev.target.closest('#stStemMenu')))return;
+  stMenuClose();
 });
+/* ---- Per-stem download: that single stem as WAV (effects in) ---- */
+async function stDownloadStem(tr){
+  if(!tr||!tr.buffer)return;
+  stMsg('កំពុងរៀបចំ Stem · Preparing stem…');
+  try{
+    var dur=Math.max(0.05,tr.trimEnd-tr.trimStart),sr=44100;
+    var off=new OfflineAudioContext(2,Math.ceil(dur*sr),sr);
+    var g=off.createGain();g.gain.value=tr.vol;g.connect(off.destination);
+    var src=off.createBufferSource();src.buffer=tr.buffer;
+    src.connect(stChain(off,tr,g).input);
+    src.start(0,tr.trimStart,dur);
+    var buf=await off.startRendering();
+    var blob=stWavBlob(buf);
+    var a=document.createElement('a');
+    a.href=URL.createObjectURL(blob);
+    a.download=tr.name.replace(/[\\/:*?"<>|]+/g,' ').trim()+'.wav';
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(function(){try{URL.revokeObjectURL(a.href);a.remove();}catch(e){}},4000);
+    stMsg('ទាញយក Stem រួច · Stem downloaded ✓');
+  }catch(e){
+    stMsg('ទាញយក Stem មិនបាន · Stem download failed',true);
+  }
+}
+/* ---- Mic record: sing over the song (owner order 2026-11-18) ----
+   Tap 🎤 Rec → getUserMedia (audio only). Playback starts from
+   the current playhead position while the mic records; Stop
+   decodes the take and adds it as a «Voice · សំឡេងខ្ញុំ» lane at
+   the position where recording started (tr.startAt), included
+   in the Export WAV mixdown like any other track. Denied /
+   unavailable mic only shows a message — the DAW is untouched. */
+var stRec={active:false,mr:null,stream:null,chunks:[],startPos:0,t0:0,timer:null,token:0};
+function stRecPaint(){
+  var b=document.getElementById('stRecBtn'),ind=document.getElementById('stRecInd'),tm=document.getElementById('stRecTime');
+  if(stRec.active){
+    if(b){b.classList.add('rec');b.innerHTML='⏹ Stop';}
+    if(ind)ind.classList.add('on');
+    if(tm)tm.textContent=stFmt((Date.now()-stRec.t0)/1000);
+  }else{
+    if(b){b.classList.remove('rec');b.innerHTML='🎤 Rec';}
+    if(ind)ind.classList.remove('on');
+  }
+}
+async function stRecToggle(){
+  if(stRec.active){stRecStop();return;}
+  if(!ST.tracks.length)return;
+  if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia||typeof MediaRecorder==='undefined'){
+    stMsg('ឧបករណ៍នេះមិនអាចថតសំឡេងបានទេ · Recording is not available on this device',true);
+    return;
+  }
+  var stream=null;
+  try{stream=await navigator.mediaDevices.getUserMedia({audio:true});}
+  catch(e){
+    stMsg('មិនអាចប្រើមីក្រូបាន — សូមអនុញ្ញាតមីក្រូជាមុន · Microphone unavailable — please allow microphone access',true);
+    return;
+  }
+  stRec.stream=stream;
+  stRec.chunks=[];
+  stRec.startPos=ST.pos;
+  stRec.t0=Date.now();
+  stRec.token=ST.autoToken;
+  var mr=null;
+  try{mr=new MediaRecorder(stream);}
+  catch(e){
+    try{stream.getTracks().forEach(function(t){t.stop();});}catch(e2){}
+    stRec.stream=null;
+    stMsg('ការថតមិនដំណើរការលើឧបករណ៍នេះទេ · Recording is not supported on this device',true);
+    return;
+  }
+  stRec.mr=mr;
+  mr.ondataavailable=function(ev){if(ev.data&&ev.data.size)stRec.chunks.push(ev.data);};
+  mr.onstop=stRecFinish;
+  try{mr.start(250);}
+  catch(e){stRecFinishErr();return;}
+  stRec.active=true;
+  stRecPaint();
+  if(stRec.timer)clearInterval(stRec.timer);
+  stRec.timer=setInterval(stRecPaint,500);
+  if(!ST.playing)stPlay();
+}
+function stRecStop(){
+  if(stRec.mr&&stRec.mr.state!=='inactive'){
+    try{stRec.mr.stop();}
+    catch(e){stRecFinishErr();}
+  }
+}
+function stRecCleanup(){
+  if(stRec.timer){clearInterval(stRec.timer);stRec.timer=null;}
+  if(stRec.stream){
+    try{stRec.stream.getTracks().forEach(function(t){t.stop();});}catch(e){}
+    stRec.stream=null;
+  }
+  stRec.active=false;
+  stRecPaint();
+}
+function stRecFinishErr(){
+  stRecCleanup();
+  stMsg('ថតមិនបាន · Recording failed',true);
+}
+function stRecFinish(){
+  var token=stRec.token,startPos=stRec.startPos;
+  var mime=(stRec.mr&&stRec.mr.mimeType)||'audio/webm';
+  var chunks=stRec.chunks.slice();
+  stRecCleanup();
+  stPause(false);
+  if(token!==ST.autoToken)return;/* project cleared while recording — discard the take */
+  if(!chunks.length){stMsg('ថតមិនបាន · Nothing was recorded',true);return;}
+  var blob=new Blob(chunks,{type:mime});
+  blob.arrayBuffer().then(function(ab){return stDecode(ab);}).then(function(buffer){
+    if(token!==ST.autoToken)return;
+    if(!buffer||buffer.duration<0.3){stMsg('ការថតខ្លីពេក · Recording too short',true);return;}
+    var tr=stAddTrack('Voice · សំឡេងខ្ញុំ',buffer,false);
+    tr.startAt=startPos;
+    stRenderAllTracks();
+    stMsg('បានបន្ថែមសំឡេងរបស់អ្នក · Your voice was added ✓');
+  }).catch(function(){
+    stMsg('បើកសំឡេងដែលថតមិនបាន · Could not open the recording',true);
+  });
+}
+/* ---- Attached DAW render (owner order 2026-11-18) ----
+   ONE shared container: each row is a sticky left control cell
+   (icon + name + fx badge + M / S / ⋮, volume slider under it)
+   fused to that stem's waveform lane on the right. One ruler
+   over the timeline area only, one playhead overlay spanning
+   every row. Tap / drag on the timeline seeks all tracks. */
 function stRenderAllTracks(){
   var box=document.getElementById('stTracks');if(!box)return;
   box.innerHTML='';
   if(ST.tracks.length){
-    var body=document.createElement('div');body.className='st-daw-body';
-    var stems=document.createElement('div');stems.className='st-daw-stems';
-    var shead=document.createElement('div');shead.className='st-daw-stems-head';shead.textContent='STEMS';
-    stems.appendChild(shead);
-    var scroll=document.createElement('div');scroll.className='st-daw-tl-scroll';
-    var inner=document.createElement('div');inner.className='st-daw-tl-inner';inner.id='stTlInner';inner.style.width=(stZoom*100)+'%';
-    var ruler=document.createElement('div');ruler.className='st-daw-ruler';
+    var wrap=document.createElement('div');wrap.className='st-daw-wrap';wrap.id='stDawWrap';
+    var table=document.createElement('div');table.className='st-daw-table';table.id='stDawTable';table.style.width=(stZoom*100)+'%';
+    var head=document.createElement('div');head.className='st-daw-headrow';
+    var corner=document.createElement('div');corner.className='st-daw-corner';
+    head.appendChild(corner);
+    var ruler=document.createElement('div');ruler.className='st-daw-ruler';ruler.id='stRuler';
     var rcv=document.createElement('canvas');rcv.id='stRulerCv';ruler.appendChild(rcv);
-    inner.appendChild(ruler);
-    var lanes=document.createElement('div');lanes.className='st-daw-lanes';
-    inner.appendChild(lanes);
+    head.appendChild(ruler);
+    table.appendChild(head);
+    for(var i=0;i<ST.tracks.length;i++)table.appendChild(stStemRowEl(ST.tracks[i]));
+    var ov=document.createElement('div');ov.className='st-daw-tloverlay';
     var ph=document.createElement('div');ph.className='st-daw-playhead';ph.id='stDawPlayhead';
     var phm=document.createElement('div');phm.className='st-daw-ph-mark';ph.appendChild(phm);
-    inner.appendChild(ph);
-    scroll.appendChild(inner);
-    for(var i=0;i<ST.tracks.length;i++){
-      stems.appendChild(stStemRowEl(ST.tracks[i]));
-      lanes.appendChild(stLaneEl(ST.tracks[i]));
-    }
-    body.appendChild(stems);
-    body.appendChild(scroll);
-    box.appendChild(body);
+    ov.appendChild(ph);
+    table.appendChild(ov);
+    wrap.appendChild(table);
+    box.appendChild(wrap);
     /* One shared seek surface: tap or drag anywhere on the
-       ruler / lanes moves every track to that time together. */
+       ruler / lanes moves every track to that time together.
+       Taps on a control cell never seek. */
     var seeking=false;
     var fracFromEvent=function(ev){
-      var r=inner.getBoundingClientRect();if(r.width<=0)return null;
+      var r=ruler.getBoundingClientRect();if(r.width<=0)return null;
       return Math.max(0,Math.min(1,(ev.clientX-r.left)/r.width));
     };
-    inner.addEventListener('pointerdown',function(ev){
+    table.addEventListener('pointerdown',function(ev){
+      if(ev.target.closest&&ev.target.closest('.st-ctl'))return;
       var f=fracFromEvent(ev);if(f===null)return;
       seeking=true;
-      try{inner.setPointerCapture(ev.pointerId);}catch(e){}
+      try{table.setPointerCapture(ev.pointerId);}catch(e){}
       stSeek(stTotal()*f);
     });
-    inner.addEventListener('pointermove',function(ev){
+    table.addEventListener('pointermove',function(ev){
       if(!seeking)return;
       var f=fracFromEvent(ev);if(f===null)return;
       stSeek(stTotal()*f);
     });
     var endSeek=function(){seeking=false;};
-    inner.addEventListener('pointerup',endSeek);
-    inner.addEventListener('pointercancel',endSeek);
+    table.addEventListener('pointerup',endSeek);
+    table.addEventListener('pointercancel',endSeek);
   }
   /* Show the DAW (stSyncEmptyUI) BEFORE drawing, so the lanes
      measure their real on-screen width. */
@@ -20780,63 +21097,47 @@ function stRenderAllTracks(){
 }
 function stStemRowEl(tr){
   var col=stStemColor(tr),kind=stStemKind(tr);
-  var wrap=document.createElement('div');wrap.className='st-stem';
-  var main=document.createElement('div');main.className='st-stem-main';
+  var row=document.createElement('div');row.className='st-daw-row';
+  var ctl=document.createElement('div');ctl.className='st-ctl';
+  var line=document.createElement('div');line.className='st-ctl-line';
   var ico=document.createElement('span');ico.className='st-stem-ico';ico.style.background=col;ico.innerHTML=stStemIcon(kind);
-  main.appendChild(ico);
+  line.appendChild(ico);
   var nm=document.createElement('span');nm.className='st-stem-name';nm.textContent=tr.name;nm.title=tr.name;
-  main.appendChild(nm);
-  var menu=document.createElement('button');menu.type='button';menu.className='st-stem-menu';menu.textContent='⋮';
-  menu.setAttribute('aria-label','Track options · Trim');
-  main.appendChild(menu);
-  wrap.appendChild(main);
-  var sub=document.createElement('div');sub.className='st-stem-sub';
+  line.appendChild(nm);
+  var fx=document.createElement('span');fx.className='st-fx-badge'+(stFxActive(tr)?' on':'');fx.textContent='fx';
+  line.appendChild(fx);
+  tr.els.fxBadge=fx;
   var mb=document.createElement('button');mb.type='button';mb.className='st-ms'+(tr.mute?' on-mute':'');mb.textContent='M';
   mb.setAttribute('aria-label','Mute');mb.setAttribute('aria-pressed',tr.mute?'true':'false');
   mb.addEventListener('click',function(){tr.mute=!tr.mute;mb.className='st-ms'+(tr.mute?' on-mute':'');mb.setAttribute('aria-pressed',tr.mute?'true':'false');stApplyGains();});
-  sub.appendChild(mb);
+  line.appendChild(mb);
   var sb=document.createElement('button');sb.type='button';sb.className='st-ms'+(tr.solo?' on-solo':'');sb.textContent='S';
   sb.setAttribute('aria-label','Solo');sb.setAttribute('aria-pressed',tr.solo?'true':'false');
   sb.addEventListener('click',function(){tr.solo=!tr.solo;sb.className='st-ms'+(tr.solo?' on-solo':'');sb.setAttribute('aria-pressed',tr.solo?'true':'false');stApplyGains();});
-  sub.appendChild(sb);
-  var vol=document.createElement('input');vol.type='range';vol.className='st-range st-stem-vol';vol.min='0';vol.max='100';vol.value=Math.round(tr.vol*100);
+  line.appendChild(sb);
+  var menu=document.createElement('button');menu.type='button';menu.className='st-stem-menu';menu.textContent='⋮';
+  menu.setAttribute('aria-label','Track options · Effects / Download / Trim');
+  menu.addEventListener('click',function(ev){
+    ev.stopPropagation();
+    var m=document.getElementById('stStemMenu');
+    if(stMenuTr===tr&&m&&m.style.display==='block')stMenuClose();
+    else stMenuOpen(tr,menu);
+  });
+  line.appendChild(menu);
+  ctl.appendChild(line);
+  var vol=document.createElement('input');vol.type='range';vol.className='st-range st-ctl-vol';vol.min='0';vol.max='100';vol.value=Math.round(tr.vol*100);
   vol.style.accentColor=col;
   vol.setAttribute('aria-label','Volume');
   vol.addEventListener('input',function(){tr.vol=(parseInt(vol.value,10)||0)/100;stApplyGains();});
-  sub.appendChild(vol);
-  wrap.appendChild(sub);
-  var pop=document.createElement('div');pop.className='st-stem-pop';
-  var trim=document.createElement('div');trim.className='st-trim';
-  trim.appendChild(document.createTextNode('Trim · កាត់'));
-  var ts=document.createElement('input');ts.type='number';ts.min='0';ts.step='0.1';ts.value=tr.trimStart.toFixed(1);ts.setAttribute('aria-label','Trim start (seconds)');
-  var te=document.createElement('input');te.type='number';te.min='0';te.step='0.1';te.value=tr.trimEnd.toFixed(1);te.setAttribute('aria-label','Trim end (seconds)');
-  ts.addEventListener('change',function(){stApplyTrim(tr,ts,te);});
-  te.addEventListener('change',function(){stApplyTrim(tr,ts,te);});
-  trim.appendChild(ts);
-  trim.appendChild(document.createTextNode('–'));
-  trim.appendChild(te);
-  trim.appendChild(document.createTextNode('s'));
-  pop.appendChild(trim);
-  var del=document.createElement('button');del.type='button';del.className='st-stem-del';del.textContent='✕ លុប Track · Remove track';
-  del.addEventListener('click',function(){stRemoveTrack(tr);});
-  pop.appendChild(del);
-  wrap.appendChild(pop);
-  menu.addEventListener('click',function(ev){
-    ev.stopPropagation();
-    var was=pop.classList.contains('on');
-    var pops=document.querySelectorAll('.st-stem-pop.on');
-    for(var i=0;i<pops.length;i++)pops[i].classList.remove('on');
-    if(!was)pop.classList.add('on');
-  });
-  return wrap;
-}
-function stLaneEl(tr){
-  var lane=document.createElement('div');lane.className='st-lane';
-  lane.style.background=stStemColor(tr)+'14';
+  ctl.appendChild(vol);
+  row.appendChild(ctl);
+  var lane=document.createElement('div');lane.className='st-lane2';
+  lane.style.background=col+'1e';
   var cv=document.createElement('canvas');
   lane.appendChild(cv);
   tr.els.canvas=cv;
-  return lane;
+  row.appendChild(lane);
+  return row;
 }
 function stApplyTrim(tr,tsEl,teEl){
   var s=parseFloat(tsEl.value),e=parseFloat(teEl.value);
@@ -20877,7 +21178,7 @@ function stDrawAllWaves(){
 function stDrawRuler(){
   var cv=document.getElementById('stRulerCv');if(!cv)return;
   var dpr=window.devicePixelRatio||1;
-  var w=cv.clientWidth||300,h=30;
+  var w=cv.clientWidth||300,h=cv.clientHeight||26;
   if(w<=0)w=300;
   cv.width=Math.round(w*dpr);cv.height=Math.round(h*dpr);
   var g=cv.getContext('2d');if(!g)return;
@@ -20908,14 +21209,15 @@ function stDrawWave(tr){
   g.setTransform(dpr,0,0,dpr,0,0);
   g.clearRect(0,0,w,h);
   var tot=stTotal();if(tot<=0)tot=tr.buffer.duration;
+  var xOff=w*((tr.startAt||0)/tot);
   var waveW=w*(tr.buffer.duration/tot);
   var n=Math.max(24,Math.floor(waveW/2));
   if(!tr.peaks||tr.peaks.length!==n)tr.peaks=stPeaks(tr.buffer,n);
   var accent=stStemColor(tr);
-  var x0=tr.trimStart/tr.buffer.duration*waveW,x1=tr.trimEnd/tr.buffer.duration*waveW;
+  var x0=xOff+tr.trimStart/tr.buffer.duration*waveW,x1=xOff+tr.trimEnd/tr.buffer.duration*waveW;
   var bw=waveW/n;
   for(var i=0;i<n;i++){
-    var x=i*bw,cx=x+bw*0.5;
+    var x=xOff+i*bw,cx=x+bw*0.5;
     var inside=cx>=x0&&cx<=x1;
     g.globalAlpha=inside?0.92:0.25;
     g.fillStyle=inside?accent:'#9a9ea6';
@@ -20940,11 +21242,11 @@ function stPaintPlayhead(){
   ph.style.left=pct+'%';
   /* Zoomed in: keep the moving playhead in view. */
   if(ST.playing&&stZoom>1){
-    var inner=document.getElementById('stTlInner');
-    var sc=inner?inner.parentElement:null;
-    if(sc&&inner){
-      var x=pct/100*inner.offsetWidth;
-      if(x<sc.scrollLeft+30||x>sc.scrollLeft+sc.clientWidth-30)sc.scrollLeft=Math.max(0,x-sc.clientWidth*0.3);
+    var wrap=document.getElementById('stDawWrap');
+    var ov=ph.parentElement;
+    if(wrap&&ov){
+      var x=ov.offsetLeft+pct/100*ov.clientWidth;
+      if(x<wrap.scrollLeft+40||x>wrap.scrollLeft+wrap.clientWidth-40)wrap.scrollLeft=Math.max(0,x-wrap.clientWidth*0.3);
     }
   }
 }
@@ -20952,17 +21254,24 @@ function stApplyGains(){
   for(var i=0;i<ST.tracks.length;i++){var tr=ST.tracks[i];tr.gain.gain.value=stAudible(tr)?tr.vol:0;}
 }
 function stStopSources(){
-  for(var i=0;i<ST.tracks.length;i++){var tr=ST.tracks[i];if(tr.src){try{tr.src.onended=null;tr.src.stop();}catch(e){}tr.src=null;}}
+  for(var i=0;i<ST.tracks.length;i++){
+    var tr=ST.tracks[i];
+    if(tr.src){try{tr.src.onended=null;tr.src.stop();}catch(e){}tr.src=null;}
+    if(tr._live){for(var j=0;j<tr._live.all.length;j++){try{tr._live.all[j].disconnect();}catch(e){}}tr._live=null;}
+  }
 }
 function stStartSources(){
   var ctx=ST.ctx,now=ctx.currentTime+0.06,pos=ST.pos;
   for(var i=0;i<ST.tracks.length;i++){
     var tr=ST.tracks[i];
-    var src=ctx.createBufferSource();src.buffer=tr.buffer;src.connect(tr.gain);
+    var src=ctx.createBufferSource();src.buffer=tr.buffer;
+    var nd=stChain(ctx,tr,tr.gain);tr._live=nd;
+    src.connect(nd.input);
     tr.src=src;
-    if(pos<tr.trimEnd){
-      if(pos<=tr.trimStart)src.start(now+(tr.trimStart-pos),tr.trimStart,tr.trimEnd-tr.trimStart);
-      else src.start(now,pos,tr.trimEnd-pos);
+    var cb=(tr.startAt||0)+tr.trimStart,ce=(tr.startAt||0)+tr.trimEnd;
+    if(pos<ce){
+      if(pos<=cb)src.start(now+(cb-pos),tr.trimStart,tr.trimEnd-tr.trimStart);
+      else src.start(now,tr.trimStart+(pos-cb),ce-pos);
     }
   }
   ST.startAt=now;ST.startPos=pos;
@@ -21151,6 +21460,7 @@ function stClearProject(){
   var pk=ST.projectKey;
   if(pk&&stAutoSeen[pk])delete stAutoSeen[pk];
   ST.autoToken++;
+  if(typeof stRec!=='undefined'&&stRec.active)stRecStop();
   try{stPause(false);}catch(e){}
   stStopSources();
   for(var i=0;i<ST.tracks.length;i++){try{ST.tracks[i].gain.disconnect();}catch(e){}}
@@ -21505,9 +21815,11 @@ async function stLoadSplitAI(it,row){
     ST.projectKey=key;
     try{stSyncEmptyUI();}catch(e){}
     paintTxt('⏳ កំពុងបំបែក AI · Splitting with AI…');
+    ST.progSink=function(p){paint(p);};
     var aiPromise=stSplitAI();
     var tokenAI=ST.autoToken;/* stSplitAI bumped the token in its synchronous prologue — compare against THIS value below */
     await aiPromise;
+    ST.progSink=null;
     if(String(ST.projectKey||'').indexOf('ai-')===0){
       /* AI stems installed as the current project. (A partial-
          stem warning, if any, stays in the Studio message
@@ -21690,10 +22002,11 @@ async function stSplit(){
    MVSEP's own servers and returns clean stems (Vocals / Drums /
    Bass / Other, possibly Piano / Guitar). The MVSEP key never
    reaches the browser — every call goes through the server.
-   · Progress is honest: the server polls MVSEP internally for
-     up to ~4 minutes, so the wait can be long — the Studio bar
-     shows an indeterminate animation + ticking elapsed seconds,
-     never a fake % (ST.progNoPct).
+   · Progress is alive (owner order 2026-11-18): the Studio
+     bar shimmers with bouncing wave bars, ticking elapsed
+     seconds and a % that advances while MVSEP processes and
+     becomes the REAL loaded fraction once the stems return
+     (they are fetched + decoded in parallel).
    · mvsep_timeout (job still processing, hash included) is NOT
      an error: the SAME separation is resumed by polling GET
      /api/studio/separate/status every 10 s for up to 10 more
@@ -21766,9 +22079,10 @@ async function stSplitAI(){
   ST.autoToken++;
   var token=ST['auto'+'Token'];
   stPause(false);
+  ST.progAi=true;
+  ST.progAiFrac=null;
   stProgBegin('កំពុងបំបែក AI · Splitting with AI');
-  ST.progNoPct=true;
-  var fl=document.getElementById('stProgFill');if(fl)fl.classList.add('indet');
+  var fl=document.getElementById('stProgFill');if(fl)fl.classList.remove('indet');
   stProgPaint();
   var ab=document.getElementById('stSplitAIBtn');if(ab)ab.disabled=true;
   var stems=null,hash='';
@@ -21810,15 +22124,33 @@ async function stSplitAI(){
       if(ia<0)ia=99;if(ib<0)ib=99;
       return ia-ib;
     });
+    /* Fetch + decode ALL stems IN PARALLEL (owner order
+       2026-11-18) — on a phone this is much faster than loading
+       them one by one. Order and failed-stem names are kept
+       exactly as the sequential version reported them, and the
+       real loaded fraction drives the progress bar. */
     var loaded=[],failed=[];
-    for(var i=0;i<ordered.length;i++){
-      var s=ordered[i];
-      if(!s||!s.url){failed.push(stAIStemLabel(s&&s.name));continue;}
-      try{
-        var buf=await stAIStemFetch(s.url);
-        loaded.push({label:stAIStemLabel(s.name),buffer:buf});
-      }catch(e){failed.push(stAIStemLabel(s.name));}
-      if(token!==ST.autoToken)return;
+    var totalStems=ordered.length,doneStems=0;
+    ST.progAiFrac=0;
+    var results=await Promise.all(ordered.map(function(s){
+      if(!s||!s.url){
+        doneStems++;ST.progAiFrac=totalStems?doneStems/totalStems:1;
+        return Promise.resolve({failed:stAIStemLabel(s&&s.name)});
+      }
+      return stAIStemFetch(s.url).then(function(buf){
+        doneStems++;ST.progAiFrac=totalStems?doneStems/totalStems:1;
+        ST.progLabel='កំពុងផ្ទុក Stem · Loading stems '+doneStems+'/'+totalStems;stProgPaint();
+        return {label:stAIStemLabel(s.name),buffer:buf};
+      }).catch(function(){
+        doneStems++;ST.progAiFrac=totalStems?doneStems/totalStems:1;
+        ST.progLabel='កំពុងផ្ទុក Stem · Loading stems '+doneStems+'/'+totalStems;stProgPaint();
+        return {failed:stAIStemLabel(s.name)};
+      });
+    }));
+    if(token!==ST.autoToken)return;
+    for(var ri=0;ri<results.length;ri++){
+      if(results[ri]&&results[ri].buffer)loaded.push(results[ri]);
+      else failed.push(results[ri]?results[ri].failed:stAIStemLabel(ordered[ri]&&ordered[ri].name));
     }
     if(!loaded.length){stMsg('បំបែក AI បានតែ Stem បើកមិនបាន · AI split finished but no stem could be loaded',true);return;}
     stSetAIStemProject(ST.songName,ST.mainBuffer,loaded,'ai-'+(hash||ST.projectKey||''));
@@ -21847,8 +22179,8 @@ function stRenderMix(){
       any=true;
       var src=off.createBufferSource();src.buffer=tr.buffer;
       var g=off.createGain();g.gain.value=tr.vol;
-      src.connect(g);g.connect(master);
-      src.start(tr.trimStart,tr.trimStart,Math.max(0.01,tr.trimEnd-tr.trimStart));
+      src.connect(stChain(off,tr,g).input);g.connect(master);
+      src.start((tr.startAt||0)+tr.trimStart,tr.trimStart,Math.max(0.01,tr.trimEnd-tr.trimStart));
     }
     if(!any){reject(new Error('silent'));return;}
     for(var k=1;k<10;k++){
