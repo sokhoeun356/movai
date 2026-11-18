@@ -4035,8 +4035,16 @@ async function apiRoute(req, res, urlPath) {
           // Agnes image via the admin-stored keys (browser sends no
           // key). Free ($0) — no MovAi credit is charged, like NovAI.
           // API: POST https://apihub.agnes-ai.com/v1/images/generations
-          // {model:'agnes-image-2.5-flash', prompt, size:'1K',
+          // {model:'agnes-image-2.5-flash'|'agnes-image-2.1-flash'|
+          //  'agnes-image-2.0-flash', prompt, size:'1K',
           //  ratio:'16:9'|'9:16'|..., n:1} → data[0].url.
+          // The model comes from the website picker; anything else
+          // falls back to 2.5-flash. The Agnes docs list 2.0/2.1 as
+          // paid ($0.015/image at 1K) but other sources say $0 — the
+          // call itself decides: a payment/balance failure is
+          // reported, never charged.
+          const _agnesModels = ['agnes-image-2.5-flash', 'agnes-image-2.1-flash', 'agnes-image-2.0-flash'];
+          const _agnesModel = (typeof body.model === 'string' && _agnesModels.indexOf(body.model.trim()) >= 0) ? body.model.trim() : 'agnes-image-2.5-flash';
           // Ratio from the requested dimensions (Agnes supports
           // 1:1, 3:4, 4:3, 16:9, 9:16, 2:3, 3:2, 21:9).
           const _ar = width / height;
@@ -4046,7 +4054,7 @@ async function apiRoute(req, res, urlPath) {
           let out;
           try {
             out = await withProviderKeyRotation('agnes', async (k) => {
-              const r = await fetch('https://apihub.agnes-ai.com/v1/images/generations', { method: 'POST', headers: { 'Authorization': 'Bearer ' + k, 'Content-Type': 'application/json' }, body: JSON.stringify({ model: 'agnes-image-2.5-flash', prompt, size: '1K', ratio: _ratio, n: 1 }), signal: AbortSignal.timeout(120000) });
+              const r = await fetch('https://apihub.agnes-ai.com/v1/images/generations', { method: 'POST', headers: { 'Authorization': 'Bearer ' + k, 'Content-Type': 'application/json' }, body: JSON.stringify({ model: _agnesModel, prompt, size: '1K', ratio: _ratio, n: 1 }), signal: AbortSignal.timeout(120000) });
               const j = await r.json().catch(() => null);
               const url = j && j.data && (Array.isArray(j.data) ? (j.data[0] && (j.data[0].url || j.data[0].image_url)) : (j.data.url || j.data.image_url));
               if (url) return { done: true, imageUrl: url };
