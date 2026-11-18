@@ -2052,9 +2052,10 @@ function publicSettings(s) {
 // switches to the next (see withProviderKeyRotation). Old single-key files
 // ({key, endpoint, updatedAt}) are migrated on load, never losing a key.
 // Providers: novai, magichour, masterpiecex, hunyuan3d, suno, acemusic,
-// musicapi, groq (the AI chat key), tavus kept for the legacy proxy branch).
+// musicapi, groq (the AI chat key), tavus kept for the legacy proxy branch,
+// agnes (Agnes AI — free text/image/video Flash models, OpenAI-compatible).
 const ADMIN_KEYS_FILE = path.join(DATA_DIR, 'admin-keys.json');
-const KNOWN_KEY_PROVIDERS = ['novai', 'magichour', 'masterpiecex', 'hunyuan3d', 'suno', 'acemusic', 'musicapi', 'tavus', 'groq', 'mvsep'];
+const KNOWN_KEY_PROVIDERS = ['novai', 'magichour', 'masterpiecex', 'hunyuan3d', 'suno', 'acemusic', 'musicapi', 'tavus', 'groq', 'mvsep', 'agnes'];
 function normProvider(v) {
   if (typeof v !== 'string') return '';
   let p = v.trim().toLowerCase().replace(/[\s_-]+/g, '');
@@ -2177,7 +2178,7 @@ async function keyHealthList() {
   // Also include providers that have keys configured but no health record
   // yet (shown as 'unknown' until first use).
   try {
-    for (const p of ['suno', 'magichour', 'musicapi', 'novai', 'groq', 'mvsep']) {
+    for (const p of ['suno', 'magichour', 'musicapi', 'novai', 'groq', 'mvsep', 'agnes']) {
       const n = (await adminProviderKeyList(p)).length;
       if (!n) continue;
       if (!out[p]) out[p] = [];
@@ -6485,6 +6486,15 @@ async function apiRoute(req, res, urlPath) {
         if (r.status === 401 || r.status === 403) return blockedMsg(r.status);
         if (r.status === 429) return { status: 'error', message: 'Rate limit (HTTP 429) — សាកល្បងម្តងទៀតពេលក្រោយ' };
         return { status: 'error', message: 'NovAI ឆ្លើយ HTTP ' + r.status };
+      }
+      if (p === 'agnes') {
+        // Agnes AI is OpenAI-compatible: GET /v1/models on the Agnes hub
+        // answers 200 for a valid key, 401/403 for a bad one.
+        const r = await fetch('https://apihub.agnes-ai.com/v1/models', { headers: { 'Authorization': 'Bearer ' + key }, signal: AbortSignal.timeout(timeoutMs) });
+        if (r.status === 200) return okMsg;
+        if (r.status === 401 || r.status === 403) return blockedMsg(r.status);
+        if (r.status === 429) return { status: 'error', message: 'Rate limit (HTTP 429) — សាកល្បងម្តងទៀតពេលក្រោយ' };
+        return { status: 'error', message: 'Agnes AI ឆ្លើយ HTTP ' + r.status };
       }
       if (p === 'tavus') {
         const r = await fetch('https://tavusapi.com/v2/replicas', { headers: { 'x-api-key': key }, signal: AbortSignal.timeout(timeoutMs) });
