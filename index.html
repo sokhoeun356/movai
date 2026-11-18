@@ -1585,6 +1585,31 @@ html[data-mode="light"] .btn-free{color:#63910c}
 #forgotSheet .forgot-code-input{text-align:center;font-size:1.5rem;font-weight:800;letter-spacing:.4em;text-indent:.4em}
 #forgotSheet .forgot-count{font-variant-numeric:tabular-nums}
 .forgot-google-alt{margin-top:14px;padding:14px;border:1px solid var(--line2);border-radius:14px;background:var(--card2);text-align:left}
+/* ===== Wallet (Profile) + Instant reset sheet =====
+   The wallet block sits at the very TOP of My Profile: a large
+   balance card, then Top-up and Withdraw boxes in the same plain
+   bordered style as the payment boxes (.pay-opt). The Buy with
+   Wallet button on package cards is a secondary white-outline
+   button under the green Buy button. */
+#instantSheet{-webkit-backdrop-filter:blur(16px) saturate(130%);backdrop-filter:blur(16px) saturate(130%)}
+#instantSheet .login-brand{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px;padding-bottom:12px;border-bottom:1px solid var(--line)}
+#instantSheet .login-brand-name{font-size:1.75rem;font-weight:900;letter-spacing:-.02em;line-height:1;color:var(--text);white-space:nowrap}
+#instantSheet .login-brand-name span{color:var(--accent-text)}
+#instantSheet .login-brand-credit{text-align:right;line-height:1.3;min-width:0}
+#instantSheet .login-brand-credit b{display:block;font-size:0.75rem;font-weight:800;letter-spacing:.04em;color:var(--text);white-space:nowrap}
+#instantSheet .login-brand-credit i{display:block;font-style:normal;font-size:0.6875rem;font-weight:600;color:var(--muted);white-space:nowrap}
+.wallet-bal-card{border:1px solid rgba(var(--accent-rgb),.45);border-radius:14px;padding:16px 14px;background:var(--card2);text-align:center}
+.wallet-bal-label{font-size:0.8125rem;font-weight:800;color:var(--muted)}
+.wallet-bal-amt{font-size:2.25rem;font-weight:900;line-height:1.15;margin-top:4px;color:var(--accent-text);font-variant-numeric:tabular-nums}
+.wallet-sec{border:1px solid var(--line2);border-radius:14px;padding:14px;margin-top:12px;background:var(--card2);text-align:left}
+.wallet-sec-head{font-size:0.9375rem;font-weight:900}
+.wallet-note{font-size:0.8125rem;color:var(--muted);line-height:1.7;margin-top:8px}
+.wallet-msg{font-size:0.8125rem;margin-top:10px;min-height:16px;line-height:1.6;font-weight:700}
+.wallet-methods{display:flex;gap:8px;margin-top:10px}
+.wallet-method{flex:1 1 0;padding:11px 8px;border-radius:12px;border:1px solid var(--line2);background:var(--field);color:var(--text);font-family:inherit;font-size:0.875rem;font-weight:800;cursor:pointer;min-height:46px}
+.wallet-method.on{border-color:var(--accent);background:rgba(var(--accent-rgb),.16);color:var(--accent-text)}
+.pkg-card .btn.wallet-btn{background:rgba(0,0,0,.30);color:#fff;border:1px solid rgba(255,255,255,.55)}
+.pkg-card .btn.wallet-btn:active{filter:brightness(1.2)}
 /* Google sign-in loading spinner — shown in the login sheet while
    Google is opening, INSTEAD of any «Opening Google…» text (owner
    rule: a spinning indicator only, no waiting words). */
@@ -3067,12 +3092,14 @@ input[type=range].st-range{accent-color:var(--accent);min-height:32px;cursor:poi
         <div class="pkg-price" id="pkgPrice-yearly">$15<small data-i18n="pkgPerMonth">/ខែ</small></div>
         <div class="pkg-credits" data-i18n="pkgCreditsYear">140,000 Credit</div>
         <button type="button" class="btn btn-green" id="pkgBuy-yearly" onclick="pkgBuyAsk('yearly')" data-i18n="pkgBuy">ទិញឥឡូវ</button>
+        <button type="button" class="btn wallet-btn" onclick="walletBuyAsk('yearly')" data-i18n="walletBuyBtn">ទិញដោយ Wallet · Buy with Wallet</button>
       </div>
       <div class="pkg-card media">
         <span class="pkg-name" data-i18n="pkgMonthly">ប្រចាំខែ</span>
         <div class="pkg-price" id="pkgPrice-monthly">$25<small data-i18n="pkgPerMonth">/ខែ</small></div>
         <div class="pkg-credits" data-i18n="pkgCreditsMonth">11,000 Credit</div>
         <button type="button" class="btn btn-green" id="pkgBuy-monthly" onclick="pkgBuyAsk('monthly')" data-i18n="pkgBuy">ទិញឥឡូវ</button>
+        <button type="button" class="btn wallet-btn" onclick="walletBuyAsk('monthly')" data-i18n="walletBuyBtn">ទិញដោយ Wallet · Buy with Wallet</button>
       </div>
     </div>
     </div>
@@ -3347,6 +3374,50 @@ input[type=range].st-range{accent-color:var(--accent);min-height:32px;cursor:poi
       <h3 style="font-size:1rem;font-weight:800" data-i18n="profileTitle">ប្រូហ្វាល់របស់ខ្ញុំ</h3>
       <button type="button" class="drawer-close" style="background:var(--card2);color:var(--text);border-color:var(--line2)" onclick="profileClose()" aria-label="Close">✕</button>
     </div>
+    <!-- Wallet (owner order): balance at the very TOP of My
+         Profile, then Top-up and Withdraw request forms. Static
+         markup (NOT rebuilt by profileRender) so typed amounts
+         and attached images survive profile re-renders; the
+         balance is refreshed by walletLoadBalance() on open and
+         after every wallet action. -->
+    <div id="walletBox" style="margin-top:10px">
+      <div class="wallet-bal-card">
+        <div class="wallet-bal-label" data-i18n="walletTitle">កាបូបលុយ · Wallet</div>
+        <div class="wallet-bal-amt" id="walletBalance">$0.00</div>
+      </div>
+      <div class="wallet-sec">
+        <div class="wallet-sec-head" data-i18n="walletTopupTitle">បញ្ចូលលុយ · Top up</div>
+        <div class="wallet-methods" role="group" aria-label="Payment method">
+          <button type="button" class="wallet-method on" id="walletMethodKhmer" onclick="walletSetMethod('khmer')" data-i18n="walletMethodKhmer">ខ្មែរ · Khmer</button>
+          <button type="button" class="wallet-method" id="walletMethodForeign" onclick="walletSetMethod('foreign')" data-i18n="walletMethodForeign">បរទេស · Foreign</button>
+        </div>
+        <div class="auth-field">
+          <label for="walletTopupAmount" data-i18n="walletAmount">ចំនួនលុយ (USD) · Amount (USD)</label>
+          <input class="input" id="walletTopupAmount" type="number" inputmode="decimal" min="5" step="0.01" placeholder="5.00">
+        </div>
+        <p class="wallet-note" data-i18n="walletMinNote">អប្បបរមា $5.00 · Minimum $5.00</p>
+        <label class="pay-receipt-pick" for="walletTopupFile" data-i18n="walletReceiptPick">ភ្ជាប់រូបវិក្កយបត្រ (បើមាន) · Attach receipt image (optional)</label>
+        <input type="file" id="walletTopupFile" accept="image/*" style="display:none" onchange="walletFilePick(this,'topup')">
+        <div id="walletTopupPrev"></div>
+        <p class="wallet-msg" id="walletTopupMsg"></p>
+        <button type="button" class="kbtn kbtn-black" id="walletTopupBtn" style="margin-top:8px;width:100%" onclick="walletTopupSubmit()" data-i18n="walletSubmit">ផ្ញើសំណើ · Submit</button>
+      </div>
+      <div class="wallet-sec">
+        <div class="wallet-sec-head" data-i18n="walletWithdrawTitle">ដកលុយ · Withdraw</div>
+        <div class="auth-field">
+          <label for="walletWithdrawAmount" data-i18n="walletAmount">ចំនួនលុយ (USD) · Amount (USD)</label>
+          <input class="input" id="walletWithdrawAmount" type="number" inputmode="decimal" min="5" step="0.01" placeholder="5.00" oninput="walletWithdrawTotal()">
+        </div>
+        <p class="wallet-note" data-i18n="walletMinNote">អប្បបរមា $5.00 · Minimum $5.00</p>
+        <p class="wallet-note" data-i18n="walletWithdrawFee">ថ្លៃសេវាដកលុយ៖ ថេរ $0.50 ក្នុងមួយដង (មិនមែនភាគរយទេ)។ ដក $X ត្រូវកាត់ $X + $0.50 — កាត់តែបន្ទាប់ពី Admin យល់ព្រមប៉ុណ្ណោះ។ · Withdraw fee: a FLAT $0.50 per withdrawal (not a percentage). Withdrawing $X costs $X + $0.50 — deducted only after the Admin approves.</p>
+        <p class="wallet-note" id="walletWithdrawTotalLine" style="font-weight:800;color:var(--text)"></p>
+        <label class="pay-receipt-pick" for="walletWithdrawFile" data-i18n="walletKhqrPick">ភ្ជាប់រូប KHQR របស់អ្នក · Attach your KHQR image</label>
+        <input type="file" id="walletWithdrawFile" accept="image/*" style="display:none" onchange="walletFilePick(this,'withdraw')">
+        <div id="walletWithdrawPrev"></div>
+        <p class="wallet-msg" id="walletWithdrawMsg"></p>
+        <button type="button" class="kbtn kbtn-black" id="walletWithdrawBtn" style="margin-top:8px;width:100%" onclick="walletWithdrawSubmit()" data-i18n="walletSubmit">ផ្ញើសំណើ · Submit</button>
+      </div>
+    </div>
     <div id="profileBody" style="margin-top:8px"></div>
   </div>
 </div>
@@ -3486,11 +3557,22 @@ input[type=range].st-range{accent-color:var(--accent);min-height:32px;cursor:poi
         <label for="forgotEmail" data-i18n="loginGmailLabel">គណនី Google (Gmail)</label>
         <input class="input" id="forgotEmail" type="email" autocomplete="email" placeholder="yourname@gmail.com" onkeydown="if(event.key==='Enter')forgotSendCode()">
       </div>
-      <p id="forgotMsg1" style="font-size:0.8125rem;margin-top:10px;min-height:16px;line-height:1.6"></p>
-      <button type="button" class="kbtn kbtn-black" id="forgotSendBtn" style="margin-top:6px;width:100%" onclick="forgotSendCode()" data-i18n="forgotSendBtn">ផ្ញើលេខកូដ · Send code</button>
+      <div class="wallet-sec">
+        <div class="wallet-sec-head" data-i18n="forgotOpt1Title">ជម្រើស 1 · Option 1 — លេខកូដ Gmail ឥតគិតថ្លៃ · Free Gmail code</div>
+        <p class="wallet-note" data-i18n="forgotOpt1Note">ឥតគិតថ្លៃ — តែប្រើបានតែ 2 ដងប៉ុណ្ណោះសម្រាប់គណនីនេះ; បន្ទាប់ពីនោះវាឈប់ដំណើរការ។ · Free — but it works only 2 times ever for this account; after that it stops working.</p>
+        <p id="forgotMsg1" style="font-size:0.8125rem;margin-top:10px;min-height:16px;line-height:1.6"></p>
+        <button type="button" class="kbtn kbtn-black" id="forgotSendBtn" style="margin-top:6px;width:100%" onclick="forgotSendCode()" data-i18n="forgotSendBtn">ផ្ញើលេខកូដ · Send code</button>
+      </div>
       <div id="forgotGoogleAlt" class="forgot-google-alt" style="display:none">
         <p style="font-size:0.875rem;line-height:1.7" data-i18n="forgotGoogleAltNote">Email មិនទាន់ដំឡើងនៅលើ Server ទេ — តែអ្នកអាចកំណត់លេខសម្ងាត់ថ្មីដោយ Google បាន (មិនត្រូវការ email)៖</p>
         <button type="button" class="google-btn" style="margin-top:10px;width:100%" onclick="forgotUseGoogle()"><svg viewBox="0 0 48 48" width="20" height="20" aria-hidden="true" style="flex:0 0 auto"><path fill="#FFC107" d="M43.6 20.1H42V20H24v8h11.3C33.7 32.7 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.9 1.2 8 3l5.7-5.7C34.3 6.1 29.3 4 24 4 13 4 4 13 4 24s9 20 20 20 20-9 20-20c0-1.3-.1-2.6-.4-3.9z"/><path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.9 1.2 8 3l5.7-5.7C34.3 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.1 26.7 36 24 36c-5.2 0-9.6-3.3-11.3-8l-6.5 5C9.5 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.1H42V20H24v8h11.3c-.8 2.3-2.3 4.3-4.1 5.6l6.2 5.2C36.9 39.2 44 34 44 24c0-1.3-.1-2.6-.4-3.9z"/></svg><span data-i18n="forgotUseGoogle">ប្រើ Google ជំនួសវិញ · Use Google instead</span></button>
+      </div>
+      <div class="wallet-sec">
+        <div class="wallet-sec-head" data-i18n="forgotOpt2Title">ជម្រើស 2 · Option 2 — កំណត់ភ្លាមៗ · Instant reset</div>
+        <p class="wallet-note" data-i18n="forgotOpt2Note">កាត់ $0.10 ពីសមតុល្យ Wallet របស់អ្នក ហើយបើកផ្ទាំងដាក់លេខសម្ងាត់ថ្មីភ្លាមៗ — មិនបាច់រង់ចាំលេខកូដ Gmail ទេ។ · Deducts $0.10 from your wallet balance and opens the new-password panel right away — no Gmail code needed.</p>
+        <p class="wallet-note" id="forgotInstantBal" style="font-weight:800;color:var(--text)"></p>
+        <p class="wallet-msg" id="forgotInstantMsg"></p>
+        <button type="button" class="kbtn kbtn-black" id="forgotInstantBtn" style="margin-top:6px;width:100%" onclick="forgotInstantStart()" data-i18n="forgotInstantBtn">កំណត់ភ្លាមៗ — $0.10 · Instant reset — $0.10</button>
       </div>
       <button type="button" class="auth-forgot" onclick="forgotUseGoogle()" data-i18n="forgotUseGoogle">ប្រើ Google ជំនួសវិញ · Use Google instead</button>
       <button type="button" class="kbtn kbtn-white" style="margin-top:10px;width:100%" onclick="forgotClose()" data-i18n="verifyBack">ត្រឡប់ទៅ Log in</button>
@@ -3519,6 +3601,38 @@ input[type=range].st-range{accent-color:var(--accent);min-height:32px;cursor:poi
       <button type="button" class="kbtn kbtn-white" id="forgotResendBtn" style="display:none;margin-top:10px;width:100%" onclick="forgotResendCode()" data-i18n="verifyResend">ផ្ញើលេខកូដម្ដងទៀត · Resend</button>
       <button type="button" class="kbtn kbtn-white" style="margin-top:10px;width:100%" onclick="forgotClose()" data-i18n="verifyBack">ត្រឡប់ទៅ Log in</button>
     </div>
+  </div>
+</div>
+<!-- Instant reset panel (Forgot password · Option 2): shown after
+     POST /api/auth/forget-password-instant charges $0.10 from the
+     wallet; same password-setup look as the first-time Create
+     Password sheet. Submits to POST /api/auth/instant-reset. -->
+<div id="instantSheet" class="pkg-sheet" style="display:none" role="dialog" aria-modal="true">
+  <div class="pkg-sheet-card">
+    <div class="login-brand" aria-hidden="true"><span class="login-brand-name">Mov<span>Ai</span></span><span class="login-brand-credit"><b>YEM SOKHOEUN</b><i>Create by Owner</i></span></div>
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:10px">
+      <h3 style="font-size:1.0625rem;font-weight:800" data-i18n="instantTitle">កំណត់លេខសម្ងាត់ថ្មី · Set a new password</h3>
+      <button type="button" class="drawer-close" style="background:var(--card2);color:var(--text);border-color:var(--line2)" onclick="instantSheetCancel()" aria-label="Close">✕</button>
+    </div>
+    <p style="font-size:0.875rem;color:var(--muted);line-height:1.7;margin-top:10px" data-i18n="instantNote">បានកាត់ $0.10 ពី Wallet របស់អ្នកហើយ។ សូមដាក់លេខសម្ងាត់ថ្មីសម្រាប់គណនីរបស់អ្នក។ · $0.10 was deducted from your wallet. Please set a new password for your account.</p>
+    <p id="instantEmail" style="font-size:0.9375rem;font-weight:800;margin-top:8px;overflow-wrap:break-word"></p>
+    <div class="auth-field">
+      <label for="instantNew" data-i18n="forgotNewPassLabel">លេខសម្ងាត់ថ្មី · New password</label>
+      <div class="auth-pass-wrap">
+        <input class="input" id="instantNew" type="password" autocomplete="new-password" data-i18n-ph="authPassPh" placeholder="បញ្ចូលលេខសម្ងាត់របស់អ្នក" onkeydown="if(event.key==='Enter'){event.preventDefault();var c=document.getElementById('instantConfirm');if(c)c.focus();}">
+        <button type="button" class="auth-eye" onclick="authToggleEye('instantNew',this)" aria-label="Show / hide password"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button>
+      </div>
+    </div>
+    <div class="auth-field">
+      <label for="instantConfirm" data-i18n="pwdConfirmLabel">បញ្ជាក់លេខសម្ងាត់</label>
+      <div class="auth-pass-wrap">
+        <input class="input" id="instantConfirm" type="password" autocomplete="new-password" data-i18n-ph="pwdConfirmPh" placeholder="បញ្ចូលលេខសម្ងាត់ម្ដងទៀត" onkeydown="if(event.key==='Enter')instantResetSubmit()">
+        <button type="button" class="auth-eye" onclick="authToggleEye('instantConfirm',this)" aria-label="Show / hide password"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button>
+      </div>
+    </div>
+    <p id="instantMsg" style="font-size:0.8125rem;margin-top:10px;min-height:16px;line-height:1.6"></p>
+    <button type="button" class="kbtn kbtn-black" id="instantBtn" style="margin-top:6px;width:100%" onclick="instantResetSubmit()" data-i18n="instantBtn">រក្សាទុកលេខសម្ងាត់ថ្មី · Save new password</button>
+    <button type="button" class="kbtn kbtn-white" style="margin-top:10px;width:100%" onclick="instantSheetCancel()" data-i18n="pkgCancel">បោះបង់</button>
   </div>
 </div>
 <div id="savePwdSheet" class="pkg-sheet" style="display:none" role="dialog" aria-modal="true">
@@ -3776,6 +3890,34 @@ km:{
  forgotResetBtn:'កំណត់លេខសម្ងាត់ថ្មី · Reset password',
  forgotResetting:'កំពុងកំណត់លេខសម្ងាត់ថ្មី…',
  forgotErrReset:'កំណត់លេខសម្ងាត់ថ្មីមិនបានទេ — សូមព្យាយាមម្ដងទៀត',
+ walletTitle:'កាបូបលុយ · Wallet',walletBalanceLbl:'សមតុល្យ Wallet · Wallet balance',
+ walletTopupTitle:'បញ្ចូលលុយ · Top up',walletWithdrawTitle:'ដកលុយ · Withdraw',
+ walletMethodKhmer:'ខ្មែរ · Khmer',walletMethodForeign:'បរទេស · Foreign',
+ walletAmount:'ចំនួនលុយ (USD) · Amount (USD)',walletMinNote:'អប្បបរមា $5.00 · Minimum $5.00',
+ walletReceiptPick:'ភ្ជាប់រូបវិក្កយបត្រ (បើមាន) · Attach receipt image (optional)',
+ walletKhqrPick:'ភ្ជាប់រូប KHQR របស់អ្នក · Attach your KHQR image',
+ walletImgOk:'បានភ្ជាប់រូបហើយ ✓ · Image attached ✓',walletRemove:'ដកចេញ · Remove',
+ walletSubmit:'ផ្ញើសំណើ · Submit',walletSending:'កំពុងផ្ញើ… · Sending…',
+ walletTopupSent:'បានផ្ញើសំណើបញ្ចូលលុយទៅ Admin ហើយ ✓ — រង់ចាំ Admin យល់ព្រម លុយនឹងចូល Wallet របស់អ្នក។ · Top-up request sent to the Admin ✓ — once approved, the money lands in your wallet.',
+ walletWithdrawSent:'បានផ្ញើសំណើដកលុយទៅ Admin ហើយ ✓ — Admin នឹងផ្ញើលុយទៅ KHQR របស់អ្នក ក្រោយយល់ព្រម។ · Withdraw request sent to the Admin ✓ — after approval the Admin sends the money to your KHQR.',
+ walletErrAmount:'សូមបញ្ចូលចំនួនចាប់ពី $5.00 ឡើងទៅ · Please enter an amount of $5.00 or more',
+ walletErrFail:'ផ្ញើសំណើមិនបានទេ — សូមព្យាយាមម្ដងទៀត · Could not send the request — please try again',
+ walletWithdrawFee:'ថ្លៃសេវាដកលុយ៖ ថេរ $0.50 ក្នុងមួយដង (មិនមែនភាគរយទេ)។ ដក $X ត្រូវកាត់ $X + $0.50 — កាត់តែបន្ទាប់ពី Admin យល់ព្រមប៉ុណ្ណោះ។ · Withdraw fee: a FLAT $0.50 per withdrawal (not a percentage). Withdrawing $X costs $X + $0.50 — deducted only after the Admin approves.',
+ walletWithdrawTotalFmt:'សរុបត្រូវកាត់ (ក្រោយ Admin យល់ព្រម)៖ {t} · Total deducted (after Admin approval): {t}',
+ walletBuyBtn:'ទិញដោយ Wallet · Buy with Wallet',walletBuying:'កំពុងទិញ… · Buying…',
+ walletBuyDone:'ទិញរួចរាល់ ✓ កញ្ចប់របស់អ្នកបានបើកហើយ · Purchase complete ✓ Your package is now active',
+ walletErrInsufficient:'សមតុល្យ Wallet មិនគ្រប់ទេ — សូមបញ្ចូលលុយជាមុនសិន · Wallet balance is not enough — please top up first',
+ walletNewBalFmt:'សមតុល្យថ្មី៖ {b} · New balance: {b}',
+ forgotOpt1Title:'ជម្រើស 1 · Option 1 — លេខកូដ Gmail ឥតគិតថ្លៃ · Free Gmail code',
+ forgotOpt1Note:'ឥតគិតថ្លៃ — តែប្រើបានតែ 2 ដងប៉ុណ្ណោះសម្រាប់គណនីនេះ; បន្ទាប់ពីនោះវាឈប់ដំណើរការ។ · Free — but it works only 2 times ever for this account; after that it stops working.',
+ forgotOpt2Title:'ជម្រើស 2 · Option 2 — កំណត់ភ្លាមៗ · Instant reset',
+ forgotOpt2Note:'កាត់ $0.10 ពីសមតុល្យ Wallet របស់អ្នក ហើយបើកផ្ទាំងដាក់លេខសម្ងាត់ថ្មីភ្លាមៗ — មិនបាច់រង់ចាំលេខកូដ Gmail ទេ។ · Deducts $0.10 from your wallet balance and opens the new-password panel right away — no Gmail code needed.',
+ forgotInstantBtn:'កំណត់ភ្លាមៗ — $0.10 · Instant reset — $0.10',
+ instantTitle:'កំណត់លេខសម្ងាត់ថ្មី · Set a new password',
+ instantNote:'បានកាត់ $0.10 ពី Wallet របស់អ្នកហើយ។ សូមដាក់លេខសម្ងាត់ថ្មីសម្រាប់គណនីរបស់អ្នក។ · $0.10 was deducted from your wallet. Please set a new password for your account.',
+ instantBtn:'រក្សាទុកលេខសម្ងាត់ថ្មី · Save new password',
+ instantStarting:'កំពុងរៀបចំ… · Preparing…',
+ instantErrFail:'កំណត់ភ្លាមៗមិនបានទេ — សូមព្យាយាមម្ដងទៀត · Instant reset failed — please try again',
  savePwdTitle:'ចង់សេវ password អត់?',
  savePwdNote:'បើសេវ — លើកក្រោយគ្រាន់តែចុចលើគណនីរបស់អ្នកនៅលើអេក្រង់ Log in វានឹងចូលដោយស្វ័យប្រវត្តិ មិនបាច់វាយលេខសម្ងាត់ទេ។',
  savePwdYes:'សេវ · Save',savePwdNo:'អត់សេវ · Not now',
@@ -4043,6 +4185,34 @@ en:{
  forgotResetBtn:'Reset password · កំណត់លេខសម្ងាត់ថ្មី',
  forgotResetting:'Resetting your password…',
  forgotErrReset:'Could not reset the password — please try again',
+ walletTitle:'Wallet · កាបូបលុយ',walletBalanceLbl:'Wallet balance · សមតុល្យ Wallet',
+ walletTopupTitle:'Top up · បញ្ចូលលុយ',walletWithdrawTitle:'Withdraw · ដកលុយ',
+ walletMethodKhmer:'Khmer · ខ្មែរ',walletMethodForeign:'Foreign · បរទេស',
+ walletAmount:'Amount (USD) · ចំនួនលុយ (USD)',walletMinNote:'Minimum $5.00 · អប្បបរមា $5.00',
+ walletReceiptPick:'Attach receipt image (optional) · ភ្ជាប់រូបវិក្កយបត្រ (បើមាន)',
+ walletKhqrPick:'Attach your KHQR image · ភ្ជាប់រូប KHQR របស់អ្នក',
+ walletImgOk:'Image attached ✓ · បានភ្ជាប់រូបហើយ ✓',walletRemove:'Remove · ដកចេញ',
+ walletSubmit:'Submit · ផ្ញើសំណើ',walletSending:'Sending… · កំពុងផ្ញើ…',
+ walletTopupSent:'Top-up request sent to the Admin ✓ — once approved, the money lands in your wallet. · បានផ្ញើសំណើបញ្ចូលលុយទៅ Admin ហើយ ✓ — រង់ចាំ Admin យល់ព្រម លុយនឹងចូល Wallet របស់អ្នក។',
+ walletWithdrawSent:'Withdraw request sent to the Admin ✓ — after approval the Admin sends the money to your KHQR. · បានផ្ញើសំណើដកលុយទៅ Admin ហើយ ✓ — Admin នឹងផ្ញើលុយទៅ KHQR របស់អ្នក ក្រោយយល់ព្រម។',
+ walletErrAmount:'Please enter an amount of $5.00 or more · សូមបញ្ចូលចំនួនចាប់ពី $5.00 ឡើងទៅ',
+ walletErrFail:'Could not send the request — please try again · ផ្ញើសំណើមិនបានទេ — សូមព្យាយាមម្ដងទៀត',
+ walletWithdrawFee:'Withdraw fee: a FLAT $0.50 per withdrawal (not a percentage). Withdrawing $X costs $X + $0.50 — deducted only after the Admin approves. · ថ្លៃសេវាដកលុយ៖ ថេរ $0.50 ក្នុងមួយដង (មិនមែនភាគរយទេ)។ ដក $X ត្រូវកាត់ $X + $0.50 — កាត់តែបន្ទាប់ពី Admin យល់ព្រមប៉ុណ្ណោះ។',
+ walletWithdrawTotalFmt:'Total deducted (after Admin approval): {t} · សរុបត្រូវកាត់ (ក្រោយ Admin យល់ព្រម)៖ {t}',
+ walletBuyBtn:'Buy with Wallet · ទិញដោយ Wallet',walletBuying:'Buying… · កំពុងទិញ…',
+ walletBuyDone:'Purchase complete ✓ Your package is now active · ទិញរួចរាល់ ✓ កញ្ចប់របស់អ្នកបានបើកហើយ',
+ walletErrInsufficient:'Wallet balance is not enough — please top up first · សមតុល្យ Wallet មិនគ្រប់ទេ — សូមបញ្ចូលលុយជាមុនសិន',
+ walletNewBalFmt:'New balance: {b} · សមតុល្យថ្មី៖ {b}',
+ forgotOpt1Title:'Option 1 · ជម្រើស 1 — Free Gmail code · លេខកូដ Gmail ឥតគិតថ្លៃ',
+ forgotOpt1Note:'Free — but it works only 2 times ever for this account; after that it stops working. · ឥតគិតថ្លៃ — តែប្រើបានតែ 2 ដងប៉ុណ្ណោះសម្រាប់គណនីនេះ; បន្ទាប់ពីនោះវាឈប់ដំណើរការ។',
+ forgotOpt2Title:'Option 2 · ជម្រើស 2 — Instant reset · កំណត់ភ្លាមៗ',
+ forgotOpt2Note:'Deducts $0.10 from your wallet balance and opens the new-password panel right away — no Gmail code needed. · កាត់ $0.10 ពីសមតុល្យ Wallet របស់អ្នក ហើយបើកផ្ទាំងដាក់លេខសម្ងាត់ថ្មីភ្លាមៗ — មិនបាច់រង់ចាំលេខកូដ Gmail ទេ។',
+ forgotInstantBtn:'Instant reset — $0.10 · កំណត់ភ្លាមៗ — $0.10',
+ instantTitle:'Set a new password · កំណត់លេខសម្ងាត់ថ្មី',
+ instantNote:'$0.10 was deducted from your wallet. Please set a new password for your account. · បានកាត់ $0.10 ពី Wallet របស់អ្នកហើយ។ សូមដាក់លេខសម្ងាត់ថ្មីសម្រាប់គណនីរបស់អ្នក។',
+ instantBtn:'Save new password · រក្សាទុកលេខសម្ងាត់ថ្មី',
+ instantStarting:'Preparing… · កំពុងរៀបចំ…',
+ instantErrFail:'Instant reset failed — please try again · កំណត់ភ្លាមៗមិនបានទេ — សូមព្យាយាមម្ដងទៀត',
  savePwdTitle:'Save password?',
  savePwdNote:'If you save it, next time just tap your account on the Log in screen and you will be signed in automatically — no password typing.',
  savePwdYes:'Save',savePwdNo:'Not now',
@@ -5704,6 +5874,273 @@ function pkgShowReqFail(){
   var body=document.getElementById('pkgSheetBody');if(!body)return;
   body.innerHTML='<p style="font-size:0.9375rem;font-weight:800;color:#f87171;line-height:1.7">'+escHtml(tx('pkgReqFail'))+'</p><button type="button" class="btn btn-green btn-block" style="margin-top:14px" onclick="pkgSheetClose()">OK</button>';
 }
+/* ================= Wallet (owner order) =================
+   The server wallet already exists; this is its website UI.
+   Balance: GET  /api/public/wallet/balance?email=
+   Top-up:  POST /api/public/wallet/topup-request
+            {email, amount, method:'khmer'|'foreign', receiptUrl?}
+            — a request only; the Admin approves before money lands.
+   Withdraw: POST /api/public/wallet/withdraw-request
+            {email, amount, khqrImageUrl?} — FLAT $0.50 fee per
+            withdrawal, deducted (amount + $0.50) only after the
+            Admin approves.
+   Buy:     POST /api/public/wallet/buy-package {email, packageId}
+            — pays a package straight from the balance.
+   Attached images (receipt / KHQR) upload FIRST through the same
+   receipt endpoint the package buy flow uses; only the returned
+   URL rides along with the wallet request. All wallet state is
+   in-memory only (one page session). */
+var WALLET={balance:null,method:'khmer',topup:null,withdraw:null};
+function walletFmt(n){
+  var v=Number(n);if(!isFinite(v))v=0;
+  return '$'+v.toFixed(2);
+}
+function walletEmail(){
+  var u=(typeof acctCurrent==='function')?acctCurrent():null;
+  return (u&&u.email)?u.email:'';
+}
+function walletSetMsg(id,t,ok){
+  var m=document.getElementById(id);if(!m)return;
+  m.textContent=t||'';m.style.color=ok?'var(--accent-text)':'#f87171';
+}
+/* The balance may ride under several shapes — accept the first
+   numeric one found (balance / wallet.balance / data.balance). */
+function walletPickBalance(d){
+  if(!d||typeof d!=='object')return null;
+  var cands=[d.balance,d.walletBalance];
+  if(d.wallet&&typeof d.wallet==='object')cands.push(d.wallet.balance);
+  if(d.data&&typeof d.data==='object'){
+    cands.push(d.data.balance);
+    if(d.data.wallet&&typeof d.data.wallet==='object')cands.push(d.data.wallet.balance);
+  }
+  for(var i=0;i<cands.length;i++){
+    var v=cands[i];
+    if(typeof v==='number'&&isFinite(v))return v;
+    if(typeof v==='string'&&v.trim()!==''&&!isNaN(parseFloat(v)))return parseFloat(v);
+  }
+  return null;
+}
+function walletPaintBalance(){
+  var f=walletFmt(WALLET.balance||0);
+  var el=document.getElementById('walletBalance');if(el)el.textContent=f;
+  var els=document.querySelectorAll('.js-wallet-bal');
+  for(var i=0;i<els.length;i++)els[i].textContent=f;
+}
+function walletFetchBalance(email){
+  if(!email)return Promise.resolve(null);
+  return authFetchJson('/api/public/wallet/balance?email='+encodeURIComponent(email),'GET',null,20000).then(function(d){
+    var b=walletPickBalance(d);
+    if(b!==null){WALLET.balance=b;walletPaintBalance();}
+    return b;
+  });
+}
+function walletLoadBalance(){return walletFetchBalance(walletEmail());}
+function walletSetMethod(m){
+  WALLET.method=(m==='foreign')?'foreign':'khmer';
+  var k=document.getElementById('walletMethodKhmer');
+  var f=document.getElementById('walletMethodForeign');
+  if(k)k.classList.toggle('on',WALLET.method==='khmer');
+  if(f)f.classList.toggle('on',WALLET.method==='foreign');
+}
+/* Receipt / KHQR image pick — same rules as the package receipt
+   (image only, max 8 MB), kept per form ('topup' / 'withdraw'). */
+function walletFilePick(input,kind){
+  var f=input&&input.files&&input.files[0];
+  if(!f)return;
+  var msgId=(kind==='topup')?'walletTopupMsg':'walletWithdrawMsg';
+  if(!/^image\//i.test(f.type||'')){walletSetMsg(msgId,tx('payReceiptBadImg'),false);input.value='';return;}
+  if(f.size>8*1024*1024){walletSetMsg(msgId,tx('payReceiptTooBig'),false);input.value='';return;}
+  var rd=new FileReader();
+  rd.onerror=function(){walletSetMsg(msgId,tx('payReceiptBadImg'),false);};
+  rd.onload=function(){
+    var durl=String(rd.result||'');
+    var b64=durl.split(',')[1]||'';
+    if(!b64){walletSetMsg(msgId,tx('payReceiptBadImg'),false);return;}
+    WALLET[kind]={dataUrl:durl,b64:b64,filename:f.name||'image.jpg'};
+    walletFilePrevRender(kind);
+  };
+  rd.readAsDataURL(f);
+}
+function walletFilePrevRender(kind){
+  var pv=document.getElementById(kind==='topup'?'walletTopupPrev':'walletWithdrawPrev');if(!pv)return;
+  var f=WALLET[kind];
+  if(!f){pv.innerHTML='';return;}
+  pv.innerHTML='<div class="pay-receipt-prev"><img src="'+f.dataUrl+'" alt=""><div class="pay-receipt-meta"><span class="pay-receipt-name">'+escHtml(f.filename)+'</span><span class="pay-receipt-ok">'+escHtml(tx('walletImgOk'))+'</span><button type="button" class="pay-receipt-rm" onclick="walletFileRemove(\''+kind+'\')">'+escHtml(tx('walletRemove'))+'</button></div></div>';
+}
+function walletFileRemove(kind){
+  WALLET[kind]=null;
+  var inp=document.getElementById(kind==='topup'?'walletTopupFile':'walletWithdrawFile');if(inp)inp.value='';
+  walletFilePrevRender(kind);
+}
+/* Upload an attached image first; resolves '' when none is
+   attached, rejects when an attached image fails to upload (the
+   wallet request is then NOT sent without it). */
+function walletUploadFile(kind){
+  return new Promise(function(resolve,reject){
+    var f=WALLET[kind];
+    if(!f||!f.b64){resolve('');return;}
+    var payload;
+    try{payload=JSON.stringify({email:walletEmail(),filename:f.filename||'wallet.jpg',data:f.b64});}
+    catch(e){reject(new Error('encode'));return;}
+    var xhr=new XMLHttpRequest();
+    try{xhr.open('POST',RECEIPT_UPLOAD_URL,true);}catch(e){reject(new Error('open'));return;}
+    try{xhr.setRequestHeader('Content-Type','application/json');}catch(e){}
+    xhr.timeout=120000;
+    xhr.onload=function(){
+      var j={};try{j=JSON.parse(xhr.responseText||'{}');}catch(e){}
+      var url=(j&&(j.url||j.receiptUrl||j.path||(j.data&&(j.data.url||j.data.receiptUrl||j.data.path))))||'';
+      if(xhr.status>=200&&xhr.status<300&&j&&j.ok!==false&&url)resolve(url);
+      else reject(new Error((j&&j.error)||('HTTP '+xhr.status)));
+    };
+    xhr.onerror=function(){reject(new Error('network'));};
+    xhr.ontimeout=function(){reject(new Error('timeout'));};
+    try{xhr.send(payload);}catch(e){reject(e);}
+  });
+}
+function walletParse(input){
+  if(!input)return null;
+  var v=parseFloat(String(input.value||'').replace(',','.'));
+  return isFinite(v)?v:null;
+}
+/* Amounts are valid only at the $5.00 minimum (owner rule). */
+function walletReadAmount(id){
+  var v=walletParse(document.getElementById(id));
+  if(v===null||v<5)return null;
+  return Math.round(v*100)/100;
+}
+function walletClearForm(kind){
+  if(kind==='topup'){
+    var a=document.getElementById('walletTopupAmount');if(a)a.value='';
+    walletFileRemove('topup');
+  }else{
+    var b=document.getElementById('walletWithdrawAmount');if(b)b.value='';
+    walletFileRemove('withdraw');
+    walletWithdrawTotal();
+  }
+}
+function walletTopupSubmit(){
+  var em=walletEmail();if(!em){loginSheetOpen();return;}
+  var amt=walletReadAmount('walletTopupAmount');
+  if(amt===null){walletSetMsg('walletTopupMsg',tx('walletErrAmount'),false);return;}
+  var btn=document.getElementById('walletTopupBtn');if(btn)btn.disabled=true;
+  walletSetMsg('walletTopupMsg',tx('walletSending'),true);
+  walletUploadFile('topup').then(function(url){
+    var payload={email:em,amount:amt,method:WALLET.method};
+    if(url)payload.receiptUrl=url;
+    return authFetchJson('/api/public/wallet/topup-request','POST',payload,30000);
+  }).then(function(data){
+    if(btn)btn.disabled=false;
+    if(!data){walletSetMsg('walletTopupMsg',tx('authErrNet'),false);return;}
+    if(data.ok!==true){walletSetMsg('walletTopupMsg',authErrText(data,'walletErrFail'),false);return;}
+    walletSetMsg('walletTopupMsg',tx('walletTopupSent'),true);
+    walletClearForm('topup');
+    var b=walletPickBalance(data);
+    if(b!==null){WALLET.balance=b;walletPaintBalance();}else walletLoadBalance();
+  }).catch(function(){
+    if(btn)btn.disabled=false;
+    walletSetMsg('walletTopupMsg',tx('walletErrFail'),false);
+  });
+}
+/* Live total under the withdraw amount: amount + the FLAT $0.50
+   fee, so the user sees the full deduction before sending. */
+function walletWithdrawTotal(){
+  var line=document.getElementById('walletWithdrawTotalLine');if(!line)return;
+  var amt=walletParse(document.getElementById('walletWithdrawAmount'));
+  if(amt===null||!(amt>0)){line.textContent='';return;}
+  line.textContent=tx('walletWithdrawTotalFmt').replace('{t}',walletFmt(amt+0.5));
+}
+function walletWithdrawSubmit(){
+  var em=walletEmail();if(!em){loginSheetOpen();return;}
+  var amt=walletReadAmount('walletWithdrawAmount');
+  if(amt===null){walletSetMsg('walletWithdrawMsg',tx('walletErrAmount'),false);return;}
+  var btn=document.getElementById('walletWithdrawBtn');if(btn)btn.disabled=true;
+  walletSetMsg('walletWithdrawMsg',tx('walletSending'),true);
+  walletUploadFile('withdraw').then(function(url){
+    var payload={email:em,amount:amt};
+    if(url)payload.khqrImageUrl=url;
+    return authFetchJson('/api/public/wallet/withdraw-request','POST',payload,30000);
+  }).then(function(data){
+    if(btn)btn.disabled=false;
+    if(!data){walletSetMsg('walletWithdrawMsg',tx('authErrNet'),false);return;}
+    if(data.ok!==true){walletSetMsg('walletWithdrawMsg',authErrText(data,'walletErrFail'),false);return;}
+    walletSetMsg('walletWithdrawMsg',tx('walletWithdrawSent'),true);
+    walletClearForm('withdraw');
+    var b=walletPickBalance(data);
+    if(b!==null){WALLET.balance=b;walletPaintBalance();}else walletLoadBalance();
+  }).catch(function(){
+    if(btn)btn.disabled=false;
+    walletSetMsg('walletWithdrawMsg',tx('walletErrFail'),false);
+  });
+}
+/* ===== Buy with Wallet =====
+   The wallet box inside the regular buy sheet (pkgBuyAsk /
+   songPkgBuyAsk): current balance + a Buy with Wallet button, in
+   addition to the existing payment flow. */
+function walletSheetBoxHtml(){
+  return '<div class="wallet-sec"><div class="wallet-sec-head">'+escHtml(tx('walletTitle'))+'</div>'
+    +'<p class="wallet-note" style="margin-top:6px">'+escHtml(tx('walletBalanceLbl'))+': <b class="js-wallet-bal" style="color:var(--text)">'+escHtml(walletFmt(WALLET.balance||0))+'</b></p>'
+    +'<button type="button" class="btn btn-green btn-block" style="margin-top:10px" onclick="walletBuyFromSheet()">'+escHtml(tx('walletBuyBtn'))+'</button>'
+    +'<p class="wallet-msg" id="pkgWalletMsg"></p></div>';
+}
+function walletBuyFromSheet(){
+  var id=PKG_PENDING||SONG_PKG_PENDING;if(!id)return;
+  walletBuyPackage(id,'pkgWalletMsg',null);
+}
+/* The wallet-only buy sheet opened by the «Buy with Wallet»
+   button on each package card: plan, price, live balance, and
+   the confirm button. */
+function walletBuyAsk(id){
+  var pl=pkgPlanById(id)||songPkgPlanById(id);if(!pl)return;
+  var isSong=!!songPkgPlanById(id);
+  PKG_EVT_LAST=id;pkgEvent('buy',id);
+  var sheet=document.getElementById('pkgSheet');if(!sheet)return;
+  var body=document.getElementById('pkgSheetBody');if(!body)return;
+  var u=(typeof acctCurrent==='function')?acctCurrent():null;
+  var h='';
+  h+='<div style="display:flex;justify-content:space-between;gap:10px;padding:8px 0;border-top:1px solid var(--line)"><span>'+escHtml(tx('pkgSheetPlan'))+'</span><b>'+escHtml(loc(pl.name))+' · MovAi</b></div>';
+  h+='<div style="display:flex;justify-content:space-between;gap:10px;padding:8px 0;border-top:1px solid var(--line)"><span>'+escHtml(tx('pkgCreditsLbl'))+'</span><b style="color:'+(isSong?'#ADDC29':'var(--accent-text)')+'">'+pkgFmtNum(pl.credits)+' Credit</b></div>';
+  h+='<div style="display:flex;justify-content:space-between;gap:10px;padding:8px 0;border-top:1px solid var(--line)"><span>'+escHtml(tx('pkgTotal'))+'</span><b>$'+pkgFmtPrice(pkgCurPrice(pl))+'</b></div>';
+  if(u){
+    h+='<div class="wallet-sec"><div class="wallet-sec-head">'+escHtml(tx('walletTitle'))+'</div>'
+      +'<p class="wallet-note" style="margin-top:6px">'+escHtml(tx('walletBalanceLbl'))+': <b class="js-wallet-bal" style="color:var(--text)">'+escHtml(walletFmt(WALLET.balance||0))+'</b></p>'
+      +'<button type="button" class="btn btn-green btn-block" id="walletAskBtn" style="margin-top:10px" onclick="walletBuyPackage(\''+pl.id+'\',\'walletAskMsg\',\'walletAskBtn\')">'+escHtml(tx('walletBuyBtn'))+'</button>'
+      +'<p class="wallet-msg" id="walletAskMsg"></p></div>';
+  }else{
+    h+='<p style="font-size:0.875rem;color:#fbbf24;line-height:1.7;margin-top:12px;font-weight:700">'+escHtml(tx('pkgNeedLogin'))+'</p>';
+    h+='<button type="button" class="btn btn-green btn-block" style="margin-top:10px" onclick="pkgGoLogin()">'+escHtml(tx('pkgLoginBtn'))+'</button>';
+  }
+  h+='<button type="button" class="kbtn kbtn-white" style="margin-top:10px;width:100%" onclick="pkgSheetClose()">'+escHtml(tx('pkgCancel'))+'</button>';
+  body.innerHTML=h;
+  sheetShowAnim(sheet);
+  if(u)walletLoadBalance();
+}
+function walletBuyPackage(id,msgId,btnId){
+  var em=walletEmail();
+  if(!em){pkgSheetClose();loginSheetOpen();return;}
+  var btn=btnId?document.getElementById(btnId):null;if(btn)btn.disabled=true;
+  walletSetMsg(msgId,tx('walletBuying'),true);
+  authFetchJson('/api/public/wallet/buy-package','POST',{email:em,packageId:id},30000).then(function(data){
+    if(btn)btn.disabled=false;
+    if(!data){walletSetMsg(msgId,tx('authErrNet'),false);return;}
+    if(data.ok!==true){
+      var raw=String((data&&(data.error||data.code))||'');
+      walletSetMsg(msgId,/insufficient|balance/i.test(raw)?tx('walletErrInsufficient'):authErrText(data,'walletErrInsufficient'),false);
+      walletLoadBalance();
+      return;
+    }
+    var b=walletPickBalance(data);
+    if(b!==null){WALLET.balance=b;walletPaintBalance();}
+    var done=tx('walletBuyDone');
+    if(b!==null)done+=' · '+tx('walletNewBalFmt').replace('{b}',walletFmt(b));
+    walletSetMsg(msgId,done,true);
+    if(b===null)walletLoadBalance();
+    /* The package activates server-side; pull the fresh account
+       (plan + credits) through the normal sync, then repaint the
+       package cards so the bought plan shows as active. */
+    try{acctAdminSync();}catch(e){}
+    setTimeout(function(){try{pkgRender();}catch(e){}try{songPkgRender();}catch(e){}},1500);
+  });
+}
 var PKG_PENDING=null;
 function pkgBuyAsk(id){
   PKG_PENDING=id;SONG_PKG_PENDING=null;PAY_RECEIPT=null;
@@ -5718,6 +6155,7 @@ function pkgBuyAsk(id){
   h+='<div style="display:flex;justify-content:space-between;gap:10px;padding:8px 0;border-top:1px solid var(--line)"><span>'+escHtml(tx('pkgTotal'))+'</span><b>$'+pkgFmtPrice(pkgCurPrice(pl))+'</b></div>';
   if(u){
     h+='<div id="pkgPayBox"></div>';
+    h+=walletSheetBoxHtml();
   }else{
     h+='<p style="font-size:0.875rem;color:#fbbf24;line-height:1.7;margin-top:12px;font-weight:700">'+escHtml(tx('pkgNeedLogin'))+'</p>';
     h+='<button type="button" class="btn btn-green btn-block" style="margin-top:10px" onclick="pkgGoLogin()">'+escHtml(tx('pkgLoginBtn'))+'</button>';
@@ -5725,7 +6163,7 @@ function pkgBuyAsk(id){
   h+='<button type="button" class="kbtn kbtn-white" style="margin-top:10px;width:100%" onclick="pkgSheetClose()">'+escHtml(tx('pkgCancel'))+'</button>';
   if(body)body.innerHTML=h;
   sheetShowAnim(sheet);
-  if(u)pkgPayRender('pkgBuyConfirm');
+  if(u){pkgPayRender('pkgBuyConfirm');walletLoadBalance();}
 }
 /* ===== Blur-to-clear show / clear-to-blur hide for EVERY sheet =====
    The same entrance/exit language as the offline popup, applied to
@@ -5859,6 +6297,7 @@ function songPkgRender(){
       h+='<button type="button" class="btn btn-free" disabled>'+escHtml(tx('songFreeAuto'))+'</button>';
     }else{
       h+='<button type="button" class="btn btn-green" onclick="songPkgBuyAsk(\''+pl.id+'\')"'+(active?' disabled':'')+'>'+escHtml(active?tx('pkgActive'):tx('pkgBuy'))+'</button>';
+      if(!active)h+='<button type="button" class="btn wallet-btn" onclick="walletBuyAsk(\''+pl.id+'\')">'+escHtml(tx('walletBuyBtn'))+'</button>';
     }
     h+='</div>';
   });
@@ -5878,6 +6317,7 @@ function songPkgBuyAsk(id){
   h+='<div style="display:flex;justify-content:space-between;gap:10px;padding:8px 0;border-top:1px solid var(--line)"><span>'+escHtml(tx('pkgTotal'))+'</span><b>$'+pkgFmtPrice(pkgCurPrice(pl))+'</b></div>';
   if(u){
     h+='<div id="pkgPayBox"></div>';
+    h+=walletSheetBoxHtml();
   }else{
     h+='<p style="font-size:0.875rem;color:#fbbf24;line-height:1.7;margin-top:12px;font-weight:700">'+escHtml(tx('pkgNeedLogin'))+'</p>';
     h+='<button type="button" class="btn btn-green btn-block" style="margin-top:10px" onclick="pkgGoLogin()">'+escHtml(tx('pkgLoginBtn'))+'</button>';
@@ -5885,7 +6325,7 @@ function songPkgBuyAsk(id){
   h+='<button type="button" class="kbtn kbtn-white" style="margin-top:10px;width:100%" onclick="pkgSheetClose()">'+escHtml(tx('pkgCancel'))+'</button>';
   if(body)body.innerHTML=h;
   sheetShowAnim(sheet);
-  if(u)pkgPayRender('songPkgBuyConfirm');
+  if(u){pkgPayRender('songPkgBuyConfirm');walletLoadBalance();}
 }
 function songPkgBuyConfirm(){
   var pl=songPkgPlanById(SONG_PKG_PENDING);if(!pl)return;
@@ -14613,6 +15053,11 @@ function forgotOpen(){
   var s2=document.getElementById('forgotStep2');if(s2)s2.style.display='none';
   var ga=document.getElementById('forgotGoogleAlt');if(ga)ga.style.display='none';
   forgotMsg(1,'',true);forgotMsg(2,'',true);
+  /* Option 2 (instant reset) starts clean, with the wallet
+     balance of the prefilled Gmail shown when there is one. */
+  forgotInstantMsg('',true);
+  var fb=document.getElementById('forgotInstantBal');if(fb)fb.textContent='';
+  if(fe&&String(fe.value||'').indexOf('@')>0)forgotInstantBalShow(String(fe.value).trim().toLowerCase());
   var s=document.getElementById('forgotSheet');if(s)sheetShowAnim(s);
   setTimeout(function(){var i=document.getElementById('forgotEmail');if(i){try{i.focus();}catch(e){}}},380);
 }
@@ -14717,6 +15162,87 @@ function forgotResetSubmit(){
     if(a)a.value='';if(b)b.value='';if(ci)ci.value='';
     var s=document.getElementById('forgotSheet');if(s)sheetHideAnim(s);
     savePwdPrompt(forgotEmail,pw,authProfFromUser(data.user,forgotEmail));
+  });
+}
+/* ===== Forgot password · Option 2 — Instant reset ($0.10) =====
+   POST /api/auth/forget-password-instant {email} deducts $0.10
+   from that account's wallet balance and returns a one-time
+   token; the password-setup panel (instantSheet — the same look
+   as the first-time Create Password sheet) then POSTs
+   /api/auth/instant-reset {email, token, password,
+   passwordConfirm}. On success the user lands on the same
+   «Save password?» prompt as a normal reset / sign-in. */
+var instantCtx={email:'',token:''};
+function forgotInstantMsg(t,ok){
+  var m=document.getElementById('forgotInstantMsg');
+  if(m){m.textContent=t||'';m.style.color=ok?'var(--accent-text)':'#f87171';}
+}
+function forgotInstantBalShow(email){
+  var el=document.getElementById('forgotInstantBal');if(!el||!email)return;
+  walletFetchBalance(email).then(function(b){
+    if(b!==null)el.textContent=tx('walletBalanceLbl')+': '+walletFmt(b);
+  });
+}
+function forgotInstantStart(){
+  var fe=document.getElementById('forgotEmail');
+  var email=fe?String(fe.value||'').trim().toLowerCase():'';
+  if(!email||email.indexOf('@')<0){forgotInstantMsg(tx('loginErrEmail'),false);return;}
+  var btn=document.getElementById('forgotInstantBtn');if(btn)btn.disabled=true;
+  forgotInstantMsg(tx('instantStarting'),true);
+  authFetchJson('/api/auth/forget-password-instant','POST',{email:email},30000).then(function(data){
+    if(btn)btn.disabled=false;
+    if(!data){forgotInstantMsg(tx('authErrNet'),false);return;}
+    if(data.ok!==true){
+      var raw=String((data&&(data.error||data.code))||'');
+      forgotInstantMsg(/insufficient|balance/i.test(raw)?tx('walletErrInsufficient'):authErrText(data,'instantErrFail'),false);
+      forgotInstantBalShow(email);
+      return;
+    }
+    instantCtx={email:email,token:String(data.token||data.resetToken||'')};
+    var b=walletPickBalance(data);
+    if(b!==null){WALLET.balance=b;walletPaintBalance();}
+    forgotStopCountdown();
+    var s=document.getElementById('forgotSheet');if(s)sheetHideAnim(s);
+    instantSheetShow(email);
+  });
+}
+function instantMsg(t,ok){
+  var m=document.getElementById('instantMsg');
+  if(m){m.textContent=t||'';m.style.color=ok?'var(--accent-text)':'#f87171';}
+}
+function instantSheetShow(email){
+  var e=document.getElementById('instantEmail');if(e)e.textContent=email||'';
+  var a=document.getElementById('instantNew');if(a)a.value='';
+  var b=document.getElementById('instantConfirm');if(b)b.value='';
+  instantMsg('',true);
+  var s=document.getElementById('instantSheet');if(s)sheetShowAnim(s);
+  setTimeout(function(){var i=document.getElementById('instantNew');if(i){try{i.focus();}catch(e){}}},380);
+}
+function instantSheetCancel(){
+  instantCtx={email:'',token:''};
+  var s=document.getElementById('instantSheet');if(s)sheetHideAnim(s);
+  loginSheetOpen();
+}
+function instantResetSubmit(){
+  if(!instantCtx.email){instantSheetCancel();return;}
+  var a=document.getElementById('instantNew');
+  var b=document.getElementById('instantConfirm');
+  var pw=a?String(a.value||''):'';
+  var cf=b?String(b.value||''):'';
+  if(pw.length<6){instantMsg(tx('pwdErrShort'),false);return;}
+  if(pw!==cf){instantMsg(tx('pwdErrMismatch'),false);return;}
+  var btn=document.getElementById('instantBtn');if(btn)btn.disabled=true;
+  instantMsg(tx('forgotResetting'),true);
+  authFetchJson('/api/auth/instant-reset','POST',{email:instantCtx.email,token:instantCtx.token,password:pw,passwordConfirm:cf},30000).then(function(data){
+    if(btn)btn.disabled=false;
+    if(!data){instantMsg(tx('authErrNet'),false);return;}
+    if(data.ok!==true){instantMsg(authErrText(data,'instantErrFail'),false);return;}
+    var email=instantCtx.email;instantCtx={email:'',token:''};
+    if(a)a.value='';if(b)b.value='';
+    var s=document.getElementById('instantSheet');if(s)sheetHideAnim(s);
+    var prof=(data.user&&typeof authProfFromUser==='function')?authProfFromUser(data.user,email):{email:email};
+    savePwdPrompt(email,pw,prof);
+    try{walletLoadBalance();}catch(e){}
   });
 }
 /* ===== Log in email verification · verify រាល់ពេល Log in =====
@@ -16187,6 +16713,9 @@ function profileGoPackages(){profileClose();menuGo('sec-packages');}
 function profileOpen(){
   var u=acctCurrent();if(!u){loginSheetOpen();return;}
   profileRender();
+  /* Wallet balance refreshes every time the Profile opens (and
+     after every wallet action — see the wallet submit handlers). */
+  try{walletLoadBalance();}catch(e){}
   var s=document.getElementById('profileSheet');if(s)sheetShowAnim(s);
 }
 function profileClose(){var s=document.getElementById('profileSheet');sheetHideAnim(s);}
