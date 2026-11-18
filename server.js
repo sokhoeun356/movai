@@ -113,8 +113,17 @@ const USERS_FILE = path.join(DATA_DIR, 'users.json');
 const GRANTS_FILE = path.join(DATA_DIR, 'grants.json');
 const HISTORY_FILE = path.join(DATA_DIR, 'history.json');
 const SETTINGS_FILE = path.join(DATA_DIR, 'settings.json');
-const FREE_MEDIA_CREDITS = 250;
+// New-user gift (owner order 2026-11-18): SONG credits ONLY — the 250
+// media-credit gift is REMOVED. A new registrant who claims the gift
+// gets 24 song credits (or 50 when the gift50 toggle is ON and the
+// account is brand new). No media credits, no other credits.
+const FREE_MEDIA_CREDITS = 0;
 const FREE_SONG_CREDITS = 24;
+// Gift-50: when the gift50 toggle is ON, a BRAND-NEW account (created
+// within this window, never logged in/used before) claims 50 song
+// credits instead of 24. Older accounts can never get the 50.
+const GIFT50_SONG_CREDITS = 50;
+const GIFT50_NEW_ACCOUNT_WINDOW_MS = 24 * 60 * 60 * 1000; // 24 hours
 
 /* ---------------- GitHub-backed persistent storage ----------------- */
 // Render free disk is ephemeral — ./data/*.json is wiped on restart, so
@@ -144,6 +153,7 @@ const GH_DATA_FILES = [
   'model-logins.json', 'blocked-ips.json', 'blocked-emails.json',
   'updates.json', 'admin-lockouts.json', 'history.json', 'mp3cache.json',
   'cloudinary-accounts.json', 'cloudinary-rotation.json', 'admin-key.json', 'mvsep-cache.json',
+  'feature-usage.json', 'wallet-requests.json', 'device-records.json',
 ];
 const ghShaCache = {}; // filename -> GitHub blob sha (for PUT updates)
 function ghEnabled() { return !!GH_TOKEN; }
@@ -615,6 +625,22 @@ function lookupIpCountryAsync(email, ip) {
         const users = loadUsers();
         const u = users[email];
         if (!u) return;
+        // VPN flag (country change for the DEVICE): if this device was
+        // previously seen in a DIFFERENT country, the IP's country
+        // changed — likely VPN (or travel). The fingerprint still
+        // identifies the device; the flag is informational only.
+        try {
+          const did = u.lastDeviceId || u.deviceId || '';
+          if (did && country) {
+            const dall = loadDeviceRecords();
+            const dk = 'id:' + did;
+            const dr = dall[dk];
+            if (dr && typeof dr === 'object') {
+              if (dr.country && dr.country !== country) { dr.vpnDetected = true; dr.vpnLastSeen = new Date().toISOString(); }
+              if (dr.country !== country) { dr.country = country; saveDeviceRecords(dall); }
+            }
+          }
+        } catch (e) {}
         let changed = false;
         if (country && u.country !== country) { u.country = country; changed = true; }
         if (countryCode && u.countryCode !== countryCode) { u.countryCode = countryCode; changed = true; }
@@ -632,11 +658,33 @@ function lookupIpCountryAsync(email, ip) {
     })
     .catch(() => {});
 }
-function pubUser(u, modelLogins) {
+function pubUser(u, modelLogins, deviceInfo) {
   const map = modelLogins || loadModelLogins();
   const model = u.model || '';
   const count = model && map && typeof map === 'object' ? (Number(map[model]) || 0) : 0;
-  return { id: u.id || '', email: u.email, name: u.name || '', firstName: u.firstName || '', lastName: u.lastName || '', credits: u.credits, songCredits: u.songCredits, plan: u.plan || '', songPlan: u.songPlan || '', createdAt: u.createdAt, updatedAt: u.updatedAt, lastIp: u.lastIp || '', country: u.country || '', countryCode: u.countryCode || '', device: u.device || '', model, modelLogins: count, lastSeen: u.lastSeen || '', knownDevices: Array.isArray(u.knownDevices) ? u.knownDevices : [], hasPassword: !!(u.passwordHash && u.passwordSalt) };
+  const out = { id: u.id || '', email: u.email, name: u.name || '', firstName: u.firstName || '', lastName: u.lastName || '', credits: u.credits, songCredits: u.songCredits, balance: Math.round(numOr(u.balance, 0) * 100) / 100, plan: u.plan || '', songPlan: u.songPlan || '', createdAt: u.createdAt, updatedAt: u.updatedAt, lastIp: u.lastIp || '', country: u.country || '', countryCode: u.countryCode || '', device: u.device || '', model, modelLogins: count, lastSeen: u.lastSeen || '', knownDevices: Array.isArray(u.knownDevices) ? u.knownDevices : [], hasPassword: !!(u.passwordHash && u.passwordSalt),
+    // Device fingerprint (anti-abuse): the device the account was
+    // registered on (deviceId, never overwritten by later sign-ins from
+    // other devices), the most recent device seen, and the model the
+    // account was registered on. A model change alone never blocks.
+    deviceId: u.deviceId || '', lastDeviceId: u.lastDeviceId || '', registeredModel: u.registeredModel || '' };
+  // Device-limit picture (Admin reads only — passed by the admin
+  // endpoints): accounts on this device, purchased slots, limit,
+  // strikes, VPN flags, block state.
+  if (deviceInfo && typeof deviceInfo === 'object') {
+    out.deviceFingerprint = deviceInfo.fingerprint || '';
+    out.deviceAccounts = deviceInfo.accounts;
+    out.deviceSlots = deviceInfo.slots;
+    out.deviceLimit = deviceInfo.limit;
+    out.deviceStrikes = deviceInfo.strikes;
+    out.deviceVpnDetected = !!deviceInfo.vpnDetected;
+    out.deviceVpnSuspected = !!deviceInfo.vpnSuspected;
+    out.deviceVpnLastSeen = deviceInfo.vpnLastSeen || '';
+    out.deviceBlocked = !!deviceInfo.deviceBlocked;
+    out.deviceBlockedReason = deviceInfo.blockedReason || '';
+    out.emailBlocked = !!deviceInfo.emailBlocked;
+  }
+  return out;
 }
 function logGrant(entry) {
   try {
@@ -1425,6 +1473,24 @@ function fmtCreditDelta(dMedia, dSong) {
 // the website applies them on load and hides its own appearance controls.
 const SETTINGS_DEFAULTS = {
   smoothModeAuto: false,
+  // Auto-Catch master toggle (owner order 2026-11-18): when true the
+  // device-limit auto-enforcement (limit, strikes, blocks) is active;
+  // when false the server only records device info / VPN flags / strike
+  // counts and never blocks automatically. Default OFF.
+  autoCatch: false,
+  // Device account-limit toggle (owner order 2026-11-18). deviceLimitEnabled
+  // (default OFF) = enforce the free-account limit at registration;
+  // deviceLimit (default 3) = how many free Google accounts one device
+  // may register. The Admin can change the number later (e.g. 5+ when
+  // the website is profitable). Read fresh from disk on every
+  // registration — an Admin change takes effect immediately.
+  deviceLimitEnabled: false,
+  deviceLimit: 3,
+  // New-user gift-50 toggle (owner order 2026-11-18). When true, a
+  // BRAND-NEW registrant who claims the gift gets 50 song credits
+  // instead of 24. When false (default) the gift is 24 song credits.
+  // The gift is song-only either way — no media credits. Default OFF.
+  gift50: false,
   theme: 0, font: 50,
   glassClear: 45, glassBlur: 65, glassShine: 55,
   tshadow: 'none', txtblur: 0, bgb: 50, brandfx: 'none', mode: 'dark',
@@ -1473,6 +1539,18 @@ function cleanSettings(j, base) {
   const s = Object.assign({}, base || SETTINGS_DEFAULTS);
   if (!j || typeof j !== 'object' || Array.isArray(j)) return s;
   if (typeof j.smoothModeAuto === 'boolean') s.smoothModeAuto = j.smoothModeAuto;
+  // Auto-Catch master toggle (owner order 2026-11-18). A boolean true
+  // turns the device-limit auto-enforcement on; anything else keeps the
+  // stored value (default OFF).
+  if (typeof j.autoCatch === 'boolean') s.autoCatch = j.autoCatch;
+  // Device account-limit toggle (owner order 2026-11-18). enabled is a
+  // boolean; limit is a whole number 1-100 (default 3). Invalid values
+  // keep the stored value.
+  if (typeof j.deviceLimitEnabled === 'boolean') s.deviceLimitEnabled = j.deviceLimitEnabled;
+  if (Number.isFinite(j.deviceLimit)) s.deviceLimit = Math.min(100, Math.max(1, Math.floor(j.deviceLimit)));
+  // Gift-50 toggle (owner order 2026-11-18). Boolean; invalid values
+  // keep the stored value (default OFF).
+  if (typeof j.gift50 === 'boolean') s.gift50 = j.gift50;
   s.theme = Math.round(clampNum(j.theme, 0, 6, s.theme));
   s.font = clampNum(j.font, 0, 100, s.font);
   s.glassClear = clampNum(j.glassClear, 0, 100, s.glassClear);
@@ -1860,6 +1938,790 @@ function mvsepKeyRemaining(idx) {
     if (!e || typeof e.remainingToday !== 'number') return null;
     return e.remainingToday;
   } catch (err) { return null; }
+}
+// ---- Feature-usage tracking (Admin: how often each new function is used) ----
+// The website reports every tap of the new functions (History actions,
+// theme switches, Export choice, version-history view) via POST
+// /api/public/feature-usage; the Admin reads the totals via GET
+// /api/admin/feature-usage. Generic: ANY feature name is accepted (not a
+// hardcoded list), so future features are tracked the same way. Counts
+// are per-feature totals + a per-day breakdown (Phnom Penh date),
+// persisted to feature-usage.json (GitHub-backed, in GH_DATA_FILES) so
+// they survive restarts. Email is accepted but NOT stored — counts only.
+// Day entries older than 90 days are pruned on write to bound growth.
+const FEATURE_USAGE_FILE = path.join(DATA_DIR, 'feature-usage.json');
+const FEATURE_USAGE_MAX_DAYS = 90;
+let _featureUsage = null;
+function featureUsageLoad() {
+  if (_featureUsage && typeof _featureUsage === 'object') return _featureUsage;
+  try { const j = JSON.parse(fs.readFileSync(FEATURE_USAGE_FILE, 'utf8')); if (j && typeof j === 'object' && j.features && typeof j.features === 'object') { _featureUsage = j; return _featureUsage; } } catch (e) {}
+  _featureUsage = { features: {} };
+  return _featureUsage;
+}
+function featureUsageSave() {
+  try { fs.mkdirSync(DATA_DIR, { recursive: true }); fs.writeFileSync(FEATURE_USAGE_FILE, JSON.stringify(_featureUsage, null, 2)); ghPersistFile(FEATURE_USAGE_FILE); } catch (e) {}
+}
+function featureUsageDate() {
+  return new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Phnom_Penh' });
+}
+function featureUsageCleanName(raw) {
+  if (typeof raw !== 'string') return '';
+  const name = raw.trim().toLowerCase().replace(/[^a-z0-9_-]/g, '_').replace(/_+/g, '_').replace(/^_+|_+$/g, '').slice(0, 64);
+  return /^[a-z0-9][a-z0-9_-]*$/.test(name) ? name : '';
+}
+function featureUsageRecord(rawFeature) {
+  const feature = featureUsageCleanName(rawFeature);
+  if (!feature) return null;
+  const today = featureUsageDate();
+  const u = featureUsageLoad();
+  if (!u.features || typeof u.features !== 'object') u.features = {};
+  let f = u.features[feature];
+  if (!f || typeof f !== 'object') f = u.features[feature] = { total: 0, days: {} };
+  if (!f.days || typeof f.days !== 'object') f.days = {};
+  f.total = (Number(f.total) || 0) + 1;
+  f.days[today] = (Number(f.days[today]) || 0) + 1;
+  // Prune day entries older than FEATURE_USAGE_MAX_DAYS to bound file growth.
+  const cutoff = new Date(Date.now() - FEATURE_USAGE_MAX_DAYS * 24 * 60 * 60 * 1000).toLocaleDateString('en-CA', { timeZone: 'Asia/Phnom_Penh' });
+  for (const d of Object.keys(f.days)) { if (d < cutoff) delete f.days[d]; }
+  featureUsageSave();
+  return { feature, total: f.total, today: f.days[today] || 0 };
+}
+function featureUsageList() {
+  // Returns {date, features:[{feature, total, today, days:{date:count}}]}
+  // sorted by total descending. days is the per-day breakdown.
+  const today = featureUsageDate();
+  const u = featureUsageLoad();
+  const out = [];
+  const feats = (u.features && typeof u.features === 'object') ? u.features : {};
+  for (const name of Object.keys(feats)) {
+    const f = feats[name] || {};
+    const days = (f.days && typeof f.days === 'object') ? f.days : {};
+    out.push({ feature: name, total: Number(f.total) || 0, today: Number(days[today]) || 0, days });
+  }
+  out.sort((a, b) => b.total - a.total);
+  return { date: today, features: out };
+}
+// ---- Wallet / Balance (stored-value money, owner order 2026-11-18) ----
+// Users top up money (min $5) into a stored balance, use it to buy any
+// package or to pay $0.10 for an instant password reset, and can ask to
+// withdraw (min $5, flat $0.50 fee per withdrawal). Top-ups and
+// withdrawals are REQUESTS: the Admin approves/rejects them; money only
+// moves on approval. Balances live on the user record (users.json,
+// GitHub-backed); requests live in wallet-requests.json (GitHub-backed).
+// Money is always stored rounded to 2 decimals (dollars).
+const WALLET_MIN_TOPUP = 5.00;
+const WALLET_MIN_WITHDRAW = 5.00;
+const WALLET_WITHDRAW_FEE = 0.50;
+const WALLET_INSTANT_RESET_PRICE = 0.10;
+const WALLET_FREE_RESET_LIMIT = 2; // free email-code resets per user, ever
+const INSTANT_RESET_TTL_MS = 10 * 60 * 1000; // instant-reset token lives 10 min
+const WALLET_REQUESTS_FILE = path.join(DATA_DIR, 'wallet-requests.json');
+// Instant-reset tokens: email -> {token, expiresAt}. In-memory only
+// (like the email verification codes) — a token dies on use or expiry.
+const instantResetTokens = new Map();
+function walletMoney(n) { return Math.round(numOr(n, 0) * 100) / 100; }
+function walletBalance(u) { return walletMoney(u && u.balance); }
+function loadWalletRequests() {
+  try { const j = JSON.parse(fs.readFileSync(WALLET_REQUESTS_FILE, 'utf8')); if (Array.isArray(j)) return j; } catch (e) {}
+  return [];
+}
+function saveWalletRequests(arr) {
+  try { fs.mkdirSync(DATA_DIR, { recursive: true }); } catch (e) {}
+  fs.writeFileSync(WALLET_REQUESTS_FILE, JSON.stringify(arr, null, 2));
+  ghPersistFile(WALLET_REQUESTS_FILE);
+}
+function newWalletRequestId() {
+  return 'wr_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+}
+function walletRequestPublic(r, users) {
+  const u = users && r && users[r.email];
+  return Object.assign({}, r, { buyerId: u && u.id ? u.id : '', balance: u ? walletBalance(u) : 0 });
+}
+// ---- Device account limit + VPN-proof fingerprint (owner order 2026-11-18) ----
+// Anti-abuse: one person can own 10 Gmails on one phone and register 10
+// MovAi accounts to claim 10 gifts / create many songs. Rule: max 3
+// accounts per DEVICE, free. A 4th+ registration is refused; each extra
+// Gmail costs $1.00 (paid from the Wallet). Login is UNLIMITED — the
+// limit is only on REGISTERING new accounts.
+// The fingerprint must survive VPN: it does NOT rely on IP alone. The
+// primary identifier is a stable client device ID (a UUID the website
+// generates once and keeps in localStorage) + phone model + user-agent +
+// screen. Turning on VPN only changes the IP — the device is still
+// recognised, so VPN cannot evade the 3-account limit. A brand-new
+// device (no prior registrations) is allowed its 3 accounts. A new or
+// different phone model alone NEVER blocks a legitimate user — the model
+// is only part of the fingerprint.
+// Graduated warnings (owner order 2026-11-18, replaces immediate block):
+// each refused registration attempt is a STRIKE on the device:
+//   strike 1 (GREEN)  — email: the problem + the company rules
+//   strike 2 (YELLOW) — email: same rules, yellow warning — there is a
+//                        problem in their phone, it is not safe
+//   strike 3 (FINAL)  — email: final warning, already determined/limited
+//   strike 4+ (BLOCK) — the DEVICE is blocked + the attempting Gmail is
+//                        blocked; email tells them to check their phone —
+//                        it has a scam or a hidden hacker in it.
+// Buying extra slots ($1 each) resets the device's strikes to 0 (they
+// paid, so they are compliant again). The Admin unblocks a device via
+// POST /api/admin/unblock-device (and a Gmail via unblock-email).
+const DEVICE_FREE_ACCOUNT_LIMIT = 3; // free accounts per device
+const DEVICE_SLOT_PRICE = 1.00; // $1.00 per extra account slot (Gmail)
+const DEVICE_STRIKE_BLOCK_AT = 4; // block the device at strike 4
+// Auto-Catch master toggle (owner order 2026-11-18). Stored in settings
+// (GitHub-backed, default OFF). When OFF the server still RECORDS
+// device info, VPN flags and strike counts, but does NOT send strike
+// emails or auto-block anything — no account is blocked automatically
+// (the Admin reviews the recorded strikes manually). When ON the full
+// auto-enforcement is active (graduated strike emails, block at
+// strike 4). The device-limit REFUSAL itself is governed by the
+// separate deviceLimitEnabled setting below — autoCatch only gates
+// the strike emails / auto-blocks. A VPN flag alone NEVER blocks
+// anything — it is only an indicator.
+function autoCatchEnabled() {
+  try { const s = loadSettings(); return s && s.autoCatch === true; } catch (e) { return false; }
+}
+// Device account-limit setting (owner order 2026-11-18). Stored in
+// settings (GitHub-backed). deviceLimitEnabled (default OFF) = enforce
+// the free-account limit at registration; deviceLimit (default 3) =
+// how many free Google accounts one device may register. Read FRESH
+// from disk on EVERY call (loadSettings re-reads settings.json — no
+// in-memory cache) so an Admin change takes effect immediately on the
+// next registration, even on Render. Separate from autoCatch (which
+// gates strike emails / auto-blocks only).
+function deviceLimitSetting() {
+  try {
+    const s = loadSettings();
+    const enabled = !!(s && s.deviceLimitEnabled === true);
+    let limit = DEVICE_FREE_ACCOUNT_LIMIT;
+    if (s && Number.isFinite(s.deviceLimit)) limit = Math.min(100, Math.max(1, Math.floor(s.deviceLimit)));
+    return { enabled, limit };
+  } catch (e) { return { enabled: false, limit: DEVICE_FREE_ACCOUNT_LIMIT }; }
+}
+// New-user gift-50 toggle (owner order 2026-11-18). Stored in settings
+// (GitHub-backed). When ON, a BRAND-NEW registrant who claims the gift
+// gets 50 song credits instead of 24. When OFF (default) the gift is
+// 24 song credits. The gift is song-only either way — no media credits.
+// Read FRESH from disk on every call (loadSettings re-reads
+// settings.json — no in-memory cache) so an Admin change takes effect
+// immediately. Separate from autoCatch and deviceLimitEnabled.
+function gift50Enabled() {
+  try { const s = loadSettings(); return s && s.gift50 === true; } catch (e) { return false; }
+}
+const DEVICE_RECORDS_FILE = path.join(DATA_DIR, 'device-records.json');
+// device-records.json shape: { "<fingerprintKey>": {
+//   slots, strikes, blocked, blockedReason, blockedAt, blockedEmails,
+//   vpnDetected, vpnLastSeen, ipChanges,
+//   model, device, screen, timezone, lastIp, country,
+//   firstSeen, lastSeen, emails: [] } }
+// Fingerprint key: 'id:<deviceId>' when the website sends a device ID
+// (primary, VPN-proof); 'mi:<model>|<ip>' fallback when it does not.
+function loadDeviceRecords() {
+  try { const j = JSON.parse(fs.readFileSync(DEVICE_RECORDS_FILE, 'utf8')); if (j && typeof j === 'object' && !Array.isArray(j)) return j; } catch (e) {}
+  return {};
+}
+function saveDeviceRecords(m) {
+  try { fs.mkdirSync(DATA_DIR, { recursive: true }); } catch (e) {}
+  fs.writeFileSync(DEVICE_RECORDS_FILE, JSON.stringify(m, null, 2));
+  ghPersistFile(DEVICE_RECORDS_FILE);
+}
+function deviceCleanId(v) {
+  const s = typeof v === 'string' ? v.trim() : '';
+  if (!s) return '';
+  return s.replace(/[^A-Za-z0-9\-_]/g, '').slice(0, 64);
+}
+// Fingerprint for THIS request. deviceId = stable client UUID
+// (localStorage, generated once per browser/device). model = phone model
+// (Client Hints body.model, else UA). screen/timezone/vpn come from the
+// website body when sent. IP is server-side (X-Forwarded-For) — recorded
+// but NEVER the primary key, because VPN changes it.
+function deviceFingerprintFor(req, body, model) {
+  const b = body && typeof body === 'object' ? body : {};
+  return {
+    deviceId: deviceCleanId(b.deviceId),
+    model: typeof model === 'string' ? model : '',
+    device: deviceFromUA(req.headers && req.headers['user-agent']),
+    screen: typeof b.screen === 'string' ? b.screen.trim().slice(0, 32) : '',
+    timezone: typeof b.timezone === 'string' ? b.timezone.trim().slice(0, 64) : '',
+    vpn: b.vpn === true,
+    ip: getClientIp(req),
+  };
+}
+function deviceFingerprintKey(fp) {
+  if (fp.deviceId) return 'id:' + fp.deviceId;
+  if (fp.model && fp.ip) return 'mi:' + fp.model + '|' + fp.ip;
+  if (fp.model) return 'm:' + fp.model;
+  if (fp.ip) return 'ip:' + fp.ip;
+  return '';
+}
+// Find (or create) the device record for this fingerprint. Migration:
+// when the website starts sending a deviceId for a device previously
+// tracked under the model+IP key, its slots/strikes/block move to the
+// 'id:' key once, so paid slots are not lost.
+function getDeviceRecord(fp, create) {
+  const all = loadDeviceRecords();
+  const key = deviceFingerprintKey(fp);
+  if (key && all[key] && typeof all[key] === 'object') return { rec: all[key], key, all };
+  if (fp.deviceId && fp.model && fp.ip) {
+    const miKey = 'mi:' + fp.model + '|' + fp.ip;
+    if (all[miKey] && typeof all[miKey] === 'object') {
+      const migrated = all[miKey];
+      delete all[miKey];
+      all[key] = migrated;
+      saveDeviceRecords(all);
+      return { rec: migrated, key, all };
+    }
+  }
+  if (!create || !key) return { rec: null, key, all };
+  const now = new Date().toISOString();
+  const rec = { slots: 0, strikes: 0, blocked: false, blockedReason: '', blockedAt: '', blockedEmails: [], vpnDetected: false, vpnLastSeen: '', ipChanges: 0, model: fp.model || '', device: fp.device || '', screen: fp.screen || '', timezone: fp.timezone || '', lastIp: fp.ip || '', country: '', firstSeen: now, lastSeen: now, emails: [] };
+  all[key] = rec;
+  return { rec, key, all };
+}
+// Purchased extra slots for this device (0 when none). Checks the
+// canonical key and, for migration, the model+IP key — takes the max.
+function deviceSlotsFor(fp) {
+  const all = loadDeviceRecords();
+  let n = 0;
+  const key = deviceFingerprintKey(fp);
+  if (key && all[key] && typeof all[key] === 'object') n = Math.max(n, Math.floor(numOr(all[key].slots, 0)));
+  if (fp.deviceId && fp.model && fp.ip) {
+    const miKey = 'mi:' + fp.model + '|' + fp.ip;
+    if (all[miKey] && typeof all[miKey] === 'object') n = Math.max(n, Math.floor(numOr(all[miKey].slots, 0)));
+  }
+  return Math.max(0, n);
+}
+// Is this device blocked? Canonical key only (precise): a cleared
+// localStorage (new deviceId) cannot be matched to the old record, but
+// the registration limit (model+IP count) still catches a 4th account.
+function deviceIsBlocked(fp) {
+  const got = getDeviceRecord(fp, false);
+  const rec = got.rec;
+  if (rec && rec.blocked) return { blocked: true, reason: rec.blockedReason || 'device-blocked', key: got.key };
+  return { blocked: false, reason: '', key: got.key };
+}
+// How many accounts already exist for this device. Primary: same
+// deviceId. Fallback (no deviceId sent yet): same model + same last IP.
+function deviceAccountsCount(users, fp) {
+  let n = 0;
+  const list = Object.values(users || {});
+  for (const u of list) {
+    if (!u || typeof u !== 'object') continue;
+    if (fp.deviceId) {
+      if (u.deviceId && u.deviceId === fp.deviceId) n++;
+    } else if (fp.model && fp.ip) {
+      if (u.model === fp.model && u.lastIp === fp.ip) n++;
+    } else if (fp.model) {
+      if (u.model === fp.model) n++;
+    } else if (fp.ip) {
+      if (u.lastIp === fp.ip) n++;
+    }
+  }
+  return n;
+}
+// VPN detection (owner order 2026-11-18): VPN does NOT hide the device.
+// Signals: (1) the website explicitly reports vpn:true; (2) the IP's
+// country changes for a recognised device (checked in the async country
+// lookup below). An IP change alone only bumps ipChanges — it is a
+// neutral signal (WiFi -> mobile data also changes the IP), never a
+// block by itself. The block comes only from the 3-account limit +
+// strikes.
+function deviceNoteVpn(rec, fp, now) {
+  if (!rec) return;
+  if (fp.vpn && !rec.vpnDetected) { rec.vpnDetected = true; rec.vpnLastSeen = now; }
+  if (rec.lastIp && fp.ip && rec.lastIp !== fp.ip) rec.ipChanges = Math.floor(numOr(rec.ipChanges, 0)) + 1;
+}
+// Record this device sighting on the device record (last seen/IP/model,
+// VPN flags, and the Gmails seen from it). Never creates a block.
+function deviceTouchRecord(fp, email, now) {
+  const got = getDeviceRecord(fp, true);
+  const rec = got.rec;
+  if (!rec) return null;
+  deviceNoteVpn(rec, fp, now);
+  rec.lastSeen = now;
+  if (fp.ip) rec.lastIp = fp.ip;
+  if (fp.model) rec.model = fp.model;
+  if (fp.device) rec.device = fp.device;
+  if (fp.screen) rec.screen = fp.screen;
+  if (fp.timezone) rec.timezone = fp.timezone;
+  if (email) {
+    if (!Array.isArray(rec.emails)) rec.emails = [];
+    if (!rec.emails.includes(email)) {
+      rec.emails.unshift(email);
+      if (rec.emails.length > 10) rec.emails.length = 10;
+    }
+  }
+  saveDeviceRecords(got.all);
+  return rec;
+}
+// Full device picture for one user (Admin visibility): accounts on the
+// user's registered device, purchased slots, limit, strikes, VPN flags,
+// block state.
+function deviceInfoForUser(users, u) {
+  const fp = { deviceId: u.deviceId || '', model: u.registeredModel || u.model || '', ip: u.lastIp || '' };
+  const accounts = deviceAccountsCount(users, fp);
+  const all = loadDeviceRecords();
+  let slots = 0, strikes = 0, vpnDetected = false, vpnLastSeen = '', deviceBlocked = false, blockedReason = '';
+  const keys = [];
+  const ck = deviceFingerprintKey(fp);
+  if (ck) keys.push(ck);
+  if (fp.deviceId && fp.model && fp.ip) keys.push('mi:' + fp.model + '|' + fp.ip);
+  for (const k of keys) {
+    const r = all[k];
+    if (!r || typeof r !== 'object') continue;
+    slots = Math.max(slots, Math.floor(numOr(r.slots, 0)));
+    strikes = Math.max(strikes, Math.floor(numOr(r.strikes, 0)));
+    if (r.vpnDetected) vpnDetected = true;
+    if (r.vpnLastSeen && (!vpnLastSeen || r.vpnLastSeen > vpnLastSeen)) vpnLastSeen = r.vpnLastSeen;
+    if (r.blocked) { deviceBlocked = true; blockedReason = r.blockedReason || 'device-blocked'; }
+  }
+  return { fingerprint: ck, accounts, slots, limit: deviceLimitSetting().limit + slots, strikes, vpnDetected, vpnSuspected: vpnDetected, vpnLastSeen, deviceBlocked, blockedReason, emailBlocked: loadBlockedEmails().some((b) => b === (u.email || '')) };
+}
+// Strike / block emails — APPROVED DESIGN (owner order 2026-11-18).
+// Matches the approved Strike 1 preview (strike-1-warning-email-preview):
+// MovAi brand header, coloured strike banner + progress dots, detected
+// issues, 5 prohibitions, 6 phone-check steps, strike ladder, Admin
+// contact box. Bilingual (Khmer then English) in one HTML email, with a
+// plain-text fallback. Level 1 = GREEN, 2 = YELLOW, 3 = FINAL (orange),
+// 4 = BLOCKED (red). Only the email CONTENT changed — the strike logic
+// (counts, triggers, blocking) is untouched.
+function deviceStrikeEmail(level, reason, ctx) {
+  const lv = (level === 2) ? 2 : (level === 3) ? 3 : (level >= 4) ? 4 : 1;
+  const esc = (x) => String(x).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  const email = (ctx && ctx.email) || '';
+  const name = (ctx && ctx.name && String(ctx.name).trim()) || (email ? email.split('@')[0] : '') || 'អ្នកប្រើ MovAi';
+  const model = (ctx && (ctx.model || ctx.deviceId)) || 'Unknown';
+  const ip = (ctx && ctx.ip) || '';
+  const count = Math.max(0, Math.floor(numOr(ctx && ctx.count, 0)));
+  const limit = Math.max(DEVICE_FREE_ACCOUNT_LIMIT, Math.floor(numOr(ctx && ctx.limit, DEVICE_FREE_ACCOUNT_LIMIT)));
+  const countShown = count > 0 ? count : limit;
+  const r = reason || 'device-limit';
+  const theme = {
+    1: { c: '#4ade80', deep: '#14532d', border: '#2f5238', bg: '#12241a' },
+    2: { c: '#facc15', deep: '#713f12', border: '#57501f', bg: '#241f0e' },
+    3: { c: '#fb923c', deep: '#7c2d12', border: '#5b3a22', bg: '#241509' },
+    4: { c: '#f87171', deep: '#7f1d1d', border: '#5b2323', bg: '#260f0f' },
+  }[lv];
+  const LV = {
+    1: { subject: 'ការព្រមានទី 1 (បៃតង) · First Warning — MovAi',
+      kmTitle: 'ការព្រមានទី 1', enTitle: 'First Warning', sub: 'STRIKE 1 · GREEN WARNING', dots: 1, dotsKm: 'ព្រមាន 1 / 3', dotsEn: 'Warning 1 of 3',
+      kmBanner: 'នេះជាការព្រមានលើកទី 1 — គណនីរបស់អ្នកនៅដំណើរការធម្មតា មិនទាន់ត្រូវបានបិទទេ។ សូមអានឲ្យចប់ ហើយធ្វើតាមការណែនាំខាងក្រោម ដើម្បីកុំឲ្យឈានដល់ការព្រមានលើកក្រោយ។',
+      enBanner: 'This is your first warning — your account is still active and has not been closed. Please read this email fully and follow the steps below so it does not reach the next warning.' },
+    2: { subject: 'ការព្រមានទី 2 (លឿង) · Second Warning — MovAi',
+      kmTitle: 'ការព្រមានទី 2', enTitle: 'Second Warning', sub: 'STRIKE 2 · YELLOW WARNING', dots: 2, dotsKm: 'ព្រមាន 2 / 3', dotsEn: 'Warning 2 of 3',
+      kmBanner: 'នេះជាការព្រមានលើកទី 2 — ទូរស័ព្ទរបស់អ្នកត្រូវបានចាត់ទុកថាមិនសុវត្ថិភាព។ គណនីរបស់អ្នកនៅដំណើរការធម្មតា ប៉ុន្តែសូមពិនិត្យទូរស័ព្ទរបស់អ្នកឥឡូវនេះ ហើយធ្វើតាមការណែនាំខាងក្រោម។',
+      enBanner: 'This is your second warning — your phone is now marked as unsafe. Your account is still active, but please check your phone right now and follow the steps below.' },
+    3: { subject: 'ការព្រមានចុងក្រោយ · Final Warning — MovAi',
+      kmTitle: 'ការព្រមានចុងក្រោយ', enTitle: 'Final Warning', sub: 'STRIKE 3 · FINAL WARNING', dots: 3, dotsKm: 'ព្រមាន 3 / 3', dotsEn: 'Warning 3 of 3',
+      kmBanner: 'នេះជាការព្រមានចុងក្រោយ — បើបញ្ហានេះកើតឡើងម្តងទៀត គណនីរបស់អ្នកនឹងត្រូវបានបិទ។ សូមធ្វើតាមការណែនាំខាងក្រោមភ្លាម។',
+      enBanner: 'This is the final warning — if this happens one more time, your account will be closed. Please follow the steps below right now.' },
+    4: { subject: 'គណនីត្រូវបានប្លុក · Account Blocked — MovAi',
+      kmTitle: 'គណនីត្រូវបានប្លុក', enTitle: 'Account Blocked', sub: 'STRIKE 4 · ACCOUNT BLOCKED', dots: 3, dotsKm: 'ប្លុកហើយ · Blocked', dotsEn: 'Blocked',
+      kmBanner: 'គណនី/ឧបករណ៍របស់អ្នកត្រូវបានប្លុក។ សូមពិនិត្យទូរស័ព្ទរបស់អ្នក — វាមានស្កេម ឬហេកឃ័រលាក់ខ្លួននៅក្នុងហ្នឹង។ សូមសម្អាតទូរស័ព្ទរបស់អ្នកឲ្យស្អាត រួចទាក់ទង Admin ដើម្បីស្នើបើកវិញ។',
+      enBanner: 'Your account/device has been blocked. Please check your phone — it has a scam or a hidden hacker in it. Clean your phone, then contact the Admin to ask to reopen it.' },
+  }[lv];
+  // Detected issues (dynamic per case).
+  const issuesKm = [];
+  const issuesEn = [];
+  if (r === 'vpn') {
+    issuesKm.push(['បញ្ហាទី 1', 'រកឃើញការបើក VPN ពេលចុះឈ្មោះ / ប្រើប្រាស់']);
+    issuesEn.push(['Issue 1', 'A VPN was turned on during sign-up / use']);
+  }
+  const accNo = issuesKm.length + 1;
+  issuesKm.push(['បញ្ហាទី ' + accNo, 'Device នេះបានចុះឈ្មោះគណនី ' + countShown + ' រួចហើយ (កំណត់ ' + limit + ')']);
+  issuesEn.push(['Issue ' + accNo, 'This device has already registered ' + countShown + ' accounts (max ' + limit + ' free)']);
+  if (lv === 4) {
+    issuesKm.push(['ស្ថានភាព', 'ប្លុកហើយ — ត្រូវទាក់ទង Admin ដើម្បីដោះប្លុក']);
+    issuesEn.push(['Status', 'Blocked — contact the Admin to unblock']);
+  }
+  // Shared content — copied from the approved preview (same for all levels).
+  const BAN_KM = [
+    { t: 'ហាមបើក VPN', s: 'ដើម្បីបិទបាំង Device ឬប្ដូរ IP ក្លែងធ្វើជាទូរស័ព្ទថ្មី ដើម្បីចុះឈ្មោះបន្ថែម។ ប្រព័ន្ធសម្គាល់ Device បានដោយផ្ទាល់ — VPN លាក់មិនបានទេ ហើយ VPN ក៏មិនត្រូវបានគាំទ្រ (Not Supported) សម្រាប់ការចុះឈ្មោះដែរ។' },
+    { t: 'ហាមចុះឈ្មោះលើសពី 3 គណនី', s: 'នៅក្នុងទូរស័ព្ទតែមួយ (1 Device = 3 Accounts)។ បើចង់ប្រើ Gmail បន្ថែម ត្រូវ Upgrade — បន្ថែម 1 Gmail = $1 បង់តាម Balance ក្នុង Profile។' },
+    { t: 'ហាមទុក App ស្កេម ឬ App ដែលមិនស្គាល់ប្រភព', s: 'នៅក្នុងទូរស័ព្ទ ជាពិសេស App ដែលទាញយកក្រៅ Play Store / App Store។ App បែបនេះអាចលួចមើលអេក្រង់ អានសារ OTP និងលួចលុយពីគណនីធនាគាររបស់អ្នកបាន។' },
+    { t: 'ហាមឲ្យលេខកូដ OTP ឬ Password', s: 'ទៅអ្នកដទៃ ទោះគេអះអាងថាជាបុគ្គលិក MovAi ឬបុគ្គលិកធនាគារក៏ដោយ។ ក្រុម MovAi មិនដែលសុំលេខកូដ OTP ឬ Password របស់អ្នកទេ។' },
+    { t: 'ហាមប្រើ MovAi ក្លែងបន្លំ (MOD / Crack)', s: 'ឬចូលតាម Website ក្លែងក្លាយ។ សូមប្រើតែ Website ផ្លូវការរបស់ MovAi ប៉ុណ្ណោះ។' },
+  ];
+  const BAN_EN = [
+    { t: 'Do not use a VPN', s: 'to hide your device or change your IP to look like a new phone and register more accounts. Our system identifies the device directly — a VPN cannot hide it, and VPNs are not supported for registration.' },
+    { t: 'Do not register more than 3 accounts', s: 'on one phone (1 device = 3 accounts). If you need more Gmail accounts, please Upgrade — each extra Gmail is $1, paid from your Profile balance.' },
+    { t: 'Do not keep scam apps or apps from unknown sources', s: 'on your phone, especially apps installed from outside the Play Store / App Store. Such apps can watch your screen, read OTP codes, and steal money from your bank account.' },
+    { t: 'Never give your OTP code or password', s: 'to anyone, even if they claim to be MovAi staff or bank staff. MovAi never asks for your OTP code or password.' },
+    { t: 'Do not use fake MovAi copies (MOD / Crack)', s: 'or fake websites. Only use the official MovAi website.' },
+  ];
+  const STEPS_KM = [
+    { t: 'បិទ VPN ហើយលុប App VPN ចោល', s: 'បើមិនចាំបាច់ប្រើ។ ចូល Settings → Apps → រក App VPN → Uninstall។' },
+    { t: 'ពិនិត្យបញ្ជី App ទាំងអស់ក្នុងទូរស័ព្ទ', s: 'បើឃើញ App ណាដែលអ្នកមិនស្គាល់ មិនបានដំឡើងខ្លួនឯង ឬគ្មានរូបតំណាងច្បាស់លាស់ សូមលុបវាចោលភ្លាម។' },
+    { t: 'ពិនិត្យសិទ្ធិ (Permission) របស់ App', s: 'App ណាសុំសិទ្ធិអាន SMS, សិទ្ធិ Accessibility ឬសិទ្ធិថត/មើលអេក្រង់ ដោយគ្មានហេតុផល សូមបិទសិទ្ធិនោះ ឬលុប App ចោល។ នេះជាច្រកដែល Scam ប្រើលួចលេខកូដ OTP ធនាគារច្រើនជាងគេ។' },
+    { t: 'ស្កេនទូរស័ព្ទរកមេរោគ', s: 'បើក Google Play Protect (Play Store → រូប Profile → Play Protect → Scan) ឬកម្មវិធីការពារដែលទុកចិត្តបាន ហើយស្កេនឲ្យចប់។' },
+    { t: 'ការពារគណនីធនាគាររបស់អ្នក', s: 'កុំប្រើ App ធនាគារនៅលើទូរស័ព្ទដែលមាន App ស្កេម។ បើអ្នកសង្ស័យថាធ្លាប់ដំឡើង App ប្លែក សូមដូរ Password ធនាគារ និងបើកការផ្ទៀងផ្ទាត់ 2 ជំហាន (2FA)។' },
+    { pre: 'ធ្វើរួចហើយ ', t: 'ចូល MovAi ដោយមិនបើក VPN', s: 'ហើយប្រើប្រាស់ធម្មតា — គណនីរបស់អ្នកនឹងនៅសុវត្ថិភាព។' },
+  ];
+  const STEPS_EN = [
+    { t: 'Turn off the VPN and delete the VPN app', s: 'if you do not really need it. Go to Settings → Apps → find the VPN app → Uninstall.' },
+    { t: 'Check every app on your phone.', s: 'If you see an app you do not know, did not install yourself, or that has no clear icon, delete it immediately.' },
+    { t: 'Check app permissions.', s: 'If an app can read your SMS, use Accessibility, or record/view your screen without a good reason, remove that permission or delete the app. This is the main way scams steal bank OTP codes.' },
+    { t: 'Scan your phone for malware.', s: 'Run Google Play Protect (Play Store → your profile picture → Play Protect → Scan) or a trusted security app, and let the scan finish.' },
+    { t: 'Protect your bank accounts.', s: 'Do not use banking apps on a phone that has scam apps on it. If you ever installed a strange app, change your bank password and turn on two-step verification (2FA).' },
+    { pre: 'When you are done, ', t: 'open MovAi without a VPN', s: 'and use it normally — your account will stay safe.' },
+  ];
+  const LADDER_KM = [
+    { t: 'លើកទី 1 — ពណ៌បៃតង', s: 'ផ្ញើសារព្រមាន និងណែនាំឲ្យពិនិត្យទូរស័ព្ទ (សារនេះ)។' },
+    { t: 'លើកទី 2 — ពណ៌លឿង', s: 'ព្រមានធ្ងន់ជាងមុន៖ ទូរស័ព្ទរបស់អ្នកត្រូវបានចាត់ទុកថាមិនសុវត្ថិភាព។' },
+    { t: 'លើកទី 3 — ព្រមានចុងក្រោយ', s: 'ផ្ញើសារដូចដើមជាលើកចុងក្រោយ មុនពេលបិទគណនី។' },
+    { t: 'លើសពី 3 ដង — បិទគណនី', s: 'គណនីនឹងត្រូវបានបិទ ហើយអ្នកត្រូវពិនិត្យទូរស័ព្ទឲ្យស្អាតពី Scam / Hacker សិន ទើបអាចស្នើបើកវិញបាន។' },
+  ];
+  const LADDER_EN = [
+    { t: '1st time — Green', s: 'A warning email with instructions to check your phone (this email).' },
+    { t: '2nd time — Yellow', s: 'A stronger warning: your phone is marked as unsafe.' },
+    { t: '3rd time — Final warning', s: 'The same warning sent one last time before the account is closed.' },
+    { t: 'More than 3 times — Account closed', s: 'Your account will be closed, and you must clean your phone of scams/hackers before you can ask to reopen it.' },
+  ];
+  const INTRO_KM = 'ប្រព័ន្ធសុវត្ថិភាពរបស់ MovAi បានរកឃើញបញ្ហាមួយចំនួននៅលើគណនី និងទូរស័ព្ទរបស់អ្នក។ យើងផ្ញើសារនេះមក ដើម្បីឲ្យអ្នកបានដឹង និងប្រុងប្រយ័ត្នទាន់ពេល — ព្រោះបញ្ហាបែបនេះអាចធ្វើឲ្យទូរស័ព្ទរបស់អ្នក គណនីធនាគារ និងព័ត៌មានផ្ទាល់ខ្លួនរបស់អ្នក ត្រូវជនខិលខូច (Hacker / Scam) លួចយកបាន។';
+  const INTRO_EN = 'MovAi security system found some problems with your account and your phone. We are sending this email so you know in time and can take care — problems like these can let hackers and scammers steal your phone data, your bank accounts, and your personal information.';
+  const INTRO4_KM = 'ប្រព័ន្ធសុវត្ថិភាពរបស់ MovAi បានរកឃើញបញ្ហាម្តងហើយម្តងទៀតនៅលើគណនី និងទូរស័ព្ទរបស់អ្នក។ ដោយសារនេះជាលើកទី 4 ហើយ គណនី/ឧបករណ៍របស់អ្នកត្រូវបានប្លុក។ សូមពិនិត្យទូរស័ព្ទរបស់អ្នកឲ្យស្អាតពីស្កេម/ហេកឃ័រ រួចទាក់ទង Admin ដើម្បីស្នើបើកវិញ។';
+  const INTRO4_EN = 'MovAi security system found the same problems on your account and phone again and again. Because this is the 4th time, your account/device has been blocked. Please clean your phone of scams and hackers, then contact the Admin to ask to reopen it.';
+  const KM = {
+    teamTag: 'ក្រុមសុវត្ថិភាព', greet: 'សួស្តី', intro: lv === 4 ? INTRO4_KM : INTRO_KM,
+    s1: 'បញ្ហាដែលប្រព័ន្ធរកឃើញ', s2: 'ចំណុចបម្រាម — ហាមធ្វើដាច់ខាត',
+    s3: 'សូមពិនិត្យទូរស័ព្ទរបស់អ្នកឥឡូវនេះ',
+    s3sub: 'ដើម្បីការពារខ្លួនអ្នកពី Hacker និង App ស្កេម — ជាពិសេស App ធនាគារ និងលុយរបស់អ្នក — សូមធ្វើតាមជំហានទាំងនេះ៖',
+    s4: 'បើបញ្ហានេះកើតឡើងម្តងទៀត',
+    account: 'គណនី', device: 'ទូរស័ព្ទ (Device)',
+    contactTitle: 'ត្រូវការជំនួយ? ទាក់ទង Admin',
+    contactSub: 'បើអ្នកគិតថានេះជាកំហុស ឬត្រូវការជំនួយពិនិត្យទូរស័ព្ទ សូមទាក់ទងមកយើង៖',
+    phone: 'លេខទូរស័ព្ទ · Phone',
+    thanks: 'សូមអរគុណដែលបានយល់ និងសហការ។', team: '— ក្រុមសុវត្ថិភាព MovAi',
+    foot: 'សារនេះត្រូវបានផ្ញើដោយស្វ័យប្រវត្តិពីប្រព័ន្ធសុវត្ថិភាព MovAi — សូមកុំចែករំលែកលេខកូដ ឬ Password របស់អ្នកទៅអ្នកណាម្នាក់។',
+    rights: '© 2026 MovAi · រក្សាសិទ្ធិគ្រប់យ៉ាង', now: 'ឥឡូវនេះ',
+    bannerTitle: LV.kmTitle, bannerSub: LV.sub, banner: LV.kmBanner, dotsLabel: LV.dotsKm, dots: LV.dots,
+    ban: BAN_KM, steps: STEPS_KM, ladder: LADDER_KM, issues: issuesKm,
+  };
+  const EN = {
+    teamTag: 'Security Team', greet: 'Hello', intro: lv === 4 ? INTRO4_EN : INTRO_EN,
+    s1: 'What our system detected', s2: 'Rules — strictly prohibited',
+    s3: 'Please check your phone now',
+    s3sub: 'To protect yourself from hackers and scam apps — especially your banking apps and your money — please follow these steps:',
+    s4: 'If this happens again',
+    account: 'Account', device: 'Device',
+    contactTitle: 'Need help? Contact Admin',
+    contactSub: 'If you think this is a mistake, or you need help checking your phone, contact us:',
+    phone: 'Phone',
+    thanks: 'Thank you for understanding and cooperating.', team: '— MovAi Security Team',
+    foot: 'This email was sent automatically by the MovAi security system — never share your codes or password with anyone.',
+    rights: '© 2026 MovAi · All rights reserved', now: 'NOW',
+    bannerTitle: LV.enTitle, bannerSub: LV.sub, banner: LV.enBanner, dotsLabel: LV.dotsEn, dots: LV.dots,
+    ban: BAN_EN, steps: STEPS_EN, ladder: LADDER_EN, issues: issuesEn,
+  };
+  // One language of the email (inline styles only — email-safe).
+  function langHtml(B) {
+    let dots = '';
+    for (let i = 1; i <= 3; i++) dots += '<span style="display:inline-block;width:26px;height:8px;border-radius:99px;background:' + (i <= B.dots ? theme.c : '#2b3324') + ';margin-right:6px;"></span>';
+    let rows = '';
+    rows += '<div style="padding:9px 0;border-bottom:1px dashed #2b3324;"><span style="color:#a7b198;font-weight:600;font-size:14px;">' + B.account + ': </span><span style="font-weight:600;">' + esc(name) + ' · ' + esc(email) + '</span></div>';
+    rows += '<div style="padding:9px 0;border-bottom:1px dashed #2b3324;"><span style="color:#a7b198;font-weight:600;font-size:14px;">' + B.device + ': </span><span style="font-weight:600;">' + esc(model) + (ip ? ' · IP ' + esc(ip) : '') + '</span></div>';
+    for (let i = 0; i < B.issues.length; i++) {
+      rows += '<div style="padding:9px 0;' + (i < B.issues.length - 1 ? 'border-bottom:1px dashed #2b3324;' : '') + '"><span style="color:#a7b198;font-weight:600;font-size:14px;">' + B.issues[i][0] + ': </span><span style="font-weight:600;color:#facc15;">' + esc(B.issues[i][1]) + '</span></div>';
+    }
+    let ban = '';
+    for (const it of B.ban) ban += '<div style="background:#151a12;border:1px solid #2b3324;border-radius:12px;padding:11px 14px;margin-bottom:9px;"><span style="display:inline-block;width:22px;height:22px;border-radius:50%;background:rgba(248,113,113,.14);color:#f87171;text-align:center;line-height:22px;font-weight:700;font-size:13px;">✕</span> <b>' + it.t + '</b> ' + it.s + '</div>';
+    let steps = '';
+    for (let i = 0; i < B.steps.length; i++) {
+      const st = B.steps[i];
+      steps += '<div style="background:#151a12;border:1px solid #2b3324;border-radius:12px;padding:11px 14px;margin-bottom:9px;"><span style="display:inline-block;width:24px;height:24px;border-radius:50%;background:#a3e635;color:#131702;text-align:center;line-height:24px;font-weight:700;font-size:13px;">' + (i + 1) + '</span> ' + (st.pre || '') + '<b>' + st.t + '</b> ' + st.s + '</div>';
+    }
+    let ladder = '';
+    const dotColors = ['#4ade80', '#facc15', '#fb923c', '#f87171'];
+    for (let i = 0; i < B.ladder.length; i++) {
+      const isNow = (i + 1) === lv;
+      ladder += '<div style="background:' + (isNow ? '#101c13' : '#151a12') + ';border:1px solid ' + (isNow ? theme.border : '#2b3324') + ';border-radius:12px;padding:12px 14px;margin-bottom:9px;"><span style="display:inline-block;width:14px;height:14px;border-radius:50%;background:' + dotColors[i] + ';vertical-align:middle;"></span> <b>' + B.ladder[i].t + '</b>' + (isNow ? ' <span style="float:right;font-size:11px;font-weight:700;padding:3px 10px;border-radius:99px;background:' + theme.deep + ';color:' + theme.c + ';">' + B.now + '</span>' : '') + '<br><span style="color:#a7b198;font-size:13px;">' + B.ladder[i].s + '</span></div>';
+    }
+    return '<div style="max-width:560px;margin:0 auto;padding:26px 22px 0;background:#0c0f0a;color:#eef3e2;font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:1.65;">'
+      + '<table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td style="font-size:27px;font-weight:700;color:#ffffff;">Mov<span style="color:#a3e635;">Ai</span></td><td align="right" style="font-size:11px;font-weight:700;letter-spacing:2px;color:#a7b198;text-transform:uppercase;">Security Team<br><span style="color:#a3e635;letter-spacing:0;text-transform:none;font-size:13px;">' + B.teamTag + '</span></td></tr></table>'
+      + '<div style="border-bottom:1px solid #2b3324;margin-bottom:20px;"></div>'
+      + '<div style="border:1px solid ' + theme.border + ';border-radius:14px;background:' + theme.bg + ';padding:18px;">'
+      + '<table role="presentation" cellpadding="0" cellspacing="0"><tr><td width="58" valign="top"><div style="width:46px;height:46px;border-radius:12px;background:' + theme.deep + ';text-align:center;line-height:46px;font-size:24px;color:' + theme.c + ';">⚠</div></td><td valign="top"><div style="font-size:21px;font-weight:700;">' + B.bannerTitle + '</div><div style="font-size:13px;letter-spacing:2px;color:' + theme.c + ';font-weight:700;">' + B.bannerSub + '</div></td></tr></table>'
+      + '<p style="margin:10px 0 0;color:#a7b198;font-size:14px;">' + B.banner + '</p>'
+      + '<div style="margin-top:10px;">' + dots + '<span style="color:#a7b198;font-size:13px;">' + B.dotsLabel + '</span></div>'
+      + '</div>'
+      + '<p style="margin-top:20px;">' + B.greet + ' <b>' + esc(name) + '</b>,</p>'
+      + '<p>' + B.intro + '</p>'
+      + '<h2 style="font-size:17px;font-weight:700;margin:26px 0 10px;">1. ' + B.s1 + '</h2>'
+      + '<div style="background:#151a12;border:1px solid #2b3324;border-radius:12px;padding:6px 16px;">' + rows + '</div>'
+      + '<h2 style="font-size:17px;font-weight:700;margin:26px 0 10px;">2. ' + B.s2 + '</h2>'
+      + ban
+      + '<h2 style="font-size:17px;font-weight:700;margin:26px 0 10px;">3. ' + B.s3 + '</h2>'
+      + '<p style="color:#a7b198;margin-top:0;">' + B.s3sub + '</p>'
+      + steps
+      + '<h2 style="font-size:17px;font-weight:700;margin:26px 0 10px;">4. ' + B.s4 + '</h2>'
+      + ladder
+      + '<div style="margin-top:26px;background:#1a2015;border:1px solid #2b3324;border-radius:14px;padding:16px 18px;">'
+      + '<h2 style="font-size:17px;font-weight:700;margin:0 0 2px;">' + B.contactTitle + '</h2>'
+      + '<p style="color:#a7b198;margin:0 0 8px;font-size:14px;">' + B.contactSub + '</p>'
+      + '<a href="tel:+85581914728" style="display:block;color:#eef3e2;text-decoration:none;background:#151a12;border:1px solid #2b3324;border-radius:10px;padding:10px 14px;margin-bottom:10px;"><span style="color:#a7b198;font-size:13px;display:block;">' + B.phone + '</span><b>081 914 728</b></a>'
+      + '<a href="mailto:sokhoeun356@gmail.com" style="display:block;color:#eef3e2;text-decoration:none;background:#151a12;border:1px solid #2b3324;border-radius:10px;padding:10px 14px;margin-bottom:10px;"><span style="color:#a7b198;font-size:13px;display:block;">Gmail</span><b>sokhoeun356@gmail.com</b></a>'
+      + '<a href="https://t.me/yemsokhoeun_9999" style="display:block;color:#eef3e2;text-decoration:none;background:#151a12;border:1px solid #2b3324;border-radius:10px;padding:10px 14px;"><span style="color:#a7b198;font-size:13px;display:block;">Telegram</span><b>@yemsokhoeun_9999</b></a>'
+      + '</div>'
+      + '<p style="margin-top:24px;margin-bottom:2px;">' + B.thanks + '</p>'
+      + '<p style="font-weight:700;margin-top:0;">' + B.team + '</p>'
+      + '<div style="margin:22px -22px 0;padding:16px 22px 20px;border-top:1px solid #2b3324;color:#a7b198;font-size:13px;text-align:center;"><div style="font-size:17px;font-weight:700;color:#ffffff;">Mov<span style="color:#a3e635;">Ai</span></div><p style="margin:6px 0 0;">' + B.foot + '<br>' + B.rights + '</p></div>'
+      + '</div>';
+  }
+  // Plain-text fallback (same content, both languages).
+  function langText(B) {
+    const lines = [];
+    lines.push('MovAi — ' + B.teamTag, '');
+    lines.push(B.bannerTitle + ' · ' + B.bannerSub, B.banner, B.dotsLabel, '');
+    lines.push(B.greet + ' ' + name + ',', B.intro, '');
+    lines.push('1) ' + B.s1);
+    lines.push('• ' + B.account + ': ' + name + ' · ' + email);
+    lines.push('• ' + B.device + ': ' + model + (ip ? ' · IP ' + ip : ''));
+    for (const iss of B.issues) lines.push('• ' + iss[0] + ': ' + iss[1]);
+    lines.push('');
+    lines.push('2) ' + B.s2);
+    for (const it of B.ban) lines.push('✕ ' + it.t + ' ' + it.s);
+    lines.push('');
+    lines.push('3) ' + B.s3, B.s3sub);
+    for (let i = 0; i < B.steps.length; i++) lines.push((i + 1) + '. ' + (B.steps[i].pre || '') + B.steps[i].t + ' ' + B.steps[i].s);
+    lines.push('');
+    lines.push('4) ' + B.s4);
+    for (let i = 0; i < B.ladder.length; i++) lines.push('• ' + B.ladder[i].t + ': ' + B.ladder[i].s + ((i + 1) === lv ? ' [' + B.now + ']' : ''));
+    lines.push('');
+    lines.push(B.contactTitle, B.contactSub);
+    lines.push('• ' + B.phone + ': 081 914 728');
+    lines.push('• Gmail: sokhoeun356@gmail.com');
+    lines.push('• Telegram: @yemsokhoeun_9999');
+    lines.push('', B.thanks, B.team, '', B.foot, B.rights, '');
+    return lines.join('\n');
+  }
+  const html = '<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head><body style="margin:0;padding:0;background:#0c0f0a;font-family:Arial,Helvetica,sans-serif;color:#eef3e2;">'
+    + langHtml(KM)
+    + '<div style="max-width:560px;margin:0 auto;padding:14px 22px;text-align:center;color:#a7b198;font-size:13px;">— English version below · ខាងក្រោមជាភាសាអង់គ្លេស —</div>'
+    + langHtml(EN)
+    + '</body></html>';
+  const text = langText(KM) + '\n' + langText(EN);
+  return { subject: LV.subject, html, text };
+}
+
+// Record one violation (a refused registration attempt) on the device:
+// always increments strikes, logs it and notifies the Admin (a record).
+// The strike LEVEL EMAIL and the block at strike 4 happen ONLY when
+// Auto-Catch is ON (owner order 2026-11-18) — when OFF the strike is
+// only recorded, nothing is sent and nothing is blocked. extra =
+// {name, count, limit} for the email (per-user name/Gmail/device).
+// Returns {strikes, level, blocked}.
+async function recordDeviceStrike(all, key, rec, email, reason, fp, extra) {
+  const now = new Date().toISOString();
+  rec.strikes = Math.floor(numOr(rec.strikes, 0)) + 1;
+  rec.lastSeen = now;
+  if (fp.ip) rec.lastIp = fp.ip;
+  const strikes = rec.strikes;
+  const level = strikes >= DEVICE_STRIKE_BLOCK_AT ? 4 : strikes; // 1, 2, 3, 4
+  let blocked = false;
+  const catchOn = autoCatchEnabled();
+  // Auto-Catch ON only: at strike 4 block the device + the Gmail.
+  if (catchOn && strikes >= DEVICE_STRIKE_BLOCK_AT) {
+    rec.blocked = true;
+    rec.blockedReason = 'device-limit-abuse';
+    rec.blockedAt = now;
+    blocked = true;
+    // Block the attempting Gmail too, so it cannot register later from
+    // another device until the Admin unblocks it (unblock-email).
+    const bem = loadBlockedEmails();
+    if (!bem.some((b) => b === email)) { bem.push(email); saveBlockedEmails(bem); await ghFlushFile(BLOCKED_EMAILS_FILE); }
+    if (!Array.isArray(rec.blockedEmails)) rec.blockedEmails = [];
+    if (!rec.blockedEmails.includes(email)) rec.blockedEmails.push(email);
+  }
+  saveDeviceRecords(all);
+  await ghFlushFile(DEVICE_RECORDS_FILE);
+  logActivity({ at: now, mode: 'device-strike', email, deviceId: fp.deviceId || '', model: fp.model || '', ip: fp.ip || '', strikes, level, blocked, reason });
+  addNotification('security', email, level === 4 ? '🚫 ឧបករណ៍ត្រូវបានប្លុក · Device blocked (strikes)' : '⚠️ បំពានច្បាប់គណនី · Device-limit violation', email + ' បានព្យាយាមចុះឈ្មោះគណនីលើសកំណត់ពីឧបករណ៍ ' + (fp.model || fp.deviceId || 'Unknown') + ' · IP ' + (fp.ip || '—') + ' · Strike ' + strikes + (blocked ? ' — ឧបករណ៍ត្រូវបានប្លុក' : ''));
+  // Strike email to the user — Auto-Catch ON only. Never fails the
+  // request if Brevo is down — the strike is already recorded.
+  if (catchOn) {
+    try {
+      const ex = extra && typeof extra === 'object' ? extra : {};
+      const msg = deviceStrikeEmail(level, reason, { email, name: ex.name || '', strikes, count: ex.count || 0, limit: ex.limit || DEVICE_FREE_ACCOUNT_LIMIT, model: fp.model || '', deviceId: fp.deviceId || '', ip: fp.ip || '' });
+      await sendViaBrevo(email, '', msg.subject, msg.html, msg.text);
+    } catch (e) {}
+  }
+  return { strikes, level, blocked };
+}
+// Device-limit gate for NEW account creation. Returns null when the
+// registration may proceed, or the error payload when it must be refused.
+// The limit is enforced ONLY when deviceLimitEnabled is ON (owner order
+// 2026-11-18 — default OFF, because the website is not working well
+// yet); the setting is read fresh from disk on EVERY call, so an Admin
+// change takes effect immediately. When ON, the free limit is the
+// configured deviceLimit (default 3) + purchased slots. A standing
+// block (strike 4 while Auto-Catch was ON) is still enforced even
+// when the toggle is OFF — only the Admin lifts it (unblock-device).
+// On refusal it records a strike (+ level email and block at strike 4
+// only when Auto-Catch is ON). The refusal itself is the limit
+// enforcement, so it applies whenever the limit toggle is ON.
+async function deviceLimitGate(users, fp, email, name) {
+  const count = deviceAccountsCount(users, fp);
+  const got = getDeviceRecord(fp, true);
+  const rec = got.rec;
+  const all = got.all;
+  const slots = Math.floor(numOr(rec.slots, 0));
+  const dl = deviceLimitSetting(); // fresh from settings, every call
+  const freeLimit = dl.limit;
+  const limit = freeLimit + slots;
+  // A blocked device cannot register at all.
+  if (rec.blocked) {
+    return { ok: false, error: 'ឧបករណ៍នេះត្រូវបានប្លុក — This device has been used before · VPN is not supported. សូមទាក់ទង Admin · Please contact the Admin', deviceBlocked: true, blockedReason: rec.blockedReason || 'device-blocked', deviceLimitReached: true, upgradePrice: DEVICE_SLOT_PRICE, deviceLimit: freeLimit, deviceAccounts: count, deviceSlots: slots };
+  }
+  // Device-limit toggle OFF: no limit enforcement at registration —
+  // users can register many accounts.
+  if (!dl.enabled) return null;
+  if (count < limit) return null;
+  // Over the limit: a violation — record a strike (+ level email and
+  // block at 4 only when Auto-Catch is ON).
+  const reason = (fp.vpn || rec.vpnDetected) ? 'vpn' : 'device-limit';
+  const st = await recordDeviceStrike(all, got.key, rec, email, reason, fp, { name: name || '', count, limit: freeLimit });
+  return { ok: false, error: 'ឧបករណ៍នេះត្រូវបានប្រើរួចហើយ — This device has been used before · VPN is not supported. ឧបករណ៍នេះបានចុះឈ្មោះគណនី ' + count + ' រួចហើយ (កំណត់ ' + freeLimit + ' ដោយឥតគិតថ្លៃ) — សូម Upgrade 1 Gmail = $' + DEVICE_SLOT_PRICE.toFixed(2) + ' · This device already registered ' + count + ' accounts (max ' + freeLimit + ' free) — please Upgrade, 1 Gmail = $' + DEVICE_SLOT_PRICE.toFixed(2), deviceLimitReached: true, upgradePrice: DEVICE_SLOT_PRICE, deviceLimit: freeLimit, deviceAccounts: count, deviceSlots: slots, strike: st.strikes, deviceBlocked: st.blocked };
+}
+// Scam / hacker detection — NOTIFY ONLY, never block (owner order
+// 2026-11-18). When the system detects a scam or a hidden hacker, it
+// notifies the Admin (bell + Telegram, via addNotification) AND the
+// user (email), and the Admin reviews the Gmail manually and decides
+// whether to block. The system only notifies; it never auto-blocks
+// for scam/hacker detection. Separate from the device-limit strike
+// system (which does block after 3+ strikes, when Auto-Catch is ON).
+function scamHackerEmail(ctx) {
+  const esc = (x) => String(x).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  const email = (ctx && ctx.email) || '';
+  const name = (ctx && ctx.name && String(ctx.name).trim()) || (email ? email.split('@')[0] : '') || 'អ្នកប្រើ MovAi';
+  const kind = (ctx && ctx.kind) || 'brute-force';
+  const detail = (ctx && ctx.detail) || '';
+  const model = (ctx && ctx.model) || 'Unknown';
+  const ip = (ctx && ctx.ip) || '';
+  const detectedKm = kind === 'brute-force'
+    ? 'មានអ្នកព្យាយាមចូលគណនីរបស់អ្នក ដោយបញ្ចូល Password ខុស 5 ដងជាប់គ្នា។'
+    : 'ប្រព័ន្ធបានរកឃើញសកម្មភាពគួរឲ្យសង្ស័យនៅលើគណនីរបស់អ្នក។';
+  const detectedEn = kind === 'brute-force'
+    ? 'Someone tried to sign in to your account by entering the wrong password 5 times in a row.'
+    : 'Our system detected suspicious activity on your account.';
+  const KM = {
+    teamTag: 'ក្រុមសុវត្ថិភាព', greet: 'សួស្តី',
+    title: 'រកឃើញសកម្មភាពគួរឲ្យសង្ស័យ', sub: 'SCAM / HACKER DETECTED',
+    banner: 'យើងបានរកឃើញសកម្មភាពគួរឲ្យសង្ស័យនៅលើគណនីរបស់អ្នក។ សូមកុំភ័យ — គណនីរបស់អ្នកមិនទាន់ត្រូវបានប្លុកទេ ហើយអ្នកនៅអាចប្រើប្រាស់បានធម្មតា។',
+    detected: detectedKm,
+    notBlocked: 'គណនីរបស់អ្នកមិនទាន់ត្រូវបានប្លុកទេ — អ្នកនៅអាចប្រើប្រាស់បានធម្មតា។',
+    review: 'Admin របស់ MovAi នឹងពិនិត្យគណនី Gmail របស់អ្នកដោយផ្ទាល់ ដើម្បីផ្ទៀងផ្ទាត់ថាតើវាពិតជាមានបញ្ហាមែនឬអត់។ បើ Admin រកឃើញថាពិតជាមានបញ្ហា ទើប Admin សម្រេចថាត្រូវប្លុកឬអត់។',
+    adviceTitle: 'សូមធ្វើដូចខាងក្រោម',
+    advice: [
+      'បើអ្នកមិនមែនជាអ្នកព្យាយាមចូលនោះទេ សូមដូរ Password របស់អ្នកភ្លាម។',
+      'ពិនិត្យទូរស័ព្ទរបស់អ្នករក App ស្កេម ឬ App ដែលមិនស្គាល់ប្រភព ហើយលុបវាចោល។',
+      'សូមកុំចែករំលែកលេខកូដ OTP ឬ Password របស់អ្នកទៅអ្នកណាម្នាក់ — MovAi មិនដែលសុំវាទេ។',
+    ],
+    account: 'គណនី', device: 'ទូរស័ព្ទ (Device)',
+    contactTitle: 'ត្រូវការជំនួយ? ទាក់ទង Admin',
+    contactSub: 'បើអ្នកគិតថានេះជាកំហុស ឬត្រូវការជំនួយ សូមទាក់ទងមកយើង៖',
+    phone: 'លេខទូរស័ព្ទ · Phone',
+    thanks: 'សូមអរគុណដែលបានយល់ និងសហការ។', team: '— ក្រុមសុវត្ថិភាព MovAi',
+    foot: 'សារនេះត្រូវបានផ្ញើដោយស្វ័យប្រវត្តិពីប្រព័ន្ធសុវត្ថិភាព MovAi — សូមកុំចែករំលែកលេខកូដ ឬ Password របស់អ្នកទៅអ្នកណាម្នាក់។',
+    rights: '© 2026 MovAi · រក្សាសិទ្ធិគ្រប់យ៉ាង',
+  };
+  const EN = {
+    teamTag: 'Security Team', greet: 'Hello',
+    title: 'Suspicious activity detected', sub: 'SCAM / HACKER DETECTED',
+    banner: 'We detected suspicious activity on your account. Do not worry — your account has NOT been blocked, and you can still use it normally.',
+    detected: detectedEn,
+    notBlocked: 'Your account has NOT been blocked — you can still use it normally.',
+    review: 'The MovAi Admin will manually review your Gmail account to verify whether it really has a problem. Only if the Admin finds a real problem will the Admin decide whether to block it.',
+    adviceTitle: 'Please do the following',
+    advice: [
+      'If it was not you trying to sign in, change your password right away.',
+      'Check your phone for scam apps or apps from unknown sources, and delete them.',
+      'Never share your OTP code or password with anyone — MovAi never asks for them.',
+    ],
+    account: 'Account', device: 'Device',
+    contactTitle: 'Need help? Contact Admin',
+    contactSub: 'If you think this is a mistake, or you need help, contact us:',
+    phone: 'Phone',
+    thanks: 'Thank you for understanding and cooperating.', team: '— MovAi Security Team',
+    foot: 'This email was sent automatically by the MovAi security system — never share your codes or password with anyone.',
+    rights: '© 2026 MovAi · All rights reserved',
+  };
+  function langHtml(B) {
+    let adv = '';
+    for (const a of B.advice) adv += '<div style="background:#151a12;border:1px solid #2b3324;border-radius:12px;padding:11px 14px;margin-bottom:9px;">• ' + a + '</div>';
+    return '<div style="max-width:560px;margin:0 auto;padding:26px 22px 0;background:#0c0f0a;color:#eef3e2;font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:1.65;">'
+      + '<table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td style="font-size:27px;font-weight:700;color:#ffffff;">Mov<span style="color:#a3e635;">Ai</span></td><td align="right" style="font-size:11px;font-weight:700;letter-spacing:2px;color:#a7b198;text-transform:uppercase;">Security Team<br><span style="color:#a3e635;letter-spacing:0;text-transform:none;font-size:13px;">' + B.teamTag + '</span></td></tr></table>'
+      + '<div style="border-bottom:1px solid #2b3324;margin-bottom:20px;"></div>'
+      + '<div style="border:1px solid #57501f;border-radius:14px;background:#241f0e;padding:18px;">'
+      + '<table role="presentation" cellpadding="0" cellspacing="0"><tr><td width="58" valign="top"><div style="width:46px;height:46px;border-radius:12px;background:#422006;text-align:center;line-height:46px;font-size:24px;color:#facc15;">⚠</div></td><td valign="top"><div style="font-size:21px;font-weight:700;">' + B.title + '</div><div style="font-size:13px;letter-spacing:2px;color:#facc15;font-weight:700;">' + B.sub + '</div></td></tr></table>'
+      + '<p style="margin:10px 0 0;color:#a7b198;font-size:14px;">' + B.banner + '</p>'
+      + '</div>'
+      + '<p style="margin-top:20px;">' + B.greet + ' <b>' + esc(name) + '</b>,</p>'
+      + '<p>' + B.detected + (detail ? ' ' + esc(detail) : '') + '</p>'
+      + '<div style="background:#151a12;border:1px solid #2b3324;border-radius:12px;padding:6px 16px;">'
+      + '<div style="padding:9px 0;border-bottom:1px dashed #2b3324;"><span style="color:#a7b198;font-weight:600;font-size:14px;">' + B.account + ': </span><span style="font-weight:600;">' + esc(name) + ' · ' + esc(email) + '</span></div>'
+      + '<div style="padding:9px 0;"><span style="color:#a7b198;font-weight:600;font-size:14px;">' + B.device + ': </span><span style="font-weight:600;">' + esc(model) + (ip ? ' · IP ' + esc(ip) : '') + '</span></div>'
+      + '</div>'
+      + '<div style="background:#101c13;border:1px solid #2f5238;border-radius:12px;padding:12px 14px;margin:14px 0;"><b style="color:#4ade80;">✓ ' + B.notBlocked + '</b></div>'
+      + '<p>' + B.review + '</p>'
+      + '<h2 style="font-size:17px;font-weight:700;margin:26px 0 10px;">' + B.adviceTitle + '</h2>'
+      + adv
+      + '<div style="margin-top:26px;background:#1a2015;border:1px solid #2b3324;border-radius:14px;padding:16px 18px;">'
+      + '<h2 style="font-size:17px;font-weight:700;margin:0 0 2px;">' + B.contactTitle + '</h2>'
+      + '<p style="color:#a7b198;margin:0 0 8px;font-size:14px;">' + B.contactSub + '</p>'
+      + '<a href="tel:+85581914728" style="display:block;color:#eef3e2;text-decoration:none;background:#151a12;border:1px solid #2b3324;border-radius:10px;padding:10px 14px;margin-bottom:10px;"><span style="color:#a7b198;font-size:13px;display:block;">' + B.phone + '</span><b>081 914 728</b></a>'
+      + '<a href="mailto:sokhoeun356@gmail.com" style="display:block;color:#eef3e2;text-decoration:none;background:#151a12;border:1px solid #2b3324;border-radius:10px;padding:10px 14px;margin-bottom:10px;"><span style="color:#a7b198;font-size:13px;display:block;">Gmail</span><b>sokhoeun356@gmail.com</b></a>'
+      + '<a href="https://t.me/yemsokhoeun_9999" style="display:block;color:#eef3e2;text-decoration:none;background:#151a12;border:1px solid #2b3324;border-radius:10px;padding:10px 14px;"><span style="color:#a7b198;font-size:13px;display:block;">Telegram</span><b>@yemsokhoeun_9999</b></a>'
+      + '</div>'
+      + '<p style="margin-top:24px;margin-bottom:2px;">' + B.thanks + '</p>'
+      + '<p style="font-weight:700;margin-top:0;">' + B.team + '</p>'
+      + '<div style="margin:22px -22px 0;padding:16px 22px 20px;border-top:1px solid #2b3324;color:#a7b198;font-size:13px;text-align:center;"><div style="font-size:17px;font-weight:700;color:#ffffff;">Mov<span style="color:#a3e635;">Ai</span></div><p style="margin:6px 0 0;">' + B.foot + '<br>' + B.rights + '</p></div>'
+      + '</div>';
+  }
+  function langText(B) {
+    const lines = [];
+    lines.push('MovAi — ' + B.teamTag, '');
+    lines.push(B.title + ' · ' + B.sub, B.banner, '');
+    lines.push(B.greet + ' ' + name + ',', B.detected + (detail ? ' ' + detail : ''), '');
+    lines.push('• ' + B.account + ': ' + name + ' · ' + email);
+    lines.push('• ' + B.device + ': ' + model + (ip ? ' · IP ' + ip : ''));
+    lines.push('', '✓ ' + B.notBlocked, '', B.review, '');
+    lines.push(B.adviceTitle);
+    for (const a of B.advice) lines.push('• ' + a);
+    lines.push('');
+    lines.push(B.contactTitle, B.contactSub);
+    lines.push('• ' + B.phone + ': 081 914 728');
+    lines.push('• Gmail: sokhoeun356@gmail.com');
+    lines.push('• Telegram: @yemsokhoeun_9999');
+    lines.push('', B.thanks, B.team, '', B.foot, B.rights, '');
+    return lines.join('\n');
+  }
+  const html = '<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head><body style="margin:0;padding:0;background:#0c0f0a;font-family:Arial,Helvetica,sans-serif;color:#eef3e2;">'
+    + langHtml(KM)
+    + '<div style="max-width:560px;margin:0 auto;padding:14px 22px;text-align:center;color:#a7b198;font-size:13px;">— English version below · ខាងក្រោមជាភាសាអង់គ្លេស —</div>'
+    + langHtml(EN)
+    + '</body></html>';
+  const text = langText(KM) + '\n' + langText(EN);
+  return { subject: 'MovAi — ⚠️ រកឃើញសកម្មភាពគួរឲ្យសង្ស័យ · Suspicious activity detected', html, text };
+}
+// Notify Admin + user about a detected scam/hacker. NEVER blocks.
+// Fire-and-forget: callers use .catch(() => {}) and never await it
+// in the response path.
+async function reportScamHacker(o) {
+  const email = (o && o.email) || '';
+  if (!email) return;
+  const name = (o && o.name) || '';
+  const kind = (o && o.kind) || 'brute-force';
+  const model = (o && o.model) || '';
+  const ip = (o && o.ip) || '';
+  const detail = (o && o.detail) || '';
+  const now = new Date().toISOString();
+  logActivity({ at: now, mode: 'scam-hacker-alert', email, deviceId: (o && o.deviceId) || '', model, ip, kind, detail });
+  // Admin: bell + Telegram (security kind). The Admin reviews the
+  // Gmail manually and decides whether to block.
+  addNotification('security', email, '🕵️ រកឃើញ Scam / Hacker · Scam or hacker detected', email + ' — ' + (kind === 'brute-force' ? 'មានអ្នកព្យាយាមចូលគណនី ដោយបញ្ចូល Password ខុស 5 ដងជាប់គ្នា' : 'រកឃើញសកម្មភាពគួរឲ្យសង្ស័យ') + ' · ' + (model || 'Unknown') + ' · IP ' + (ip || '—') + ' — គណនីមិនទាន់ត្រូវបានប្លុកទេ សូម Admin ពិនិត្យដោយផ្ទាល់');
+  // User: email (bilingual). Never fails the request if Brevo is down.
+  try {
+    const msg = scamHackerEmail({ email, name, kind, detail, model, ip });
+    await sendViaBrevo(email, '', msg.subject, msg.html, msg.text);
+  } catch (e) {}
 }
 // ---- MVSEP separation cache (fast re-split) ----
 // audioUrl sha256 -> {hash, savedAt}. When the same song is split again
@@ -3710,7 +4572,8 @@ function apiRoute(req, res, urlPath) {
   // ---- MovAi Admin API ----
   // POST /api/admin/sync — {email, name, credits, songCredits, plan, songPlan}
   // Called by the MovAi website (no admin key). Creates the user on first
-  // sync (free grant 250 media + 24 song credits when credits are absent);
+  // sync (new-user gift on CLAIM: 24 song credits, or 50 when the
+  // gift50 toggle is ON for a brand-new account; no media credits);
   // on later syncs the SERVER credits are the truth — the client's credits
   // are ignored and the server values are returned.
   if (req.method === 'POST' && urlPath === '/api/admin/sync') {
@@ -3743,10 +4606,24 @@ function apiRoute(req, res, urlPath) {
         return sendJSON(res, 200, { ok: false, error: 'ម៉ូដែលនេះត្រូវបានប្លុក · This device model is blocked' });
       }
       const now = new Date().toISOString();
-      logActivity({ at: now, mode: 'sync', email });
+      // Device fingerprint for this request (deviceId + model + screen +
+      // timezone + vpn flag from the website; IP server-side). It survives
+      // VPN — only the IP changes, the device is still recognised.
+      const _fp = deviceFingerprintFor(req, body, _model);
+      logActivity({ at: now, mode: 'sync', email, deviceId: _fp.deviceId || '', model: _fp.model || '', ip: _fp.ip || '', vpn: !!_fp.vpn });
       const users = loadUsers();
       const isNewUser = !users[email];
       let u = users[email];
+      // DEVICE ACCOUNT LIMIT (owner order 2026-11-18): max N accounts per
+      // DEVICE, free (N = deviceLimit setting, default 3 — enforced only
+      // when deviceLimitEnabled is ON). A 4th+ registration is refused
+      // (strike + level email when Auto-Catch is ON, device blocked at
+      // strike 4). Login is unlimited — the limit is only on
+      // REGISTERING new accounts.
+      if (isNewUser) {
+        const _gate = await deviceLimitGate(users, _fp, email, typeof body.name === 'string' ? body.name : '');
+        if (_gate) return sendJSON(res, 200, _gate);
+      }
       if (!u) {
         const takenIds = new Set(Object.values(users).map((x) => x.id).filter(Boolean));
         u = {
@@ -3759,13 +4636,15 @@ function apiRoute(req, res, urlPath) {
           // starts at 0/0. The server NEVER trusts the client's
           // balance — a browser could send credits:250 and mint the
           // gift without claiming, and a stale/new-device sync could
-          // re-create the account with the gift. The gift (+250 media
-          // / +24 song) is granted ONLY by the CLAIM flow below
+          // re-create the account with the gift. The gift (24 song
+          // credits, or 50 when gift50 is ON for a brand-new account)
+          // is granted ONLY by the CLAIM flow below
           // (giftClaimed:true + !giftClaimed), once per Gmail,
           // forever, on any device. The Admin/server balance is the
           // only truth; the Profile number is display-only.
           credits: 0,
           songCredits: 0,
+          balance: 0,
           giftClaimed: false,
           plan: typeof body.plan === 'string' ? body.plan.slice(0, 50) : '',
           songPlan: typeof body.songPlan === 'string' ? body.songPlan.slice(0, 50) : '',
@@ -3786,12 +4665,37 @@ function apiRoute(req, res, urlPath) {
         if (typeof body.songPlan === 'string') u.songPlan = body.songPlan.slice(0, 50);
         u.updatedAt = now;
       }
+      // DEVICE BLOCK (strike 4+): a blocked device cannot sign in either.
+      // A new/different phone model alone NEVER blocks — the model is
+      // only part of the fingerprint; a brand-new device gets its 3
+      // free accounts. The block is for limit abuse, not for a new phone.
+      if (!isNewUser) {
+        const _blk = deviceIsBlocked(_fp);
+        if (_blk.blocked) {
+          logActivity({ at: now, mode: 'device-blocked-signin', email, deviceId: _fp.deviceId || '', model: _fp.model || '', ip: _fp.ip || '' });
+          return sendJSON(res, 200, { ok: false, error: 'ឧបករណ៍នេះត្រូវបានប្លុក — This device has been used before · VPN is not supported. សូមទាក់ទង Admin · Please contact the Admin', deviceBlocked: true, blockedReason: _blk.reason });
+        }
+        // Adopt the current model as the registered model on first sight
+        // (legacy users). Informational only — a model change never blocks.
+        if (_model && !u.registeredModel) u.registeredModel = _model;
+      } else if (_model) {
+        u.registeredModel = _model;
+      }
       // Capture where this user connects from + on what device (every sync).
       const _cip = getClientIp(req);
       if (_cip) u.lastIp = _cip;
       const _dev = deviceFromUA(req.headers && req.headers['user-agent']);
       if (_dev) u.device = _dev;
       if (_model) u.model = _model;
+      // Device fingerprint: the registration device is recorded once
+      // (u.deviceId, never overwritten by later sign-ins from other
+      // devices); u.lastDeviceId is the most recent device seen.
+      if (_fp.deviceId) {
+        if (!u.deviceId) u.deviceId = _fp.deviceId;
+        u.lastDeviceId = _fp.deviceId;
+      }
+      // Record this sighting on the device record (VPN flags, last IP).
+      deviceTouchRecord(_fp, email, now);
       u.lastSeen = now;
       // Known devices: record this model/device/IP. A (model + IP) pair
       // never seen before for this user is a NEW device (alerted below),
@@ -3809,21 +4713,37 @@ function apiRoute(req, res, urlPath) {
         _modelLogins[_model] = (Number(_modelLogins[_model]) || 0) + 1;
         saveModelLogins(_modelLogins);
       }
-      // GIFT — LOCKED once per Gmail, forever (owner order 2026-11-17,
-      // biggest problem): when the website sends giftClaimed:true the
-      // server grants the gift (+250 media / +24 song), once per user.
-      // giftClaimed flag prevents a second grant; Math.max tops the
-      // balance UP to 250/24 instead of adding. New accounts start at
-      // 0/0 (see above) so the gift can only arrive through this
-      // CLAIM flow. The 21:01 exploit: Oun Lyna2 got the gift again
-      // (+50 media / +24 song) by logging in from a new device,
-      // because her earlier admin grant never set giftClaimed — the
-      // flag is now the single lock, and the notification below fires
-      // ONLY when credits are actually granted (never on a refused
+      // GIFT — SONG credits ONLY, LOCKED once per Gmail, forever
+      // (owner orders 2026-11-17 + 2026-11-18): when the website sends
+      // giftClaimed:true the server grants the gift, once per user.
+      // The 250 media gift is REMOVED — a new registrant gets 24 song
+      // credits (or 50 when the gift50 toggle is ON and the account is
+      // BRAND NEW: created within the last 24h, never logged in/used
+      // before). An older account, or one that already claimed, can
+      // NEVER get the 50 — they get the normal 24 (or nothing if
+      // already claimed). The giftClaimed flag prevents a second grant;
+      // Math.max tops the balance UP to the target instead of adding.
+      // New accounts start at 0/0 (see above) so the gift can only
+      // arrive through this CLAIM flow. The 21:01 exploit: Oun Lyna2
+      // got the gift again by logging in from a new device, because
+      // her earlier admin grant never set giftClaimed — the flag is
+      // now the single lock, and the notification below fires ONLY
+      // when credits are actually granted (never on a refused
       // re-claim). Logged to grants.json so it shows in credit history.
       if (body && body.giftClaimed === true && !u.giftClaimed) {
+        // Brand-new account? The claim arrives on a sync AFTER the
+        // account-creation sync (the gift popup shows after first
+        // login), so isNewUser is usually false here — account age is
+        // the reliable marker. Created within the last 24h = just
+        // registered, never used the app.
+        let _isBrandNew = false;
+        try {
+          const _createdMs = Date.parse(u.createdAt || '');
+          _isBrandNew = Number.isFinite(_createdMs) && (Date.now() - _createdMs) <= GIFT50_NEW_ACCOUNT_WINDOW_MS;
+        } catch (e) { _isBrandNew = false; }
+        const _songTarget = (gift50Enabled() && _isBrandNew) ? GIFT50_SONG_CREDITS : FREE_SONG_CREDITS;
         const _gm = Math.max(0, FREE_MEDIA_CREDITS - Math.floor(numOr(u.credits, 0)));
-        const _gs = Math.max(0, FREE_SONG_CREDITS - Math.floor(numOr(u.songCredits, 0)));
+        const _gs = Math.max(0, _songTarget - Math.floor(numOr(u.songCredits, 0)));
         if (_gm > 0) u.credits = Math.floor(numOr(u.credits, 0)) + _gm;
         if (_gs > 0) u.songCredits = Math.floor(numOr(u.songCredits, 0)) + _gs;
         u.giftClaimed = true;
@@ -3833,7 +4753,7 @@ function apiRoute(req, res, urlPath) {
         // false "Gift claimed" alert for a user who got nothing.
         if (_gm > 0 || _gs > 0) {
           logGrant({ email, credits: _gm, songCredits: _gs, note: 'gift', at: now });
-          addNotification('gift-claimed', email, '🎁 កាដូបានទទួល · Gift claimed', (u.name || email) + ' (' + email + ') បានទទួលកាដូ Free 250 Image.Video + 24 Song Credit');
+          addNotification('gift-claimed', email, '🎁 កាដូបានទទួល · Gift claimed', (u.name || email) + ' (' + email + ') បានទទួលកាដូ Free ' + _gs + ' Song Credit');
         }
       }
       u.credits = Math.max(0, Math.floor(numOr(u.credits, 0)));
@@ -3878,13 +4798,24 @@ function apiRoute(req, res, urlPath) {
       if (_cip0 && loadBlockedIps().some((b) => b === _cip0)) return sendJSON(res, 200, { ok: false, error: 'គណនីនេះត្រូវបានប្លុក · This account is blocked' });
       if (loadBlockedEmails().some((b) => b === email)) return sendJSON(res, 200, { ok: false, error: 'គណនីនេះត្រូវបានប្លុក · This account is blocked' });
       const now = new Date().toISOString();
-      logActivity({ at: now, mode: 'set-password', email });
+      // Device fingerprint (same as sync). The limit is only on CREATING
+      // a new account — setting/resetting a password on an existing
+      // account is never limited (the Google token already proves
+      // ownership).
+      const _spBodyModel = typeof body.model === 'string' ? body.model.trim().slice(0, 64) : '';
+      const _spModel = (_spBodyModel && _spBodyModel !== 'K') ? _spBodyModel : modelFromUA(req.headers && req.headers['user-agent']);
+      const _fp = deviceFingerprintFor(req, body, _spModel);
+      logActivity({ at: now, mode: 'set-password', email, deviceId: _fp.deviceId || '', model: _fp.model || '', ip: _fp.ip || '', vpn: !!_fp.vpn });
       const users = loadUsers();
       const isNewUser = !users[email];
       let u = users[email];
+      if (isNewUser) {
+        const _gate = await deviceLimitGate(users, _fp, email, g.name || '');
+        if (_gate) return sendJSON(res, 200, _gate);
+      }
       if (!u) {
         const takenIds = new Set(Object.values(users).map((x) => x.id).filter(Boolean));
-        u = { id: genUserId(takenIds), email, name: g.name || '', credits: 0, songCredits: 0, giftClaimed: false, plan: '', songPlan: '', createdAt: now, updatedAt: now };
+        u = { id: genUserId(takenIds), email, name: g.name || '', credits: 0, songCredits: 0, balance: 0, giftClaimed: false, plan: '', songPlan: '', createdAt: now, updatedAt: now };
         users[email] = u;
       } else {
         if (!u.id) { const takenIds = new Set(Object.values(users).map((x) => x.id).filter(Boolean)); u.id = genUserId(takenIds); }
@@ -3894,6 +4825,16 @@ function apiRoute(req, res, urlPath) {
       const hp = await hashPassword(password);
       u.passwordSalt = hp.salt;
       u.passwordHash = hp.hash;
+      // Record the registration device + this sighting.
+      if (_fp.deviceId) {
+        if (!u.deviceId) u.deviceId = _fp.deviceId;
+        u.lastDeviceId = _fp.deviceId;
+      }
+      if (_fp.model && !u.registeredModel) u.registeredModel = _fp.model;
+      if (_fp.model) u.model = _fp.model;
+      if (_fp.device) u.device = _fp.device;
+      if (_cip0) u.lastIp = _cip0;
+      deviceTouchRecord(_fp, email, now);
       // A new password revokes ALL saved (remember-me) logins — the old
       // saved Accounts must not keep working after a password change.
       revokeAllRememberTokens(u);
@@ -3937,13 +4878,36 @@ function apiRoute(req, res, urlPath) {
       if (!u || !u.passwordHash || !u.passwordSalt) {
         return sendJSON(res, 200, { ok: false, error: 'មិនទាន់មាន Gmail នេះទេ — សូម Continue with Google ជាមុនសិន ទើបអាច Log in បាន · No account with this Gmail yet — please Continue with Google first, then you can log in', noAccount: true });
       }
+      // Blocked device (strike 4+): cannot sign in from this device.
+      // A new/different phone model alone never blocks.
+      const _siBodyModel = typeof body.model === 'string' ? body.model.trim().slice(0, 64) : '';
+      const _siModel = (_siBodyModel && _siBodyModel !== 'K') ? _siBodyModel : modelFromUA(req.headers && req.headers['user-agent']);
+      const _fp = deviceFingerprintFor(req, body, _siModel);
+      const _blk = deviceIsBlocked(_fp);
+      if (_blk.blocked) return sendJSON(res, 200, { ok: false, error: 'ឧបករណ៍នេះត្រូវបានប្លុក — This device has been used before · VPN is not supported. សូមទាក់ទង Admin · Please contact the Admin', deviceBlocked: true, blockedReason: _blk.reason });
       const okPw = await verifyPassword(password, u.passwordSalt, u.passwordHash);
-      if (!okPw) { signinFail(email); return bad(); }
+      if (!okPw) {
+        const _f = signinFail(email);
+        // 5 wrong passwords in a row = possible scam/hacker: notify the
+        // Admin + the user (email). NEVER blocks — the Admin reviews
+        // the Gmail manually and decides. Fire-and-forget.
+        if (_f && _f.count === 5 && _f.lockedUntil) reportScamHacker({ email, name: u.name || '', kind: 'brute-force', model: _fp.model || '', deviceId: _fp.deviceId || '', ip: _fp.ip || '' }).catch(() => {});
+        return bad();
+      }
       signinClear(email);
       const now = new Date().toISOString();
-      logActivity({ at: now, mode: 'signin', email });
+      logActivity({ at: now, mode: 'signin', email, deviceId: _fp.deviceId || '', model: _fp.model || '', ip: _fp.ip || '', vpn: !!_fp.vpn });
       u.lastSeen = now;
       if (_cip0) u.lastIp = _cip0;
+      if (_fp.deviceId) {
+        if (!u.deviceId) u.deviceId = _fp.deviceId;
+        u.lastDeviceId = _fp.deviceId;
+      }
+      if (_fp.model && !u.registeredModel) u.registeredModel = _fp.model;
+      if (_fp.model) u.model = _fp.model;
+      if (_fp.device) u.device = _fp.device;
+      trackKnownDevice(u, _fp.model || '', _fp.device || '', _cip0 || '', now, u.country || '', u.countryCode || '');
+      deviceTouchRecord(_fp, email, now);
       u.updatedAt = now;
       saveUsers(users);
       await ghFlushFile(USERS_FILE);
@@ -3969,7 +4933,13 @@ function apiRoute(req, res, urlPath) {
       const bad = () => sendJSON(res, 200, { ok: false, error: 'Gmail ឬ Password មិនត្រឹមត្រូវទេ · Wrong Gmail or password' });
       if (!u || !u.passwordHash || !u.passwordSalt) { signinFail(email); return bad(); }
       const okPw = await verifyPassword(password, u.passwordSalt, u.passwordHash);
-      if (!okPw) { signinFail(email); return bad(); }
+      if (!okPw) {
+        const _f = signinFail(email);
+        // 5 wrong passwords in a row = possible scam/hacker: notify the
+        // Admin + the user (email). NEVER blocks. Fire-and-forget.
+        if (_f && _f.count === 5 && _f.lockedUntil) reportScamHacker({ email, name: u.name || '', kind: 'brute-force', model: '', deviceId: '', ip: getClientIp(req) || '' }).catch(() => {});
+        return bad();
+      }
       signinClear(email);
       const token = issueRememberToken(u);
       u.updatedAt = new Date().toISOString();
@@ -3996,12 +4966,27 @@ function apiRoute(req, res, urlPath) {
       const u = users[email];
       const bad = () => sendJSON(res, 200, { ok: false, error: 'ការចូលដែលបានសេវផុតកំណត់ហើយ សូមចូលដោយ Password ម្តងទៀត · Saved login expired, please sign in with your password' });
       if (!u) return bad();
+      // Blocked device (strike 4+): cannot sign in from this device.
+      const _rlBodyModel = typeof body.model === 'string' ? body.model.trim().slice(0, 64) : '';
+      const _rlModel = (_rlBodyModel && _rlBodyModel !== 'K') ? _rlBodyModel : modelFromUA(req.headers && req.headers['user-agent']);
+      const _fp = deviceFingerprintFor(req, body, _rlModel);
+      const _blk = deviceIsBlocked(_fp);
+      if (_blk.blocked) return sendJSON(res, 200, { ok: false, error: 'ឧបករណ៍នេះត្រូវបានប្លុក — This device has been used before · VPN is not supported. សូមទាក់ទង Admin · Please contact the Admin', deviceBlocked: true, blockedReason: _blk.reason });
       const entry = findRememberToken(u, token);
       if (!entry) return bad();
       const now = new Date().toISOString();
-      logActivity({ at: now, mode: 'remember-login', email });
+      logActivity({ at: now, mode: 'remember-login', email, deviceId: _fp.deviceId || '', model: _fp.model || '', ip: _fp.ip || '', vpn: !!_fp.vpn });
       u.lastSeen = now;
       if (_cip0) u.lastIp = _cip0;
+      if (_fp.deviceId) {
+        if (!u.deviceId) u.deviceId = _fp.deviceId;
+        u.lastDeviceId = _fp.deviceId;
+      }
+      if (_fp.model && !u.registeredModel) u.registeredModel = _fp.model;
+      if (_fp.model) u.model = _fp.model;
+      if (_fp.device) u.device = _fp.device;
+      trackKnownDevice(u, _fp.model || '', _fp.device || '', _cip0 || '', now, u.country || '', u.countryCode || '');
+      deviceTouchRecord(_fp, email, now);
       u.updatedAt = now;
       saveUsers(users);
       await ghFlushFile(USERS_FILE);
@@ -4043,10 +5028,20 @@ function apiRoute(req, res, urlPath) {
       if (!email) return sendJSON(res, 200, { ok: false, error: 'សូមដាក់ Gmail ត្រឹមត្រូវ' });
       const users = loadUsers();
       if (!users[email]) return sendJSON(res, 200, { ok: false, error: 'រក Gmail នេះមិនឃើញទេ — សូម Sign-up ជាមុនសិន · No account with this Gmail, please sign up first' });
+      // FREE RESET LIMIT (owner order 2026-11-18): the email-code reset is
+      // free only 2 times per user, ever. After that the user must use the
+      // paid instant reset (Option 2, $0.10 from the Wallet). The count
+      // only grows when a code is actually sent.
+      const _freeUsed = Math.floor(numOr(users[email].freeResetCount, 0));
+      if (_freeUsed >= WALLET_FREE_RESET_LIMIT) return sendJSON(res, 200, { ok: false, error: 'លេខកូដ Free អស់ហើយ (ប្រើ ' + WALLET_FREE_RESET_LIMIT + ' ដងរួច) — សូមប្រើ Forget Password បង់ $0.10 ដើម្បី Reset ភ្លាមៗ · Free resets used up (' + WALLET_FREE_RESET_LIMIT + ' used) — please use the $0.10 instant reset', freeResetsUsedUp: true, instantResetPrice: WALLET_INSTANT_RESET_PRICE });
       if (!verifyEmailConfigured()) return sendJSON(res, 200, { ok: false, error: 'Admin មិនទាន់ដាក់ Email (Gmail App Password) ទេ — សូមប្រាប់ Admin · Email is not set up yet, please tell the Admin' });
       const sent = await sendVerificationEmail(email);
       if (!sent.ok) return sendJSON(res, 200, { ok: false, error: sent.error || 'ផ្ញើលេខកូដមិនបានទេ · Could not send the code' });
-      return sendJSON(res, 200, { ok: true, sent: true });
+      users[email].freeResetCount = _freeUsed + 1;
+      users[email].updatedAt = new Date().toISOString();
+      saveUsers(users);
+      await ghFlushFile(USERS_FILE);
+      return sendJSON(res, 200, { ok: true, sent: true, freeResetsLeft: Math.max(0, WALLET_FREE_RESET_LIMIT - (_freeUsed + 1)) });
     }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
     return;
   }
@@ -4091,7 +5086,7 @@ function apiRoute(req, res, urlPath) {
     if (!a.ok) return sendJSON(res, 200, { ok: false, error: a.error });
     const users = loadUsers();
     const modelLogins = loadModelLogins();
-    const list = Object.values(users).sort((x, y) => String(y.createdAt || '').localeCompare(String(x.createdAt || ''))).map((x) => pubUser(x, modelLogins));
+    const list = Object.values(users).sort((x, y) => String(y.createdAt || '').localeCompare(String(x.createdAt || ''))).map((x) => pubUser(x, modelLogins, deviceInfoForUser(users, x)));
     return sendJSON(res, 200, { ok: true, users: list });
   }
   // GET /api/admin/user?email=... — admin key required.
@@ -4100,9 +5095,10 @@ function apiRoute(req, res, urlPath) {
     if (!a.ok) return sendJSON(res, 200, { ok: false, error: a.error });
     const email = normEmail(new URL(req.url, 'http://localhost').searchParams.get('email') || '');
     if (!email) return sendJSON(res, 200, { ok: false, error: 'សូមដាក់ Gmail ត្រឹមត្រូវ' });
-    const u = loadUsers()[email];
+    const _allUsers = loadUsers();
+    const u = _allUsers[email];
     if (!u) return sendJSON(res, 200, { ok: false, error: 'រកអ្នកប្រើនេះមិនឃើញទេ' });
-    return sendJSON(res, 200, { ok: true, user: pubUser(u) });
+    return sendJSON(res, 200, { ok: true, user: pubUser(u, null, deviceInfoForUser(_allUsers, u)) });
   }
   // GET /api/admin/email-usage — admin key required. Live Brevo usage
   // for the Admin → Settings → Email panel: plan (Free), daily limit
@@ -4169,6 +5165,88 @@ function apiRoute(req, res, urlPath) {
     if (!a.ok) return sendJSON(res, 200, { ok: false, error: a.error });
     const u = mvsepUsageList();
     return sendJSON(res, 200, { ok: true, provider: 'mvsep', date: u.date, dailyLimit: u.dailyLimit, keys: u.keys });
+  }
+  // GET /api/admin/feature-usage — admin key required. Feature-usage
+  // counts for the Admin (how many times each new function was used):
+  // per-feature total + today + per-day breakdown, sorted by total
+  // descending. Optional ?feature=<name> returns only that one feature.
+  if (req.method === 'GET' && urlPath === '/api/admin/feature-usage') {
+    const a = adminKeyOk(req);
+    if (!a.ok) return sendJSON(res, 200, { ok: false, error: a.error });
+    const u = featureUsageList();
+    const only = featureUsageCleanName(new URL(req.url, 'http://localhost').searchParams.get('feature') || '');
+    if (only) {
+      const one = u.features.find((f) => f.feature === only);
+      return sendJSON(res, 200, { ok: true, date: u.date, features: one ? [one] : [] });
+    }
+    return sendJSON(res, 200, { ok: true, date: u.date, features: u.features });
+  }
+  // GET /api/admin/auto-catch — admin key required. Reads the Auto-Catch
+  // master toggle (default OFF). POST /api/admin/auto-catch {enabled}
+  // sets it. The Admin app has a toggle button for it.
+  if (req.method === 'GET' && urlPath === '/api/admin/auto-catch') {
+    const a = adminKeyOk(req);
+    if (!a.ok) return sendJSON(res, 200, { ok: false, error: a.error });
+    return sendJSON(res, 200, { ok: true, enabled: autoCatchEnabled() });
+  }
+  if (req.method === 'POST' && urlPath === '/api/admin/auto-catch') {
+    const a = adminKeyOk(req);
+    if (!a.ok) return sendJSON(res, 200, { ok: false, error: a.error });
+    readJSONBody(req, 64 * 1024).then(async (body) => {
+      if (!body || typeof body.enabled !== 'boolean') return sendJSON(res, 200, { ok: false, error: 'សូមដាក់ enabled: true/false' });
+      const out = saveSettings(Object.assign(loadSettings(), { autoCatch: body.enabled }));
+      return sendJSON(res, 200, { ok: true, enabled: out.autoCatch === true });
+    }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
+    return;
+  }
+  // GET /api/admin/device-limit — admin key required. Reads the device
+  // account-limit setting {enabled, limit} (defaults OFF / 3).
+  // POST /api/admin/device-limit {enabled?, limit?} sets it. The limit
+  // is read fresh from settings on EVERY registration, so a change
+  // takes effect immediately. The Admin app has a toggle + number
+  // input for it.
+  if (req.method === 'GET' && urlPath === '/api/admin/device-limit') {
+    const a = adminKeyOk(req);
+    if (!a.ok) return sendJSON(res, 200, { ok: false, error: a.error });
+    const dl = deviceLimitSetting();
+    return sendJSON(res, 200, { ok: true, enabled: dl.enabled, limit: dl.limit });
+  }
+  if (req.method === 'POST' && urlPath === '/api/admin/device-limit') {
+    const a = adminKeyOk(req);
+    if (!a.ok) return sendJSON(res, 200, { ok: false, error: a.error });
+    readJSONBody(req, 64 * 1024).then(async (body) => {
+      const patch = {};
+      if (body && typeof body.enabled === 'boolean') patch.deviceLimitEnabled = body.enabled;
+      if (body && Number.isFinite(body.limit)) patch.deviceLimit = Math.min(100, Math.max(1, Math.floor(body.limit)));
+      if (!('deviceLimitEnabled' in patch) && !('deviceLimit' in patch)) return sendJSON(res, 200, { ok: false, error: 'សូមដាក់ enabled និង/ឬ limit (1–100)' });
+      saveSettings(Object.assign(loadSettings(), patch));
+      const dl = deviceLimitSetting();
+      return sendJSON(res, 200, { ok: true, enabled: dl.enabled, limit: dl.limit });
+    }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
+    return;
+  }
+  // GET /api/admin/gift-50 — admin key required. Reads the new-user
+  // gift-50 toggle (default OFF). POST /api/admin/gift-50 {enabled}
+  // sets it. When ON, a BRAND-NEW registrant who claims the gift gets
+  // 50 song credits instead of 24; when OFF the gift is 24 song
+  // credits. The gift is song-only either way — no media credits.
+  // Only an account created within the last 24h (never logged in /
+  // used before) can get the 50; older accounts get 24. The Admin
+  // app has a toggle button for it.
+  if (req.method === 'GET' && urlPath === '/api/admin/gift-50') {
+    const a = adminKeyOk(req);
+    if (!a.ok) return sendJSON(res, 200, { ok: false, error: a.error });
+    return sendJSON(res, 200, { ok: true, enabled: gift50Enabled() });
+  }
+  if (req.method === 'POST' && urlPath === '/api/admin/gift-50') {
+    const a = adminKeyOk(req);
+    if (!a.ok) return sendJSON(res, 200, { ok: false, error: a.error });
+    readJSONBody(req, 64 * 1024).then(async (body) => {
+      if (!body || typeof body.enabled !== 'boolean') return sendJSON(res, 200, { ok: false, error: 'សូមដាក់ enabled: true/false' });
+      const out = saveSettings(Object.assign(loadSettings(), { gift50: body.enabled }));
+      return sendJSON(res, 200, { ok: true, enabled: out.gift50 === true });
+    }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
+    return;
   }
   // POST /api/admin/grant — {email, credits, songCredits, note?} — admin key required.
   // credits/songCredits are DELTAS (can be negative to deduct, balance never below 0).
@@ -4376,6 +5454,48 @@ function apiRoute(req, res, urlPath) {
     const a = adminKeyOk(req);
     if (!a.ok) return sendJSON(res, 200, { ok: false, error: a.error });
     return sendJSON(res, 200, { ok: true, blocked: loadBlockedEmails() });
+  }
+  // GET /api/admin/device-records — admin key required. Lists all known
+  // devices (fingerprint -> slots, strikes, blocked, VPN flags, model,
+  // last IP, Gmails seen from it), newest first. The Admin reviews
+  // blocked devices here and unblocks them.
+  if (req.method === 'GET' && urlPath === '/api/admin/device-records') {
+    const a = adminKeyOk(req);
+    if (!a.ok) return sendJSON(res, 200, { ok: false, error: a.error });
+    const all = loadDeviceRecords();
+    const list = Object.keys(all).map((k) => Object.assign({ fingerprint: k }, all[k])).sort((x, y) => String(y.lastSeen || '').localeCompare(String(x.lastSeen || '')));
+    return sendJSON(res, 200, { ok: true, devices: list });
+  }
+  // POST /api/admin/unblock-device — {fingerprint} — admin key required.
+  // Clears a device block (strike 4+) and resets its strikes to 0, so
+  // the device can sign in and register again. Also lifts the block on
+  // the Gmails that this device's strike blocked (tracked on the record).
+  if (req.method === 'POST' && urlPath === '/api/admin/unblock-device') {
+    const a = adminKeyOk(req);
+    if (!a.ok) return sendJSON(res, 200, { ok: false, error: a.error });
+    readJSONBody(req, 64 * 1024).then(async (body) => {
+      const fingerprint = typeof body && typeof body.fingerprint === 'string' ? body.fingerprint.trim().slice(0, 128) : '';
+      if (!fingerprint) return sendJSON(res, 200, { ok: false, error: 'សូមដាក់ fingerprint របស់ឧបករណ៍' });
+      const all = loadDeviceRecords();
+      const rec = all[fingerprint];
+      if (!rec || typeof rec !== 'object') return sendJSON(res, 200, { ok: false, error: 'រកឧបករណ៍នេះមិនឃើញទេ' });
+      rec.blocked = false;
+      rec.blockedReason = '';
+      rec.blockedAt = '';
+      rec.strikes = 0;
+      const cleared = Array.isArray(rec.blockedEmails) ? rec.blockedEmails.filter((e) => typeof e === 'string' && e) : [];
+      rec.blockedEmails = [];
+      saveDeviceRecords(all);
+      await ghFlushFile(DEVICE_RECORDS_FILE);
+      if (cleared.length) {
+        const bem = loadBlockedEmails().filter((b) => !cleared.includes(b));
+        saveBlockedEmails(bem);
+        await ghFlushFile(BLOCKED_EMAILS_FILE);
+      }
+      addNotification('security', '', '✅ ឧបករណ៍ត្រូវបានដោះប្លុក · Device unblocked', 'Admin បានដោះប្លុកឧបករណ៍ ' + fingerprint + ' (' + (rec.model || '') + ')' + (cleared.length ? ' — Gmail ត្រូវបានដោះប្លុក៖ ' + cleared.join(', ') : ''));
+      return sendJSON(res, 200, { ok: true, fingerprint, unblockedEmails: cleared });
+    }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
+    return;
   }
   // GET /api/admin/settings — PUBLIC (no admin key). The MovAi website reads
   // it on load to know whether the admin turned Smooth mode Auto on.
@@ -5027,6 +6147,323 @@ function apiRoute(req, res, urlPath) {
       addNotification('purchase-rejected', r.email, '❌ បដិសេធ · Purchase rejected', pkgNotifText(_pkgR, r.email, _ruid), { extra: { pkg: r.packageId, pkgName: _pd3.pkgName, priceText: _pd3.priceText, creditText: _pd3.creditText, buyerId: _ruid, decision: 'rejected' }, telegramHtml: pkgNotifTelegram('❌ បដិសេធ · Purchase rejected', _pkgR, r.email, _ruid) });
       markPurchaseRequestDecided(r.email, r.packageId, 'rejected', now);
       return sendJSON(res, 200, { ok: true, request: r });
+    }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
+    return;
+  }
+  // ---- Wallet / Balance endpoints (owner order 2026-11-18) ----
+  // GET /api/public/wallet/balance?email=... — PUBLIC. Returns the user's
+  // stored Wallet balance in dollars.
+  if (req.method === 'GET' && urlPath === '/api/public/wallet/balance') {
+    const email = normEmail(new URL(req.url, 'http://localhost').searchParams.get('email') || '');
+    if (!email) return sendJSON(res, 200, { ok: false, error: 'សូមដាក់ Gmail ត្រឹមត្រូវ' });
+    const u = loadUsers()[email];
+    if (!u) return sendJSON(res, 200, { ok: false, error: 'រក Gmail នេះមិនឃើញទេ · No account with this Gmail' });
+    return sendJSON(res, 200, { ok: true, email, balance: walletBalance(u) });
+  }
+  // POST /api/public/wallet/topup-request — {email, amount, method, receipt?}
+  // — PUBLIC. Asks to top up the Wallet. amount >= $5.00. method is
+  // 'khmer' (KHQR / local bank) or 'foreign' (international). The money
+  // only lands in the balance when the Admin approves the request.
+  if (req.method === 'POST' && urlPath === '/api/public/wallet/topup-request') {
+    readJSONBody(req, 64 * 1024).then(async (body) => {
+      const email = normEmail(body && body.email);
+      if (!email) return sendJSON(res, 200, { ok: false, error: 'សូមដាក់ Gmail ត្រឹមត្រូវ' });
+      const users = loadUsers();
+      const u = users[email];
+      if (!u) return sendJSON(res, 200, { ok: false, error: 'រក Gmail នេះមិនឃើញទេ — សូម Sign-up ជាមុនសិន · No account with this Gmail, please sign up first' });
+      const amount = walletMoney(body && body.amount);
+      if (!Number.isFinite(amount) || amount < WALLET_MIN_TOPUP) return sendJSON(res, 200, { ok: false, error: 'ចំនួនបញ្ចូលយ៉ាងហោចណាស់ $' + WALLET_MIN_TOPUP.toFixed(2) + ' · Minimum top-up is $' + WALLET_MIN_TOPUP.toFixed(2) });
+      const method = (body && typeof body.method === 'string' && body.method.trim().toLowerCase() === 'foreign') ? 'foreign' : 'khmer';
+      const now = new Date().toISOString();
+      const reqs = loadWalletRequests();
+      const r = {
+        id: newWalletRequestId(), type: 'topup', email, amount, method,
+        receiptUrl: typeof body.receiptUrl === 'string' ? body.receiptUrl.trim().slice(0, 500) : '',
+        status: 'pending', createdAt: now, updatedAt: now,
+      };
+      reqs.push(r);
+      saveWalletRequests(reqs);
+      await ghFlushFile(WALLET_REQUESTS_FILE);
+      addNotification('purchase-request', email, '💰 សំណើបញ្ចូលលុយ · Wallet top-up request', (u.name || email) + ' (' + email + ') · ID: ' + (u.id || '—') + ' ស្នើបញ្ចូល $' + amount.toFixed(2) + ' (' + (method === 'foreign' ? 'បរទេស · Foreign' : 'ខ្មែរ · Khmer') + ')', { extra: { walletRequestId: r.id, type: 'topup', amount, method, buyerId: u.id || '—' } });
+      return sendJSON(res, 200, { ok: true, request: walletRequestPublic(r, users) });
+    }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
+    return;
+  }
+  // POST /api/public/wallet/withdraw-request — {email, amount, khqrImageUrl?}
+  // — PUBLIC. Asks to withdraw from the Wallet. amount >= $5.00 and
+  // <= balance. Flat fee $0.50 per withdrawal (e.g. deposit $5, withdraw
+  // $4.50). Nothing is deducted yet — the Admin deducts (amount + fee)
+  // when approving.
+  if (req.method === 'POST' && urlPath === '/api/public/wallet/withdraw-request') {
+    readJSONBody(req, 64 * 1024).then(async (body) => {
+      const email = normEmail(body && body.email);
+      if (!email) return sendJSON(res, 200, { ok: false, error: 'សូមដាក់ Gmail ត្រឹមត្រូវ' });
+      const users = loadUsers();
+      const u = users[email];
+      if (!u) return sendJSON(res, 200, { ok: false, error: 'រក Gmail នេះមិនឃើញទេ — សូម Sign-up ជាមុនសិន · No account with this Gmail, please sign up first' });
+      const amount = walletMoney(body && body.amount);
+      if (!Number.isFinite(amount) || amount < WALLET_MIN_WITHDRAW) return sendJSON(res, 200, { ok: false, error: 'ចំនួនដកយ៉ាងហោចណាស់ $' + WALLET_MIN_WITHDRAW.toFixed(2) + ' · Minimum withdrawal is $' + WALLET_MIN_WITHDRAW.toFixed(2) });
+      const bal = walletBalance(u);
+      if (amount > bal) return sendJSON(res, 200, { ok: false, error: 'លុយក្នុង Wallet មិនគ្រប់ទេ (នៅសល់ $' + bal.toFixed(2) + ') · Insufficient wallet balance ($' + bal.toFixed(2) + ' left)', balance: bal });
+      const now = new Date().toISOString();
+      const reqs = loadWalletRequests();
+      const r = {
+        id: newWalletRequestId(), type: 'withdraw', email, amount, fee: WALLET_WITHDRAW_FEE, total: walletMoney(amount + WALLET_WITHDRAW_FEE),
+        khqrImageUrl: typeof body.khqrImageUrl === 'string' ? body.khqrImageUrl.trim().slice(0, 500) : '',
+        status: 'pending', createdAt: now, updatedAt: now,
+      };
+      reqs.push(r);
+      saveWalletRequests(reqs);
+      await ghFlushFile(WALLET_REQUESTS_FILE);
+      addNotification('purchase-request', email, '💸 សំណើដកលុយ · Wallet withdraw request', (u.name || email) + ' (' + email + ') · ID: ' + (u.id || '—') + ' ស្នើដក $' + amount.toFixed(2) + ' (ថ្លៃសេវា $' + WALLET_WITHDRAW_FEE.toFixed(2) + ' — សរុបកាត់ $' + r.total.toFixed(2) + ')', { extra: { walletRequestId: r.id, type: 'withdraw', amount, fee: WALLET_WITHDRAW_FEE, total: r.total, buyerId: u.id || '—' } });
+      return sendJSON(res, 200, { ok: true, request: walletRequestPublic(r, users), fee: WALLET_WITHDRAW_FEE });
+    }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹমត្រូវទេ', 'Bad request')));
+    return;
+  }
+  // POST /api/public/wallet/buy-package — {email, packageId} — PUBLIC.
+  // Buys a package with the Wallet balance: deducts the package price
+  // (only if sufficient) and activates the package exactly as an
+  // approved purchase-request does (same credits + plan expiry).
+  if (req.method === 'POST' && urlPath === '/api/public/wallet/buy-package') {
+    readJSONBody(req, 64 * 1024).then(async (body) => {
+      const email = normEmail(body && body.email);
+      if (!email) return sendJSON(res, 200, { ok: false, error: 'សូមដាក់ Gmail ត្រឹមត្រូវ' });
+      const packageId = typeof body.packageId === 'string' ? body.packageId.trim() : '';
+      const pkg = loadPackages()[packageId];
+      if (!pkg) return sendJSON(res, 200, { ok: false, error: 'កញ្ចប់នេះមិនស្គាល់ទេ' });
+      const users = loadUsers();
+      const u = users[email];
+      if (!u) return sendJSON(res, 200, { ok: false, error: 'រក Gmail នេះមិនឃើញទេ — សូម Sign-up ជាមុនសិន · No account with this Gmail, please sign up first' });
+      const price = walletMoney(pkg.price);
+      const bal = walletBalance(u);
+      if (price > bal) return sendJSON(res, 200, { ok: false, error: 'លុយក្នុង Wallet មិនគ្រប់ទេ (ត្រូវការ $' + price.toFixed(2) + ', នៅសល់ $' + bal.toFixed(2) + ') · Insufficient wallet balance (need $' + price.toFixed(2) + ', have $' + bal.toFixed(2) + ')', balance: bal, price });
+      const now = new Date().toISOString();
+      u.balance = walletMoney(bal - price);
+      u.credits = Math.max(0, Math.floor(numOr(u.credits, 0)) + pkg.credits);
+      u.songCredits = Math.max(0, Math.floor(numOr(u.songCredits, 0)) + pkg.songCredits);
+      if (pkg.credits) { u.plan = packageId; u.planExpiresAt = new Date(Date.now() + Math.max(1, pkg.days || 30) * 86400000).toISOString(); }
+      if (pkg.songCredits) { u.songPlan = packageId; u.songPlanExpiresAt = new Date(Date.now() + Math.max(1, pkg.days || 30) * 86400000).toISOString(); }
+      u.updatedAt = now;
+      saveUsers(users);
+      logGrant({ email, credits: pkg.credits, songCredits: pkg.songCredits, note: 'wallet-buy:' + packageId, at: now });
+      await ghFlushFile(USERS_FILE);
+      const _pdw = pkgDisplay(pkg);
+      addNotification('purchase-approved', email, '✅ បានទិញកញ្ចប់ដោយ Wallet · Package bought with Wallet', pkgNotifText(pkg, email, u.id || '—') + ' — បង់ដោយ Wallet $' + price.toFixed(2) + ' (នៅសល់ $' + u.balance.toFixed(2) + ')', { extra: { pkg: packageId, pkgName: _pdw.pkgName, priceText: _pdw.priceText, creditText: _pdw.creditText, buyerId: u.id || '—', decision: 'approved', paidBy: 'wallet', price }, telegramHtml: pkgNotifTelegram('✅ បានទិញកញ្ចប់ដោយ Wallet · Package bought with Wallet', pkg, email, u.id || '—') });
+      return sendJSON(res, 200, { ok: true, user: pubUser(u), package: packageId, price, balance: u.balance });
+    }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
+    return;
+  }
+  // POST /api/public/device/buy-slot — {email, count} — PUBLIC (logged-in
+  // user). Buys extra account slots for THIS device: $1.00 per slot, paid
+  // from the user's Wallet balance. The slots raise the device's
+  // registration limit (3 free + purchased slots), so the device can
+  // register more Gmails. Buying slots resets the device's strikes to 0
+  // (they paid, so they are compliant again). A BLOCKED device cannot buy
+  // slots — the Admin must unblock it first (no money taken).
+  if (req.method === 'POST' && urlPath === '/api/public/device/buy-slot') {
+    readJSONBody(req, 64 * 1024).then(async (body) => {
+      const email = normEmail(body && body.email);
+      if (!email) return sendJSON(res, 200, { ok: false, error: 'សូមដាក់ Gmail ត្រឹមត្រូវ' });
+      const count = Math.floor(numOr(body && body.count, 0));
+      if (count < 1 || count > 100) return sendJSON(res, 200, { ok: false, error: 'សូមដាក់ចំនួន Slot 1–100 · Please enter 1–100 slots' });
+      const users = loadUsers();
+      const u = users[email];
+      if (!u) return sendJSON(res, 200, { ok: false, error: 'រក Gmail នេះមិនឃើញទេ — សូម Sign-up ជាមុនសិន · No account with this Gmail, please sign up first' });
+      const _bsBodyModel = typeof body.model === 'string' ? body.model.trim().slice(0, 64) : '';
+      const _bsModel = (_bsBodyModel && _bsBodyModel !== 'K') ? _bsBodyModel : modelFromUA(req.headers && req.headers['user-agent']);
+      const _fp = deviceFingerprintFor(req, body, _bsModel);
+      const got = getDeviceRecord(_fp, true);
+      const rec = got.rec;
+      if (!rec) return sendJSON(res, 200, { ok: false, error: 'មិនអាចកំណត់អត្តសញ្ញាណឧបករណ៍បានទេ · Cannot identify this device' });
+      if (rec.blocked) return sendJSON(res, 200, { ok: false, error: 'ឧបករណ៍នេះត្រូវបានប្លុក — សូមទាក់ទង Admin ដើម្បីដោះប្លុកជាមុនសិន · This device is blocked — please contact the Admin to unblock first', deviceBlocked: true, blockedReason: rec.blockedReason || 'device-blocked' });
+      const price = walletMoney(count * DEVICE_SLOT_PRICE);
+      const bal = walletBalance(u);
+      if (price > bal) return sendJSON(res, 200, { ok: false, error: 'លុយក្នុង Wallet មិនគ្រប់ទេ (ត្រូវការ $' + price.toFixed(2) + ' សម្រាប់ ' + count + ' Slot, នៅសល់ $' + bal.toFixed(2) + ') · Insufficient wallet balance (need $' + price.toFixed(2) + ' for ' + count + ' slots, have $' + bal.toFixed(2) + ')', balance: bal, price });
+      const now = new Date().toISOString();
+      u.balance = walletMoney(bal - price);
+      if (_fp.deviceId) u.lastDeviceId = _fp.deviceId;
+      u.updatedAt = now;
+      saveUsers(users);
+      rec.slots = Math.floor(numOr(rec.slots, 0)) + count;
+      rec.strikes = 0; // paid → compliant again
+      rec.lastSeen = now;
+      if (_fp.ip) rec.lastIp = _fp.ip;
+      if (_fp.model) rec.model = _fp.model;
+      if (_fp.device) rec.device = _fp.device;
+      if (email && (!Array.isArray(rec.emails) || !rec.emails.includes(email))) {
+        if (!Array.isArray(rec.emails)) rec.emails = [];
+        rec.emails.unshift(email);
+        if (rec.emails.length > 10) rec.emails.length = 10;
+      }
+      saveDeviceRecords(got.all);
+      await ghFlushFile(USERS_FILE);
+      await ghFlushFile(DEVICE_RECORDS_FILE);
+      const deviceLimit = deviceLimitSetting().limit + rec.slots;
+      logActivity({ at: now, mode: 'device-buy-slot', email, count, price, slots: rec.slots, deviceLimit, deviceId: _fp.deviceId || '', model: _fp.model || '', ip: _fp.ip || '' });
+      addNotification('deduct', email, '➕ បានទិញ Slot អាខោន · Extra account slots bought', (u.name || email) + ' (' + email + ') បានទិញ ' + count + ' Slot ($' + price.toFixed(2) + ') សម្រាប់ឧបករណ៍ ' + (_fp.model || _fp.deviceId || 'Unknown') + ' — ឥឡូវចុះឈ្មោះបាន ' + deviceLimit + ' គណនី (នៅសល់ $' + u.balance.toFixed(2) + ')');
+      return sendJSON(res, 200, { ok: true, slots: rec.slots, balance: u.balance, deviceLimit, price, count });
+    }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
+    return;
+  }
+  // POST /api/auth/forget-password-instant — {email} — PUBLIC. Forget
+  // Password Option 2 (paid instant reset, $0.10): deducts $0.10 from the
+  // user's Wallet balance, then returns a short-lived (10 min, single-use)
+  // reset token. The website uses the token to show the password-setup
+  // panel and set a new MovAi password via /api/auth/instant-reset.
+  if (req.method === 'POST' && urlPath === '/api/auth/forget-password-instant') {
+    readJSONBody(req, 64 * 1024).then(async (body) => {
+      const email = normEmail(body && body.email);
+      if (!email) return sendJSON(res, 200, { ok: false, error: 'សូមដាក់ Gmail ត្រឹមត្រូវ' });
+      const users = loadUsers();
+      const u = users[email];
+      if (!u) return sendJSON(res, 200, { ok: false, error: 'រក Gmail នេះមិនឃើញទេ — សូម Sign-up ជាមុនសិន · No account with this Gmail, please sign up first' });
+      const bal = walletBalance(u);
+      if (bal < WALLET_INSTANT_RESET_PRICE) return sendJSON(res, 200, { ok: false, error: 'លុយក្នុង Wallet មិនគ្រប់ទេ (ត្រូវការ $' + WALLET_INSTANT_RESET_PRICE.toFixed(2) + ' សម្រាប់ Reset ភ្លាមៗ, នៅសល់ $' + bal.toFixed(2) + ') · Insufficient wallet balance (need $' + WALLET_INSTANT_RESET_PRICE.toFixed(2) + ' for instant reset, have $' + bal.toFixed(2) + ')', balance: bal, price: WALLET_INSTANT_RESET_PRICE });
+      const now = new Date().toISOString();
+      u.balance = walletMoney(bal - WALLET_INSTANT_RESET_PRICE);
+      u.updatedAt = now;
+      saveUsers(users);
+      await ghFlushFile(USERS_FILE);
+      logActivity({ at: now, mode: 'wallet-instant-reset', email });
+      addNotification('deduct', email, '➖ កាត់ $' + WALLET_INSTANT_RESET_PRICE.toFixed(2) + ' · Instant reset fee', (u.name || email) + ' (' + email + ') បានកាត់ $' + WALLET_INSTANT_RESET_PRICE.toFixed(2) + ' ពី Wallet សម្រាប់ Forget Password ភ្លាមៗ (នៅសល់ $' + u.balance.toFixed(2) + ')');
+      const token = crypto.randomBytes(16).toString('hex');
+      instantResetTokens.set(email, { token, expiresAt: Date.now() + INSTANT_RESET_TTL_MS });
+      return sendJSON(res, 200, { ok: true, token, expiresIn: Math.floor(INSTANT_RESET_TTL_MS / 1000), balance: u.balance });
+    }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
+    return;
+  }
+  // POST /api/auth/instant-reset — {email, token, password, passwordConfirm}
+  // — PUBLIC. Step 2 of the paid instant reset: the token (from
+  // forget-password-instant, 10 min, single-use) proves the Gmail belongs
+  // to the caller, then the new password is set — same logic as the
+  // code-based /api/auth/reset-password (hash, revoke remember tokens,
+  // clear sign-in lock, security notification, log in at once).
+  if (req.method === 'POST' && urlPath === '/api/auth/instant-reset') {
+    readJSONBody(req, 64 * 1024).then(async (body) => {
+      const email = normEmail(body && body.email);
+      const token = body && typeof body.token === 'string' ? body.token : '';
+      const password = body && typeof body.password === 'string' ? body.password : '';
+      const passwordConfirm = body && typeof body.passwordConfirm === 'string' ? body.passwordConfirm : '';
+      if (!email) return sendJSON(res, 200, { ok: false, error: 'សូមដាក់ Gmail ត្រឹមត្រូវ' });
+      if (password.length < 6 || password.length > 64) return sendJSON(res, 200, { ok: false, error: 'Password ត្រូវមាន 6–64 តួអក្សរ · Password must be 6–64 characters' });
+      if (password !== passwordConfirm) return sendJSON(res, 200, { ok: false, error: 'Password ទាំងពីរមិនដូចគ្នាទេ · Passwords do not match' });
+      const rec = instantResetTokens.get(email);
+      if (!rec || rec.token !== token) return sendJSON(res, 200, { ok: false, error: 'Token មិនត្រឹមត្រូវទេ — សូមស្នើសុំ Reset ភ្លាមៗម្តងទៀត · Invalid reset token — please request the instant reset again' });
+      if (Date.now() > rec.expiresAt) { instantResetTokens.delete(email); return sendJSON(res, 200, { ok: false, error: 'Token ផុតកំណត់ហើយ — សូមស្នើសុំ Reset ភ្លាមៗម្តងទៀត · Token expired — please request the instant reset again' }); }
+      const users = loadUsers();
+      const u = users[email];
+      if (!u) return sendJSON(res, 200, { ok: false, error: 'រក Gmail នេះមិនឃើញទេ · No account with this Gmail' });
+      const hp = await hashPassword(password);
+      u.passwordSalt = hp.salt;
+      u.passwordHash = hp.hash;
+      revokeAllRememberTokens(u);
+      signinClear(email);
+      const now = new Date().toISOString();
+      logActivity({ at: now, mode: 'reset-password', email });
+      u.updatedAt = now;
+      saveUsers(users);
+      await ghFlushFile(USERS_FILE);
+      instantResetTokens.delete(email);
+      addNotification('security', email, '🔑 Password ត្រូវបានប្តូរ · Password changed', (u.name || email) + ' (' + email + ') បានប្តូរ Password តាមរយៈ Forget Password ភ្លាមៗ ($0.10)');
+      return sendJSON(res, 200, { ok: true, user: pubUser(u) });
+    }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
+    return;
+  }
+  // GET /api/admin/wallet/requests — admin key required. Top-up + withdraw
+  // requests, pending first, then newest first. ?status=pending|approved|
+  // rejected|all (default all) and ?type=topup|withdraw|all (default all).
+  if (req.method === 'GET' && urlPath === '/api/admin/wallet/requests') {
+    const a = adminKeyOk(req);
+    if (!a.ok) return sendJSON(res, 200, { ok: false, error: a.error });
+    const q = new URL(req.url, 'http://localhost').searchParams;
+    const status = (q.get('status') || 'all').trim().toLowerCase();
+    const type = (q.get('type') || 'all').trim().toLowerCase();
+    const reqs = loadWalletRequests();
+    const users = loadUsers();
+    const order = { pending: 0, approved: 1, rejected: 2 };
+    const list = reqs
+      .filter((r) => (status === 'all' || r.status === status) && (type === 'all' || r.type === type))
+      .sort((x, y) => ((order[x.status] ?? 3) - (order[y.status] ?? 3)) || String(y.createdAt || '').localeCompare(String(x.createdAt || '')))
+      .map((r) => walletRequestPublic(r, users));
+    return sendJSON(res, 200, { ok: true, requests: list });
+  }
+  // GET /api/admin/wallet/balance?email=... — admin key required. Reads one
+  // user's Wallet balance for the Admin display.
+  if (req.method === 'GET' && urlPath === '/api/admin/wallet/balance') {
+    const a = adminKeyOk(req);
+    if (!a.ok) return sendJSON(res, 200, { ok: false, error: a.error });
+    const email = normEmail(new URL(req.url, 'http://localhost').searchParams.get('email') || '');
+    if (!email) return sendJSON(res, 200, { ok: false, error: 'សូមដាក់ Gmail ត្រឹមត្រូវ' });
+    const u = loadUsers()[email];
+    if (!u) return sendJSON(res, 200, { ok: false, error: 'រកអ្នកប្រើនេះមិនឃើញទេ' });
+    return sendJSON(res, 200, { ok: true, email, balance: walletBalance(u) });
+  }
+  // POST /api/admin/wallet/approve — {requestId} — admin key required.
+  // Top-up: adds the amount to the user's balance. Withdraw: deducts
+  // (amount + $0.50 fee) from the balance (only if sufficient). Marks the
+  // request approved and notifies the user.
+  if (req.method === 'POST' && urlPath === '/api/admin/wallet/approve') {
+    const a = adminKeyOk(req);
+    if (!a.ok) return sendJSON(res, 200, { ok: false, error: a.error });
+    readJSONBody(req, 64 * 1024).then(async (body) => {
+      const requestId = typeof body.requestId === 'string' ? body.requestId.trim() : (typeof body.id === 'string' ? body.id.trim() : '');
+      const reqs = loadWalletRequests();
+      const r = reqs.find((x) => x.id === requestId);
+      if (!r) return sendJSON(res, 200, { ok: false, error: 'រកសំណើនេះមិនឃើញទេ' });
+      if (r.status !== 'pending') return sendJSON(res, 200, { ok: false, error: 'សំណើនេះបានសម្រេចរួចហើយ' });
+      const users = loadUsers();
+      const u = users[r.email];
+      if (!u) return sendJSON(res, 200, { ok: false, error: 'រកអ្នកប្រើនេះមិនឃើញទេ' });
+      const now = new Date().toISOString();
+      if (r.type === 'topup') {
+        u.balance = walletMoney(walletBalance(u) + walletMoney(r.amount));
+        u.updatedAt = now;
+        saveUsers(users);
+        await ghFlushFile(USERS_FILE);
+        addNotification('grant', r.email, '✅ បញ្ចូលលុយបានអនុម័ត · Top-up approved', '$' + walletMoney(r.amount).toFixed(2) + ' បានបញ្ចូលទៅ Wallet របស់ ' + r.email + ' (នៅសល់ $' + u.balance.toFixed(2) + ')', { extra: { walletRequestId: r.id, type: 'topup', amount: walletMoney(r.amount), balance: u.balance, buyerId: u.id || '—' } });
+      } else if (r.type === 'withdraw') {
+        const total = walletMoney(walletMoney(r.amount) + WALLET_WITHDRAW_FEE);
+        const bal = walletBalance(u);
+        if (total > bal) return sendJSON(res, 200, { ok: false, error: 'លុយក្នុង Wallet មិនគ្រប់ទេ (ត្រូវការ $' + total.toFixed(2) + ', នៅសល់ $' + bal.toFixed(2) + ') · Insufficient wallet balance', balance: bal });
+        u.balance = walletMoney(bal - total);
+        u.updatedAt = now;
+        saveUsers(users);
+        await ghFlushFile(USERS_FILE);
+        addNotification('deduct', r.email, '✅ ដកលុយបានអនុម័ត · Withdraw approved', '$' + walletMoney(r.amount).toFixed(2) + ' (+ថ្លៃសេវា $' + WALLET_WITHDRAW_FEE.toFixed(2) + ' = $' + total.toFixed(2) + ') បានកាត់ពី Wallet របស់ ' + r.email + ' (នៅសល់ $' + u.balance.toFixed(2) + ') — Admin នឹងផ្ញើលុយតាម KHQR របស់អ្នក', { extra: { walletRequestId: r.id, type: 'withdraw', amount: walletMoney(r.amount), fee: WALLET_WITHDRAW_FEE, total, balance: u.balance, buyerId: u.id || '—' } });
+      } else {
+        return sendJSON(res, 200, { ok: false, error: 'ប្រភេទសំណើនេះមិនស្គាល់ទេ' });
+      }
+      r.status = 'approved';
+      r.decidedAt = now;
+      r.updatedAt = now;
+      saveWalletRequests(reqs);
+      await ghFlushFile(WALLET_REQUESTS_FILE);
+      return sendJSON(res, 200, { ok: true, request: walletRequestPublic(r, users), user: pubUser(u), balance: u.balance });
+    }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
+    return;
+  }
+  // POST /api/admin/wallet/reject — {requestId, reason?} — admin key
+  // required. Marks the request rejected; no money moves.
+  if (req.method === 'POST' && urlPath === '/api/admin/wallet/reject') {
+    const a = adminKeyOk(req);
+    if (!a.ok) return sendJSON(res, 200, { ok: false, error: a.error });
+    readJSONBody(req, 64 * 1024).then(async (body) => {
+      const requestId = typeof body.requestId === 'string' ? body.requestId.trim() : (typeof body.id === 'string' ? body.id.trim() : '');
+      const reason = typeof body.reason === 'string' ? body.reason.trim().slice(0, 200) : '';
+      const reqs = loadWalletRequests();
+      const r = reqs.find((x) => x.id === requestId);
+      if (!r) return sendJSON(res, 200, { ok: false, error: 'រកសំណើនេះមិនឃើញទេ' });
+      if (r.status !== 'pending') return sendJSON(res, 200, { ok: false, error: 'សំណើនេះបានសម្រេចរួចហើយ' });
+      const now = new Date().toISOString();
+      r.status = 'rejected';
+      r.decidedAt = now;
+      r.updatedAt = now;
+      if (reason) r.reason = reason;
+      saveWalletRequests(reqs);
+      await ghFlushFile(WALLET_REQUESTS_FILE);
+      const _wu = loadUsers()[r.email];
+      addNotification('purchase-rejected', r.email, '❌ សំណើ Wallet ត្រូវបានបដិសេធ · Wallet request rejected', (r.type === 'withdraw' ? 'សំណើដកលុយ $' + walletMoney(r.amount).toFixed(2) : 'សំណើបញ្ចូលលុយ $' + walletMoney(r.amount).toFixed(2)) + ' របស់ ' + r.email + ' ត្រូវបានបដិសេធ' + (reason ? ' — ' + reason : ''), { extra: { walletRequestId: r.id, type: r.type, amount: walletMoney(r.amount), buyerId: _wu && _wu.id ? _wu.id : '', decision: 'rejected' } });
+      return sendJSON(res, 200, { ok: true, request: walletRequestPublic(r, loadUsers()) });
     }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
     return;
   }
@@ -6777,6 +8214,23 @@ function apiRoute(req, res, urlPath) {
       savePublicPosts(posts);
       await ghFlushFile(PUBLIC_FILE);
       return sendJSON(res, 200, { ok: true, downloads: p.downloads });
+    }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
+    return;
+  }
+  // POST /api/public/feature-usage — PUBLIC. {feature, email?} Counts one
+  // use of a website feature (History actions, theme switches, Export
+  // choice, version-history view, ...). Generic: any feature name is
+  // accepted (sanitized to [a-z0-9_-], max 64 chars) — no hardcoded list,
+  // so future features are tracked the same way. Email is accepted but
+  // NOT stored (counts only). Mirrors /api/public/download: increment,
+  // save, await the GitHub flush so the count is locked in and never
+  // lost on restart.
+  if (req.method === 'POST' && urlPath === '/api/public/feature-usage') {
+    readJSONBody(req, 64 * 1024).then(async (body) => {
+      const r = featureUsageRecord(body && body.feature);
+      if (!r) return sendJSON(res, 200, { ok: false, error: 'សូមដាក់ feature ត្រឹមត្រូវ' });
+      await ghFlushFile(FEATURE_USAGE_FILE);
+      return sendJSON(res, 200, { ok: true, feature: r.feature, total: r.total, today: r.today });
     }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
     return;
   }
