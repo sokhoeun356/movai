@@ -3200,6 +3200,7 @@ input[type=range].st-range{accent-color:var(--accent);min-height:32px;cursor:poi
         <textarea class="input" id="thumbPrompt" rows="2" data-i18n-ph="thumbPromptPh" placeholder="ពណ៌នារូបផ្ទៃខាងក្រោយ..." style="width:100%;min-height:64px;padding:10px 14px;border-radius:12px"></textarea>
       </div>
       <button type="button" class="btn btn-green" id="thumbGenBtn" onclick="thumbGenerate()" style="width:100%;margin-top:10px" data-i18n="thumbGen">បង្កើត Thumbnail</button>
+      <div id="thumbFreeNote" style="font-size:0.8125rem;color:var(--muted);margin:8px 2px 0"></div>
       <p id="thumbMsg" style="font-size:0.8125rem;margin-top:8px;min-height:16px;line-height:1.6"></p>
       <div id="thumbResult" style="margin-top:10px"></div>
     </div>
@@ -4304,7 +4305,7 @@ km:{
  errTimeoutImage:'អស់ពេលរង់ចាំ (10 នាទី) — រូបភាពអាចនៅកំពុងបង្កើតក្នុងគណនីរបស់អ្នក',
  errNoVideoUrl:'វីដេអូរួចរាល់ តែរក URL មិនឃើញ — សូមមើលក្នុងគណនីរបស់អ្នកផ្ទាល់',
  genFailed:'បង្កើតមិនបានទេ',errTitle:'បញ្ហាដែលកើតឡើង — ចម្លងទុកផ្ញើឲ្យអ្នកជួយមើល',btnCopy:'ចម្លងបញ្ហា',copiedOk:'បានចម្លងហើយ ✓',copyFail:'ចម្លងមិនបាន — សូមចុចសង្កត់លើអត្ថបទក្នុងប្រអប់ ហើយជ្រើស Copy ដោយខ្លួនឯង',unknownProvider:'Provider មិនស្គាល់ទេ',adminNotSet:'Admin មិនទាន់កំណត់ provider/model សម្រាប់ផ្នែកនេះទេ — សូមរង់ចាំ Admin កំណត់សិន',serverOffline:'Server មិនទាន់ភ្ជាប់ទេ — សូមព្យាយាមម្ដងទៀតបន្តិចក្រោយ',d3MsgServer3d:'Server 3D មិនទាន់ភ្ជាប់ទេ — Key 3D ត្រូវបាន Admin គ្រប់គ្រងលើ server សូមព្យាយាមម្ដងទៀតបន្តិចក្រោយ',
- badImgUrl:'Provider បានផ្ដល់ URL រូបភាពមិនត្រឹមត្រូវទេ',imgFreeLeft:'Free {left}/{limit} រូបទៀតថ្ងៃនេះ',imgFreeOut:'រូប Free អស់ហើយថ្ងៃនេះ ({used}/{limit}) — សូមត្រឡប់មកវិញថ្ងៃស្អែក',badVidUrl:'Provider បានផ្ដល់ URL វីដេអូមិនត្រឹមត្រូវទេ',
+ badImgUrl:'Provider បានផ្ដល់ URL រូបភាពមិនត្រឹមត្រូវទេ',imgFreeLeft:'Free {left}/{limit} រូបទៀត · បាន Free ម្ដងទៀតក្នុង {days} {dayWord}',imgFreeOut:'រូប Free អស់ហើយ ({used}/{limit}) — បាន Free ម្ដងទៀតក្នុង {days} {dayWord}',thumbFreeLeft:'Free {left}/{limit} Thumbnail ទៀត · បាន Free ម្ដងទៀតក្នុង {days} {dayWord}',thumbFreeOut:'Thumbnail Free អស់ហើយ ({used}/{limit}) — បាន Free ម្ដងទៀតក្នុង {days} {dayWord}',badVidUrl:'Provider បានផ្ដល់ URL វីដេអូមិនត្រឹមត្រូវទេ',
  dlFailed:'ទាញយកមិនបានទេ — សូមព្យាយាមម្ដងទៀត',
  mp3Converting:'កំពុងបម្លែងទៅជា MP3…',
  dlDone:'ទាញយករួចរាល់',
@@ -4609,7 +4610,7 @@ en:{
  errTimeoutImage:'Timed out after 10 minutes — the image may still be generating in your account',
  errNoVideoUrl:'Video finished but no URL was returned — please check your account',
  genFailed:'Generation failed',errTitle:'Error details — copy this to share for help',btnCopy:'Copy error',copiedOk:'Copied ✓',copyFail:'Copy failed — long-press the text in the box and copy it manually',unknownProvider:'Unknown provider',adminNotSet:'The admin has not set a provider/model for this mode yet — please wait for the admin to set it',serverOffline:'The server is not connected yet — please try again in a little while',d3MsgServer3d:'The 3D server is not connected yet — 3D keys are managed by the admin on the server, please try again in a little while',
- badImgUrl:'The provider returned an invalid image URL',imgFreeLeft:'Free {left}/{limit} images left today',imgFreeOut:'Free images used up for today ({used}/{limit}) — come back tomorrow',badVidUrl:'The provider returned an invalid video URL',
+ badImgUrl:'The provider returned an invalid image URL',imgFreeLeft:'Free {left}/{limit} images left · free again in {days} {dayWord}',imgFreeOut:'Free images used up ({used}/{limit}) — free again in {days} {dayWord}',thumbFreeLeft:'Free {left}/{limit} thumbnails left · free again in {days} {dayWord}',thumbFreeOut:'Free thumbnails used up ({used}/{limit}) — free again in {days} {dayWord}',badVidUrl:'The provider returned an invalid video URL',
  dlFailed:'Download failed — please try again',
  mp3Converting:'Converting to MP3…',
  dlDone:'Downloaded',
@@ -5714,19 +5715,60 @@ function imgPickCur(){
    image mode opens and after every image generation (including
    thumbnails, which use the same endpoint). */
 var imgFreeCache=null;
+function imgFreeDaysLeft(resetDate){
+  // Days from today (local) to the reset date 'YYYY-MM-DD'; >=0.
+  var t=new Date();function p2(n){return (n<10?'0':'')+n;}
+  var today=t.getFullYear()+'-'+p2(t.getMonth()+1)+'-'+p2(t.getDate());
+  var a=Date.parse(today+'T00:00:00Z'),b=Date.parse(resetDate+'T00:00:00Z');
+  if(!isFinite(a)||!isFinite(b))return 3;
+  return Math.max(0,Math.round((b-a)/86400000));
+}
+function imgFreeDayWord(days){
+  // Khmer uses ថ្ងៃ for any count; English singular/plural.
+  if(typeof LANG!=='undefined'&&LANG==='en')return days===1?'day':'days';
+  return 'ថ្ងៃ';
+}
+function imgFreeNoteText(kind,ctr){
+  // kind: 'image' | 'thumbnail'. ctr: {limit, used, left, resetDate}.
+  var limit=Number(ctr.limit)||10,used=Math.max(0,Number(ctr.used)||0),left=Math.max(0,Number(ctr.left)||0);
+  var days=ctr.resetDate?imgFreeDaysLeft(ctr.resetDate):3;
+  var key=(left<=0)?(kind==='thumbnail'?'thumbFreeOut':'imgFreeOut'):(kind==='thumbnail'?'thumbFreeLeft':'imgFreeLeft');
+  return tx(key).replace('{used}',String(used)).replace('{limit}',String(limit)).replace('{left}',String(left)).replace('{days}',String(days)).replace('{dayWord}',imgFreeDayWord(days));
+}
 function imgFreeApply(d){
   var el=document.getElementById('genImgFreeNote');if(!el)return;
   if(!d||d.ok!==true){el.textContent='';return;}
-  var left=Math.max(0,Number(d.left)||0),limit=Number(d.limit)||10,used=Number(d.used)||0;
+  var ctr=d.images||{limit:d.limit||10,used:d.used||0,left:d.left||0};
+  var left=Math.max(0,Number(ctr.left)||0),limit=Number(ctr.limit)||10,used=Math.max(0,Number(ctr.used)||0);
   imgFreeCache={left:left,limit:limit,used:used};
-  if(left<=0){el.textContent=tx('imgFreeOut').replace('{used}',String(used)).replace('{limit}',String(limit));el.style.color='#f87171';}
-  else{el.textContent=tx('imgFreeLeft').replace('{left}',String(left)).replace('{limit}',String(limit));el.style.color='';}
+  el.textContent=imgFreeNoteText('image',ctr);
+  el.style.color=left<=0?'#f87171':'';
+}
+function thumbFreeApply(d){
+  var el=document.getElementById('thumbFreeNote');if(!el)return;
+  if(!d||d.ok!==true){el.textContent='';return;}
+  var ctr=d.thumbnails||{limit:d.limit||10,used:d.used||0,left:d.left||0};
+  var left=Math.max(0,Number(ctr.left)||0);
+  el.textContent=imgFreeNoteText('thumbnail',ctr);
+  el.style.color=left<=0?'#f87171':'';
 }
 function imgFreeLoad(){
   var em=null;try{em=genUserEmail();}catch(e){}
   if(!em)return;
   var base=(typeof GEN_API!=='undefined'&&GEN_API)?GEN_API:'https://movai-proxy.onrender.com/api';
-  fetch(base+'/public/image-free?email='+encodeURIComponent(em)).then(function(r){return r.json().catch(function(){return null;});}).then(function(d){try{imgFreeApply(d);}catch(e){}}).catch(function(){});
+  fetch(base+'/public/image-free?email='+encodeURIComponent(em)).then(function(r){return r.json().catch(function(){return null;});}).then(function(d){try{imgFreeApply(d);}catch(e){}try{thumbFreeApply(d);}catch(e){}}).catch(function(){});
+}
+// Language-pure limit message for a free-counter error (the server's
+// error text is bilingual; this rebuilds it from the i18n dicts).
+function imgFreeLimitText(isThumb,freeObj){
+  var ctr={limit:10,used:10,left:0};
+  if(freeObj&&typeof freeObj==='object'){
+    if(freeObj.limit)ctr.limit=Number(freeObj.limit)||10;
+    if(freeObj.used!=null)ctr.used=Math.max(0,Number(freeObj.used)||0);
+    if(freeObj.left!=null)ctr.left=Math.max(0,Number(freeObj.left)||0);
+    if(freeObj.resetDate)ctr.resetDate=freeObj.resetDate;
+  }
+  return imgFreeNoteText(isThumb?'thumbnail':'image',ctr);
 }
 function genRenderImgProviders(){
   var wrap=document.getElementById('genImgProviderWrap');if(!wrap)return;
@@ -8005,6 +8047,7 @@ async function genGenerate(){
     if(e&&e.genCancelled){genMsg(tx('msgGenCancelled'));}
     else if(e&&e.acctNotReady){genMsg(tx('acctLoading'));}
     else if(e&&e.adminServerDown){genMsg(tx('serverOffline'));}
+    else if(e&&e.code==='image_free_daily_limit'){genMsg(imgFreeLimitText(false,e.imgFree));}
     else{
       var m=(e&&e.message?e.message:String(e));
       if(/failed to fetch|networkerror|load failed/i.test(m))m=tx('serverOffline');
@@ -8231,7 +8274,7 @@ async function thumbGenerate(){
     var cfg={provider:imgPick.provider,model:imgPick.model};
     histCtx={prompt:prompt,provider:cfg.provider};
     var _tr=THUMB_RATIOS[thumbRatio]||THUMB_RATIOS['16:9'];
-    var j=await adminGenPost('/api/gen/image',{provider:cfg.provider,prompt:genEnhanceImgPrompt(prompt)+thumbStyleSuffix(),model:cfg.model,width:_tr.w,height:_tr.h},60000);
+    var j=await adminGenPost('/api/gen/image',{provider:cfg.provider,prompt:genEnhanceImgPrompt(prompt)+thumbStyleSuffix(),model:cfg.model,width:_tr.w,height:_tr.h,isThumbnail:true},60000);
     var url=j.imageUrl||j.image_url||j.url||null;
     if(!url){
       var jobId=adminJobId(j);
@@ -8249,9 +8292,10 @@ async function thumbGenerate(){
     if(e&&e.genCancelled){thumbMsg(tx('msgGenCancelled'));}
     else if(e&&e.acctNotReady){thumbMsg(tx('acctLoading'));}
     else if(e&&e.adminServerDown){thumbMsg(tx('serverOffline'));}
+    else if(e&&e.code==='image_free_daily_limit'){thumbMsg(imgFreeLimitText(true,e.imgFree));}
     else{var m=(e&&e.message?e.message:String(e));if(/failed to fetch|networkerror|load failed/i.test(m))m=tx('serverOffline');thumbMsg(m);}
   }
-  finally{genStopProg();if(btn)btn.disabled=false;genAnyBusy=false;epSyncButtons();try{genGateSync();}catch(e){}try{provStatusLoad();}catch(e){}}
+  finally{genStopProg();if(btn)btn.disabled=false;genAnyBusy=false;epSyncButtons();try{genGateSync();}catch(e){}try{provStatusLoad();}catch(e){}try{imgFreeLoad();}catch(e){}}
 }
 /* Fetch the image bytes through the server proxy (CORS *) so the
    canvas stays clean and exportable; fall back to a direct
@@ -18885,7 +18929,7 @@ async function adminGenPost(path,body,timeoutMs){
      by itself and the refunded balance rides this same reply, so
      the restored number shows everywhere before the error does. */
   if(j){try{acctApplyServerData(j);}catch(e){}}
-  if(j&&j.ok===false)throw new Error(String(j.error||tx('genFailed')));
+  if(j&&j.ok===false){var _ne=new Error(String(j.error||tx('genFailed')));if(j.code)_ne.code=j.code;if(j.imgFree)_ne.imgFree=j.imgFree;throw _ne;}
   if(!r.ok)throw new Error(genErrText(j,'HTTP '+r.status));
   if(!j)throw new Error(tx('genFailed'));
   return j;
