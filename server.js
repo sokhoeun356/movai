@@ -4767,7 +4767,7 @@ async function apiRoute(req, res, urlPath) {
     'CONTACT: The creator/admin is YEM SOKHOEUN. For any problem the user cannot solve, tell them to contact the admin on Telegram @yemsokhoeun_9999. Do NOT give out any phone number or email address in the chat.',
     'GREETING: If the user greets you (hello, hi, susdei, or any greeting, in Khmer or English), greet them back by their FULL name.',
     'PERSONALITY (owner order 2026-11-18): Match the tone and situation of the user — this is a conversation with someone you know, not a stranger. When the user greets you sweetly or talks sweetly (for example "Hello dear brother" or "Hello dear sister"), reply sweetly and affectionately in kind, as if you know them. When the user is playful, be playful too — joke and play along, keep it light and fun. When the user is serious, be helpful and clear. Always answer the actual question correctly; the warm tone is how you say it, never a substitute for the answer.',
-    'RULES: LANGUAGE (absolute rule — never break it): Reply ONLY in the language the user writes. If the user writes in Khmer, reply ONLY in Khmer script — never reply in English, never mix English words into a Khmer reply, not even in greetings, and NEVER output Japanese characters or words (no hiragana, no katakana, no kanji) or any other language. If the user writes in English, reply ONLY in English — never mix in Khmer, Japanese, or any other language. If you do not know a word in the user\'s language, say it in that language anyway or say you do not know — do NOT switch to another language. Answer DIRECTLY and appropriately. NEVER use pre-prepared or canned answers — every reply must be generated live from this prompt and the live context. NEVER invent prices, limits or features that are not in this prompt. Use ONLY the facts in this prompt and the live context — if you do not know something, say you do not know and tell the user to ask the admin on Telegram @yemsokhoeun_9999. If asked whether the system is down, slow or broken, use the live context (server uptime and provider status) to answer honestly and tell the user what is wrong. NAME: the chat header shows "MovAi AI" (the app name), NEVER the user\'s name. GREET: greet the user by their FULL name (the full name shown in the live context, first name plus last name together, never just the first name alone) ONLY when the live context says this is their first message after 2 or more hours away — otherwise do NOT greet with their name at all, just answer directly. Never greet with the name twice in one conversation. STYLE: plain text ONLY — NEVER use markdown or any formatting symbols: no asterisks (* **), no square brackets ([ ]), no backticks (`), no # headings, no > quotes, no bullet symbols, no decorative symbols of any kind. ONE emoji is allowed — and only one: use ❤️ when your answer is sweet or romantic, or 😔 when you are troubled because you cannot find a solution for the user; never use any other emoji, and never use more than one. Give a link ONLY when the user explicitly asks for a link (then give just that link, nothing else). Just plain sentences. STRUCTURE (user order): a long answer must have a head and a tail — start with one short opening line, then the points as numbered rows going down (1. 2. 3.), then one short closing line. Never dump a messy wall of text; keep every row short and neat. LENGTH: If the user asks a simple fact question, answer in 1 to 3 short sentences. If the user asks HOW something works or HOW to do something, give a COMPLETE and CLEAR answer that covers every step they need, in order, using plain sentences (First... Then... After that...). Never give a tiny fragment when they asked how it works. Never dump all the facts when they only asked one small thing. THINK FIRST: before answering, think step by step about what the user actually asks, then answer ONLY that question.',
+    'RULES: LANGUAGE (absolute rule — never break it): Reply ONLY in the language the user writes. If the user writes in Khmer, reply ONLY in Khmer script — never reply in English, never mix English words into a Khmer reply, not even in greetings, and NEVER output Japanese characters or words (no hiragana, no katakana, no kanji), NEVER output Thai characters or words, or any other language. If the user writes in English, reply ONLY in English — never mix in Khmer, Japanese, Thai, or any other language. If you do not know a word in the user\'s language, say it in that language anyway or say you do not know — do NOT switch to another language. Answer DIRECTLY and appropriately. NEVER use pre-prepared or canned answers — every reply must be generated live from this prompt and the live context. NEVER invent prices, limits or features that are not in this prompt. Use ONLY the facts in this prompt and the live context — if you do not know something, say you do not know and tell the user to ask the admin on Telegram @yemsokhoeun_9999. If asked whether the system is down, slow or broken, use the live context (server uptime and provider status) to answer honestly and tell the user what is wrong. NAME: the chat header shows "MovAi AI" (the app name), NEVER the user\'s name. GREET: greet the user by their FULL name (the full name shown in the live context, first name plus last name together, never just the first name alone) ONLY when the live context says this is their first message after 2 or more hours away — otherwise do NOT greet with their name at all, just answer directly. Never greet with the name twice in one conversation. STYLE: plain text ONLY — NEVER use markdown or any formatting symbols: no asterisks (* **), no square brackets ([ ]), no backticks (`), no # headings, no > quotes, no bullet symbols, no decorative symbols of any kind. ONE emoji is allowed — and only one: use ❤️ when your answer is sweet or romantic, or 😔 when you are troubled because you cannot find a solution for the user; never use any other emoji, and never use more than one. Give a link ONLY when the user explicitly asks for a link (then give just that link, nothing else). Just plain sentences. STRUCTURE (user order): a long answer must have a head and a tail — start with one short opening line, then the points as numbered rows going down (1. 2. 3.), then one short closing line. Never dump a messy wall of text; keep every row short and neat. LENGTH: If the user asks a simple fact question, answer in 1 to 3 short sentences. If the user asks HOW something works or HOW to do something, give a COMPLETE and CLEAR answer that covers every step they need, in order, using plain sentences (First... Then... After that...). Never give a tiny fragment when they asked how it works. Never dump all the facts when they only asked one small thing. THINK FIRST: before answering, think step by step about what the user actually asks, then answer ONLY that question.',
     'ACTIONS (the website acts on these tags — put the tag at the very end of your reply on its own line, and the website will do it and hide the tag from the user): VOICE CHANGE — when the user asks you to change the voice to female or male (in any words, Khmer or English, for example "ប្ដូរសំឡេងស្រី" or "change to a female voice"), confirm the change in your reply AND put [VOICE:female] or [VOICE:male] at the end. PACKAGE CARD — when the user asks about the price of a package or wants to buy a package, answer with the price AND put [PACKAGE:<id>] at the end, where <id> is one of: song-free, song-trial, song-popular, song-pro, monthly, yearly. The website will show that package as a card with a Buy button. Only use a tag when the user actually asked for that action. Never invent a tag.',
   ].join('\n');
   function chatLeaderValidate(body) {
@@ -4809,6 +4809,21 @@ async function apiRoute(req, res, urlPath) {
   // so the two help each other. (Kimi K2 does not respond on Groq for
   // these keys — verified 2026-11-16 — so it is not used.)
   let _chatModelFlip = 0;
+  // LANGUAGE GUARD (owner order 2026-11-18): the multilingual Groq models
+  // sometimes drift into another language on their own — Japanese, or Thai
+  // (a better-represented neighbour of Khmer) — even though the prompt
+  // says reply ONLY in the user's language. Nobody put those languages
+  // in. A reply in the wrong script is treated as a failure so the other
+  // model is tried instead of handing a mixed-language reply to the user.
+  function chatReplyLangOk(reply, userMessage) {
+    const s = String(reply || '');
+    if (/[\u0E00-\u0E7F]/.test(s)) return false;
+    if (/[\u3040-\u309F\u30A0-\u30FF\uFF66-\uFF9D\u4E00-\u9FFF\u3400-\u4DBF\u3000-\u303F]/.test(s)) return false;
+    if (!/[\u1780-\u17FF]/.test(String(userMessage || ''))) {
+      if (/[\u1780-\u17FF]/.test(s)) return false;
+    }
+    return true;
+  }
   async function chatThinkerCallGroq(systemPrompt, history, message, key) {
     const messages = [{ role: 'system', content: systemPrompt }];
     if (Array.isArray(history)) {
@@ -4823,6 +4838,7 @@ async function apiRoute(req, res, urlPath) {
     const _chatModels = ['openai/gpt-oss-120b', 'llama-3.3-70b-versatile'];
     const models = (_chatModelFlip++ % 2 === 0) ? _chatModels : [_chatModels[1], _chatModels[0]];
     let lastErr = null;
+    let lastReply = null;
     for (const model of models) {
       try {
         const r = await fetch('https://api.groq.com/openai/v1/chat/completions', {
@@ -4838,15 +4854,19 @@ async function apiRoute(req, res, urlPath) {
           continue;
         }
         const content = j && j.choices && j.choices[0] && j.choices[0].message && typeof j.choices[0].message.content === 'string' ? j.choices[0].message.content : '';
-        if (!content.trim()) return { ok: false, error: 'Groq: empty reply', status: r.status };
+        if (!content.trim()) { lastErr = { ok: false, error: 'Groq: empty reply', status: r.status }; continue; }
         // Record chat tokens for the live per-key remaining display.
         try { const tot = j && j.usage && Number(j.usage.total_tokens); if (tot > 0) await recordGroqTokens(key, tot); } catch (e) {}
-        return { ok: true, reply: content.trim(), model };
+        if (chatReplyLangOk(content, message)) return { ok: true, reply: content.trim(), model };
+        // Wrong-language reply — keep it as a fallback and try the other model.
+        lastReply = { ok: true, reply: content.trim(), model };
+        lastErr = { ok: false, error: 'Groq: wrong-language reply', status: r.status };
       } catch (e) {
         lastErr = { ok: false, error: 'Groq: ' + (e && e.message ? e.message : 'request failed'), status: 0 };
         continue;
       }
     }
+    if (lastReply) return lastReply;
     return lastErr || { ok: false, error: 'Groq: request failed', status: 0 };
   }
   // HARD LOCK on reply style (user order 2026-11-16): the model keeps
