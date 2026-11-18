@@ -895,7 +895,13 @@ img.hist-media,.d3-preview{cursor:zoom-in}
 .song-menu-item{position:relative}
 .song-menu-item .feat-limit-badge{top:6px;right:8px}
 .feat-locked{opacity:.45;filter:grayscale(.55)}
-.song-act:has(>.feat-limit-badge.fl-out),.pub-pill:has(>.feat-limit-badge.fl-out),.pub-act:has(>.feat-limit-badge.fl-out),.song-menu-item:has(>.feat-limit-badge.fl-out){opacity:.45;filter:grayscale(.55)}
+/* Locked buttons are solid GREY, clearly off (owner order
+   2026-11-18 13:18): grey fill, white icon/text. Tapping a grey
+   button opens the Packages page (see featLockedGoPackages).
+   The song-menu row keeps the faded treatment (it is a list row,
+   not a button). */
+.song-act.feat-locked,.pub-pill.feat-locked,.pub-act.feat-locked{background:#9aa0a8!important;border-color:#9aa0a8!important;color:#fff!important;opacity:1;filter:none}
+.song-menu-item:has(>.feat-limit-badge.fl-out){opacity:.45;filter:grayscale(.55)}
 .hist-song-lg .song-seek{height:22px;margin-top:8px}
 /* Song menu — bottom sheet listing EVERY action of one Song
    History song, icon + text label, opened by the row's ☰ button. */
@@ -8175,7 +8181,7 @@ async function dlSaveSongMp3(src,title,fallback,anchorEl){
      the locked message shows instead. (Only when the limits
      have actually loaded; before the first fetch the server
      still enforces on its own endpoint below.) */
-  if(featLimitsLocked('download')){featLockedShow('download');return;}
+  if(featLimitsLocked('download')){featLockedGoPackages('download');return;}
   mp3Busy=true;
   var fname=dlCleanName(title,fallback||'movai-song')+'.mp3';
   /* The download progress runs on the song's OWN card (owner order
@@ -9081,6 +9087,13 @@ function featLockedShow(kind){
   var key=kind==='mv'?'featLockedMv':(kind==='vs'?'featLockedVs':'featLockedDl');
   try{mp3FailText(tx(key));}catch(e){}
 }
+/* Locked tap → Buy Package (owner order 2026-11-18 13:18): when a
+   button is grey (out), tapping it shows the locked message and
+   opens the Packages page so the user can buy a package. */
+function featLockedGoPackages(kind){
+  featLockedShow(kind);
+  try{dockGo('packages');}catch(e){}
+}
 var mvUseBusy=false;
 /* MV gate (owner order 2026-11-18): consume one MV use FIRST —
    only on ok:true does the MV sheet open, with the badge repainted
@@ -9109,7 +9122,7 @@ function mvOpenGated(song){
     }
     if(d&&d.error==='mv_out'){
       featLimitsRefresh();
-      featLockedShow('mv');
+      featLockedGoPackages('mv');
       return;
     }
     mvOpen(song);
@@ -13804,7 +13817,7 @@ function pubDownloadPost(it,btn){
   /* Free 2 + package allowance (owner order 2026-11-18): a song
      download the limits already know is locked never starts —
      nothing is counted or bumped, just the locked message. */
-  if(it.type==='song'&&featLimitsLocked('download')){featLockedShow('download');return;}
+  if(it.type==='song'&&featLimitsLocked('download')){featLockedGoPackages('download');return;}
   if(it.type==='song'&&!pubHasSongPlan()){
     var bucket=pubSongBucket(it);
     if(pubSongDlLeft(bucket)<=0){
@@ -23402,7 +23415,7 @@ function studioOpenSong(url,title){
      message shows instead of switching to the Studio. (Only when
      the limits have actually loaded; otherwise the separate
      endpoint still enforces with vs_out below.) */
-  if(featLimitsLocked('vs')){featLockedShow('vs');return;}
+  if(featLimitsLocked('vs')){featLockedGoPackages('vs');return;}
   appSetView('studio');
   window.scrollTo(0,0);
   /* Same one-tap path as the AI Studio song list: load the song
