@@ -6766,7 +6766,7 @@ function monetRender(){
   var statusStr=monetPickStr(st,['applyStatus','applicationStatus','monetizationStatus','state']).toLowerCase();
   var fEl=document.getElementById('monetFollowers');if(fEl)fEl.innerHTML='<span class="monet-cur">'+(followers===null?'—':Math.floor(followers))+'</span> / 1000';
   var fb=document.getElementById('monetFollowersBar');if(fb)fb.style.width=Math.min(100,((followers||0)/1000)*100)+'%';
-  var wEl=document.getElementById('monetWatchHours');if(wEl)wEl.innerHTML='<span class="monet-cur">'+(watch===null?'—':(Math.round(watch*10)/10))+'</span> / 2000';
+  var wEl=document.getElementById('monetWatchHours');if(wEl){var _wm=(watch===null?null:Math.max(0,Math.round(watch*60)));wEl.innerHTML='<span class="monet-cur">'+(watch===null?'—':(Math.round(watch*100)/100))+'</span> / 2000'+(watch===null?'':' <small style="color:var(--muted);font-weight:600">('+_wm+' min)</small>');}
   var wb=document.getElementById('monetWatchBar');if(wb)wb.style.width=Math.min(100,((watch||0)/2000)*100)+'%';
   var eEl=document.getElementById('monetEligible');if(eEl)eEl.textContent=eligibleVal===null?'—':(eligibleVal?tx('monetEligibleYes'):tx('monetEligibleNo'));
   var total=monetPick(ea,['totalEarned','total','earnings','totalEarnings']);
@@ -11056,6 +11056,12 @@ function histAudioGet(){
         if(mit)pubMiniSet(histAudio,mit,list);
       }catch(e){}
     });
+    /* Watch-time tracking (owner order 2026-11-18): a History
+       song that plays also accrues watch time for its creator
+       (the server skips it when the listener IS the creator). */
+    histAudio.addEventListener('play',function(){try{watchStart('hist:'+histAudioId,histAudio);}catch(e){}});
+    histAudio.addEventListener('pause',function(){try{watchStop('hist:'+histAudioId);}catch(e){}});
+    histAudio.addEventListener('ended',function(){try{watchStop('hist:'+histAudioId);}catch(e){}});
   }
   return histAudio;
 }
@@ -12775,6 +12781,7 @@ function pubWireFeedAudio(au,it,sync){
   au.addEventListener('play',function(){
     if(it&&it.url)mp3Warm(it.url);
     pubCountView(it.id);
+    try{watchStart(it.id,au);}catch(e){}
     try{pubMiniSet(au,it);}catch(e){}
     try{
       var all=document.querySelectorAll('#pubFeed audio');
@@ -12782,8 +12789,9 @@ function pubWireFeedAudio(au,it,sync){
     }catch(e){}
     if(sync)sync();
   });
-  au.addEventListener('pause',function(){if(sync)sync();});
+  au.addEventListener('pause',function(){try{watchStop(it.id);}catch(e){}if(sync)sync();});
   au.addEventListener('ended',function(){
+    try{watchStop(it.id);}catch(e){}
     if(sync)sync();
     if(pubPlayMode==='loop'||pubPlayMode==='shuffle')pubAdvanceFrom(au);
   });
@@ -13690,7 +13698,9 @@ function pubCardEl(it){
   }else if(it.type==='video'){
     var vd=document.createElement('video');
     vd.src=it.url;vd.controls=true;vd.preload='metadata';vd.playsInline=true;vd.className='pub-media';
-    vd.addEventListener('play',function(){pubCountView(it.id);});
+    vd.addEventListener('play',function(){pubCountView(it.id);try{watchStart(it.id,vd);}catch(e){}});
+    vd.addEventListener('pause',function(){try{watchStop(it.id);}catch(e){}});
+    vd.addEventListener('ended',function(){try{watchStop(it.id);}catch(e){}});
     card.appendChild(vd);
   }else if(it.type==='3d'){
     if(it.image&&/^https:/i.test(it.image)){
@@ -14362,7 +14372,47 @@ function pubCountView(id){
     var els=document.querySelectorAll('[data-pub-views="'+CSS.escape(id)+'"]');
     for(var vi=0;vi<els.length;vi++)els[vi].textContent=fmtCount(it.views);
   }
-  try{fetch(PUB_API+'/view',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:id})}).catch(function(){});}catch(e){}
+  try{var _vu=null;try{_vu=acctCurrent();}catch(e){}fetch(PUB_API+'/view',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({postId:id,email:_vu&&_vu.email?_vu.email:''})}).catch(function(){});}catch(e){}
+}
+/* ===== Watch-time tracking (owner order 2026-11-18) =====
+   While a song/video actually plays, the listening time accrues
+   as Watch hours for the creator (Monetization progress). One
+   active session at a time: a 1s tick adds a second only while
+   the audio/video is playing and the tab is visible; every 30s
+   a heartbeat POSTs {postId, email, seconds:30} to
+   /api/public/watch (watch time only — no view increment, no
+   earnings). Pause/ended flushes the remainder (>=1s). Guests
+   send nothing (logged-in listeners only); the server skips
+   self-listens. The key is a public post id, or 'hist:<id>' for
+   a History song (the server then uses ownerEmail). */
+var watchCur={key:null,au:null,pending:0,timer:null};
+function watchViewerEmail(){var u=null;try{u=acctCurrent();}catch(e){}return (u&&u.email)?String(u.email).trim().toLowerCase():'';}
+function watchSend(key,seconds){
+  var em=watchViewerEmail();if(!em||!key||!(seconds>0))return;
+  var body={email:em,seconds:Math.floor(seconds)};
+  if(String(key).indexOf('hist:')===0)body.ownerEmail=em;
+  else body.postId=key;
+  try{fetch(GEN_API+'/public/watch',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}).catch(function(){});}catch(e){}
+}
+function watchStart(key,au){
+  if(!key||!au)return;
+  if(watchCur.key&&watchCur.key!==key)watchStop(watchCur.key);
+  if(watchCur.key===key&&watchCur.au===au&&watchCur.timer)return;
+  watchStop(watchCur.key);
+  watchCur={key:key,au:au,pending:0,timer:setInterval(function(){
+    try{
+      if(!watchCur.au||watchCur.au.paused||watchCur.au.ended||document.hidden)return;
+      watchCur.pending+=1;
+      if(watchCur.pending>=30){watchSend(watchCur.key,30);watchCur.pending-=30;}
+    }catch(e){}
+  },1000)};
+}
+function watchStop(key){
+  if(!watchCur.key||(key&&watchCur.key!==key))return;
+  if(watchCur.timer){try{clearInterval(watchCur.timer);}catch(e){}}
+  var pend=watchCur.pending,k2=watchCur.key;
+  watchCur={key:null,au:null,pending:0,timer:null};
+  if(pend>=1)watchSend(k2,pend);
 }
 /* ----- Post to Public sheet ----- */
 function pubSheetClose(){pubCoverBusyStop();var s=document.getElementById('pubSheet');sheetHideAnim(s);}
