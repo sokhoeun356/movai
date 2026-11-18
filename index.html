@@ -2920,6 +2920,34 @@ input[type=range].st-range{accent-color:var(--accent);min-height:32px;cursor:poi
 .st-pick-err.on{display:block}
 .st-pick-retry{margin-top:8px;min-height:38px;padding:7px 14px;border-radius:9px;border:1px solid var(--line2);background:var(--field);color:var(--text);font-size:0.8125rem;font-weight:700;cursor:pointer;font-family:inherit}
 @media(min-width:1024px){#page-studio .panel{max-width:1360px;margin-left:auto;margin-right:auto}}
+/* ===== Header + dock: NO bars (owner order 2026-11-18) =====
+   The header pill and the dock bar are REMOVED — only the
+   buttons remain, each one a SOLID opaque chip on the same
+   solid surface as every other button (var(--card)). No glass,
+   no SONAR gradient, no blur, no shadow on the bar itself.
+   This block sits at the very end of the stylesheet so it wins
+   over the base glass rules, the SONAR overrides and the
+   smooth-mode rules (the html[data-smooth="1"] selectors
+   below match their specificity). Positions, tap behaviour,
+   badges and the header +10px offset are unchanged; the
+   buttons still float sticky and the content padding is
+   untouched. The desktop top strip (body::before) goes too —
+   it is the same kind of bar. */
+.brand-frame,.dock{background:none;background-color:transparent;background-image:none;border:0;box-shadow:none;-webkit-backdrop-filter:none;backdrop-filter:none;animation:none}
+html[data-smooth="1"] .brand-frame,html[data-smooth="1"] .dock,html[data-smooth="1"] .acct-chip,html[data-smooth="1"] .notif-bell{background:none;background-color:transparent;background-image:none;border:0;box-shadow:none;animation:none}
+.brand-frame::before,.dock::before{display:none}
+.brand-frame{padding:0;border-radius:0}
+.dock{color:var(--text)}
+body::before{display:none}
+.brand-frame .menu-btn{background:var(--card);border:1px solid var(--line2);box-shadow:0 4px 14px rgba(0,0,0,.35)}
+.brand-frame .menu-btn span{background:var(--text)}
+.brand-frame .brand-logo{background:#013f1f}
+.acct-chip{background:var(--card);background-image:none;border:1px solid var(--line2);box-shadow:0 4px 14px rgba(0,0,0,.35);-webkit-backdrop-filter:none;backdrop-filter:none;animation:none;color:var(--text)}
+.acct-chip b{color:var(--accent-text)}
+.notif-bell{background:var(--card);background-image:none;border:1px solid var(--line2);box-shadow:0 4px 14px rgba(0,0,0,.35);-webkit-backdrop-filter:none;backdrop-filter:none;animation:none;color:var(--text)}
+.dock-item{background:var(--card);border:1px solid var(--line2);box-shadow:0 4px 14px rgba(0,0,0,.35);color:inherit}
+.dock-item:hover{background:var(--card);filter:brightness(1.2)}
+.dock-item.on{background:var(--card2);color:var(--accent-text);box-shadow:inset 0 0 0 1.5px var(--accent),0 4px 14px rgba(0,0,0,.35)}
 </style>
 </head>
 <body>
