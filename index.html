@@ -872,6 +872,14 @@ img.hist-media{cursor:zoom-in}
    Song History row, marking them as AI features. It never takes
    taps and never shifts the button's icon. */
 .hist-song-lg .song-ai-badge{position:absolute;top:4px;left:4px;z-index:1;padding:1px 5px;border-radius:999px;background:var(--accent);color:#101216;font-size:0.5625rem;font-weight:900;line-height:1.35;letter-spacing:.04em;pointer-events:none;box-shadow:0 1px 4px rgba(0,0,0,.25)}
+/* Version badge (owner order 2026-11-18): a small highlight pill
+   pinned to the TOP-RIGHT corner of a song's cover — the MODEL
+   that created the song. Suno (v6 family) violet, Magic Hour
+   (V5) amber, so the system is told at a glance. It never takes
+   taps and never covers the Play button or the title. */
+.song-ver-badge{position:absolute;top:4px;right:4px;z-index:3;padding:2px 6px;border-radius:999px;font-size:0.5625rem;font-weight:900;line-height:1.35;letter-spacing:.04em;pointer-events:none;box-shadow:0 1px 4px rgba(0,0,0,.35);white-space:nowrap}
+.song-ver-badge.song-ver-suno{background:#8b5cf6;color:#fff}
+.song-ver-badge.song-ver-mh{background:#f59e0b;color:#1a1a1a}
 /* Free 2 + package allowance badge (owner order 2026-11-18):
    a small pill on the Download / MV / Vocal Studio buttons
    (History + Feed) and on the same three rows in the song menu
@@ -8939,6 +8947,35 @@ function songAiBadge(){
   s.className='song-ai-badge';s.textContent='AI';s.setAttribute('aria-hidden','true');
   return s;
 }
+/* Version badge (owner order 2026-11-18): the MODEL that created
+   a song, shown as a highlight pill on its cover — V5 = Magic
+   Hour, V6 / V6 Wild / V6 Mini = Suno. The model is stored on the
+   history item (`model`); older items without one fall back to the
+   provider (magichour → V5, suno → V6). No model and no known
+   provider → no badge (never guess wrong). */
+function songVerBadgeInfo(it,provider){
+  var key=null;
+  if(it&&typeof it.model==='string'&&songModelByKey(it.model))key=it.model;
+  if(!key){
+    var p=String((it&&it.provider)||provider||'').toLowerCase();
+    if(/magic/.test(p))key='v5';
+    else if(/suno|movai|musicapi/.test(p))key='v6';
+  }
+  if(!key)return null;
+  var m=songModelByKey(key);
+  var label=m?m.label:key;
+  if(/^v6/i.test(label))label='V6'+label.slice(2);
+  return {label:label,suno:!!(m?m.provider==='suno':key!=='v5')};
+}
+function songVerBadgeEl(it,provider){
+  var info=songVerBadgeInfo(it,provider);
+  if(!info)return null;
+  var s=document.createElement('span');
+  s.className='song-ver-badge '+(info.suno?'song-ver-suno':'song-ver-mh');
+  s.textContent=info.label;
+  s.setAttribute('aria-hidden','true');
+  return s;
+}
 /* ===== Free 2 + package allowance limits — Download / MV / Vocal Studio =====
    (owner order 2026-11-18) Every account gets 2 FREE uses of each
    feature — Download MP3, MV, Vocal Studio — then package
@@ -9264,6 +9301,10 @@ function genShowSongs(items,streaming,restored){
   var sTitle=(histCtx&&histCtx.title)||'';
   var sProv=histCtx?histCtx.provider:histProviderName();
   var sPrompt=histCtx?histCtx.prompt:'';
+  /* Version badge (owner order 2026-11-18): the model that made
+     these songs — stamped on the history item so the badge shows
+     the song's OWN version, never the currently picked model. */
+  var sModel=(histCtx&&histCtx.model)||songModelCurKey();
   /* The finished songs belong to the account that STARTED the
      generation (histCtx.acctKey, stamped at start): they save
      into that account's History even if another account has
@@ -9275,7 +9316,7 @@ function genShowSongs(items,streaming,restored){
     songs.forEach(function(s,si){
       var su=/^https:/i.test(s.url)?s.url:((/^data:audio\//i.test(s.url)&&s.url.length<1200000)?s.url:null);
       if(su){
-        var hit={type:'song',url:su,title:s.title||sTitle,prompt:sPrompt,provider:sProv,image:(s.image&&/^https:/i.test(s.image))?s.image:undefined};
+        var hit={type:'song',url:su,title:s.title||sTitle,prompt:sPrompt,provider:sProv,model:sModel,image:(s.image&&/^https:/i.test(s.image))?s.image:undefined};
         /* Flagged BEFORE the save when the URL is still a
            temporary provider URL: pushes hold the item back until
            its permanent Cloudinary URL lands (see histPushItems),
@@ -9303,8 +9344,8 @@ function genShowSongs(items,streaming,restored){
        restores them (lastSongsRestore) instead of leaving an
        empty results box. Only permanent https URLs are kept. */
     try{
-      var keep=songs.filter(function(s){return /^https:/i.test(s.url);}).map(function(s){return {url:s.url,title:s.title||'',image:(s.image&&/^https:/i.test(s.image))?s.image:null};});
-      if(keep.length)localStorage.setItem((histCtx&&histCtx.lastKey)?histCtx.lastKey:lastSongsKey(),JSON.stringify({ts:Date.now(),title:sTitle,provider:sProv,prompt:sPrompt,songs:keep}));
+      var keep=songs.filter(function(s){return /^https:/i.test(s.url);}).map(function(s){return {url:s.url,title:s.title||'',model:sModel,image:(s.image&&/^https:/i.test(s.image))?s.image:null};});
+      if(keep.length)localStorage.setItem((histCtx&&histCtx.lastKey)?histCtx.lastKey:lastSongsKey(),JSON.stringify({ts:Date.now(),title:sTitle,provider:sProv,model:sModel,prompt:sPrompt,songs:keep}));
     }catch(e){}
   }
   var saved=streaming?[]:histGetFrom(saveKey);
@@ -9313,6 +9354,7 @@ function genShowSongs(items,streaming,restored){
   songs.forEach(function(s,i){
     var it=null;
     for(var j=0;j<saved.length;j++){if(saved[j].type==='song'&&saved[j].url===s.url){it=saved[j];break;}}
+    if(!s.model)s.model=(it&&it.model)||sModel;
     grid.appendChild(genSongCard(s,i+1,it,s.title||sTitle,sProv,sPrompt,streaming));
   });
   box.appendChild(grid);
@@ -9363,7 +9405,7 @@ function lastSongsRestore(){
   var j=null;try{j=JSON.parse(raw);}catch(e){}
   if(!j||!Array.isArray(j.songs)||!j.songs.length)return;
   lastSongsRestored=true;
-  histCtx={prompt:j.prompt||'',provider:j.provider||'',title:j.title||''};
+  histCtx={prompt:j.prompt||'',provider:j.provider||'',title:j.title||'',model:j.model||''};
   histCtxStamp();
   try{genShowSongs(j.songs,false,true);}catch(e){}
 }
@@ -9415,6 +9457,8 @@ function genSongCard(song,n,it,title,prov,prompt,streaming){
   play.type='button';play.className='song-play gcc-play';
   play.textContent='▶';play.setAttribute('aria-label',tx('histPlay'));
   coverWrap.appendChild(play);
+  var vb=songVerBadgeEl(it||song,prov);
+  if(vb)coverWrap.appendChild(vb);
   /* Title strip INSIDE the cover, along its bottom (owner order
      2026-11-17, image 3): the title on top — marquee-scrolling
      when too long — and the Song n · provider · time line under
@@ -10275,6 +10319,8 @@ function histSongCard(it){
     play.textContent='▶';play.setAttribute('aria-label',tx('histPlay'));
     play.addEventListener('click',function(){histPlayToggle(it);});
     coverWrapH.appendChild(play);
+    var vbH=songVerBadgeEl(it);
+    if(vbH)coverWrapH.appendChild(vbH);
     rowEl.appendChild(meta);
     var dur=document.createElement('span');
     dur.className='song-dur hist-dur';
@@ -18274,7 +18320,7 @@ async function genDoSongServer(cfg,prompt){
      it receives the complete song: title + lyrics + style. */
   var voiceTag=sInstr?'':(sVoice==='male'?'male vocals':(sVoice==='female'?'female vocals':''));
   var styleFull=[sStyle,voiceTag].filter(function(x){return !!x;}).join(', ');
-  histCtx={prompt:prompt,provider:cfg.provider,title:sTitle,style:styleFull};
+  histCtx={prompt:prompt,provider:cfg.provider,title:sTitle,style:styleFull,model:songModelCurKey()};
   histCtxStamp();
   /* The picked duration travels with the create call ONLY for
      Magic Hour — the one provider that charges by length (60
