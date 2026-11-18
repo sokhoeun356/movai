@@ -1158,6 +1158,9 @@ async function saveFollowers(arr) {
 // 'grant' (admin grants credits), 'deduct' (admin deducts credits),
 // 'post' (new PUBLIC post — broadcast: email '*', shown to every user
 // and pushed to every subscribed phone immediately).
+// 'post-removed' (a PUBLIC post auto-removed because its audio was
+// broken — addressed to the post owner; also shown on the Admin bell
+// and sent to Telegram, and pushed to the owner's phone).
 // 'security' (new-device login or blocked-model login attempt — admin
 // notification + Telegram alert for the admin).
 // Stored newest first, capped at 5000 (oldest dropped).
@@ -1243,7 +1246,7 @@ async function addNotification(kind, email, title, text, opts) {
     if (arr.length > NOTIFICATIONS_MAX) arr.length = NOTIFICATIONS_MAX;
     await saveNotifications(arr);
   } catch (e) {}
-  if (kind === 'login' || kind === 'purchase-request' || kind === 'gift-claimed' || kind === 'security' || kind === 'update' || kind === 'grant' || kind === 'deduct' || kind === 'purchase-approved' || kind === 'purchase-rejected' || kind === 'plan-expired' || kind === 'out-of-credit') {
+  if (kind === 'login' || kind === 'purchase-request' || kind === 'gift-claimed' || kind === 'security' || kind === 'update' || kind === 'grant' || kind === 'deduct' || kind === 'purchase-approved' || kind === 'purchase-rejected' || kind === 'plan-expired' || kind === 'out-of-credit' || kind === 'post-removed') {
     if (opts && typeof opts === 'object' && typeof opts.telegramHtml === 'string' && opts.telegramHtml) {
       sendTelegramAdmin(opts.telegramHtml, 'HTML');
     } else {
@@ -1748,7 +1751,7 @@ async function sendWebPush(sub, payload) {
 async function sendPushForNotification(n) {
   try {
     const ADMIN_KINDS = ['login', 'purchase-request', 'gift-claimed', 'security'];
-    const USER_KINDS = ['purchase-approved', 'purchase-rejected', 'grant', 'deduct', 'gift-claimed', 'post'];
+    const USER_KINDS = ['purchase-approved', 'purchase-rejected', 'grant', 'deduct', 'gift-claimed', 'post', 'post-removed'];
     const subs = await loadPushSubs();
     if (!subs.length) return;
     const targets = new Map();
@@ -7643,6 +7646,17 @@ async function apiRoute(req, res, urlPath) {
       arr.sort((a, b) => String(b.createdAt || b.at || '').localeCompare(String(a.createdAt || a.at || '')));
       return arr;
   }
+  // Like loadPublicPosts, but reports whether the Supabase read itself
+  // succeeded — the feed handler must tell a genuinely empty feed apart
+  // from a failed DB read (the website now drops posts the server stops
+  // returning, so a failed read must never look like an empty feed).
+  async function loadPublicPostsStatus() {
+    const rows = await sbSelect('public_posts', 'select=id,data');
+    if (!rows) return { ok: false, posts: [] };
+    const arr = rows.map((r) => r.data).filter(Boolean);
+    arr.sort((a, b) => String(b.createdAt || b.at || '').localeCompare(String(a.createdAt || a.at || '')));
+    return { ok: true, posts: arr };
+  }
   async function savePublicPosts(arr) {
     const list = Array.isArray(arr) ? arr : [];
       for (const p of list) { if (p && !p.id) p.id = newPublicId(); }
@@ -9270,7 +9284,9 @@ async function apiRoute(req, res, urlPath) {
   // tier 3 = the rest.
   if (req.method === 'GET' && urlPath === '/api/public/feed') {
     const tombs = await loadDeletedItems();
-    const posts = (await loadPublicPosts()).filter((p) => p && p.visibility === 'public' && !tombs.posts[p.id]);
+    const read = await loadPublicPostsStatus();
+    if (!read.ok) return sendJSON(res, 200, { ok: false, error: 'Server កំពុងរវល់ — សូមព្យាយាមម្ដងទៀត · Server busy — please try again' });
+    const posts = read.posts.filter((p) => p && p.visibility === 'public' && !tombs.posts[p.id]);
     posts.sort((a, b) => ((b.views || 0) - (a.views || 0)) || ((b.likes || 0) - (a.likes || 0)) || String(a.createdAt || '').localeCompare(String(b.createdAt || '')));
     const out = posts.map((p, i) => {
       const rank = i + 1;
@@ -9279,7 +9295,22 @@ async function apiRoute(req, res, urlPath) {
       d.tier = rank <= 50 ? 1 : rank <= 200 ? 2 : 3;
       return d;
     });
-    return sendJSON(res, 200, { ok: true, posts: out });
+    // Deleted-post ids/urls so phones drop locked copies (tombstone
+    // sync, same pattern as GET /api/public/history). Posts tombstones
+    // are stored by raw post id; 'id:'/'url:' keys are handled too.
+    const tombKeys = Object.keys(tombs.posts || {});
+    tombKeys.sort((a, b) => String(tombs.posts[b] || '').localeCompare(String(tombs.posts[a] || '')));
+    const recent = tombKeys.slice(0, 600);
+    const deletedIds = [];
+    const deletedUrls = [];
+    for (const k of recent) {
+      if (k.indexOf('id:') === 0) deletedIds.push(k.slice(3));
+      else if (k.indexOf('url:') === 0) deletedUrls.push(k.slice(4));
+      else deletedIds.push(k);
+    }
+    // Fire-and-forget broken-post check (throttled inside).
+    try { maybeSweepBrokenPosts(); } catch (e) {}
+    return sendJSON(res, 200, { ok: true, posts: out, deletedIds, deletedUrls });
   }
   // POST /api/public/like — PUBLIC. {postId, email}. One like per email;
   // a repeat like from the same email returns the current count unchanged.
@@ -9497,6 +9528,128 @@ const server = http.createServer((req, res) => {
 // the Admin once per expiry (bell + Telegram via 'plan-expired'), so the
 // Admin can follow up. A renewal (new approve) stores a new expiry date,
 // so the next expiry notifies again. Runs hourly + once after startup.
+// ---- Auto-remove broken Public posts (owner order 2026-11-18) ----
+// A posted song whose audio URL is dead is removed from Public
+// automatically and its owner is notified (in-app + Web Push to the
+// owner, Admin bell + Telegram to the admin). A single transient
+// error NEVER deletes anything: a definite failure (404/410, 403
+// expired, a 200 that is really an HTML error page, a 0-byte file)
+// counts double, and removal needs 3 points — two definite
+// confirmations, or three failures of any kind — with each URL
+// checked at most once per 30 minutes. Runs on the hourly sweep and
+// (throttled) whenever the feed is served, so it works while the
+// server is awake; Render Free sleeps are fine — the check resumes
+// on the next wake. Private posts are never touched, and neither is
+// the private DIAG marker (it is not public).
+const _brokenUrlCheck = new Map(); // url -> {fails, lastCheckAt, lastStatus}
+let _brokenSweepLastAt = 0;
+const BROKEN_CHECK_MIN_GAP_MS = 30 * 60 * 1000; // re-check a URL at most every 30 min
+const BROKEN_SWEEP_MIN_GAP_MS = 10 * 60 * 1000; // run the sweep at most every 10 min
+const BROKEN_CHECK_PER_SWEEP = 20; // bound the work per sweep
+const BROKEN_REMOVE_POINTS = 3; // definite failure = 2 points, any other failure = 1
+// HEAD a media URL (5s timeout). Returns {verdict, reason} where
+// verdict is 'ok' | 'definite' | 'soft'.
+async function checkPostMediaUrl(url) {
+  const u = typeof url === 'string' ? url.trim() : '';
+  if (!/^https?:\/\//i.test(u)) return { verdict: 'soft', reason: 'no-url' };
+  const isYoutube = /youtu\.?be/i.test(u);
+  const doFetch = async (method, headers) => {
+    try {
+      const r = await fetch(u, { method, headers: headers || {}, signal: AbortSignal.timeout(5000) });
+      return r;
+    } catch (e) { return null; }
+  };
+  const evalResponse = (r) => {
+    if (!r) return { verdict: 'soft', reason: 'unreachable' };
+    const st = r.status;
+    if (st === 404 || st === 410) return { verdict: 'definite', reason: 'not-found-' + st };
+    if (st >= 200 && st < 300) {
+      // A 200 that is really an HTML error page (an expired signed URL)
+      // or a 0-byte file is broken. YouTube links are reachability-only.
+      try {
+        const ct = String((r.headers && r.headers.get('content-type')) || '').toLowerCase();
+        const len = r.headers ? r.headers.get('content-length') : null;
+        if (len === '0') return { verdict: 'definite', reason: 'empty-file' };
+        if (!isYoutube && ct && ct.indexOf('text/html') === 0) return { verdict: 'definite', reason: 'html-not-media' };
+      } catch (e) {}
+      return { verdict: 'ok', reason: 'ok-' + st };
+    }
+    return { verdict: 'soft', reason: 'http-' + st };
+  };
+  let r = await doFetch('HEAD');
+  if (r && (r.status === 405 || r.status === 501)) r = await doFetch('GET', { Range: 'bytes=0-1023' });
+  if (r && r.status === 403) {
+    // A HEAD-only 403 (hotlink guard) is not proof — confirm with a
+    // ranged GET before calling it expired.
+    const g = await doFetch('GET', { Range: 'bytes=0-1023' });
+    if (g && g.status >= 200 && g.status < 300) return evalResponse(g);
+    if (g && (g.status === 403 || g.status === 404 || g.status === 410)) return { verdict: 'definite', reason: 'expired-403' };
+    return { verdict: 'soft', reason: 'forbidden-unconfirmed' };
+  }
+  return evalResponse(r);
+}
+function brokenReasonText(reason) {
+  if (reason.indexOf('not-found') === 0) return { km: 'រក link មិនឃើញ (404)', en: 'link not found (404)' };
+  if (reason.indexOf('expired') === 0) return { km: 'link ផុតកំណត់', en: 'link expired' };
+  if (reason === 'html-not-media') return { km: 'link មិនមែនជាឯកសារសំឡេង', en: 'link is not a media file' };
+  if (reason === 'empty-file') return { km: 'ឯកសារទទេ', en: 'empty file' };
+  return { km: 'ភ្ជាប់មិនបាន', en: 'unreachable' };
+}
+// One sweep: check every public post whose audio URL is due, and
+// remove + tombstone + notify the ones proven broken. Returns
+// {checked, removed}. Never throws; a failed DB read removes nothing.
+async function sweepBrokenPosts() {
+  let posts = null;
+  try {
+    const rows = await sbSelect('public_posts', 'select=id,data');
+    if (!rows) return { checked: 0, removed: 0 };
+    posts = rows.map((r) => r.data).filter(Boolean);
+  } catch (e) { return { checked: 0, removed: 0 }; }
+  const now = Date.now();
+  let checked = 0;
+  const removedIds = [];
+  for (const p of posts) {
+    if (!p || p.visibility !== 'public' || typeof p.url !== 'string' || !/^https?:\/\//i.test(p.url)) continue;
+    const st = _brokenUrlCheck.get(p.url) || { fails: 0, lastCheckAt: 0, lastStatus: '' };
+    if (now - (st.lastCheckAt || 0) < BROKEN_CHECK_MIN_GAP_MS && st.lastStatus) continue;
+    if (checked >= BROKEN_CHECK_PER_SWEEP) break;
+    checked++;
+    let res;
+    try { res = await checkPostMediaUrl(p.url); } catch (e) { res = { verdict: 'soft', reason: 'error' }; }
+    st.lastCheckAt = now;
+    st.lastStatus = res.verdict + ':' + res.reason;
+    if (res.verdict === 'ok') { st.fails = 0; _brokenUrlCheck.set(p.url, st); continue; }
+    st.fails += (res.verdict === 'definite' ? 2 : 1);
+    _brokenUrlCheck.set(p.url, st);
+    if (st.fails < BROKEN_REMOVE_POINTS) continue;
+    // Proven broken: remove the post, tombstone its id so it can never
+    // come back, and notify the owner (in-app + push) and the admin
+    // (bell + Telegram, via the 'post-removed' kind).
+    removedIds.push(p.id);
+    _brokenUrlCheck.delete(p.url);
+    try { await tombstonePostIdNow(p.id); } catch (e) {}
+    try { scheduleBackup('deleted-items.json'); } catch (e) {}
+    const rs = brokenReasonText(res.reason);
+    try {
+      await addNotification('post-removed', p.email || '', 'បទរបស់អ្នកត្រូវបានលុបចេញពី Public · Your song was removed from Public', '«' + (p.title || '') + '» — បទនេះខូច/ស្ដាប់មិនកើត (' + rs.km + ') ទើបត្រូវបានលុបចេញពី Public ដោយស្វ័យប្រវត្តិ · This song was broken/could not be played (' + rs.en + ') so it was automatically removed from Public');
+    } catch (e) {}
+  }
+  // Delete ONLY the removed ids (never a full-list sync here — a
+  // concurrent new post must not be wiped by a stale snapshot).
+  for (const id of removedIds) {
+    try { await sbDelete('public_posts', 'id=eq.' + encodeURIComponent(String(id))); } catch (e) {}
+  }
+  if (removedIds.length) { try { scheduleBackup('public.json'); } catch (e) {} }
+  return { checked, removed: removedIds.length };
+}
+// Throttled, fire-and-forget trigger (feed serve). The hourly sweep
+// calls sweepBrokenPosts() directly.
+function maybeSweepBrokenPosts() {
+  const now = Date.now();
+  if (now - _brokenSweepLastAt < BROKEN_SWEEP_MIN_GAP_MS) return;
+  _brokenSweepLastAt = now;
+  sweepBrokenPosts().catch(() => {});
+}
 async function checkPlanExpiries() {
   try {
     const users = await loadUsers();
@@ -9552,8 +9705,8 @@ if (require.main === module) {
     // model check when due) + a first sweep 5 min after startup.
     // Plan-expiry sweep runs on the same schedule: when a bought package
     // reaches its expiry date, notify the Admin once (bell + Telegram).
-    setTimeout(() => { autoUpdateSweep(); checkPlanExpiries(); }, 5 * 60 * 1000);
-    setInterval(() => { autoUpdateSweep(); checkPlanExpiries(); }, 60 * 60 * 1000);
+    setTimeout(() => { autoUpdateSweep(); checkPlanExpiries(); sweepBrokenPosts().catch(() => {}); }, 5 * 60 * 1000);
+    setInterval(() => { autoUpdateSweep(); checkPlanExpiries(); sweepBrokenPosts().catch(() => {}); }, 60 * 60 * 1000);
   });
 }
 module.exports = { server };
