@@ -1800,6 +1800,7 @@ function groqUsageList() {
 // are never stored or exposed — only the 1-based index + counts.
 const MVSEP_USAGE_FILE = path.join(DATA_DIR, 'mvsep-usage.json');
 const MVSEP_DAILY_LIMIT = 50;
+const MVSEP_NEAR_EXHAUST_REMAINING = 5; // remaining <= 5 = "nearly exhausted" — jump to a fresh key AT ONCE, before it fails (owner order 2026-11-18)
 let _mvsepUsage = null;
 function mvsepUsageLoad() {
   if (_mvsepUsage && typeof _mvsepUsage === 'object') return _mvsepUsage;
@@ -1848,6 +1849,17 @@ function mvsepUsageList() {
     out.push({ key: i + 1, usedToday: used, remainingToday: remaining, status: remaining <= 0 ? 'red' : 'green' });
   }
   return { date: today, dailyLimit: MVSEP_DAILY_LIMIT, keys: out };
+}
+// Remaining MVSEP separations today for the key at 0-based index idx
+// (server-side daily counter, limit 50/day/key). Returns null when the
+// counter is unavailable — then the key is treated as usable.
+function mvsepKeyRemaining(idx) {
+  try {
+    const list = mvsepUsageList();
+    const e = list && Array.isArray(list.keys) ? list.keys[idx] : null;
+    if (!e || typeof e.remainingToday !== 'number') return null;
+    return e.remainingToday;
+  } catch (err) { return null; }
 }
 // ---- MVSEP separation cache (fast re-split) ----
 // audioUrl sha256 -> {hash, savedAt}. When the same song is split again
@@ -2104,8 +2116,24 @@ async function withProviderKeyRotation(provider, fn, reqKey, candidatesOverride)
   const n = candidates.length;
   let lastErr = null;
   const attempts = [];
-  for (let i = 0; i < n; i++) {
-    const idx = (start + i) % n;
+  // Try-order: rotation order starting from the remembered start index.
+  let order = [];
+  for (let i = 0; i < n; i++) order.push((start + i) % n);
+  // PROACTIVE MVSEP rotation (owner order 2026-11-18): when an MVSEP key
+  // is NEARLY exhausted (few separations left today), jump to a fresh key
+  // AT ONCE — do NOT wait until it is fully exhausted and the request
+  // fails/gets stuck. The server's own daily counter (50/day/key) is the
+  // source of truth. If EVERY key is nearly exhausted, keep them all so
+  // the best available is still tried (failover on error still applies).
+  if (p === 'mvsep') {
+    const fresh = order.filter((idx) => {
+      const rem = mvsepKeyRemaining(idx);
+      return rem === null || rem > MVSEP_NEAR_EXHAUST_REMAINING;
+    });
+    if (fresh.length) order = fresh;
+  }
+  for (let oi = 0; oi < order.length; oi++) {
+    const idx = order[oi];
     const cand = candidates[idx];
     try {
       const out = await fn(cand.key, cand.endpoint);
@@ -2128,7 +2156,7 @@ async function withProviderKeyRotation(provider, fn, reqKey, candidatesOverride)
       attempts.push({ key: idx + 1, http: (e && e.httpStatus) || 0, err: String((e && e.message) || e).slice(0, 160) });
       if (!_isRotatableError(e)) { lastErr.attempts = attempts; throw lastErr; }
       keyHealthSet(p, idx, 'exhausted', String((e && e.message) || e).slice(0, 120));
-      if (i < n - 1) console.log('[keys] ' + p + ' key ' + (idx + 1) + '/' + n + ' failed (' + String((e && e.message) || e).slice(0, 120) + '), trying next key');
+      if (oi < order.length - 1) console.log('[keys] ' + p + ' key ' + (idx + 1) + '/' + n + ' failed (' + String((e && e.message) || e).slice(0, 120) + '), trying next key');
     }
   }
   if (lastErr) lastErr.attempts = attempts;
