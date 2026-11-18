@@ -9372,7 +9372,7 @@ async function apiRoute(req, res, urlPath) {
         name: typeof body.name === 'string' ? body.name.trim().slice(0, 100) : '',
         userId: typeof body.userId === 'string' ? body.userId.trim().slice(0, 50) : '',
         mode, title, url,
-        cover: typeof body.cover === 'string' ? body.cover.trim().slice(0, 2000) : '',
+        cover: (typeof body.cover === 'string' && body.cover.trim()) ? body.cover.trim().slice(0, 2000) : (typeof body.image === 'string' ? body.image.trim().slice(0, 2000) : ''),
         aspect, youtube, youtubeChannel, avatar, visibility, likes: 0, views: 0, downloads: 0, likedBy: [], createdAt: now,
       };
       posts.push(p);
