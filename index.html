@@ -3117,6 +3117,14 @@ input[type=range].st-range{accent-color:var(--accent);min-height:32px;cursor:poi
             <div class="fl-field">
               <span class="fl-label" data-i18n="lblSongLyrics">អត្ថបទចម្រៀង</span>
               <textarea class="input" id="songLyrics" rows="5" data-i18n-ph="songLyricsPh" placeholder="សរសេរអត្ថបទចម្រៀង (lyrics) របស់អ្នកនៅទីនេះ..." style="border:1px solid var(--line2);background:var(--field);padding:26px 14px 12px;min-height:110px;border-radius:12px"></textarea>
+              <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:8px">
+                <button type="button" class="btn btn-green" id="aiLyricsBtn" onclick="aiLyricsGenerate()" style="flex:0 0 auto;min-height:44px;padding:10px 18px">✨ <span data-i18n="aiLyricsBtn">AI Lyrics · បង្កើតអត្ថបទ</span></button>
+                <select id="aiLyricsLang" class="input" style="flex:0 0 auto;min-height:44px;padding:10px 12px;width:auto" aria-label="Lyrics language · ភាសាអត្ថបទ">
+                  <option value="kh">ខ្មែរ</option>
+                  <option value="en">English</option>
+                </select>
+                <span id="aiLyricsStatus" style="font-size:0.8125rem;color:var(--muted)"></span>
+              </div>
             </div>
             <div>
               <div style="display:flex;gap:8px">
@@ -4234,6 +4242,7 @@ km:{
  lblSongDur:'រយៈពេលបទ',
  lblSongTitle:'ចំណងជើង',songTitlePh:'ឧ. ឈ្មោះបទចម្រៀងរបស់អ្នក...',
  lblSongLyrics:'អត្ថបទចម្រៀង',songLyricsPh:'សរសេរអត្ថបទចម្រៀង (lyrics) របស់អ្នកនៅទីនេះ...',
+ aiLyricsBtn:'AI Lyrics · បង្កើតអត្ថបទ',aiLyricsBusy:'AI កំពុងសរសេរអត្ថបទ… {s}s · {p}%',aiLyricsDone:'AI សរសេរអត្ថបទរួចហើយ ✓',aiLyricsNeedTitle:'សូមសរសេរចំណងជើងជាមុនសិន',aiLyricsNeedLogin:'សូមចូលគណនេយ្យជាមុនសិន',aiLyricsFail:'បង្កើតអត្ថបទមិនបានទេ — សូមសាកល្បងម្ដងទៀត',
  lblSongStyle:'ស្ទាយបទចម្រៀង',btnAddStyle:'Add',songStylePh:'ឧ. Pop, Rock, សំឡេងខ្មែរបុរាណ...',stylePickPh:'ជ្រើសរើស Style…',
  lblSongVoice:'សំឡេង',voiceMale:'ប្រុស',voiceFemale:'ស្រី',voiceRandom:'ចៃដន្យ',
  lblSongInstr:'Instrumental · ភ្លេងសុទ្ធ',
@@ -4538,6 +4547,7 @@ en:{
  lblSongDur:'Song length',
  lblSongTitle:'Title',songTitlePh:'e.g. Your song title...',
  lblSongLyrics:'Lyrics',songLyricsPh:'Write your song lyrics here...',
+ aiLyricsBtn:'AI Lyrics · Generate lyrics',aiLyricsBusy:'AI is writing lyrics… {s}s · {p}%',aiLyricsDone:'AI wrote the lyrics ✓',aiLyricsNeedTitle:'Please enter a song title first',aiLyricsNeedLogin:'Please sign in first',aiLyricsFail:'Could not generate lyrics — please try again',
  lblSongStyle:'Style',btnAddStyle:'Add',songStylePh:'e.g. Pop, Rock, Khmer traditional...',stylePickPh:'Choose styles…',
  lblSongVoice:'Voice',voiceMale:'Male',voiceFemale:'Female',voiceRandom:'Random',
  lblSongInstr:'Instrumental',
@@ -9082,6 +9092,58 @@ function songStyleAdd(){
   inp.value='';
   songStyleRenderTags();
   try{inp.focus();}catch(e){}
+}
+/* ---- AI Auto Lyrics Generator (OpenRouter Free API) ----
+   User types a Title → taps «AI Lyrics» → the server asks OpenRouter
+   (free model) to write complete lyrics (Verse 1, Chorus, Verse 2,
+   Bridge, Final Chorus) in the chosen language (Khmer default) and the
+   lyrics auto-fill into #songLyrics. 0 MovAi credits. The key never
+   leaves the server. Progress ticks on the status line (seconds + %);
+   on failure the error shows there and tapping the button retries. */
+var aiLyricsBusy=false,aiLyricsTimer=null,aiLyricsSec=0;
+function aiLyricsSetStatus(t,err){
+  var s=document.getElementById('aiLyricsStatus');if(!s)return;
+  s.textContent=t||'';
+  s.style.color=err?'#f87171':'var(--muted)';
+}
+function aiLyricsGenerate(){
+  if(aiLyricsBusy)return;
+  var titleEl=document.getElementById('songTitle');
+  var title=titleEl?(titleEl.value||'').trim():'';
+  if(!title){aiLyricsSetStatus(tx('aiLyricsNeedTitle'),true);try{titleEl&&titleEl.focus();}catch(e){}return;}
+  var email=genUserEmail();
+  if(!email){aiLyricsSetStatus(tx('aiLyricsNeedLogin'),true);try{loginSheetOpen();}catch(e){}return;}
+  var langEl=document.getElementById('aiLyricsLang');
+  var lang=langEl?langEl.value:'kh';
+  if(lang!=='kh'&&lang!=='en')lang='kh';
+  var btn=document.getElementById('aiLyricsBtn');
+  aiLyricsBusy=true;aiLyricsSec=0;
+  if(btn)btn.disabled=true;
+  clearInterval(aiLyricsTimer);
+  aiLyricsTimer=setInterval(function(){
+    aiLyricsSec++;
+    /* % rises toward ~90% while waiting; 100% only when lyrics arrive. */
+    var p=Math.min(90,Math.round(aiLyricsSec*100/(aiLyricsSec+18)));
+    aiLyricsSetStatus(tx('aiLyricsBusy').replace('{s}',String(aiLyricsSec)).replace('{p}',String(p)));
+  },1000);
+  aiLyricsSetStatus(tx('aiLyricsBusy').replace('{s}','0').replace('{p}','0'));
+  var ctrl=null;
+  try{if(window.AbortController){ctrl=new AbortController();setTimeout(function(){try{ctrl.abort();}catch(e){}},70000);}}catch(e){ctrl=null;}
+  var opts={method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:email,title:title,language:lang})};
+  if(ctrl)opts.signal=ctrl.signal;
+  fetch(GEN_API+'/gen/lyrics',opts).then(function(r){return r.json().catch(function(){return null;});}).then(function(d){
+    clearInterval(aiLyricsTimer);aiLyricsBusy=false;if(btn)btn.disabled=false;
+    if(d&&d.ok&&typeof d.lyrics==='string'&&d.lyrics.trim()){
+      var ta=document.getElementById('songLyrics');
+      if(ta){ta.value=d.lyrics.trim();try{ta.dispatchEvent(new Event('input',{bubbles:true}));}catch(e){}}
+      aiLyricsSetStatus(tx('aiLyricsDone'));
+    }else{
+      aiLyricsSetStatus((d&&d.error)||tx('aiLyricsFail'),true);
+    }
+  }).catch(function(){
+    clearInterval(aiLyricsTimer);aiLyricsBusy=false;if(btn)btn.disabled=false;
+    aiLyricsSetStatus(tx('aiLyricsFail'),true);
+  });
 }
 function songStyleRemoveTag(i){
   if(i<0||i>=songStyleTagsArr.length)return;
