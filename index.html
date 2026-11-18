@@ -272,11 +272,9 @@ textarea.input{resize:vertical}
    that strip entirely so the song form starts at the Title. */
 #sec-create[data-cmode="song"] .composer-tools{border-top:none;margin-top:0;padding-top:0}
 #sec-create[data-cmode="image"] .composer,#sec-create[data-cmode="video"] .composer{border-color:rgba(240,100,35,.55)}
-#sec-create[data-cmode="3d"] .composer{border-color:rgba(181,55,242,.55)}
 #sec-create[data-cmode="song"] .kbtn-black,#sec-create[data-cmode="song"] .btn-green{background:linear-gradient(120deg,#a8d61f,#2e7d1e);color:#fff;border-color:transparent}
 #sec-create[data-cmode="image"] .kbtn-black,#sec-create[data-cmode="image"] .btn-green,#sec-create[data-cmode="video"] .kbtn-black,#sec-create[data-cmode="video"] .btn-green{background:linear-gradient(120deg,#f5b81a,#e5322d 62%,#571c14);color:#fff;border-color:transparent}
-#sec-create[data-cmode="3d"] .kbtn-black,#sec-create[data-cmode="3d"] .btn-green{background:linear-gradient(120deg,#b537f2,#1a0533 70%,#000000);color:#fff;border-color:transparent}
-/* ===== Create mode bar — the four create actions as small pills.
+/* ===== Create mode bar — the create actions as small pills.
    It is the ONLY element in the top navigation row (.nav-row)
    above both views (owner order 2026-11-17): the Public/Create
    pill that used to share the row is removed entirely — Public
@@ -284,13 +282,11 @@ textarea.input{resize:vertical}
    The big «Create Song» title bar and the 2×2 mode grid that
    used to sit mid-panel are gone. Each tab keeps its own
    section colour when active — the same gradients the in-panel
-   buttons used: Song green, Video+Image orange-red, 3D
-   purple-black. ===== */
+   buttons used: Song green, Video+Image orange-red. ===== */
 .create-modebar{display:flex;gap:6px;margin-top:14px}
 .create-modebar .kbtn{flex:1 1 0;min-width:0;min-height:38px;padding:8px 4px;font-size:0.78125rem;border-radius:999px;white-space:nowrap;overflow:hidden}
 .create-modebar #genTabSong.kbtn-black{background:linear-gradient(120deg,#a8d61f,#2e7d1e);color:#fff;border-color:transparent}
 .create-modebar #genTabVI.kbtn-black{background:linear-gradient(120deg,#f5b81a,#e5322d 62%,#571c14);color:#fff;border-color:transparent}
-.create-modebar #genTab3d.kbtn-black{background:linear-gradient(120deg,#b537f2,#1a0533 70%,#000000);color:#fff;border-color:transparent}
 /* ===== Top navigation row (owner order 2026-11-17) =====
    The row holds ONLY the create mode bar, full width — the
    Public/Create pill is removed from the top entirely (both
@@ -310,7 +306,6 @@ textarea.input{resize:vertical}
    same names, same colours. */
 .nav-row .create-modebar #genTabSong{flex-grow:1.45}
 .nav-row .create-modebar #genTabVI{flex-grow:1.3}
-.nav-row .create-modebar #genTab3d{flex-grow:1.05}
 .nav-row .create-modebar #genTabPost{flex-grow:0.8}
 @media(max-width:480px){
  .nav-row .create-modebar{gap:4px}
@@ -415,14 +410,6 @@ textarea.input{resize:vertical}
 .tool-group{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 .tool-group>div{display:flex;gap:6px;flex-wrap:wrap}
 .composer #genVideoOpts{flex-basis:100%;flex-wrap:wrap;gap:10px 18px;align-items:center}
-.d3-tabs{display:flex;gap:10px;margin-top:18px}
-.d3-tabs .kbtn{flex:1 1 0;min-width:0;padding:13px 6px;font-size:0.84375rem;white-space:normal;line-height:1.35;min-height:48px}
-@media(max-width:480px){.d3-tabs .kbtn{font-size:0.71875rem;padding:13px 2px}}
-.d3-drop{display:block;border:1.5px dashed rgba(255,255,255,.28);border-radius:14px;padding:30px 16px;text-align:center;cursor:pointer;color:var(--text2);font-size:0.9375rem;line-height:1.6;margin-top:14px;overflow-wrap:break-word}
-#genD3ProvSlot .kbtn{flex:1 1 0;min-width:0;white-space:normal;line-height:1.3;text-align:center;min-height:42px}
-.d3-drop:hover{border-color:var(--accent-text)}
-.d3-preview{width:100%;border-radius:14px;display:block;margin-top:12px}
-.d3-step{font-size:0.8125rem;font-weight:700;color:var(--accent-text);margin-top:16px}
 .err-box{margin-top:10px;border:1px solid rgba(248,113,113,.45);background:rgba(248,113,113,.07);border-radius:12px;padding:12px}
 html[data-mode="light"] .err-box{background:rgba(220,38,38,.05);border-color:rgba(220,38,38,.35)}
 .err-head{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
@@ -526,7 +513,7 @@ html[data-mode="light"] .err-title{color:#b91c1c}
    (object-fit:cover) instead of standing tall and overflowing down
    the card. Fullscreen view still shows the whole original. */
 .hist-carousel .hist-media{width:calc(100% + 28px);max-width:none;margin-left:-14px;margin-right:-14px;border-radius:8px;aspect-ratio:16/9;object-fit:cover}
-img.hist-media,.d3-preview{cursor:zoom-in}
+img.hist-media{cursor:zoom-in}
 /* ===== MV player (owner order 2026-11-17) =====
    MV is a VIEW, not a video-file export: tapping «MV» on a song
    opens a setup sheet (screen format + background), then a
@@ -2256,7 +2243,6 @@ html[data-mode="light"] .chat-bubble.err{color:#b91c1c;background:rgba(220,38,38
 .chat-send:disabled{opacity:.45;cursor:not-allowed}
 /* ===== Light mode surfaces ===== */
 html[data-mode="light"] .drawer-backdrop{background:rgba(20,22,40,.35)}
-html[data-mode="light"] .d3-drop{border-color:rgba(20,22,30,.3)}
 html[data-mode="light"] #genProviderDrop,html[data-mode="light"] #genMhModelDrop,html[data-mode="light"] #genMhVidModelDrop,html[data-mode="light"] #genSongModelDrop{background:#ffffff !important;border-color:rgba(20,22,30,.12) !important;box-shadow:0 16px 40px rgba(20,22,40,.16)}
 html[data-mode="light"] [style*="color:#9a9ea6"]{color:#5f646e !important}
 html[data-mode="light"] [style*="background:rgba(255,255,255,.1)"]{background:rgba(20,22,30,.12) !important}
@@ -2399,7 +2385,7 @@ html[data-smooth="1"] .brand-frame,html[data-smooth="1"] .acct-chip,html[data-sm
 @keyframes movaiBlurIn{from{opacity:0;filter:blur(14px)}to{opacity:1;filter:blur(0)}}
 .drawer{filter:blur(14px);opacity:0;transition:transform .28s ease,filter .28s ease,opacity .28s ease}
 .drawer.shown{filter:blur(0);opacity:1}
-#genProviderDrop[style*="display: block"],#genMhModelDrop[style*="display: block"],#genMhVidModelDrop[style*="display: block"],#genNovaiModelDrop[style*="display: block"],#genSunoModelDrop[style*="display: block"],#genSongModelDrop[style*="display: block"],#songStylePresetDrop[style*="display: block"],#genErrBox[style*="display: block"],#d3ErrBox[style*="display: block"]{animation:movaiBlurIn .25s ease-out both}
+#genProviderDrop[style*="display: block"],#genMhModelDrop[style*="display: block"],#genMhVidModelDrop[style*="display: block"],#genNovaiModelDrop[style*="display: block"],#genSunoModelDrop[style*="display: block"],#genSongModelDrop[style*="display: block"],#songStylePresetDrop[style*="display: block"],#genErrBox[style*="display: block"]{animation:movaiBlurIn .25s ease-out both}
 /* ===== SONAR style (owner order 2026-11-17) =====
    STYLE ONLY — no MovAi content or function changes. The
    owner pointed at the SONAR screenshot and asked for its
@@ -2897,7 +2883,6 @@ input[type=range].st-range{accent-color:var(--accent);min-height:32px;cursor:poi
     <button class="nav-desktop-only" onclick="dockGo('public')"><span data-i18n="navPublic">សាធារណៈ</span> <small data-i18n="navPublicSub">Public</small></button>
     <button onclick="menuGo('sec-create','song')"><span data-i18n="navModeSong">បង្កើតបទចម្រៀង</span></button>
     <button onclick="menuGo('sec-create','video')"><span data-i18n="navModeVI">វីដេអូ+រូបភាព</span></button>
-    <button onclick="menuGo('sec-create','3d')"><span data-i18n="navMode3d">រូបភាព 3D</span></button>
     <button onclick="menuGo('sec-studio')"><span>AI Studio</span><span id="stNavPrep" class="st-nav-prep" style="display:none"></span></button>
     <button onclick="menuGo('sec-history')"><span data-i18n="navHistory">ប្រវត្តិ</span> <small>History</small></button>
     <button onclick="menuGo('sec-playlist')"><span data-i18n="plTitle">Playlist · បញ្ជីចម្រៀង</span> <small>Playlist</small></button>
@@ -2975,8 +2960,7 @@ input[type=range].st-range{accent-color:var(--accent);min-height:32px;cursor:poi
      (owner clarification 2026-11-17, do not confuse the two):
      · In the PUBLIC / feed view the buttons are post-type FILTERS,
        never a create entry — «Create Song» shows only song posts,
-       «Video+Image» only video+image posts, «3D Image» only 3D
-       posts, and «+ Post» opens the publish flow. Tapping one
+       «Video+Image» only video+image posts, and «+ Post» opens the publish flow. Tapping one
        NEVER switches to the Create view.
      · Creating happens ONLY through the dock «＋» (Create); inside
        the Create view the same bar picks the create mode as before.
@@ -2985,7 +2969,6 @@ input[type=range].st-range{accent-color:var(--accent);min-height:32px;cursor:poi
   <div class="create-modebar" role="group" aria-label="Create mode">
     <button class="kbtn kbtn-black" id="genTabSong" onclick="modebarTap('song')" data-i18n="navModeSong">បង្កើតបទចម្រៀង</button>
     <button class="kbtn kbtn-white" id="genTabVI" onclick="modebarTap('vi')" data-i18n="navModeVI">វីដេអូ+រូបភាព</button>
-    <button class="kbtn kbtn-white" id="genTab3d" onclick="modebarTap('3d')" data-i18n="navMode3d">រូបភាព 3D</button>
     <button class="kbtn kbtn-post" id="genTabPost" onclick="postFlowOpen()" data-i18n="postBtn">＋ ផុស</button>
   </div>
 </div>
@@ -3022,10 +3005,6 @@ input[type=range].st-range{accent-color:var(--accent);min-height:32px;cursor:poi
             <span style="font-size:0.75rem;color:#9a9ea6">▼</span>
           </button>
           <div id="genProviderDrop" style="display:none;position:absolute;left:0;right:0;top:100%;z-index:30;background:#1a1c21;border:1px solid rgba(255,255,255,.12);border-radius:12px;margin-top:6px;overflow-y:auto;max-height:11.25rem;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;touch-action:pan-y;box-shadow:0 16px 40px rgba(0,0,0,.5)"></div>
-          <div id="genD3ProvSlot" style="display:none;align-items:center;gap:8px;flex-wrap:nowrap;width:100%">
-            <button class="kbtn kbtn-black" id="genD3ProvHunyuan" onclick="d3SetProvider('hunyuan3d')">Hunyuan3D</button>
-            <button class="kbtn kbtn-white" id="genD3ProvMpx" onclick="d3SetProvider('masterpiecex')">Masterpiece X</button>
-          </div>
         </div>
         <div id="genSongModelWrap" style="display:none">
           <button type="button" class="input" id="genSongModelField" onclick="genToggleSongModels()" style="display:none;justify-content:space-between;align-items:center;gap:10px;cursor:pointer;text-align:left;width:100%" aria-label="Song model">
@@ -3124,41 +3103,6 @@ input[type=range].st-range{accent-color:var(--accent);min-height:32px;cursor:poi
             <div id="genSongDur"></div>
           </div>
         </div>
-      </div>
-      <div id="d3Inline" style="display:none;margin-top:4px">
-    <div class="d3-tabs">
-      <button class="kbtn kbtn-black" id="d3TabImg" onclick="d3SetOpt('image')" data-i18n="d3TabImg">ជម្រើស ១ · ដាក់រូបភាព</button>
-      <button class="kbtn kbtn-white" id="d3TabTxt" onclick="d3SetOpt('text')" data-i18n="d3TabTxt">ជម្រើស ២ · អត្ថបទ → រូបភាព</button>
-    </div>
-    <div id="d3OptImage">
-      <label class="d3-drop" for="d3File" data-i18n="d3Drop">ដាក់រូបភាពរបស់អ្នកនៅទីនេះ — ចុចដើម្បីជ្រើសរូប (JPG / PNG / WebP)<br><span style="font-size:0.8125rem;color:#9a9ea6">រូបវត្ថុតែមួយ ផ្ទៃក្រោយសាមញ្ញ ល្អបំផុត</span></label>
-      <input type="file" id="d3File" accept="image/*" style="display:none" onchange="d3FileChange(this)">
-      <img class="d3-preview" id="d3ImgPreview" alt="រូបភាពដែលបានដាក់" data-i18n-alt="altUploaded" style="display:none" onclick="if(this.src)fsOpen(this.src,'image')">
-    </div>
-    <div id="d3OptText" style="display:none">
-      <p class="d3-step" data-i18n="d3Step1">ជំហាន ១ · ប្រើ Prompt នៅខាងលើ បង្កើតរូបភាពសិន</p>
-      <button class="btn btn-green btn-block" id="d3GenImgBtn" onclick="d3GenImage()" style="margin-top:10px" data-i18n="d3GenImg">បង្កើតរូបភាព</button>
-      <img class="d3-preview" id="d3TxtPreview" alt="រូបភាពដែលបានបង្កើតពីអត្ថបទ" data-i18n-alt="altFromText" style="display:none" onclick="if(this.src)fsOpen(this.src,'image')">
-      <p class="d3-step" id="d3Step2" style="display:none" data-i18n="d3Step2">ជំហាន ២ · រូបភាពរួចរាល់ — ចុចប៊ូតុងខាងក្រោមដើម្បីធ្វើជា 3D</p>
-    </div>
-    <button class="btn btn-green btn-block" id="d3MakeBtn" onclick="d3Make()" style="margin-top:20px" data-i18n="d3Make">ធ្វើជា 3D</button>
-    <p id="d3Msg" style="font-size:0.8125rem;margin-top:12px;min-height:18px"></p>
-    <div id="d3ErrBox" class="err-box" style="display:none">
-      <div class="err-head"><span class="err-title" data-i18n="errTitle">បញ្ហាដែលកើតឡើង — ចម្លងទុកផ្ញើឲ្យអ្នកជួយមើល</span><button type="button" class="err-copy-btn" onclick="copyErrText('d3ErrText',this,'d3CopyMsg')" data-i18n="btnCopy">ចម្លងបញ្ហា</button></div>
-      <textarea id="d3ErrText" class="err-text" readonly rows="5" aria-label="Error details — copy this problem"></textarea>
-      <p id="d3CopyMsg" class="err-copy-msg" aria-live="polite"></p>
-    </div>
-    <div id="d3Prog" style="display:none;margin-top:10px">
-      <div class="blur-stage" id="d3BlurStage" style="aspect-ratio:1/1;max-width:340px;margin:0 auto">
-        <div class="blur-fill" id="d3BlurFill"></div>
-        <img class="blur-img" id="d3BlurImg" alt="" style="display:none">
-        <div class="blur-pct" id="d3BlurPct">0%</div>
-      </div>
-      <div style="display:flex;justify-content:space-between;font-size:0.8125rem;margin-top:8px"><span id="d3ProgTxt" data-i18n="d3Working">កំពុងធ្វើ…</span><b id="d3ProgSec">0s</b></div>
-    </div>
-    <div id="d3Result" style="margin-top:14px"></div>
-    <p id="d3LinkHunyuan" style="margin-top:14px;display:none"><a href="https://cloud.tencent.com" target="_blank" rel="noopener" style="color:var(--accent-text);font-weight:700;font-size:0.875rem;text-decoration:none" data-i18n="d3LinkHunyuan">បើកវេបសាយ Hunyuan3D (Tencent Cloud) ដើម្បីយក API Key ↗</a></p>
-    <p id="d3LinkMpx" style="margin-top:14px;display:none"><button type="button" onclick="d3OpenMpxKey()" style="background:none;border:none;padding:0;color:var(--accent-text);font-weight:700;font-size:0.875rem;font-family:inherit;cursor:pointer;min-height:32px" data-i18n="d3MpxKeyBtn">ដាក់ Key Masterpiece X</button><span style="color:#62666e;margin:0 10px">·</span><a href="https://www.masterpiecex.com" target="_blank" rel="noopener" style="color:var(--accent-text);font-weight:700;font-size:0.875rem;text-decoration:none" data-i18n="d3LinkMpx">បើកវេបសាយ Masterpiece X ↗</a></p>
       </div>
       <div id="genBtnRow" style="display:flex;gap:10px;margin-top:12px">
         <button class="btn btn-green" id="genBtn" onclick="genGenerate()" style="flex:1" data-i18n="btnGenerate">បង្កើត</button>
@@ -4035,13 +3979,10 @@ input[type=range].st-range{accent-color:var(--accent);min-height:32px;cursor:poi
     <span class="chat-head-main"><span class="chat-head-title"><span id="chatUserName">Mov<span class="chat-name-lime">Ai</span> AI</span><span class="chat-online-dot" role="status" aria-label="អនឡាញ · Online"></span></span><span class="chat-head-sub" style="display:block">MovAi AI · ជំនួយការ AI — សួរអ្វីក៏បានអំពី MovAi</span></span>
     <button type="button" class="chat-close" onclick="aiChatClose()" aria-label="បិទឆាត · Close">✕</button>
   </div>
-  <div class="chat-voice-row">
-    <span class="chat-voice-label">🔊 សំឡេងនិយាយ · Voice</span>
-    <span class="chat-voice-toggle" role="group" aria-label="ជ្រើសសំឡេង · Choose voice">
-      <button type="button" id="chatVoiceMale" onclick="aiChatSetVoice('male')">ប្រុស · Piseth</button>
-      <button type="button" id="chatVoiceFemale" onclick="aiChatSetVoice('female')">ស្រី · Sreymom</button>
-    </span>
-  </div>
+  <!-- Voice picker removed (owner order 2026-11-18): no Sreymom /
+       Piseth choice is shown; the Listen button uses the single
+       default voice (aiChatVoice, 'male' unless the user picked one
+       before). -->
   <div class="chat-msgs" id="chatMsgs">
     <div class="chat-empty" id="chatEmpty"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 7V3"/><circle cx="12" cy="2.4" r="0.6" fill="currentColor"/><rect x="4.5" y="7" width="15" height="11.5" rx="3.5"/><path d="M2.5 12.5v2"/><path d="M21.5 12.5v2"/><circle cx="9.3" cy="12.3" r="0.4" fill="currentColor"/><circle cx="14.7" cy="12.3" r="0.4" fill="currentColor"/><path d="M9.8 15.6c.7.6 1.4.9 2.2.9s1.5-.3 2.2-.9"/></svg><p>សួរសំណួររបស់អ្នកនៅខាងក្រោម<br>AI នឹងឆ្លើយជូនភ្លាមៗ</p></div>
     <div class="chat-typing" id="chatTyping" role="status"><span class="tdots" aria-hidden="true"><i></i><i></i><i></i></span><span>កំពុងស្កេនសំណួរ…</span></div>
@@ -4961,8 +4902,6 @@ function applyLang(){
   var found=false;for(var m=0;m<list.length;m++)if(list[m].id===pp)found=true;
   if(found)genSetProvider(pp);
   genRenderKeys();
-  d3SetProvider(d3.provider);
-  d3SetOpt(d3.opt);
   acctRender();
   try{pubFollowRender();}catch(e){}
   try{histRender();}catch(e){}
@@ -7005,8 +6944,6 @@ var GEN_KEY_PROVIDERS=[
  {id:'suno',name:'MovAi',url:'https://suno.com',fields:[{k:'key',ph:'API Key'},{k:'endpoint',ph:'API Endpoint (https://...)'}],hint:{km:'សម្រាប់បទចម្រៀងតែប៉ុណ្ណោះ។ MovAi មិនមាន API ផ្លូវការសាធារណៈទេ — ដាក់ API Key និង Endpoint របស់សេវា MovAi API ដែលអ្នកប្រើ។ Model v6។',en:'For songs only. MovAi has no official public API — enter the API key and endpoint of the MovAi API service you use. Model v6.'}},
  {id:'acemusic',name:'ACE Music',url:'https://acemusic.ai/playground/api-key',fields:[{k:'key',ph:'API Key'}],hint:{km:'សម្រាប់បទចម្រៀងតែប៉ុណ្ណោះ។ ចុះឈ្មោះហ្វ្រីនៅ acemusic.ai រួចយក API Key របស់អ្នកផ្ទាល់មកដាក់ទីនេះ — ហ្វ្រីរហូត អត់កាត់ quota អត់ត្រូវកាត។ MovAi មិនយក Key ឲ្យអ្នកដោយអូតូទេ។',en:'For songs only. Sign up free at acemusic.ai and paste your own API key here — free forever, no quota, no card needed. MovAi never fetches a key for you automatically.'}},
  {id:'musicapi',name:'MusicAPI',url:'https://musicapi.ai',fields:[{k:'key',ph:'API Key'}],hint:{km:'សម្រាប់បទចម្រៀងតែប៉ុណ្ណោះ។ ចុះឈ្មោះហ្វ្រីនៅ musicapi.ai (អត់ត្រូវកាត) យក API Key របស់អ្នកផ្ទាល់មកដាក់ទីនេះ — MovAi មិនយក Key ឲ្យអ្នកដោយអូតូទេ។',en:'For songs only. Sign up free at musicapi.ai (no card) Paste your own API key here — MovAi never fetches a key for you automatically.'}},
- {id:'masterpiecex',name:'Masterpiece X',url:'https://www.masterpiecex.com',fields:[{k:'key',ph:'API Key'}],hint:{km:'សម្រាប់រូប 3D Design តែប៉ុណ្ណោះ — យក API Key ពី masterpiecex.com ក្រោយចុះឈ្មោះ។',en:'For 3D Design only — get an API key from masterpiecex.com after signing up.'}},
- {id:'hunyuan3d',name:'Hunyuan3D',url:'https://cloud.tencent.com',fields:[{k:'secretId',ph:'Secret ID'},{k:'secretKey',ph:'Secret Key'}],hint:{km:'សម្រាប់រូប 3D Design តែប៉ុណ្ណោះ — យក Secret ID + Secret Key ពី Tencent Cloud។',en:'For 3D Design only — get a Secret ID + Secret Key from Tencent Cloud.'}}
 ];
 var gen={mode:'image',provider:'pollinations',aspect:'16:9',duration:5,res:720,songDur:3,songVoice:'random',songInstr:false,progTimer:null,progSec:0,progPct:0,keyIdx:{},lastImg:null,lastVideo:null,lastSongs:null,mhModel:'z-image-turbo',mhVidModel:'default',sunoModel:'v6',novaiImgModel:'cogview-3-flash',novaiVidModel:'cogvideox-flash'};
 try{var _mhm=localStorage.getItem('movai-mh-img-model');if(_mhm)gen.mhModel=_mhm;}catch(e){}
@@ -7330,7 +7267,6 @@ async function genBusyWait(){
 function modebarTap(kind){
   if(typeof APP_VIEW!=='undefined'&&APP_VIEW==='create'){
     if(kind==='song')genSetMode('song');
-    else if(kind==='3d')genSetMode('3d');
     else genSectionVI();
     return;
   }
@@ -7342,22 +7278,22 @@ function modebarTap(kind){
 function modebarSync(){
   var onCreate=(typeof APP_VIEW!=='undefined'&&APP_VIEW==='create');
   var active;
-  if(onCreate)active=(gen.mode==='song')?'song':(gen.mode==='3d')?'3d':'vi';
+  if(onCreate)active=(gen.mode==='song')?'song':'vi';
   else active=(typeof pubFilter!=='undefined'&&pubFilter==='song')?'song':(typeof pubFilter!=='undefined'&&pubFilter==='3d')?'3d':'vi';
   var tsg=document.getElementById('genTabSong');if(tsg)tsg.className=active==='song'?'kbtn kbtn-black':'kbtn kbtn-white';
   var tvi=document.getElementById('genTabVI');if(tvi)tvi.className=active==='vi'?'kbtn kbtn-black':'kbtn kbtn-white';
-  var t3=document.getElementById('genTab3d');if(t3)t3.className=active==='3d'?'kbtn kbtn-black':'kbtn kbtn-white';
 }
 function genSectionVI(){
   genSetMode(gen.mode==='video'?'image':'video');
 }
 function genSetMode(m){
+  if(m==='3d')m='image';
   var prevMode=gen.mode;
   gen.mode=m;genMsg('');
   /* Create header (owner order 2026-11-17): the section name at
      the top of the panel + the section's own colour scheme. */
   var _sc=document.getElementById('sec-create');if(_sc)_sc.setAttribute('data-cmode',m);
-  var _ct=document.getElementById('createTitle');if(_ct)_ct.textContent=m==='song'?'Create Song':m==='3d'?'3D Image':'Video+Image';
+  var _ct=document.getElementById('createTitle');if(_ct)_ct.textContent=m==='song'?'Create Song':'Video+Image';
   /* Smart activation: a REAL mode change puts the previous mode's
      players to sleep — result songs stop when the song section is
      left, and any playing result video pauses. (Re-selecting the
@@ -7371,15 +7307,13 @@ function genSetMode(m){
   if(m==='song')songModelRestore();
   document.getElementById('genVideoOpts').style.display=m==='video'?'flex':'none';
   var so=document.getElementById('genSongOpts');if(so)so.style.display=m==='song'?'flex':'none';
-  var d3s=document.getElementById('genD3ProvSlot');if(d3s)d3s.style.display=m==='3d'?'flex':'none';
-  var d3i=document.getElementById('d3Inline');if(d3i)d3i.style.display=m==='3d'?'block':'none';
-  var gb=document.getElementById('genBtnRow');if(gb)gb.style.display=m==='3d'?'none':'flex';
+  var gb=document.getElementById('genBtnRow');if(gb)gb.style.display='flex';
   var ab=document.getElementById('genAutoBtn');if(ab)ab.style.display=m==='song'?'none':'';
   var gp=document.getElementById('genPrompt');
-  if(gp){gp.style.display=m==='song'?'none':'block';gp.placeholder=m==='3d'?tx('promptPh3d'):tx('promptPh');}
+  if(gp){gp.style.display=m==='song'?'none':'block';gp.placeholder=tx('promptPh');}
   var gl=document.getElementById('genPromptLabel');
-  if(gl){gl.style.display=m==='song'?'none':'block';gl.textContent=m==='3d'?tx('promptLabel3d'):tx('promptLabel');}
-  var ag=document.getElementById('genAspectGroup');if(ag)ag.style.display=(m==='3d'||m==='song')?'none':'flex';
+  if(gl){gl.style.display=m==='song'?'none':'block';gl.textContent=tx('promptLabel');}
+  var ag=document.getElementById('genAspectGroup');if(ag)ag.style.display=m==='song'?'none':'flex';
   var sb=document.getElementById('storyBox');if(sb)sb.style.display=m==='video'?'block':'none';
   genRenderProviders();genCloseProviders();genRenderOptions();
   if(m==='song')songRenderOpts();
@@ -7405,14 +7339,14 @@ function genRenderProviders(){
   var list=genProvList();
   var cur=null;
   for(var i=0;i<list.length;i++)if(list[i].id===gen.provider)cur=list[i];
-  if(gen.mode!=='3d'&&(!cur||cur.hidden||!provSelectable(cur))){
+  if(!cur||cur.hidden||!provSelectable(cur)){
     var fb=null;
     for(var j=0;j<list.length;j++)if(!list[j].hidden&&provSelectable(list[j])){fb=list[j];break;}
     if(fb){gen.provider=fb.id;cur=fb;}
   }
   var pf=document.getElementById('genProviderField');
   if(pf){
-    if(gen.mode==='3d'||!cur){pf.style.display='none';}
+    if(!cur){pf.style.display='none';}
     else{
       pf.style.display='flex';
       var nm=document.getElementById('genProviderFieldName');if(nm)nm.innerHTML=provDispHtml(cur);
@@ -7437,7 +7371,7 @@ function genRenderProviders(){
     }
   }
   var drop=document.getElementById('genProviderDrop');
-  if(drop&&gen.mode!=='3d'&&cur){
+  if(drop&&cur){
     drop.innerHTML=list.map(function(p){
       if(p.hidden)return '';
       var al=provAdminLocked(p),lk=!!p.locked;
@@ -7636,11 +7570,9 @@ function genKeyProviderCard(kp){
 function genRenderKeys(){
   var box=document.getElementById('genKeys');if(!box)return;
   var html='';
-  GEN_KEY_PROVIDERS.forEach(function(kp){if(kp.id==='masterpiecex'||kp.id==='hunyuan3d')html+=genKeyProviderCard(kp);});
   html+=genKeyCard('pollinations','Pollinations',tx('noKeyNeeded'),'<p>'+tx('pollinationsBody')+'</p>');
   html+=genKeyCard('puter','Puter.js',tx('noKeyNeeded'),'<p>'+tx('puterBody')+'</p><p style="margin-top:8px"><a href="https://puter.com" target="_blank" rel="noopener" style="color:var(--accent-text);font-weight:700;text-decoration:none">'+tx('openPuterSite')+'</a></p><p id="puterStatus" style="font-size:0.8125rem;margin-top:8px">'+tx('puterChecking')+'</p><div style="margin-top:8px"><button class="kbtn kbtn-black" id="puterSignInBtn" onclick="genPuterSignIn()">'+tx('puterSignInBtn')+'</button> <button class="kbtn kbtn-white" id="puterSignOutBtn" style="display:none" onclick="genPuterSignOut()">'+tx('puterSignOutBtn')+'</button></div>');
   GEN_KEY_PROVIDERS.forEach(function(kp){
-    if(kp.id==='masterpiecex'||kp.id==='hunyuan3d')return;
     html+=genKeyProviderCard(kp);
   });
   box.innerHTML=html;
@@ -7687,7 +7619,6 @@ async function genGenerate(){
      Generate button stays gated until the account lands. */
   if(!genUserEmail()){genMsg(tx('acctLoading'));genGateSync();return;}
   if(genAnyBusy)return;
-  if(gen.mode==='3d')return;
   var prompt;
   if(gen.mode==='song'){
     prompt=(document.getElementById('songLyrics').value||'').trim();
@@ -10829,249 +10760,6 @@ async function epGenerate(i){
   }
 }
 
-/* ================= 3D Design workspace =================
-   2 options: (1) upload an image, (2) text -> image (Pollinations) first.
-   Then the image is sent to the Hunyuan3D API (Tencent Cloud, TC3-HMAC-SHA256
-   signed in the browser with the visitor's own Secret ID + Secret Key from
-   the drawer's API Keys) as SubmitHunyuanTo3DProJob with ImageBase64, polled
-   via QueryHunyuanTo3DProJob until DONE, and the ResultFile3Ds are offered
-   as downloads. */
-var d3={opt:'image',imgData:null,progTimer:null,progSec:0,provider:'hunyuan3d'};
-function d3SetProvider(p){
-  d3.provider=p;
-  var ph=document.getElementById('genD3ProvHunyuan'),pm=document.getElementById('genD3ProvMpx');
-  if(ph)ph.className=p==='hunyuan3d'?'kbtn kbtn-black':'kbtn kbtn-white';
-  if(pm)pm.className=p==='masterpiecex'?'kbtn kbtn-black':'kbtn kbtn-white';
-  var lh=document.getElementById('d3LinkHunyuan'),lm=document.getElementById('d3LinkMpx');
-  if(lh)lh.style.display='none';
-  if(lm)lm.style.display='none';
-}
-function d3OpenMpxKey(){
-  genKeyOpen['masterpiecex']=true;genRenderKeys();openMenu();
-  setTimeout(function(){var c=document.getElementById('keyAcc-masterpiecex');if(c)c.scrollIntoView({block:'center'});},350);
-}
-function d3MakeMpx(){
-  var ks=genKeysGet('masterpiecex');
-  if(!ks.length){
-    /* Masterpiece X keys are managed by the Admin on the server now —
-       there is no key for the user to add in this browser. */
-    d3Msg(tx('d3MsgServer3d'));
-    return;
-  }
-  d3Msg(tx('d3MsgMpxOpening'));
-  window.open('https://www.masterpiecex.com','_blank');
-}
-function d3Msg(t){var el=document.getElementById('d3Msg');if(el)el.textContent=t;updateErrBox('d3ErrBox','d3ErrText','d3CopyMsg',t,'3D Design · '+((typeof d3!=='undefined'&&d3.provider)?d3.provider:''));}
-function d3ProgTxt(t){var el=document.getElementById('d3ProgTxt');if(el)el.textContent=t;}
-function d3StartProg(txt){
-  d3.progSec=0;
-  var w=document.getElementById('d3Prog');if(w)w.style.display='block';
-  d3ProgTxt(txt||tx('d3Working'));
-  var s=document.getElementById('d3ProgSec');if(s)s.textContent='0s';
-  var im=document.getElementById('d3BlurImg');
-  if(im){im.removeAttribute('src');im.style.display='none';}
-  d3StageBlur(0);
-  clearInterval(d3.progTimer);
-  d3.progTimer=setInterval(function(){
-    d3.progSec++;
-    var s2=document.getElementById('d3ProgSec');if(s2)s2.textContent=d3.progSec+'s';
-    /* Same honest waiting curve as image / video — never 95%+ while
-       Hunyuan3D has not returned a real result. */
-    d3StageBlur(honestWaitPct(d3.progSec));
-  },1000);
-}
-/* 3D progress is a picture too: heavily blurred at the start, the blur
-   melts away as the job advances, the running percentage sits in the
-   centre of the picture, and the finished preview lands with the
-   .media-reveal sharpen. */
-function d3StageBlur(pct){
-  var f=document.getElementById('d3BlurFill');
-  if(f)f.style.filter='blur('+Math.max(5,26-(21*pct/100)).toFixed(1)+'px) saturate(1.25)';
-  var im=document.getElementById('d3BlurImg');
-  if(im&&im.style.display!=='none')im.style.filter='blur('+Math.max(0,26-(27*pct/100)).toFixed(1)+'px)';
-  /* Percentage centred on the picture, same as image / video. */
-  var pc=document.getElementById('d3BlurPct');
-  if(pc)pc.textContent=Math.round(pct)+'%';
-}
-function d3StageSetImage(url){
-  var im=document.getElementById('d3BlurImg');if(!im||!url)return;
-  im.onload=function(){im.style.display='block';d3StageBlur(honestWaitPct(d3.progSec));};
-  im.onerror=function(){im.style.display='none';};
-  im.src=url;
-}
-function d3StopProg(){clearInterval(d3.progTimer);var w=document.getElementById('d3Prog');if(w)w.style.display='none';}
-function d3SetOpt(o){
-  d3.opt=o;
-  var ti=document.getElementById('d3TabImg'),tt=document.getElementById('d3TabTxt');
-  if(ti)ti.className=o==='image'?'kbtn kbtn-black':'kbtn kbtn-white';
-  if(tt)tt.className=o==='text'?'kbtn kbtn-black':'kbtn kbtn-white';
-  var oi=document.getElementById('d3OptImage'),ot=document.getElementById('d3OptText');
-  if(oi)oi.style.display=o==='image'?'block':'none';
-  if(ot)ot.style.display=o==='text'?'block':'none';
-}
-function d3FileChange(inp){
-  var f=inp.files&&inp.files[0];if(!f)return;
-  var r=new FileReader();
-  r.onload=function(){
-    d3.imgData=String(r.result);
-    var im=document.getElementById('d3ImgPreview');
-    if(im){im.src=d3.imgData;im.style.display='block';}
-    d3Msg(tx('d3MsgUploaded'));
-  };
-  r.readAsDataURL(f);
-}
-async function d3GenImage(){
-  if(!requireLogin())return;
-  var prompt=(document.getElementById('genPrompt').value||'').trim();
-  if(!prompt){d3Msg(tx('d3MsgNeedPrompt'));return;}
-  var btn=document.getElementById('d3GenImgBtn');btn.disabled=true;
-  d3Msg('');d3StartProg(tx('d3ProgImg'));
-  try{
-    var url='https://image.pollinations.ai/prompt/'+encodeURIComponent(prompt+', single object centered, plain solid background, studio product photo')+'?width=768&height=768&nologo=true&seed='+Math.floor(Math.random()*100000);
-    d3StageSetImage(url);
-    var r=await fetch(url);if(!r.ok)throw new Error('Pollinations: HTTP '+r.status);
-    var blob=await r.blob();
-    var dataUrl=await new Promise(function(res,rej){var fr=new FileReader();fr.onload=function(){res(String(fr.result));};fr.onerror=function(){rej(new Error(tx('errReadImg')));};fr.readAsDataURL(blob);});
-    d3.imgData=dataUrl;
-    var im=document.getElementById('d3TxtPreview');
-    if(im){im.src=dataUrl;im.style.display='block';im.classList.remove('media-reveal');void im.offsetWidth;im.classList.add('media-reveal');}
-    var s2=document.getElementById('d3Step2');if(s2)s2.style.display='block';
-    d3StageBlur(100);
-    d3Msg(tx('d3MsgImgReady'));
-  }catch(e){
-    d3Msg(tx('errMakeImgPrefix')+(e&&e.message?e.message:String(e)));
-  }
-  finally{d3StopProg();btn.disabled=false;}
-}
-function d3Downscale(dataUrl){
-  return new Promise(function(res){
-    var img=new Image();
-    img.onload=function(){
-      var max=1024,w=img.naturalWidth,h=img.naturalHeight;
-      var s=Math.min(1,max/Math.max(w,h));
-      if(s>=1){res(dataUrl);return;}
-      var c=document.createElement('canvas');
-      c.width=Math.round(w*s);c.height=Math.round(h*s);
-      var ctx=c.getContext('2d');
-      ctx.fillStyle='#ffffff';ctx.fillRect(0,0,c.width,c.height);
-      ctx.drawImage(img,0,0,c.width,c.height);
-      res(c.toDataURL('image/jpeg',0.9));
-    };
-    img.onerror=function(){res(dataUrl);};
-    img.src=dataUrl;
-  });
-}
-async function d3Sha256Hex(str){
-  var buf=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(str));
-  return Array.from(new Uint8Array(buf)).map(function(b){return b.toString(16).padStart(2,'0');}).join('');
-}
-async function d3HmacRaw(key,msg){
-  var k=await crypto.subtle.importKey('raw',key,{name:'HMAC',hash:'SHA-256'},false,['sign']);
-  return new Uint8Array(await crypto.subtle.sign('HMAC',k,new TextEncoder().encode(msg)));
-}
-function d3Hex(arr){return Array.from(arr).map(function(b){return b.toString(16).padStart(2,'0');}).join('');}
-async function d3TcCall(action,payload,cred){
-  var host='hunyuan.intl.tencentcloudapi.com',service='hunyuan',version='2023-09-01',region='ap-guangzhou';
-  var ts=Math.floor(Date.now()/1000);
-  var date=new Date(ts*1000).toISOString().slice(0,10);
-  var body=JSON.stringify(payload);
-  var ct='application/json; charset=utf-8';
-  var canonicalHeaders='content-type:'+ct+'\n'+'host:'+host+'\n'+'x-tc-action:'+action.toLowerCase()+'\n';
-  var signedHeaders='content-type;host;x-tc-action';
-  var canonicalRequest='POST\n/\n\n'+canonicalHeaders+'\n'+signedHeaders+'\n'+(await d3Sha256Hex(body));
-  var scope=date+'/'+service+'/tc3_request';
-  var stringToSign='TC3-HMAC-SHA256\n'+ts+'\n'+scope+'\n'+(await d3Sha256Hex(canonicalRequest));
-  var kDate=await d3HmacRaw(new TextEncoder().encode('TC3'+cred.secretKey),date);
-  var kService=await d3HmacRaw(kDate,service);
-  var kSigning=await d3HmacRaw(kService,'tc3_request');
-  var signature=d3Hex(await d3HmacRaw(kSigning,stringToSign));
-  var auth='TC3-HMAC-SHA256 Credential='+cred.secretId+'/'+scope+', SignedHeaders='+signedHeaders+', Signature='+signature;
-  var r=await fetch('https://'+host+'/',{method:'POST',headers:{'Authorization':auth,'Content-Type':ct,'X-TC-Action':action,'X-TC-Version':version,'X-TC-Timestamp':String(ts),'X-TC-Region':region},body:body});
-  var j=await r.json().catch(function(){return null;});
-  if(!j||!j.Response)throw new Error('Hunyuan3D: HTTP '+r.status);
-  if(j.Response.Error)throw new Error('Hunyuan3D: '+(j.Response.Error.Message||j.Response.Error.Code));
-  return j.Response;
-}
-async function d3Make(){
-  if(!requireLogin())return;
-  if(d3.provider==='masterpiecex'){d3MakeMpx();return;}
-  if(!d3.imgData){d3Msg(d3.opt==='text'?tx('d3MsgNeedImgText'):tx('d3MsgNeedImg'));return;}
-  var hkeys=genKeysGet('hunyuan3d').filter(function(k){return k&&typeof k==='object'&&k.secretId&&k.secretKey;});
-  if(!hkeys.length){
-    /* No local 3D key in this browser: 3D keys are managed by the
-       Admin on the server now, so the job goes through the server
-       proxy instead (see d3MakeServer below). */
-    var btnS=document.getElementById('d3MakeBtn');btnS.disabled=true;
-    d3Msg('');
-    var rbS=document.getElementById('d3Result');if(rbS)rbS.innerHTML='';
-    d3StartProg(tx('d3ProgSending'));
-    try{await d3MakeServer();}
-    catch(e){var mS=(e&&e.message?e.message:String(e));if(/failed to fetch|networkerror|load failed/i.test(mS))mS=tx('d3MsgServer3d');d3Msg(mS);}
-    finally{d3StopProg();btnS.disabled=false;}
-    return;
-  }
-  var btn=document.getElementById('d3MakeBtn');btn.disabled=true;
-  d3Msg('');
-  var rb=document.getElementById('d3Result');if(rb)rb.innerHTML='';
-  d3StartProg(tx('d3ProgSending'));
-  try{
-    /* Auto key rotation, same as Generate: a Hunyuan3D credit error
-       retries the whole job with the next saved Secret ID/Key pair. */
-    await genRotateKeys('hunyuan3d',async function(cred){
-    var small=await d3Downscale(d3.imgData);
-    var b64=small.split(',')[1];
-    if(!b64)throw new Error(tx('errImgRead2'));
-    var sub=await d3TcCall('SubmitHunyuanTo3DProJob',{Model:'3.0',ImageBase64:b64},cred);
-    var jobId=sub.JobId;
-    if(!jobId)throw new Error(tx('errNoJobId'));
-    var t0=Date.now(),done=null;
-    while(Date.now()-t0<10*60*1000){
-      await new Promise(function(res){setTimeout(res,5000);});
-      d3ProgTxt(tx('d3ProgMaking')+'('+Math.floor((Date.now()-t0)/1000)+'s)');
-      var q=await d3TcCall('QueryHunyuanTo3DProJob',{JobId:jobId},cred);
-      if(q.Status==='DONE'){done=q;break;}
-      if(q.Status==='FAIL')throw new Error('Hunyuan3D: '+(q.ErrorMessage||q.ErrorCode||tx('genFailed')));
-    }
-    if(!done)throw new Error(tx('errTimeout3d'));
-    var files=done.ResultFile3Ds||[];
-    if(!files.length)throw new Error(tx('errNo3dFile'));
-    var prev=null;
-    files.forEach(function(f){if(f.PreviewImageUrl&&!prev)prev=f.PreviewImageUrl;});
-    if(rb){
-      rb.innerHTML='';
-      if(prev&&/^https:\/\//i.test(prev)){
-        var pimg=document.createElement('img');
-        pimg.src=prev;pimg.className='d3-preview media-reveal';pimg.alt=tx('alt3dPreview');pimg.style.marginTop='0';
-        pimg.addEventListener('click',function(){fsOpen(prev,'image');});
-        rb.appendChild(pimg);
-      }
-      var drow=document.createElement('div');
-      drow.style.cssText='display:flex;gap:8px;margin-top:10px;flex-wrap:wrap';
-      var anyLink=false;
-      files.forEach(function(f){
-        if(f.Url&&/^https:\/\//i.test(f.Url)){
-          var a=document.createElement('a');
-          a.className='kbtn kbtn-black';
-          a.style.cssText='flex:1;text-align:center;min-width:120px';
-          a.href=f.Url;a.target='_blank';a.rel='noopener';
-          a.textContent=tx('dlPrefix')+(f.Type||'3D');
-          drow.appendChild(a);anyLink=true;
-        }
-      });
-      if(anyLink)rb.appendChild(drow);
-    }
-    var hFiles=files.filter(function(f){return f.Url&&/^https:\/\//i.test(f.Url);}).map(function(f){return {t:f.Type||'3D',u:f.Url};});
-    if(hFiles.length)histAdd({type:'3d',url:hFiles[0].u,files:hFiles,thumb:(prev&&/^https:\/\//i.test(prev))?prev:null,prompt:histCtxPrompt(),provider:'Hunyuan3D'});
-    d3StageBlur(100);
-    d3Msg(tx('d3MsgDone'));
-    },function(){var dm=document.getElementById('d3Msg');if(dm)dm.textContent=tx('keyRotate');});
-  }catch(e){
-    var m=(e&&e.message?e.message:String(e));
-    if(/failed to fetch|networkerror|load failed/i.test(m))m=tx('errHunyuanNet');
-    d3Msg(m);
-  }
-  finally{d3StopProg();btn.disabled=false;}
-}
 function toggleMenu(){
   var d=document.getElementById('drawer');if(!d)return;
   if(d.classList.contains('shown'))closeMenu();else openMenu();
@@ -18555,73 +18243,6 @@ async function genDoSongServer(cfg,prompt){
   if(genCtl.cancelled)throw genCtlErr();
   genShowSongs(songs.slice(0,songCap));
 }
-/* ---- 3D through the server proxy (Admin holds the 3D keys) ---- */
-function admin3dFiles(j){
-  if(!j||typeof j!=='object')return [];
-  var arr=j.files||j.resultFiles||(j.data&&(j.data.files||j.data.resultFiles))||[];
-  var out=[];
-  if(Array.isArray(arr))arr.forEach(function(f){
-    if(typeof f==='string')out.push({t:'3D',u:f,p:null});
-    else if(f&&(f.url||f.Url))out.push({t:f.type||f.Type||'3D',u:f.url||f.Url,p:f.preview||f.PreviewImageUrl||f.previewUrl||null});
-  });
-  var single=j.modelUrl||j.model_url||j.url;
-  if(!out.length&&single)out.push({t:'3D',u:single,p:j.preview||j.previewUrl||j.image||null});
-  return out;
-}
-async function d3MakeServer(){
-  var small=await d3Downscale(d3.imgData);
-  var j=await adminGenPost('/api/gen/3d',{provider:d3.provider,image:small},60000);
-  var done=j;
-  var jobId=adminJobId(j);
-  if(jobId&&!admin3dFiles(j).length){
-    var t0=Date.now();done=null;
-    while(Date.now()-t0<10*60*1000){
-      await new Promise(function(res){setTimeout(res,5000);});
-      d3ProgTxt(tx('d3ProgMaking')+'('+Math.floor((Date.now()-t0)/1000)+'s)');
-      var sj=null;
-      try{sj=await adminGenPost('/api/gen/3d/status',{provider:d3.provider,jobId:jobId},30000);}
-      catch(e){continue;}
-      var st=String((sj&&(sj.status||sj.state))||'').toLowerCase();
-      if(st==='failed'||st==='error')throw new Error(genErrText(sj,tx('genFailed')));
-      if(st==='done'||st==='complete'||st==='completed'||st==='succeeded'||admin3dFiles(sj).length){done=sj;break;}
-    }
-    if(!done)throw new Error(tx('errTimeout3d'));
-  }
-  var files=admin3dFiles(done);
-  if(!files.length)throw new Error(tx('errNo3dFile'));
-  var rb=document.getElementById('d3Result');
-  var prev=null;
-  files.forEach(function(f){if(f.p&&!prev)prev=f.p;});
-  if(!prev&&(done.preview||done.previewUrl||done.image))prev=done.preview||done.previewUrl||done.image;
-  if(rb){
-    rb.innerHTML='';
-    if(prev&&/^https:\/\//i.test(prev)){
-      var pimg=document.createElement('img');
-      pimg.src=prev;pimg.className='d3-preview media-reveal';pimg.alt=tx('alt3dPreview');pimg.style.marginTop='0';
-      pimg.addEventListener('click',function(){fsOpen(prev,'image');});
-      rb.appendChild(pimg);
-    }
-    var drow=document.createElement('div');
-    drow.style.cssText='display:flex;gap:8px;margin-top:10px;flex-wrap:wrap';
-    var anyLink=false;
-    files.forEach(function(f){
-      if(f.u&&/^https:\/\//i.test(f.u)){
-        var a=document.createElement('a');
-        a.className='kbtn kbtn-black';
-        a.style.cssText='flex:1;text-align:center;min-width:120px';
-        a.href=f.u;a.target='_blank';a.rel='noopener';
-        a.textContent=tx('dlPrefix')+f.t;
-        drow.appendChild(a);anyLink=true;
-      }
-    });
-    if(anyLink)rb.appendChild(drow);
-  }
-  var hFiles=files.filter(function(f){return f.u&&/^https:\/\//i.test(f.u);}).map(function(f){return{t:f.t,u:f.u};});
-  if(hFiles.length)histAdd({type:'3d',url:hFiles[0].u,files:hFiles,thumb:(prev&&/^https:\/\//i.test(prev))?prev:null,prompt:histCtxPrompt(),provider:d3.provider==='masterpiecex'?'Masterpiece X':'Hunyuan3D'});
-  d3StageBlur(100);
-  d3Msg(tx('d3MsgDone'));
-}
-
 function genInit(){
   appSetView('public');
   genSetMode('image');
@@ -18636,7 +18257,6 @@ function genInit(){
      left mid-store — so nothing stays only on this phone. */
   try{histPullFor(histKey());histPushFor(histKey());histStoreSweep(histKey());}catch(e){}
   histRender();
-  d3SetProvider('hunyuan3d');
   uiInit();
   try{monetCheckEnabled();}catch(e){}
   try{verifyTokenFromUrl();}catch(e){}
@@ -19311,26 +18931,13 @@ function aiChatParseActions(raw){
   out.text=out.text.replace(/[ \t]+\n/g,'\n').replace(/\n{3,}/g,'\n\n').replace(/\s+$/,'');
   return out;
 }
-/* Friendly display name for the model id the server reports; an
-   unknown id is shown exactly as the server sent it. */
-function aiChatModelName(m){
-  var s=String(m||'');
-  var low=s.toLowerCase();
-  if(low.indexOf('kimi-k2')>=0||low.indexOf('kimi_k2')>=0)return 'Kimi K2';
-  if(low.indexOf('gpt-oss-120b')>=0)return 'GPT-OSS 120B';
-  if(low.indexOf('gpt-oss-20b')>=0)return 'GPT-OSS 20B';
-  if(low.indexOf('llama-3.3-70b')>=0)return 'Llama 3.3 70B';
-  if(low.indexOf('llama-3.1-8b')>=0)return 'Llama 3.1 8B';
-  return s;
-}
-/* «Kimi K2 · 2.1s» — model name + elapsed time from the server
-   response fields model / ms (ms under a second shows as e.g.
-   340ms). Empty when the server sent neither field. */
+/* Elapsed time from the server response (ms under a second shows as
+   e.g. 340ms). The model name is NOT shown (owner order 2026-11-18):
+   the server still returns it, but the website never renders it.
+   Empty when the server sent no ms field. */
 function aiChatMetaText(model,ms){
-  var parts=[];
-  if(model)parts.push(aiChatModelName(model));
-  if(typeof ms==='number'&&isFinite(ms)&&ms>=0)parts.push(ms>=1000?(ms/1000).toFixed(1)+'s':Math.round(ms)+'ms');
-  return parts.join(' · ');
+  if(typeof ms==='number'&&isFinite(ms)&&ms>=0)return ms>=1000?(ms/1000).toFixed(1)+'s':Math.round(ms)+'ms';
+  return '';
 }
 /* Package card shown under an AI answer for a [PACKAGE:<id>] tag:
    the plan's name, current price and credits, plus a Buy button.
@@ -19473,8 +19080,8 @@ function aiChatAddBubble(role,text,isErr,opts){
       if(opts.contact){
         col.appendChild(aiChatContactCard());
       }
-      /* Proof-of-AI line: model + elapsed time from the server
-         response, in small text under the answer. */
+      /* Elapsed-time line: how long the answer took, in small text
+         under the answer (the model name is never shown). */
       var mt=aiChatMetaText(opts.model,opts.ms);
       if(mt){
         var meta=document.createElement('div');
@@ -19585,34 +19192,9 @@ function aiChatAddBubble(role,text,isErr,opts){
   }
   var t=document.getElementById('chatTyping');
   if(t)m.insertBefore(node,t);else m.appendChild(node);
-  if(role==='ai'){
-    /* Long answers only (owner order 2026-11-16): once the bubble is
-       laid out, if its text runs past ~4 lines it collapses into a
-       4-line block — the rest scrolls inside the bubble, and tapping
-       the bubble toggles full expand / collapse. Short answers are
-       left completely untouched. */
-    requestAnimationFrame(function(){
-      try{
-        var lh=parseFloat(getComputedStyle(body).lineHeight)||25;
-        if(body.scrollHeight>lh*4+4){
-          b.classList.add('collapsible');
-          var more=document.createElement('div');
-          more.className='chat-more';
-          more.textContent='▾ បង្ហាញទាំងអស់';
-          b.appendChild(more);
-          /* Expand / collapse now lives on the «បង្ហាញទាំងអស់» strip
-             itself (owner order 2026-11-17): tapping the answer
-             reveals its action buttons instead of expanding it. */
-          more.addEventListener('click',function(ev){
-            if(ev)ev.stopPropagation();
-            var ex=b.classList.toggle('expanded');
-            more.textContent=ex?'▴ បង្រួម':'▾ បង្ហាញទាំងអស់';
-          });
-        }
-      }catch(e){}
-      aiChatScroll();
-    });
-  }
+  /* Long answers are shown in FULL (owner order 2026-11-18): no
+     collapse to 4 lines — the whole reply is visible at once, and
+     nothing interrupts it while it is being read. */
   aiChatScroll();
   return b;
 }
@@ -19657,7 +19239,6 @@ async function aiChatSend(){
   if(aiChatIsContactAsk(text)){
     aiChatAddBubble('ai',AI_CHAT_CONTACT_INTRO,false,{contact:true});
     aiChatHistory.push({role:'assistant',content:AI_CHAT_CONTACT_INTRO});
-    try{inp.focus();}catch(e){}
     aiChatScroll();
     return;
   }
@@ -19686,7 +19267,9 @@ async function aiChatSend(){
   }
   aiChatBusy=false;
   if(btn)btn.disabled=false;
-  try{inp.focus();}catch(e){}
+  /* No focus() here (owner order 2026-11-18): after the reply the
+     keyboard must NOT pop up again — the user taps the input
+     themselves when they want to type. */
   aiChatScroll();
 }
 document.addEventListener('keydown',function(e){
