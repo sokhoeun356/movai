@@ -2191,6 +2191,21 @@ async function keyHealthEnsure() {
   const j = await loadKvDoc('key-health', {});
   _keyHealth = (j && typeof j === 'object' && !Array.isArray(j)) ? j : {};
   _keyHealthLoaded = true;
+  // One-time correction (2026-11-19): the 12:37 UTC incident marked all
+  // 11 MVSEP keys 'exhausted' for a QUEUE-BUSY error ("unprocessed file
+  // in queue"), not a quota — the daily limit was never reached (only
+  // 1 separation that day). Queue-busy is 'busy', never 'exhausted'.
+  // Correct any stale marker in memory so the Admin display tells the
+  // truth (persisted on the next keyHealthSave).
+  try {
+    const _mv = _keyHealth.mvsep;
+    if (_mv && typeof _mv === 'object') {
+      for (const _idx of Object.keys(_mv)) {
+        const _h = _mv[_idx];
+        if (_h && _h.status === 'exhausted' && /unprocessed file in queue/i.test(String(_h.note || ''))) { _h.status = 'busy'; }
+      }
+    }
+  } catch (e) {}
 }
 async function keyHealthSave() {
   await keyHealthEnsure();
@@ -3501,6 +3516,110 @@ async function mvsepCachePut(audioUrl, hash) {
   } catch (err) {}
 }
 // ---- MVSEP stem separation (Demucs4 HT) ----
+// ---- MVSEP in-flight registry (mvsep-pending) ----
+// MVSEP has NO cancel/delete endpoint (official full API: only create +
+// get + types + history — verified 2026-11-19). A job keeps its
+// per-account single-job slot until MVSEP itself finishes (done) or
+// fails it. So our side can never force-free the slot — but it MUST NOT
+// make things worse: before this registry, a re-tap after a timeout
+// created a BRAND-NEW separation on the next key (the timed-out job was
+// never recorded), so one stuck song fanned duplicate jobs across ALL
+// 11 keys and blocked every queue (2026-11-19 12:37 UTC). The registry
+// records every created hash (persisted to mvsep-pending.json,
+// GitHub-backed, so it survives restarts) so:
+//  - a re-POST for the same song resumes the SAME hash (no duplicate
+//    job, no extra quota);
+//  - Cancel marks the hash cancelled, so the status endpoint stops
+//    reporting it as processing and a later re-tap can start fresh;
+//  - entries older than MVSEP_PENDING_MAX_AGE_MS are treated as dead
+//    (MVSEP's own queue has had ample time) and a re-tap starts fresh.
+// Cancelling here stops OUR side only — MVSEP's slot frees when MVSEP
+// finishes/fails that job. The client message says so plainly.
+const MVSEP_PENDING_FILE = path.join(DATA_DIR, 'mvsep-pending.json');
+const MVSEP_PENDING_MAX_AGE_MS = 30 * 60 * 1000; // 30 min — a normal split finishes in ~2 min; 4-min server poll + 10-min client resume = 14 min max our-side wait
+const MVSEP_PENDING_MAX = 200;
+let _mvsepPending = null;
+async function mvsepPendingLoad() {
+  if (_mvsepPending && typeof _mvsepPending === 'object') return _mvsepPending;
+  const j = await loadKvDoc('mvsep-pending', null);
+  if (j && typeof j === 'object' && j.entries && typeof j.entries === 'object') { _mvsepPending = j; return _mvsepPending; }
+  _mvsepPending = { entries: {} };
+  return _mvsepPending;
+}
+async function mvsepPendingSave() {
+  try { await saveKvDoc('mvsep-pending', _mvsepPending, 'mvsep-pending.json'); } catch (e) {}
+}
+function mvsepPendingPrune(c) {
+  // Drop entries older than MAX_AGE (dead jobs) and cap the size.
+  const now = Date.now();
+  let changed = false;
+  for (const h of Object.keys(c.entries)) {
+    const e = c.entries[h];
+    if (!e || typeof e !== 'object' || !e.createdAt || (now - Number(e.createdAt)) > MVSEP_PENDING_MAX_AGE_MS) { delete c.entries[h]; changed = true; }
+  }
+  const keys = Object.keys(c.entries);
+  if (keys.length > MVSEP_PENDING_MAX) {
+    keys.sort((a, b) => (c.entries[a].createdAt || 0) - (c.entries[b].createdAt || 0));
+    for (let i = 0; i < keys.length - MVSEP_PENDING_MAX; i++) { delete c.entries[keys[i]]; changed = true; }
+  }
+  return changed;
+}
+async function mvsepPendingPut(audioUrl, hash) {
+  try {
+    if (!hash) return;
+    const c = await mvsepPendingLoad();
+    c.entries[hash] = { hash, audioUrl: String(audioUrl || ''), createdAt: Date.now(), status: 'processing' };
+    mvsepPendingPrune(c);
+    await mvsepPendingSave();
+  } catch (e) {}
+}
+async function mvsepPendingGetByAudio(audioUrl) {
+  // Live in-flight hash for this song, or '' — a cancelled or stale
+  // (>30 min) entry is not live.
+  try {
+    const c = await mvsepPendingLoad();
+    if (mvsepPendingPrune(c)) await mvsepPendingSave();
+    const key = mvsepCacheKey(audioUrl);
+    for (const h of Object.keys(c.entries)) {
+      const e = c.entries[h];
+      if (e && e.status === 'processing' && mvsepCacheKey(e.audioUrl || '') === key) return e.hash;
+    }
+    return '';
+  } catch (e) { return ''; }
+}
+async function mvsepPendingGetByHash(hash) {
+  try {
+    const c = await mvsepPendingLoad();
+    if (mvsepPendingPrune(c)) await mvsepPendingSave();
+    const e = c.entries[hash];
+    if (!e || typeof e !== 'object') return null;
+    return e;
+  } catch (e) { return null; }
+}
+async function mvsepPendingCancel(hash) {
+  // Mark cancelled (kept, so the status endpoint can report it as
+  // cancelled instead of processing). Returns true if it was live.
+  try {
+    if (!hash) return false;
+    const c = await mvsepPendingLoad();
+    const e = c.entries[hash];
+    if (!e || typeof e !== 'object') return false;
+    if (e.status === 'cancelled') return false;
+    e.status = 'cancelled';
+    e.cancelledAt = Date.now();
+    await mvsepPendingSave();
+    try { _mvsepHashAudio.delete(hash); _mvsepHashKey.delete(hash); } catch (err) {}
+    return true;
+  } catch (e) { return false; }
+}
+async function mvsepPendingRemove(hash) {
+  try {
+    if (!hash) return;
+    const c = await mvsepPendingLoad();
+    if (c.entries[hash]) { delete c.entries[hash]; await mvsepPendingSave(); }
+  } catch (e) {}
+}
+
 // Official API (mvsep.com/en/full_api + ZFTurbo/MVSep-API-Examples):
 // Create: POST https://mvsep.com/api/separation/create with multipart
 // form fields api_token, url (audio link — no file upload), sep_type=20,
@@ -3683,6 +3802,9 @@ async function mvsepSeparateWithKey(keyValue, audioUrl) {
   // Remember which key created this hash (in-memory) so a later status
   // check can count the separation against the right key.
   try { _mvsepHashKey.set(hash, keyValue); _mvsepHashAudio.set(hash, audioUrl); } catch (e) {}
+  // Record the in-flight job so a re-tap resumes THIS hash instead of
+  // creating a duplicate separation on another key.
+  await mvsepPendingPut(audioUrl, hash);
   const deadline = Date.now() + MVSEP_POLL_TIMEOUT_MS;
   for (;;) {
     const res = await mvsepGetSeparation(hash);
@@ -6044,6 +6166,15 @@ async function apiRoute(req, res, urlPath) {
             return sendJSON(res, 200, { ok: false, error: 'mvsep_timeout', hash: cachedHash, message: { km: 'MVSEP កំពុងបំបែកបទនេះ — សូមរង់ចាំបន្តិច ហើយចុច Split (AI) ម្តងទៀត', en: 'MVSEP is still separating this song — please wait a bit and tap Split (AI) again' } });
           } catch (e) { /* old job gone/failed — fall through to a fresh separation */ }
         }
+        // In-flight dedup: this song already has a separation running
+        // (created by an earlier tap that timed out on our side).
+        // Resume THAT hash instead of creating a duplicate job on
+        // another key — a duplicate is what fanned one stuck song
+        // across all 11 MVSEP queues (2026-11-19).
+        const pendingHash = await mvsepPendingGetByAudio(audioUrl);
+        if (pendingHash) {
+          return sendJSON(res, 200, { ok: false, error: 'mvsep_timeout', hash: pendingHash, message: { km: 'MVSEP កំពុងបំបែកបទនេះ — សូមរង់ចាំបន្តិច ហើយចុច Split (AI) ម្តងទៀត', en: 'MVSEP is still separating this song — please wait a bit and tap Split (AI) again' } });
+        }
         let out;
         try {
           out = await withProviderKeyRotation('mvsep', async (k) => {
@@ -6059,10 +6190,37 @@ async function apiRoute(req, res, urlPath) {
         }
         // Success: count it against the key that did the work (server-side daily counter for the Admin display).
         await recordMvsepSeparation(out.keyUsed, out.hash);
+        await mvsepPendingRemove(out.hash);
         // Remember this song's separation so a later re-split returns in ~1-2s from the cache instead of ~2 min.
         await mvsepCachePut(audioUrl, out.hash);
         return sendJSON(res, 200, { ok: true, provider: 'mvsep', hash: out.hash, songTitle, stems: out.stems });
       } catch (e) { return sendJSON(res, 200, { ok: false, error: 'MVSEP: ' + (e && e.message ? String(e.message).slice(0, 200) : 'request failed') }); }
+    }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
+    return;
+  }
+  // POST /api/studio/separate/cancel — {email, hash} — requires logged-in email.
+  // Stops OUR side of a split: marks the MVSEP hash cancelled in the
+  // in-flight registry, so the status endpoint reports it as cancelled
+  // (the client stops polling) and a later re-tap can start a fresh
+  // job instead of resuming the dead one. Consumes NO VS use and
+  // refunds none (the use was deducted up front when the split was
+  // accepted, same as generation credits — the owner decides on
+  // refunds; the v2.1.12 1-use restore offer is still pending).
+  // HONEST LIMIT: MVSEP has NO cancel/delete API (official full API:
+  // only create + get + types + history), so this CANNOT stop the job
+  // on MVSEP's side or free that account's queue slot. The slot frees
+  // only when MVSEP itself finishes (done) or fails the job. The
+  // client message says so plainly.
+  if (req.method === 'POST' && urlPath === '/api/studio/separate/cancel') {
+    readJSONBody(req, 64 * 1024).then(async (body) => {
+      try {
+        const email = normEmail(body && body.email);
+        if (!email) return sendJSON(res, 200, { ok: false, error: 'សូមចូលគណនេយ្យជាមុនសិន · Please sign in first', needLogin: true });
+        const hash = body && typeof body.hash === 'string' ? body.hash.trim().slice(0, 200) : '';
+        if (!hash) return sendJSON(res, 200, { ok: false, error: 'មិនមាន hash ទេ · No separation hash' });
+        const wasLive = await mvsepPendingCancel(hash);
+        return sendJSON(res, 200, { ok: true, cancelled: wasLive, hash, message: { km: 'បានបញ្ឈប់ការបំបែក · Split stopped', en: 'Split stopped' } });
+      } catch (e) { return sendJSON(res, 200, { ok: false, error: 'MVSEP: ' + (e && e.message ? String(e.message).slice(0, 200) : 'cancel failed') }); }
     }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
     return;
   }
@@ -6084,6 +6242,12 @@ async function apiRoute(req, res, urlPath) {
         if (!keys.length) return sendJSON(res, 200, { ok: false, error: 'mvsep_no_key', message: { km: 'Admin មិនទាន់ដាក់ MVSEP API Key ទេ', en: 'Admin has not added an MVSEP API key yet' } });
         // The GET status endpoint takes only the hash (official example
         // passes no api_token), so one check is enough — no key loop.
+        // A hash the user cancelled stops here — never report it as
+        // processing again (the client would poll a dead job forever).
+        const _pend = await mvsepPendingGetByHash(hash);
+        if (_pend && _pend.status === 'cancelled') {
+          return sendJSON(res, 200, { ok: false, error: 'mvsep_cancelled', hash, message: { km: 'ការបំបែកនេះត្រូវបានបោះបង់ · This split was cancelled', en: 'This split was cancelled' } });
+        }
         let r;
         try {
           r = await mvsepGetSeparation(hash);
@@ -6093,6 +6257,7 @@ async function apiRoute(req, res, urlPath) {
         if (r.done) {
           const kv = _mvsepHashKey.get(hash);
           if (kv) await recordMvsepSeparation(kv, hash);
+          await mvsepPendingRemove(hash);
           // Cache it too (the POST path does) so a later re-tap of the
           // same song reuses this finished job instead of creating a
           // duplicate separation on another key.
