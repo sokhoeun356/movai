@@ -4060,10 +4060,14 @@ function sunoCoverRejected(j) {
 // ever learns hasMyVoice (boolean) + the validation phrase.
 // Setup is FREE (Suno voice endpoints are free); songs cost the normal
 // 12 song credits via the normal gen flow.
-// V6 support: MY_VOICE_MODEL is set by the live V6 test (2026-11-19).
-// If V6 rejects voice_persona, set this to 'v5_5' and My Voice songs
-// are forced to V5.5.
-const MY_VOICE_MODEL = 'v6';
+// V6 support: the live V6 test (2026-11-19) was BLOCKED by a Suno
+// song-generation outage — sunoapi.org returned «Provider ឈប់ដំណើរការ»
+// for EVERY model (V6, V6-mini, V5.5, with and without My Voice), so V6
+// voice_persona could NOT be proven. V5.5 is the model Suno documents
+// for voice_persona, so My Voice defaults to 'v5_5' (confirmed) until
+// the outage clears and a V6 live test proves V6 works — then set this
+// back to 'v6'.
+const MY_VOICE_MODEL = 'v5_5';
 const MY_VOICE_LANGS = ['en', 'zh', 'es', 'fr', 'pt', 'de', 'ja', 'ko', 'hi', 'ru'];
 function myVoiceGet(u) {
   if (!u || typeof u !== 'object') return null;
