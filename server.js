@@ -2094,7 +2094,8 @@ function publicSettings(s) {
 // Providers: novai, magichour, masterpiecex, hunyuan3d, suno, acemusic,
 // musicapi, groq (the AI chat key), tavus kept for the legacy proxy branch,
 // agnes (Agnes AI — free text/image/video Flash models, OpenAI-compatible),
-// openrouter (OpenRouter — free chat models for the AI Lyrics generator).
+// openrouter (stored keys kept in Admin; no longer used for lyrics
+// since 2026-11-19 — AI Lyrics now uses Groq).
 const ADMIN_KEYS_FILE = path.join(DATA_DIR, 'admin-keys.json');
 const KNOWN_KEY_PROVIDERS = ['novai', 'magichour', 'masterpiecex', 'hunyuan3d', 'suno', 'acemusic', 'musicapi', 'tavus', 'groq', 'mvsep', 'agnes', 'openrouter'];
 function normProvider(v) {
@@ -4116,22 +4117,50 @@ async function apiRoute(req, res, urlPath) {
     }
   }
   // ---- AI Auto Lyrics Generator (OpenRouter Free API) ----
-  // POST /api/gen/lyrics — {email, title, language} → {ok:true, lyrics}
+  // POST /api/gen/lyrics — {email, title, language, voice} → {ok:true, lyrics, model, aiLyr}
   // The user only enters a Title; the AI writes complete lyrics
-  // (Verse 1, Chorus, Verse 2, Bridge, Final Chorus) in the requested
-  // language (Khmer default). 0 MovAi credits — lyrics are free.
-  // The OpenRouter key stays server-side (admin-stored keys only); it is
-  // NEVER sent to the frontend, never logged, never returned.
-  // Free models rotate (OpenRouter changes its free list often), so the
-  // endpoint tries a short prioritized list and falls back only when the
-  // error says the model itself is unavailable (404 / model error).
-  // Key-level failures (401/402/429/quota) rotate to the next stored key
-  // via withProviderKeyRotation and fail immediately on other errors.
-  const OPENROUTER_LYRICS_MODELS = [
-    'google/gemma-4-31b-it:free',
-    'google/gemma-4-26b-a4b-it:free',
-    'nvidia/nemotron-3-ultra-550b-a55b:free'
+  // (the owner's template structure) in the requested language
+  // (Khmer default). 0 MovAi credits — lyrics are free, but limited
+  // to 2 FREE generations per user per day (Phnom Penh date; owner
+  // order 2026-11-19 07:47). Packages do NOT change this limit.
+  // Provider is GROQ (owner order 2026-11-19 07:47 — OpenRouter is
+  // no longer used for lyrics; the stored OpenRouter keys stay in
+  // Admin untouched). Groq writes longer output, so max_tokens is
+  // 6000 and the prompt asks for the FULL song at once (4,000-5,000
+  // characters, up to 6,000-7,000+), in the owner's exact section
+  // order: [Intro], [Verse 1], [Pre-Chorus], [Chorus], [Instrumental],
+  // [Verse 2], [Bridge], [Final Chorus], [Outro].
+  // Vocal (Male/Female) follows the user's voice setting (body.voice:
+  // 'male' | 'female' | 'random' — 'random' lets the AI pick the vocal
+  // that fits the song). The Instrumental and the Bridge are NOT
+  // fixed: the AI chooses them to fit the song's lyrics/meaning each
+  // time. The Groq key stays server-side (admin-stored keys only);
+  // it is NEVER sent to the frontend, never logged, never returned.
+  // Models rotate (gpt-oss-120b first, then llama-3.3-70b-versatile)
+  // and keys rotate via withProviderKeyRotation on rotatable errors.
+  const GROQ_LYRICS_MODELS = [
+    'openai/gpt-oss-120b',
+    'llama-3.3-70b-versatile'
   ];
+  const AI_LYRICS_DAILY_LIMIT = 2;
+  // Give one AI-Lyrics free slot back (provider call failed before any
+  // lyrics were produced). Never lets the count go below 0.
+  async function aiLyrRefund(email) {
+    try {
+      const em = normEmail(email);
+      if (!em) return;
+      const users = await loadUsers();
+      const u = users[em];
+      if (!u) return;
+      const today = imgFreeTodayDate();
+      if (u.aiLyrDaily && typeof u.aiLyrDaily === 'object' && u.aiLyrDaily.date === today) {
+        const used = Math.max(0, Math.floor(Number(u.aiLyrDaily.used) || 0));
+        if (used > 0) u.aiLyrDaily = { date: today, used: used - 1 };
+      }
+      users[em] = u;
+      await saveUsers(users);
+    } catch (e) {}
+  }
   if (req.method === 'POST' && urlPath === '/api/gen/lyrics') {
     readJSONBody(req, 64 * 1024).then(async (body) => {
       try {
@@ -4139,51 +4168,63 @@ async function apiRoute(req, res, urlPath) {
         if (!normEmail(body.email)) return sendJSON(res, 200, { ok: false, error: 'សូមចូលគណនេយ្យជាមុនសិន · Please sign in first', needLogin: true });
         const title = body.title.trim().slice(0, 200);
         const lang = (typeof body.language === 'string' && body.language.trim()) ? body.language.trim().toLowerCase().slice(0, 10) : 'kh';
-        const keys = await adminProviderKeyList('openrouter');
-        if (!keys.length) return sendJSON(res, 200, { ok: false, error: 'Admin មិនទាន់ដាក់ OpenRouter Key ទេ · The Admin has not added an OpenRouter key yet — please add a free key in Admin → API Keys → OpenRouter (openrouter.ai/keys)' });
+        const voice = (typeof body.voice === 'string' && /^(male|female|random)$/.test(body.voice.trim().toLowerCase())) ? body.voice.trim().toLowerCase() : 'random';
+        const email = normEmail(body.email);
+        // FREE 2/day (Phnom Penh date). Enforce WITHOUT calling the
+        // provider; take the slot BEFORE the provider call; refund on
+        // provider failure (aiLyrRefund). Packages do not change it.
+        const users = await loadUsers();
+        const u = users[email];
+        if (!u) return sendJSON(res, 200, { ok: false, error: 'សូមចូលគណនេយ្យជាមុនសិន · Please sign in first', needLogin: true });
+        const today = imgFreeTodayDate();
+        const lyrUsed = (u.aiLyrDaily && typeof u.aiLyrDaily === 'object' && u.aiLyrDaily.date === today) ? Math.max(0, Math.floor(Number(u.aiLyrDaily.used) || 0)) : 0;
+        if (lyrUsed >= AI_LYRICS_DAILY_LIMIT) return sendJSON(res, 200, { ok: false, error: 'AI Lyrics ឥតគិតថ្លៃអស់ហើយសម្រាប់ថ្ងៃនេះ — សាកម្ដងទៀតនៅថ្ងៃស្អែក · Free AI Lyrics used up for today — try again tomorrow', aiLyr: { limit: AI_LYRICS_DAILY_LIMIT, used: lyrUsed, left: 0 } });
+        const keys = await adminProviderKeyList('groq');
+        if (!keys.length) return sendJSON(res, 200, { ok: false, error: 'Admin មិនទាន់ដាក់ Groq Key ទេ · The Admin has not added a Groq key yet — please add a free key in Admin → API Keys → Groq (console.groq.com/keys)' });
+        u.aiLyrDaily = { date: today, used: lyrUsed + 1 };
+        users[email] = u;
+        await saveUsers(users);
+        const vocalLabel = voice === 'male' ? 'Male Vocal' : voice === 'female' ? 'Female Vocal' : 'Vocal';
+        const sections = '[Intro – Sad Piano, ' + vocalLabel + ']\n[Verse 1]\n[Pre-Chorus]\n[Chorus – Emotional ' + vocalLabel + ']\n[Instrumental – Sad Violin Solo]\n[Verse 2]\n[Bridge – Deep Emotional Vocal]\n[Final Chorus – Powerful ' + vocalLabel + ']\n[Outro – Soft Piano Fade Out]';
         const sysPrompt = lang === 'kh'
-          ? 'អ្នកជាអ្នកនិពន្ធបទចម្រៀងអាជីព។ សូមសរសេរអត្ថបទចម្រៀងពេញលេញ វែង ជាភាសាខ្មែរ សម្រាប់ចំណងជើងបទដែលបានផ្តល់ឱ្យ — អត្ថបទត្រូវវែងគ្រប់គ្រាន់សម្រាប់បទចម្រៀងពេញលេញ 4-5 នាទី។ អត្ថបទត្រូវមានរចនាសម្ព័ន្ធដូចខាងក្រោមតាមលំដាប់៖ [Verse 1], [Chorus], [Verse 2], [Chorus], [Verse 3], [Bridge], [Final Chorus], [Outro]។ Verse នីមួយៗ 6-8 បន្ទាត់, Chorus នីមួយៗ 6 បន្ទាត់, Bridge 6 បន្ទាត់, Final Chorus 6-8 បន្ទាត់, Outro 2-4 បន្ទាត់។ អត្ថបទត្រូវមានអារម្មណ៍, ច្រៀងបានស្រួល, និងសមនឹងចំណងជើង។ សូមផ្តល់តែអត្ថបទចម្រៀងជាមួយស្លាកផ្នែកប៉ុណ្ណោះ — កុំមានការពន្យល់ ឬអត្ថបទបន្ថែម។'
-          : (lang === 'en'
-            ? 'You are a professional songwriter. Write complete, original, LONG song lyrics in English for the given song title — the lyrics must be long enough for a full-length 4-5 minute song. Structure the lyrics exactly with these sections in this order: [Verse 1], [Chorus], [Verse 2], [Chorus], [Verse 3], [Bridge], [Final Chorus], [Outro]. Each verse 6-8 lines, each chorus 6 lines, bridge 6 lines, final chorus 6-8 lines, outro 2-4 lines. Make the lyrics emotional, singable, and fitting the title. Output ONLY the lyrics with the section labels — no explanations, no extra text.'
-            : 'You are a professional songwriter. Write complete, original, LONG song lyrics in ' + lang + ' for the given song title — the lyrics must be long enough for a full-length 4-5 minute song. Structure the lyrics exactly with these sections in this order: [Verse 1], [Chorus], [Verse 2], [Chorus], [Verse 3], [Bridge], [Final Chorus], [Outro]. Each verse 6-8 lines, each chorus 6 lines, bridge 6 lines, final chorus 6-8 lines, outro 2-4 lines. Make the lyrics emotional, singable, and fitting the title. Output ONLY the lyrics with the section labels — no explanations, no extra text.');
+          ? 'អ្នកជាអ្នកនិពន្ធបទចម្រៀងអាជីព។ សូមសរសេរអត្ថបទចម្រៀងពេញលេញ ដើម វែង ជាភាសាខ្មែរ សម្រាប់ចំណងជើងបទដែលបានផ្តល់ឱ្យ — សរសេរពេញមួយបទតែម្ដង វែងគ្រប់គ្រាន់សម្រាប់បទចម្រៀងពេញលេញ 4-5 នាទី (ប្រហែល 4,000-5,000 អក្សរ រហូតដល់ 6,000-7,000+)។' + (voice === 'random' ? ' សូមជ្រើសរើសសំឡេងប្រុស ឬស្រីសម្រាប់បទនេះ (មួយណាសមជាង) ហើយសរសេរសំឡេងនោះនៅក្នុងស្លាកផ្នែកសំឡេងទាំងអស់ ឱ្យស៊ីសង្វាក់គ្នា។' : '') + ' រចនាសម្ព័ន្ធអត្ថបទត្រូវដូចខាងក្រោមតាមលំដាប់៖\n' + sections + '\nច្បាប់៖ Verse នីមួយៗ 6-8 បន្ទាត់, Pre-Chorus 4 បន្ទាត់, Chorus នីមួយៗ 6 បន្ទាត់, Bridge 6 បន្ទាត់, Final Chorus 6-8 បន្ទាត់, Outro 2-4 បន្ទាត់។ Instrumental ត្រូវតែសមនឹងបទនេះ — ជ្រើសរើសឧបករណ៍ភ្លេង និងអារម្មណ៍ដែលសមនឹងអត្ថបទ និងអត្ថន័យរបស់បទ (បទកំសត់ Sad Violin Solo សម; បទអារម្មណ៍ផ្សេង ជ្រើសរើសឧបករណ៍ផ្សេង — កុំប្រើឧបករណ៍ដូចគ្នាសម្រាប់បទទាំងអស់)។ Bridge ក៏ត្រូវតែសមនឹងអត្ថន័យរបស់បទដែរ — ជ្រើសរើសសំឡេង និងស្ទាយសម្រាប់បទនេះ មិនមែនដូចគ្នារាល់ពេលទេ។ អត្ថបទត្រូវមានអារម្មណ៍, ច្រៀងបានស្រួល, និងសមនឹងចំណងជើង។ សូមផ្តល់តែអត្ថបទចម្រៀងជាមួយស្លាកផ្នែកប៉ុណ្ណោះ — កុំមានការពន្យល់ ឬអត្ថបទបន្ថែម។'
+          : 'You are a professional songwriter. Write complete, original, LONG song lyrics in ' + (lang === 'en' ? 'English' : lang) + ' for the given song title — the FULL song at once, long enough for a full-length 4-5 minute song (about 4,000-5,000 characters, up to 6,000-7,000+).' + (voice === 'random' ? ' Choose Male or Female vocal for this song (whichever fits it best) and write that vocal in every vocal section header, consistently.' : '') + ' Structure the lyrics EXACTLY with these sections in this order:\n' + sections + '\nRules: each verse 6-8 lines, pre-chorus 4 lines, each chorus 6 lines, bridge 6 lines, final chorus 6-8 lines, outro 2-4 lines. The Instrumental MUST fit this song — choose the instrument and mood that matches the song\'s lyrics and meaning (Sad Violin Solo fits a sad song; for a different mood choose a different instrument — never use the same instrument for every song). The Bridge MUST also fit this song\'s meaning — choose its vocal and style for this song, not the same one every time. Make the lyrics emotional, singable, and fitting the title. Output ONLY the lyrics with the section labels — no explanations, no extra text.';
         let out;
         try {
-          out = await withProviderKeyRotation('openrouter', async (k) => {
-            // Try each free model in order; fall back when the model
+          out = await withProviderKeyRotation('groq', async (k) => {
+            // Try each Groq model in order; fall back when the model
             // itself is unavailable (404 / model error) OR when it is
-            // rate-limited right now (429 — per-model on OpenRouter,
-            // so the next model may still answer).
+            // rate-limited right now (429 — per-model on Groq, so the
+            // next model may still answer).
             let lastModelErr = null;
-            for (const model of OPENROUTER_LYRICS_MODELS) {
+            for (const model of GROQ_LYRICS_MODELS) {
               let r, j;
               try {
-                r = await fetch('https://openrouter.ai/api/v1/chat/completions', { method: 'POST', headers: { 'Authorization': 'Bearer ' + k, 'Content-Type': 'application/json', 'HTTP-Referer': 'https://movai-1.onrender.com', 'X-Title': 'MovAi' }, body: JSON.stringify({ model, messages: [{ role: 'system', content: sysPrompt }, { role: 'user', content: 'Song title: ' + title }], temperature: 0.8, max_tokens: 6000 }), signal: AbortSignal.timeout(60000) });
+                r = await fetch('https://api.groq.com/openai/v1/chat/completions', { method: 'POST', headers: { 'Authorization': 'Bearer ' + k, 'Content-Type': 'application/json' }, body: JSON.stringify({ model, messages: [{ role: 'system', content: sysPrompt }, { role: 'user', content: 'Song title: ' + title }], temperature: 0.8, max_tokens: 6000 }), signal: AbortSignal.timeout(60000) });
                 j = await r.json().catch(() => null);
               } catch (e) {
-                throw rotErr('OpenRouter: ' + (e && e.message ? e.message : 'request failed'), 0);
+                throw rotErr('Groq: ' + (e && e.message ? e.message : 'request failed'), 0);
               }
               const content = j && j.choices && j.choices[0] && j.choices[0].message && typeof j.choices[0].message.content === 'string' ? j.choices[0].message.content.trim() : '';
               if (content) return { lyrics: content, model };
               const errMsg = genErrText(j, 'HTTP ' + r.status);
-              const modelGone = r.status === 404 || /model (not found|not available|does not exist)|no such model|unknown model/i.test(errMsg);
-              // Rate limit (429) is per-model on OpenRouter: if this model is
-              // rate-limited right now, the next model may still answer, so
-              // fall back to it instead of failing the whole request.
+              const modelGone = r.status === 404 || /model (not found|not available|does not exist)|no such model|unknown model|model_decommissioned/i.test(errMsg);
               const modelLimited = r.status === 429;
-              if ((modelGone || modelLimited) && model !== OPENROUTER_LYRICS_MODELS[OPENROUTER_LYRICS_MODELS.length - 1]) { lastModelErr = errMsg; continue; }
-              throw rotErr('OpenRouter: ' + errMsg, r.status);
+              if ((modelGone || modelLimited) && model !== GROQ_LYRICS_MODELS[GROQ_LYRICS_MODELS.length - 1]) { lastModelErr = errMsg; continue; }
+              throw rotErr('Groq: ' + errMsg, r.status);
             }
-            throw rotErr('OpenRouter: ' + (lastModelErr || 'no lyrics returned'), 0);
+            throw rotErr('Groq: ' + (lastModelErr || 'no lyrics returned'), 0);
           });
         } catch (e) {
-          if (e && e.noKey) return sendJSON(res, 200, { ok: false, error: 'Admin មិនទាន់ដាក់ OpenRouter Key ទេ · The Admin has not added an OpenRouter key yet' });
+          await aiLyrRefund(email);
+          if (e && e.noKey) return sendJSON(res, 200, { ok: false, error: 'Admin មិនទាន់ដាក់ Groq Key ទេ · The Admin has not added a Groq key yet' });
           const st = (e && e.httpStatus) || 0;
-          if (st === 401 || st === 403) return sendJSON(res, 200, { ok: false, error: 'OpenRouter Key មិនត្រឹមត្រូវទេ — សូមប្រាប់ Admin ពិនិត្យ Key · The OpenRouter key seems invalid, please ask the Admin to check it' });
+          if (st === 401 || st === 403) return sendJSON(res, 200, { ok: false, error: 'Groq Key មិនត្រឹមត្រូវទេ — សូមប្រាប់ Admin ពិនិត្យ Key · The Groq key seems invalid, please ask the Admin to check it' });
           if (st === 429) return sendJSON(res, 200, { ok: false, error: 'ស្នើសុំច្រើនពេក — សូមរង់ចាំ 1 នាទីហើយសាកម្ដងទៀត · Too many requests right now — please wait 1 minute and try again' });
-          if (st === 402) return sendJSON(res, 200, { ok: false, error: 'OpenRouter អស់កូតា — សូមសាកល្បងម្ដងទៀតនៅពេលក្រោយ · OpenRouter quota reached, please try again later' });
+          if (st === 402) return sendJSON(res, 200, { ok: false, error: 'Groq អស់កូតា — សូមសាកល្បងម្ដងទៀតនៅពេលក្រោយ · Groq quota reached, please try again later' });
           return sendJSON(res, 200, { ok: false, error: 'បង្កើតអត្ថបទមិនបានទេ — សូមសាកល្បងម្ដងទៀត · Could not generate lyrics, please try again' });
         }
-        return sendJSON(res, 200, { ok: true, lyrics: out.lyrics, model: out.model });
+        return sendJSON(res, 200, { ok: true, lyrics: out.lyrics, model: out.model, aiLyr: { limit: AI_LYRICS_DAILY_LIMIT, used: lyrUsed + 1, left: Math.max(0, AI_LYRICS_DAILY_LIMIT - (lyrUsed + 1)) } });
       } catch (e) { return sendJSON(res, 200, { ok: false, error: 'បង្កើតអត្ថបទមិនបានទេ — សូមសាកល្បងម្ដងទៀត · Could not generate lyrics, please try again' }); }
     }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
     return;
@@ -4674,7 +4715,7 @@ async function apiRoute(req, res, urlPath) {
   if (req.method === 'POST' && urlPath === '/api/gen/song') {
     const genCtx = { provider: '', email: '' };
     await wrapGenLog(res, 'song', genCtx);
-    readJSONBody(req, 64 * 1024).then(async (body) => {
+    readJSONBody(req, 256 * 1024).then(async (body) => {
       if (body && typeof body === 'object') {
         if (typeof body.provider === 'string') genCtx.provider = body.provider;
         if (typeof body.email === 'string') genCtx.email = body.email;
@@ -4688,10 +4729,10 @@ async function apiRoute(req, res, urlPath) {
         if (_blkErr) return sendJSON(res, 200, { ok: false, error: _blkErr });
         const reqKey = typeof body.key === 'string' ? body.key : '';
         const title = typeof body.title === 'string' ? body.title.trim().slice(0, 200) : '';
-        const lyrics = typeof body.lyrics === 'string' ? body.lyrics.trim().slice(0, 4000) : '';
+        const lyrics = typeof body.lyrics === 'string' ? body.lyrics.trim().slice(0, 10000) : '';
         const style = typeof body.style === 'string' ? body.style.trim().slice(0, 500) : '';
         const voice = body.voice === 'male' || body.voice === 'female' ? body.voice : 'random';
-        const prompt = typeof body.prompt === 'string' ? body.prompt.trim().slice(0, 2000) : '';
+        const prompt = typeof body.prompt === 'string' ? body.prompt.trim().slice(0, 10000) : '';
         const model = typeof body.model === 'string' && body.model.trim() ? body.model.trim().slice(0, 50) : 'v6';
         if (!title && !lyrics && !style && !prompt) return sendJSON(res, 200, { ok: false, error: 'សូមសរសេរ prompt ជាមុនសិន' });
         // Require a logged-in account: without an email the server cannot
@@ -4742,7 +4783,7 @@ async function apiRoute(req, res, urlPath) {
             if (style) tagsParts.push(style);
             if (voice === 'male') tagsParts.push('male vocals');
             else if (voice === 'female') tagsParts.push('female vocals');
-            reqBody = { custom_mode: true, mv: 'sonic-v6', prompt: lyrics.slice(0, 5000), tags: tagsParts.join(', ').slice(0, 1000) };
+            reqBody = { custom_mode: true, mv: 'sonic-v6', prompt: lyrics.slice(0, 10000), tags: tagsParts.join(', ').slice(0, 1000) };
             if (title) reqBody.title = title.slice(0, 80);
             if (voice === 'male') reqBody.vocal_gender = 'm';
             else if (voice === 'female') reqBody.vocal_gender = 'f';
@@ -4797,7 +4838,7 @@ async function apiRoute(req, res, urlPath) {
             callBackUrl: SUNO_CALLBACK_URL,
             model: sunoApiModel(model),
             style: (style || 'pop').slice(0, 1000),
-            lyrics: (lyrics || prompt || '').slice(0, 5000),
+            lyrics: (lyrics || prompt || '').slice(0, 10000),
             title: title.slice(0, 80),
           };
           if (voice === 'male') genBody.vocalGender = 'm';
@@ -4848,7 +4889,7 @@ async function apiRoute(req, res, urlPath) {
             duration: mhDuration,
             style: {
               instrumental: instrumental,
-              lyrics: lyrics.slice(0, 5000),
+              lyrics: lyrics.slice(0, 10000),
               prompt: mhPrompt,
             },
           };
@@ -10287,6 +10328,21 @@ async function apiRoute(req, res, urlPath) {
       images: { limit: IMG_FREE_3DAY_LIMIT, used: imgWin.used, left: Math.max(0, IMG_FREE_3DAY_LIMIT - imgWin.used), start: imgWin.start, resetDate: imgWin.resetDate },
       thumbnails: { limit: IMG_FREE_3DAY_LIMIT, used: thumbWin.used, left: Math.max(0, IMG_FREE_3DAY_LIMIT - thumbWin.used), start: thumbWin.start, resetDate: thumbWin.resetDate }
     });
+  }
+  // GET /api/public/ai-lyrics-free?email= — PUBLIC. Read-only; never
+  // creates a user. Free AI Lyrics allowance per day (owner order
+  // 2026-11-19 07:47 — 2 free AI Lyrics generations per user per day,
+  // Phnom Penh date; packages do NOT change it):
+  // {ok:true, date, limit:2, used, left}.
+  // Unknown email -> {ok:false, error:'no_account'}.
+  if (req.method === 'GET' && urlPath === '/api/public/ai-lyrics-free') {
+    const email = normEmail(new URL(req.url, 'http://localhost').searchParams.get('email') || '');
+    if (!email) return sendJSON(res, 200, { ok: false, error: 'no_account' });
+    const u = (await loadUsers())[email];
+    if (!u) return sendJSON(res, 200, { ok: false, error: 'no_account' });
+    const today = imgFreeTodayDate();
+    const used = (u.aiLyrDaily && typeof u.aiLyrDaily === 'object' && u.aiLyrDaily.date === today) ? Math.max(0, Math.floor(Number(u.aiLyrDaily.used) || 0)) : 0;
+    return sendJSON(res, 200, { ok: true, date: today, limit: AI_LYRICS_DAILY_LIMIT, used, left: Math.max(0, AI_LYRICS_DAILY_LIMIT - used) });
   }
   // GET /api/public/feature-limits?email= — PUBLIC. Read-only; never
   // creates a user. Returns the Free-2 + package-allowance state:
