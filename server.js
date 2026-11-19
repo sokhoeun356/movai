@@ -2488,9 +2488,16 @@ function walletRequestPublic(r, users) {
 // in settings (default OFF). Data lives in three GitHub-backed files:
 //   monetization-earnings.json — per-user {views, watchSeconds,
 //     earnMicro, pendingMicro, paidOutMicro, cashbackTotal, byCountry}
-//     (earnMicro/pendingMicro/paidOutMicro are INTEGER micro-dollars:
-//     1 eligible view = 1 micro-dollar = $0.000001, so $0.001 per 1000
-//     views is exact with no float drift; $0.01 = 10,000 micro-dollars).
+//     (earnMicro/pendingMicro/paidOutMicro are micro-dollars:
+//     1 micro-dollar = $0.000001. The per-view earning is TIERED by
+//     package (owner order 2026-11-19 08:03 + 08:04): the rate for a
+//     view is the HIGHER of the viewer's tier and the poster's tier.
+//     Tiers per 1,000 views: no package $0.0001 (= 0.1 micro/view),
+//     $5 song-trial $0.001 (= 1 micro/view), $10 song-popular $0.005
+//     (= 5 micro/view), $22 song-pro $0.01 (= 10 micro/view). Media
+//     packages (monthly/yearly) do NOT raise the tier. Earnings are
+//     stored rounded to 0.1 micro (all tier rates are multiples of
+//     0.1 micro), so there is no float drift; $0.01 = 10,000 micro).
 //   monetization-applications.json — per-user {email, name, followers,
 //     watchHours, appliedAt, status, reason?, decidedAt?}.
 //   creator-follows.json — {targetEmail: [followerEmail, ...]}.
@@ -2502,7 +2509,40 @@ function walletRequestPublic(r, users) {
 const MONETIZATION_EARNINGS_FILE = path.join(DATA_DIR, 'monetization-earnings.json');
 const MONETIZATION_APPLICATIONS_FILE = path.join(DATA_DIR, 'monetization-applications.json');
 const CREATOR_FOLLOWS_FILE = path.join(DATA_DIR, 'creator-follows.json');
-const MONETIZATION_VIEW_EARN_MICRO = 1; // 1 micro-dollar per eligible view ($0.001 / 1000 views)
+// Tiered view earnings (owner order 2026-11-19 08:03 + 08:04).
+// ratePer1K = dollars per 1,000 eligible views; microPerView = the
+// micro-dollar amount accrued per eligible view (1 micro = $0.000001).
+// The rate for one view is the HIGHER of the viewer's tier and the
+// poster's (creator's) tier. Only the three SONG packages raise the
+// tier; a media-only package (monthly/yearly) earns the no-package rate.
+const VIEW_EARN_TIERS = [
+  { id: 'none', packageId: null, price: 0, ratePer1K: 0.0001, microPerView: 0.1 },
+  { id: 'song-trial', packageId: 'song-trial', price: 5, ratePer1K: 0.001, microPerView: 1 },
+  { id: 'song-popular', packageId: 'song-popular', price: 10, ratePer1K: 0.005, microPerView: 5 },
+  { id: 'song-pro', packageId: 'song-pro', price: 22, ratePer1K: 0.01, microPerView: 10 },
+];
+const MONETIZATION_VIEW_EARN_MICRO = 1; // legacy $5-tier rate (1 micro/view); kept for reference only — the tier table above is the truth
+// The view-earn tier of one user record, from their ACTIVE song
+// package only (u.songPlan + u.songPlanExpiresAt). Expired or absent
+// song package, or a media-only package, earns the 'none' tier.
+function viewEarnTierForUser(u) {
+  try {
+    if (!u) return VIEW_EARN_TIERS[0];
+    const now = Date.now();
+    const exp = Date.parse(u.songPlanExpiresAt || '');
+    if (!exp || exp <= now) return VIEW_EARN_TIERS[0];
+    const sp = typeof u.songPlan === 'string' ? u.songPlan : '';
+    for (const t of VIEW_EARN_TIERS) { if (t.packageId && t.packageId === sp) return t; }
+    return VIEW_EARN_TIERS[0];
+  } catch (e) { return VIEW_EARN_TIERS[0]; }
+}
+// Micro-dollars accrued per eligible view: the HIGHER of the viewer's
+// tier and the poster's tier. A guest (no user record) counts as 'none'.
+function viewEarnMicroForUsers(viewerU, ownerU) {
+  const a = viewEarnTierForUser(viewerU).microPerView;
+  const b = viewEarnTierForUser(ownerU).microPerView;
+  return Math.max(a, b);
+}
 const MONETIZATION_MICRO_PER_CENT = 10000; // $0.01 = 10,000 micro-dollars
 const MONETIZATION_FOLLOWERS_NEEDED = 1000;
 const MONETIZATION_WATCH_HOURS_NEEDED = 2000;
@@ -2666,20 +2706,27 @@ async function monetizationOnView(ownerEmail, viewerEmail, country, durationSec)
   if (dur > 0) rec.watchSeconds = numOr(rec.watchSeconds, 0) + dur;
   const cc = (typeof country === 'string' && country.trim()) ? country.trim().toUpperCase().slice(0, 8) : 'Unknown';
   if (await monetizationEnabled() && await monetizationIsApproved(owner)) {
+    // Tiered rate (owner 2026-11-19 08:03 + 08:04): the HIGHER of the
+    // viewer's tier and the poster's tier. Rounded to 0.1 micro on
+    // every add so the stored totals stay exact (all tier rates are
+    // multiples of 0.1 micro, so there is no float drift).
+    const _tierUsers = await loadUsers();
+    const _tierMicro = viewEarnMicroForUsers(_tierUsers[viewer], _tierUsers[owner]);
+    const _addMicro = (v) => Math.round((numOr(v, 0) + _tierMicro) * 10) / 10;
     rec.views = numOr(rec.views, 0) + 1;
-    rec.earnMicro = numOr(rec.earnMicro, 0) + MONETIZATION_VIEW_EARN_MICRO;
-    rec.pendingMicro = numOr(rec.pendingMicro, 0) + MONETIZATION_VIEW_EARN_MICRO;
+    rec.earnMicro = _addMicro(rec.earnMicro);
+    rec.pendingMicro = _addMicro(rec.pendingMicro);
     if (!rec.byCountry || typeof rec.byCountry !== 'object') rec.byCountry = {};
     if (!rec.byCountry[cc] || typeof rec.byCountry[cc] !== 'object') rec.byCountry[cc] = { views: 0, earnMicro: 0 };
     rec.byCountry[cc].views = numOr(rec.byCountry[cc].views, 0) + 1;
-    rec.byCountry[cc].earnMicro = numOr(rec.byCountry[cc].earnMicro, 0) + MONETIZATION_VIEW_EARN_MICRO;
+    rec.byCountry[cc].earnMicro = _addMicro(rec.byCountry[cc].earnMicro);
     // Move whole cents to the EARN balance (fractional remainder stays
     // pending). $0.01 = 10,000 micro-dollars. Earn money is NOT
     // spendable (cannot buy packages) — withdraw-only, it accumulates.
     const wholeMicro = Math.floor(numOr(rec.pendingMicro, 0) / MONETIZATION_MICRO_PER_CENT) * MONETIZATION_MICRO_PER_CENT;
     if (wholeMicro > 0) {
       const dollars = walletMoney(wholeMicro / 1000000);
-      const users = await loadUsers();
+      const users = _tierUsers;
       const u = users[owner];
       if (u) {
         u.earnBalance = walletMoney(walletEarnBalance(u) + dollars);
@@ -5092,7 +5139,7 @@ async function apiRoute(req, res, urlPath) {
     '12. HISTORY: Everything the user creates is saved in History, separated by Gmail (each Gmail sees only its own). They can download, like, play, use MV or Vocal Studio, or post it to Public. Suno and Magic Hour songs both appear in History together.',
     '13. MV (karaoke video): Turn your own song into a karaoke video with lyrics that light up word by word as it sings. Costs one of the Free 2 (MV 2 lifetime; song packages grant more while active). Own songs only.',
     '14. AI STUDIO / VOCAL STUDIO: Split a song into 6 stems (vocals, drums, bass, other, piano, guitar). Costs one of the Free 2 (Vocal Studio 2 lifetime; song packages grant more while active). The first split of a new song takes about 1.5-2 minutes.',
-    '15. MONETIZATION: Default OFF (the admin turns it on). Eligibility: 1,000 followers + 2,000 watch hours. View earnings are $0.001 per 1000 views (logged-in viewers only). Cashback on purchases goes to Earn Money.',
+    '15. MONETIZATION: Default OFF (the admin turns it on). Eligibility: 1,000 followers + 2,000 watch hours. View earnings are TIERED by package per 1000 views (logged-in viewers only): no package $0.0001, $5 package $0.001, $10 package $0.005, $22 package $0.01 — the rate for a view is the HIGHER of the creator\'s package and the viewer\'s package. Cashback on purchases goes to Earn Money.',
     '16. PROFILE: Shows the user name, Gmail, User ID (with Copy), both credit balances, plan, Wallet Balance and Earn Money, Followers, Packages, Monetization. Log out is here. The user can set their profile picture.',
     '17. NOTIFICATIONS: The bell shows new device login alerts (with model and IP), gift claims, package approvals/rejections, credit grants/deductions, and new posts from followed users. Tap a notification to go to the right place.',
     '18. SETTINGS AND MENU (drawer): Language Khmer/English, day/night/auto, app colour (7 themes, lime is the default), text size, smooth mode, glass effect, background brightness. The drawer opens from the left (the menu button top left); the bottom dock has the main sections. The AI chat button (robot, bottom left) opens this chat.',
@@ -6351,7 +6398,16 @@ async function apiRoute(req, res, urlPath) {
       watchSeconds: numOr(rec.watchSeconds, 0),
       byCountry,
       earnBalance: _u ? walletEarnBalance(_u) : 0,
+      viewEarnTiers: VIEW_EARN_TIERS,
+      viewEarnTier: viewEarnTierForUser(_u).id,
+      viewEarnRatePer1K: viewEarnTierForUser(_u).ratePer1K,
     });
+  }
+  // GET /api/public/view-earn-tiers — PUBLIC. The four view-earning
+  // tiers (per 1,000 views) by package. No email needed (the Admin
+  // reads this to display the rates).
+  if (req.method === 'GET' && urlPath === '/api/public/view-earn-tiers') {
+    return sendJSON(res, 200, { ok: true, tiers: VIEW_EARN_TIERS });
   }
   // GET /api/public/monetization/status?email=X — PUBLIC. Eligibility
   // (1000 followers + 2000 watch hours), applied/approved, earnings.
@@ -6375,6 +6431,9 @@ async function apiRoute(req, res, urlPath) {
       eligible, applied, approved,
       earnings: numOr(rec.earnMicro, 0) / 1000000, views: numOr(rec.views, 0),
       earnBalance: _u ? walletEarnBalance(_u) : 0,
+      viewEarnTiers: VIEW_EARN_TIERS,
+      viewEarnTier: viewEarnTierForUser(_u).id,
+      viewEarnRatePer1K: viewEarnTierForUser(_u).ratePer1K,
     });
   }
   // POST /api/public/monetization/apply — {email} — PUBLIC. Applies for
