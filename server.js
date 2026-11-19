@@ -923,7 +923,7 @@ async function pubUser(u, modelLogins, deviceInfo) {
     // registered on (deviceId, never overwritten by later sign-ins from
     // other devices), the most recent device seen, and the model the
     // account was registered on. A model change alone never blocks.
-    deviceId: u.deviceId || '', lastDeviceId: u.lastDeviceId || '', registeredModel: u.registeredModel || '' };
+    deviceId: u.deviceId || '', lastDeviceId: u.lastDeviceId || '', registeredModel: u.registeredModel || '', hasMyVoice: !!(u.myVoice && u.myVoice.voiceId) };
   // Device-limit picture (Admin reads only — passed by the admin
   // endpoints): accounts on this device, purchased slots, limit,
   // strikes, VPN flags, block state.
@@ -4054,6 +4054,75 @@ function sunoCoverRejected(j) {
   if (msg.indexOf('413') >= 0) return true;
   return false;
 }
+// ---- My Voice (Suno voice clone) — owner order 2026-11-19 ----
+// The voiceId lives ONLY on the server (u.myVoice) and is NEVER sent to
+// the client (pubUser allowlist does not include it). The client only
+// ever learns hasMyVoice (boolean) + the validation phrase.
+// Setup is FREE (Suno voice endpoints are free); songs cost the normal
+// 12 song credits via the normal gen flow.
+// V6 support: MY_VOICE_MODEL is set by the live V6 test (2026-11-19).
+// If V6 rejects voice_persona, set this to 'v5_5' and My Voice songs
+// are forced to V5.5.
+const MY_VOICE_MODEL = 'v6';
+const MY_VOICE_LANGS = ['en', 'zh', 'es', 'fr', 'pt', 'de', 'ja', 'ko', 'hi', 'ru'];
+function myVoiceGet(u) {
+  if (!u || typeof u !== 'object') return null;
+  const v = u.myVoice;
+  if (!v || typeof v !== 'object') return null;
+  return v;
+}
+async function myVoiceSave(email, patch) {
+  const users = await loadUsers();
+  const u = users[email];
+  if (!u) return null;
+  if (!u.myVoice || typeof u.myVoice !== 'object') u.myVoice = {};
+  Object.assign(u.myVoice, patch);
+  u.myVoice.updatedAt = new Date().toISOString();
+  u.updatedAt = new Date().toISOString();
+  await saveUsers(users);
+  scheduleBackup('users.json');
+  return u.myVoice;
+}
+async function myVoiceClear(email) {
+  const users = await loadUsers();
+  const u = users[email];
+  if (!u) return false;
+  delete u.myVoice;
+  u.updatedAt = new Date().toISOString();
+  await saveUsers(users);
+  scheduleBackup('users.json');
+  return true;
+}
+// Call a sunoapi.org voice endpoint with key rotation. GET when body is
+// null. Returns the parsed JSON on code 200, else throws rotErr.
+async function sunoVoiceCall(path, method, body) {
+  const keys = (await adminProviderKeyList('suno')).filter((e) => e.endpoint);
+  if (!keys.length) throw new Error('Admin មិនទាន់ដាក់ Suno Key ទេ');
+  return withProviderKeyRotation('suno', async (k, endpoint) => {
+    const ep = String(endpoint || '').replace(/\/+$/, '');
+    const r = await fetch(ep + path, { method, headers: { 'Authorization': 'Bearer ' + k, 'Content-Type': 'application/json' }, body: body ? JSON.stringify(body) : undefined, signal: AbortSignal.timeout(60000) });
+    const j = await r.json().catch(() => null);
+    if (j && j.code === 200) return j;
+    throw rotErr('Suno Voice: ' + sunoErrText(j, 'HTTP ' + r.status), r.status);
+  }, '', keys);
+}
+// Upload a voice audio buffer to Cloudinary (data URI) and return the
+// plain secure_url (no attachment flag). Returns null if all accounts fail.
+async function cloudinaryStoreVoice(buf, mime, name) {
+  const candidates = await cloudinaryCandidates();
+  if (!candidates.length) return null;
+  const dataUri = 'data:' + mime + ';base64,' + buf.toString('base64');
+  const pubId = 'movai/voices/' + String(name || 'voice').replace(/\.[^.]+$/, '');
+  for (const a of candidates) {
+    try {
+      const c = cloudinaryConfigFor(a);
+      if (!c) continue;
+      const res = await c.uploader.upload(dataUri, { resource_type: 'video', public_id: pubId, overwrite: false });
+      if (res && res.secure_url) return res.secure_url;
+    } catch (e) { /* try next account */ }
+  }
+  return null;
+}
 // sunoapi.org credit endpoint: GET {endpoint}/api/v1/generate/credit
 // answers {code:200, data:<remaining integer>}. The API returns ONLY
 // the remaining balance — no total/used. Parse defensively.
@@ -4985,6 +5054,26 @@ async function apiRoute(req, res, urlPath) {
           };
           if (voice === 'male') genBody.vocalGender = 'm';
           else if (voice === 'female') genBody.vocalGender = 'f';
+          // My Voice (owner order 2026-11-19): when the user picks their own
+          // voice, look up the stored voiceId (server-side only, never sent
+          // to the client) and check availability, then send personaId +
+          // personaModel voice_persona. The model is forced to
+          // MY_VOICE_MODEL (V6 if the live test proves it, else V5_5).
+          // A missing/unavailable voice fails BEFORE any credit is deducted.
+          if (body.myVoice === true || body.voice === 'myvoice') {
+            const _mvUsers = await loadUsers();
+            const _mv = myVoiceGet(_mvUsers[normEmail(body.email)]);
+            if (!_mv || !_mv.voiceId || !_mv.voiceTaskId) return sendJSON(res, 200, { ok: false, error: 'សូមបង្កើត My Voice ជាមុនសិន · Please set up My Voice first', needMyVoice: true });
+            try {
+              const _chk = await sunoVoiceCall('/api/v1/voice/check-voice', 'POST', { task_id: _mv.voiceTaskId });
+              if (!(_chk && _chk.data && _chk.data.isAvailable === true)) return sendJSON(res, 200, { ok: false, error: 'My Voice មិនទាន់រួចរាល់ទេ — សូមព្យាយាមម្តងទៀត · My Voice is not ready yet, please try again' });
+            } catch (e) {
+              return sendJSON(res, 200, { ok: false, error: 'My Voice: ពិនិត្យមិនបានទេ — ' + ((e && e.message) || 'check failed') });
+            }
+            genBody.personaId = _mv.voiceId;
+            genBody.personaModel = 'voice_persona';
+            genBody.model = sunoApiModel(MY_VOICE_MODEL);
+          }
           const _ded = await deductForGeneration(body.email, SONG_POOL === 'media' ? SONG_COST : 0, SONG_POOL === 'media' ? 0 : SONG_COST, 'song:' + provider);
           if (!_ded.ok) return sendJSON(res, 200, { ok: false, error: _ded.error || 'Credit មិនគ្រប់ទេ', needBuy: true, kind: SONG_POOL, balance: _ded.balance, cost: SONG_COST });
           let out;
@@ -5002,7 +5091,7 @@ async function apiRoute(req, res, urlPath) {
             await refundForGeneration(body.email, SONG_POOL === 'media' ? SONG_COST : 0, SONG_POOL === 'media' ? 0 : SONG_COST, 'song:' + provider + ' failed');
             return sendJSON(res, 200, { ok: false, error: (e && e.message) || 'Suno: request failed' });
           }
-          return sendJSON(res, 200, { ok: true, jobId: out.jobId, credits: _ded.credits, songCredits: _ded.songCredits });
+          return sendJSON(res, 200, { ok: true, jobId: out.jobId, credits: _ded.credits, songCredits: _ded.songCredits, model: genBody.model });
         }
         if (provider === 'magichour') {
           // Magic Hour music — POST /v1/ai-music-generator.
@@ -5185,6 +5274,181 @@ async function apiRoute(req, res, urlPath) {
         }
         return sendJSON(res, 200, { ok: false, error: 'Provider មិនស្គាល់ទេ' });
       } catch (e) { return sendJSON(res, 200, { ok: false, error: 'សួរព័ត៌មានមិនបានទេ៖ ' + (e && e.message ? e.message : 'unknown') }); }
+    }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
+    return;
+  }
+  // ---- My Voice (Suno voice clone) endpoints — owner order 2026-11-19 ----
+  // POST /api/voice/upload — {email, filename, data (base64 audio)}.
+  // Uploads a voice sample / verification recording. WAV/MP3/M4A/OGG only
+  // (the browser converts MediaRecorder webm -> WAV before upload, because
+  // Suno takes mp3/wav/flac and the /uploads/ server only serves those).
+  // Stored to Cloudinary (permanent public URL); falls back to the local
+  // /uploads/ store + GitHub backup. Returns {ok, url}.
+  if (req.method === 'POST' && urlPath === '/api/voice/upload') {
+    readJSONBody(req, 30 * 1024 * 1024).then(async (body) => {
+      const email = normEmail(body && body.email);
+      if (!email) return sendJSON(res, 200, { ok: false, error: 'សូមចូលគណនេយ្យជាមុនសិន · Please sign in first', needLogin: true });
+      const ext = uploadSafeExt('audio', body.filename);
+      if (!ext) return sendJSON(res, 200, { ok: false, error: 'សូមជ្រើសឯកសារសំឡេង (MP3/WAV/M4A/OGG) · Please choose an audio file (MP3/WAV/M4A/OGG)' });
+      const b64 = typeof body.data === 'string' ? body.data.replace(/\s/g, '') : '';
+      if (!b64 || !/^[A-Za-z0-9+/=]+$/.test(b64)) return sendJSON(res, 200, { ok: false, error: 'ទិន្នន័យសំឡេងមិនត្រឹមត្រូវទេ' });
+      const buf = Buffer.from(b64, 'base64');
+      if (!buf.length || buf.length > 20 * 1024 * 1024) return sendJSON(res, 200, { ok: false, error: 'ឯកសារសំឡេងធំពេក (អតិបរមា 20 MB)' });
+      const mime = ext === '.mp3' ? 'audio/mpeg' : ext === '.wav' ? 'audio/wav' : ext === '.m4a' ? 'audio/mp4' : 'audio/ogg';
+      const name = 'voice-' + Date.now().toString(36) + '-' + crypto.randomInt(100000, 999999) + ext;
+      let url = null;
+      try { url = await cloudinaryStoreVoice(buf, mime, name); } catch (e) { url = null; }
+      if (!url) {
+        try {
+          fs.mkdirSync(path.join(DATA_DIR, 'uploads'), { recursive: true });
+          fs.writeFileSync(path.join(UPLOADS_DIR, name), buf);
+          const proto = req.headers && req.headers['x-forwarded-proto'] === 'http' ? 'http' : 'https';
+          const host = (req.headers && req.headers.host) || 'movai-proxy.onrender.com';
+          if (!(await ghPutUploadVerified(name, b64))) return sendJSON(res, 200, { ok: false, error: 'រក្សាទុកឯកសារបរាជ័យ — សូមព្យាយាមម្តងទៀត' });
+          url = proto + '://' + host + '/uploads/' + name;
+        } catch (e) {
+          return sendJSON(res, 200, { ok: false, error: 'រក្សាទុកសំឡេងបរាជ័យ' });
+        }
+      }
+      return sendJSON(res, 200, { ok: true, url, name, size: buf.length });
+    }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹಮត្រូវទេ', 'Bad request')));
+    return;
+  }
+  // POST /api/voice/validate — {email, voiceUrl, vocalStartS, vocalEndS, language}.
+  // Starts the Suno Voice validation-phrase task. language has NO Khmer
+  // (en/zh/es/fr/pt/de/ja/ko/hi/ru only) — default 'en'. Returns {ok, taskId}.
+  // FREE (no credit deducted).
+  if (req.method === 'POST' && urlPath === '/api/voice/validate') {
+    readJSONBody(req, 64 * 1024).then(async (body) => {
+      const email = normEmail(body && body.email);
+      if (!email) return sendJSON(res, 200, { ok: false, error: 'សូមចូលគណនេយ្យជាមុនសិន · Please sign in first', needLogin: true });
+      const voiceUrl = typeof body.voiceUrl === 'string' ? body.voiceUrl.trim().slice(0, 2000) : '';
+      if (!/^https:\/\//i.test(voiceUrl)) return sendJSON(res, 200, { ok: false, error: 'សូម Upload សំឡេងជាមុនសិន' });
+      const vs = numOr(body.vocalStartS, 0);
+      const ve = numOr(body.vocalEndS, 0);
+      if (!(ve > vs) || ve - vs < 1 || ve - vs > 120) return sendJSON(res, 200, { ok: false, error: 'សូមជ្រើសផ្នែកសំឡេង (1–120 វិនាទី)' });
+      const lang = typeof body.language === 'string' && MY_VOICE_LANGS.includes(body.language.trim().toLowerCase()) ? body.language.trim().toLowerCase() : 'en';
+      try {
+        const j = await sunoVoiceCall('/api/v1/voice/validate', 'POST', { voiceUrl, vocalStartS: Math.floor(vs), vocalEndS: Math.floor(ve), language: lang, callBackUrl: SUNO_CALLBACK_URL });
+        const taskId = j && j.data && typeof j.data.taskId === 'string' ? j.data.taskId : '';
+        if (!taskId) return sendJSON(res, 200, { ok: false, error: 'Suno Voice: មិនបាន taskId ទេ' });
+        await myVoiceSave(email, { validateTaskId: taskId, voiceUrl, language: lang, validateAt: new Date().toISOString() });
+        return sendJSON(res, 200, { ok: true, taskId });
+      } catch (e) {
+        return sendJSON(res, 200, { ok: false, error: (e && e.message) || 'Suno Voice: validate failed' });
+      }
+    }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
+    return;
+  }
+  // GET /api/voice/validate-info?email=&taskId= — poll for the phrase.
+  // Returns {ok, validateInfo, status}. The phrase is ENGLISH (no Khmer).
+  if (req.method === 'GET' && urlPath === '/api/voice/validate-info') {
+    (async () => {
+      const qp = new URL(req.url, 'http://localhost').searchParams;
+      const email = normEmail(qp.get('email') || '');
+      const taskId = String(qp.get('taskId') || '').trim().slice(0, 200);
+      if (!email || !taskId) return sendJSON(res, 200, { ok: false, error: 'taskId មិនត្រឹមត្រូវទេ' });
+      try {
+        const j = await sunoVoiceCall('/api/v1/voice/validate-info?taskId=' + encodeURIComponent(taskId), 'GET', null);
+        const d = (j && j.data) || {};
+        return sendJSON(res, 200, { ok: true, validateInfo: typeof d.validateInfo === 'string' ? d.validateInfo : '', status: typeof d.status === 'string' ? d.status : '', errorCode: d.errorCode || 0, errorMessage: typeof d.errorMessage === 'string' ? d.errorMessage : '' });
+      } catch (e) {
+        return sendJSON(res, 200, { ok: false, error: (e && e.message) || 'Suno Voice: validate-info failed' });
+      }
+    })().catch(() => sendJSON(res, 200, { ok: false, error: 'សួរព័ត៌មានមិនបានទេ' }));
+    return;
+  }
+  // POST /api/voice/generate — {email, taskId, verifyUrl, voiceName}.
+  // Submits the phrase recording; Suno creates the reusable voice.
+  // Returns {ok, taskId} (the voice task id — poll record-info for voiceId).
+  // FREE (no credit deducted).
+  if (req.method === 'POST' && urlPath === '/api/voice/generate') {
+    readJSONBody(req, 64 * 1024).then(async (body) => {
+      const email = normEmail(body && body.email);
+      if (!email) return sendJSON(res, 200, { ok: false, error: 'សូមចូលគណនេយ្យជាមុនសិន · Please sign in first', needLogin: true });
+      const taskId = typeof body.taskId === 'string' ? body.taskId.trim().slice(0, 200) : '';
+      const verifyUrl = typeof body.verifyUrl === 'string' ? body.verifyUrl.trim().slice(0, 2000) : '';
+      if (!taskId || !/^https:\/\//i.test(verifyUrl)) return sendJSON(res, 200, { ok: false, error: 'taskId / verifyUrl មិនត្រឹមត្រូវទេ' });
+      const voiceName = typeof body.voiceName === 'string' ? body.voiceName.trim().slice(0, 50) : 'My Voice';
+      try {
+        const j = await sunoVoiceCall('/api/v1/voice/generate', 'POST', { taskId, verifyUrl, voiceName, singerSkillLevel: 'beginner', callBackUrl: SUNO_CALLBACK_URL });
+        const vTaskId = j && j.data && typeof j.data.taskId === 'string' ? j.data.taskId : '';
+        if (!vTaskId) return sendJSON(res, 200, { ok: false, error: 'Suno Voice: មិនបាន taskId ទេ' });
+        await myVoiceSave(email, { voiceTaskId: vTaskId, voiceName, generateAt: new Date().toISOString() });
+        return sendJSON(res, 200, { ok: true, taskId: vTaskId });
+      } catch (e) {
+        return sendJSON(res, 200, { ok: false, error: (e && e.message) || 'Suno Voice: generate failed' });
+      }
+    }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
+    return;
+  }
+  // GET /api/voice/record-info?email=&taskId= — poll for the voiceId.
+  // When status is 'success', stores voiceId server-side (u.myVoice) and
+  // returns {ok, ready:true, status}. The voiceId is NEVER returned.
+  if (req.method === 'GET' && urlPath === '/api/voice/record-info') {
+    (async () => {
+      const qp = new URL(req.url, 'http://localhost').searchParams;
+      const email = normEmail(qp.get('email') || '');
+      const taskId = String(qp.get('taskId') || '').trim().slice(0, 200);
+      if (!email || !taskId) return sendJSON(res, 200, { ok: false, error: 'taskId មិនត្រឹមត្រូវទេ' });
+      try {
+        const j = await sunoVoiceCall('/api/v1/voice/record-info?taskId=' + encodeURIComponent(taskId), 'GET', null);
+        const d = (j && j.data) || {};
+        const status = typeof d.status === 'string' ? d.status : '';
+        const voiceId = typeof d.voiceId === 'string' ? d.voiceId : '';
+        if (status === 'success' && voiceId) {
+          await myVoiceSave(email, { voiceId, voiceTaskId: taskId, available: true });
+          return sendJSON(res, 200, { ok: true, ready: true, status });
+        }
+        if (status === 'fail') return sendJSON(res, 200, { ok: true, ready: false, status, errorCode: d.errorCode || 0, errorMessage: typeof d.errorMessage === 'string' ? d.errorMessage : '' });
+        return sendJSON(res, 200, { ok: true, ready: false, status });
+      } catch (e) {
+        return sendJSON(res, 200, { ok: false, error: (e && e.message) || 'Suno Voice: record-info failed' });
+      }
+    })().catch(() => sendJSON(res, 200, { ok: false, error: 'សួរព័ត៌មានមិនបានទេ' }));
+    return;
+  }
+  // POST /api/voice/check — {email}. Checks the user's voice availability
+  // (Suno check-voice) before a My Voice generation. Returns {ok, hasVoice, available}.
+  if (req.method === 'POST' && urlPath === '/api/voice/check') {
+    readJSONBody(req, 64 * 1024).then(async (body) => {
+      const email = normEmail(body && body.email);
+      if (!email) return sendJSON(res, 200, { ok: false, error: 'សូមចូលគណនេយ្យជាមុនសិន · Please sign in first', needLogin: true });
+      const users = await loadUsers();
+      const v = myVoiceGet(users[email]);
+      if (!v || !v.voiceId || !v.voiceTaskId) return sendJSON(res, 200, { ok: true, hasVoice: false, available: false });
+      try {
+        const j = await sunoVoiceCall('/api/v1/voice/check-voice', 'POST', { task_id: v.voiceTaskId });
+        const avail = !!(j && j.data && j.data.isAvailable === true);
+        await myVoiceSave(email, { available: avail });
+        return sendJSON(res, 200, { ok: true, hasVoice: true, available: avail });
+      } catch (e) {
+        return sendJSON(res, 200, { ok: false, error: (e && e.message) || 'Suno Voice: check failed' });
+      }
+    }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
+    return;
+  }
+  // GET /api/voice/status?email= — {ok, hasVoice, available, voiceName}.
+  // Never returns the voiceId.
+  if (req.method === 'GET' && urlPath === '/api/voice/status') {
+    (async () => {
+      const qp = new URL(req.url, 'http://localhost').searchParams;
+      const email = normEmail(qp.get('email') || '');
+      if (!email) return sendJSON(res, 200, { ok: false, error: 'email មិនត្រឹមត្រូវទេ' });
+      const users = await loadUsers();
+      const v = myVoiceGet(users[email]);
+      if (!v || !v.voiceId) return sendJSON(res, 200, { ok: true, hasVoice: false, available: false, voiceName: '' });
+      return sendJSON(res, 200, { ok: true, hasVoice: true, available: v.available !== false, voiceName: typeof v.voiceName === 'string' ? v.voiceName : 'My Voice' });
+    })().catch(() => sendJSON(res, 200, { ok: false, error: 'សួរព័ត៌មានមិនបានទេ' }));
+    return;
+  }
+  // POST /api/voice/delete — {email}. Removes the user's saved voice.
+  if (req.method === 'POST' && urlPath === '/api/voice/delete') {
+    readJSONBody(req, 64 * 1024).then(async (body) => {
+      const email = normEmail(body && body.email);
+      if (!email) return sendJSON(res, 200, { ok: false, error: 'សូមចូលគណនេយ្យជាមុនសិន · Please sign in first', needLogin: true });
+      await myVoiceClear(email);
+      return sendJSON(res, 200, { ok: true });
     }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
     return;
   }
