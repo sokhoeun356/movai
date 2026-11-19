@@ -4783,7 +4783,7 @@ async function apiRoute(req, res, urlPath) {
             if (style) tagsParts.push(style);
             if (voice === 'male') tagsParts.push('male vocals');
             else if (voice === 'female') tagsParts.push('female vocals');
-            reqBody = { custom_mode: true, mv: 'sonic-v6', prompt: lyrics.slice(0, 10000), tags: tagsParts.join(', ').slice(0, 1000) };
+            reqBody = { custom_mode: true, mv: 'sonic-v6', prompt: lyrics.slice(0, 5000), tags: tagsParts.join(', ').slice(0, 1000) };
             if (title) reqBody.title = title.slice(0, 80);
             if (voice === 'male') reqBody.vocal_gender = 'm';
             else if (voice === 'female') reqBody.vocal_gender = 'f';
@@ -4838,7 +4838,7 @@ async function apiRoute(req, res, urlPath) {
             callBackUrl: SUNO_CALLBACK_URL,
             model: sunoApiModel(model),
             style: (style || 'pop').slice(0, 1000),
-            lyrics: (lyrics || prompt || '').slice(0, 10000),
+            lyrics: (lyrics || prompt || '').slice(0, 5000),
             title: title.slice(0, 80),
           };
           if (voice === 'male') genBody.vocalGender = 'm';
@@ -4889,7 +4889,7 @@ async function apiRoute(req, res, urlPath) {
             duration: mhDuration,
             style: {
               instrumental: instrumental,
-              lyrics: lyrics.slice(0, 10000),
+              lyrics: lyrics.slice(0, 5000),
               prompt: mhPrompt,
             },
           };
