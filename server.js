@@ -10332,7 +10332,7 @@ async function apiRoute(req, res, urlPath) {
       }
       const visibility = body.visibility === 'private' ? 'private' : 'public';
       const aspectRaw = typeof body.aspect === 'string' ? body.aspect.trim() : '';
-      const aspect = (aspectRaw === '1x1' || aspectRaw === '4x6') ? aspectRaw : '';
+      const aspect = (aspectRaw === '1x1' || aspectRaw === '4x6' || aspectRaw === '16:9') ? aspectRaw : '';
       const youtube = typeof body.youtube === 'string' ? body.youtube.trim().slice(0, 2000) : '';
       const youtubeChannel = typeof body.youtubeChannel === 'string' ? body.youtubeChannel.trim().slice(0, 2000) : '';
       const avatar = typeof body.avatar === 'string' ? body.avatar.trim().slice(0, 500) : '';
