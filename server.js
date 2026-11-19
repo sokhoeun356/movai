@@ -5301,7 +5301,7 @@ async function apiRoute(req, res, urlPath) {
       if (!url) {
         try {
           fs.mkdirSync(path.join(DATA_DIR, 'uploads'), { recursive: true });
-          fs.writeFileSync(path.join(UPLOADS_DIR, name), buf);
+          fs.writeFileSync(path.join(DATA_DIR, 'uploads', name), buf);
           const proto = req.headers && req.headers['x-forwarded-proto'] === 'http' ? 'http' : 'https';
           const host = (req.headers && req.headers.host) || 'movai-proxy.onrender.com';
           if (!(await ghPutUploadVerified(name, b64))) return sendJSON(res, 200, { ok: false, error: 'រក្សាទុកឯកសារបរាជ័យ — សូមព្យាយាមម្តងទៀត' });
