@@ -8559,17 +8559,37 @@ async function apiRoute(req, res, urlPath) {
     c.config({ cloud_name: a.cloudName, api_key: a.apiKey, api_secret: a.apiSecret });
     return c;
   }
+  // Cloudinary REJECTS non-ASCII (percent-encoded) characters in the
+  // fl_attachment transformation flag — a Khmer title percent-encoded
+  // into the flag returns HTTP 400 "Invalid flag in transformation:
+  // attachment:%E1%9E%87..." and the MP3 download fails (owner hit
+  // this 2026-11-19 on a Suno song with a Khmer title). The attachment
+  // filename MUST be ASCII-only. Strip every non-ASCII character; if
+  // the title had no ASCII characters at all (a pure Khmer title),
+  // fall back to `fallback` (a safe name such as "MovAi-song") so the
+  // download still works — the file just saves under the safe name
+  // instead of the Khmer title. An empty title returns '' (caller
+  // uses a bare fl_attachment, as before).
+  function cloudinaryAsciiName(title, fallback) {
+    const raw = String(title || '').trim();
+    if (!raw) return '';
+    const t = raw.replace(/[\\/:*?"<>|()\[\]{}#&=]/g, '').replace(/\s+/g, ' ').replace(/[^\x20-\x7E]/g, '').replace(/\s+/g, ' ').trim().slice(0, 120);
+    if (t) return t;
+    const fb = String(fallback || 'MovAi-song').replace(/[^\x20-\x7E]/g, '').trim();
+    return fb || 'MovAi-song';
+  }
   // Build the download URL for a stored Cloudinary song. `title` is the
   // song's display name (optional) — when given, it becomes the download
   // filename via fl_attachment:<title> so the saved file is named after
   // the song (e.g. "WHY IS LIFE SO HARD ON ME.mp3") instead of the
   // provider's generic name ("output.mp3"). The title is sanitised to
-  // URL-safe characters (spaces kept, Khmer kept as percent-encoded
-  // UTF-8, slashes/quotes stripped) so the URL stays valid.
+  // ASCII-only characters (spaces kept, slashes/quotes stripped,
+  // non-ASCII such as Khmer removed — Cloudinary rejects non-ASCII in
+  // the fl_attachment flag) so the URL stays valid.
   function cloudinaryMp3UrlFor(a, publicId, title) {
     const c = cloudinaryConfigFor(a);
     if (!c) return null;
-    const t = String(title || '').trim().replace(/[\\/:*?"<>|()\[\]{}#&=]/g, '').replace(/\s+/g, ' ').slice(0, 120);
+    const t = cloudinaryAsciiName(title, 'MovAi-song');
     if (t) {
       // fl_attachment:<name> sets the Content-Disposition filename.
       // Use the SDK's attachment flag with a custom filename: build the
@@ -8587,7 +8607,7 @@ async function apiRoute(req, res, urlPath) {
   // it is not a Cloudinary URL or has no title to apply.
   function cloudinaryUrlWithTitle(url, title) {
     const u = String(url || '');
-    const t = String(title || '').trim().replace(/[\\/:*?"<>|()\[\]{}#&=]/g, '').replace(/\s+/g, ' ').slice(0, 120);
+    const t = cloudinaryAsciiName(title, 'MovAi-song');
     if (!t || u.indexOf('res.cloudinary.com/') < 0 || u.indexOf('fl_attachment') < 0) return u;
     return u.replace(/fl_attachment(?::[^/]*)?/, 'fl_attachment:' + encodeURIComponent(t));
   }
