@@ -1,4 +1,4 @@
-/* MovAi service worker — Web Push (push + notificationclick + install/activate). */
+/* MovAi service worker v2.1.8 — Web Push (push + notificationclick + install/activate). */
 self.addEventListener('install', function (e) { self.skipWaiting(); });
 self.addEventListener('activate', function (e) { e.waitUntil(self.clients.claim()); });
 self.addEventListener('push', function (e) {
