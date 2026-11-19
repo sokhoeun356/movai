@@ -2568,7 +2568,7 @@ async function monetizationRecord(email) {
   const em = normEmail(email);
   if (!em) return null;
   const m = await loadMonetizationEarnings();
-  if (!m[em] || typeof m[em] !== 'object') m[em] = { views: 0, watchSeconds: 0, earnMicro: 0, pendingMicro: 0, paidOutMicro: 0, cashbackTotal: 0, byCountry: {} };
+  if (!m[em] || typeof m[em] !== 'object') m[em] = { views: 0, watchSeconds: 0, earnMicro: 0, pendingMicro: 0, paidOutMicro: 0, cashbackTotal: 0, byCountry: {}, viewsByDate: {}, viewers: {}, newListenerViews: 0 };
   return { m, rec: m[em], em };
 }
 // Lifetime package-cashback total for one user (dollars, 2 decimals).
@@ -2714,6 +2714,21 @@ async function monetizationOnView(ownerEmail, viewerEmail, country, durationSec)
     const _tierMicro = viewEarnMicroForUsers(_tierUsers[viewer], _tierUsers[owner]);
     const _addMicro = (v) => Math.round((numOr(v, 0) + _tierMicro) * 10) / 10;
     rec.views = numOr(rec.views, 0) + 1;
+    // Daily + new-listener views (owner order 2026-11-19 11:35).
+    // Same eligible basis as rec.views (monetization ON + approved).
+    // viewsByDate: {YYYY-MM-DD (Asia/Phnom_Penh): count} — today's
+    // views = viewsByDate[today]. viewers: {viewerEmail: firstDate} —
+    // a viewer's FIRST-EVER view counts once as a new-listener view.
+    // Counts start from this build (no historical per-view data).
+    // Guest views never reach here (viewer email required).
+    if (!rec.viewsByDate || typeof rec.viewsByDate !== 'object') rec.viewsByDate = {};
+    const _today = imgFreeTodayDate();
+    rec.viewsByDate[_today] = numOr(rec.viewsByDate[_today], 0) + 1;
+    if (!rec.viewers || typeof rec.viewers !== 'object') rec.viewers = {};
+    if (!rec.viewers[viewer]) {
+      rec.viewers[viewer] = _today;
+      rec.newListenerViews = numOr(rec.newListenerViews, 0) + 1;
+    }
     rec.earnMicro = _addMicro(rec.earnMicro);
     rec.pendingMicro = _addMicro(rec.pendingMicro);
     if (!rec.byCountry || typeof rec.byCountry !== 'object') rec.byCountry = {};
@@ -4015,6 +4030,7 @@ function sunoApiModel(m) {
   const s = String(m || '').trim().toLowerCase();
   if (s === 'v6-wild' || s === 'v6_wild') return 'V6_WILD';
   if (s === 'v6-mini' || s === 'v6_mini') return 'V6_MINI';
+  if (s === 'v5_5' || s === 'v5.5') return 'V5_5';
   return 'V6';
 }
 // sunoapi.org puts its error text in `msg` (genErrText does not read it).
@@ -6552,6 +6568,8 @@ async function apiRoute(req, res, urlPath) {
       pending: numOr(rec.pendingMicro, 0) / 1000000,
       paidOut: numOr(rec.paidOutMicro, 0) / 1000000,
       watchSeconds: numOr(rec.watchSeconds, 0),
+      viewsToday: numOr((rec.viewsByDate && typeof rec.viewsByDate === 'object') ? rec.viewsByDate[imgFreeTodayDate()] : 0, 0),
+      newListenerViews: numOr(rec.newListenerViews, 0),
       byCountry,
       earnBalance: _u ? walletEarnBalance(_u) : 0,
       viewEarnTiers: VIEW_EARN_TIERS,
@@ -8450,7 +8468,7 @@ async function apiRoute(req, res, urlPath) {
   }
   // Public view of a post. likedBy (liker emails) is never exposed.
   function pubPost(p) {
-    return { id: p.id, email: p.email, name: p.name || '', userId: p.userId || '', avatar: p.avatar || '', mode: p.mode, title: p.title, url: p.url, cover: p.cover || '', aspect: p.aspect || '', youtube: p.youtube || '', youtubeChannel: p.youtubeChannel || '', visibility: p.visibility, likes: p.likes || 0, views: p.views || 0, downloads: p.downloads || 0, createdAt: p.createdAt };
+    return { id: p.id, email: p.email, name: p.name || '', userId: p.userId || '', avatar: p.avatar || '', mode: p.mode, title: p.title, url: p.url, cover: p.cover || '', aspect: p.aspect || '', youtube: p.youtube || '', youtubeChannel: p.youtubeChannel || '', visibility: p.visibility, model: p.model || '', likes: p.likes || 0, views: p.views || 0, downloads: p.downloads || 0, createdAt: p.createdAt };
   }
   // ---- File uploads for the Admin app Post form (MP3 + cover image) ----
   // ---- Server-side MP3 conversion (WAV -> MP3 128kbps) ----
@@ -10105,7 +10123,7 @@ async function apiRoute(req, res, urlPath) {
         userId: typeof body.userId === 'string' ? body.userId.trim().slice(0, 50) : '',
         mode, title, url,
         cover: (typeof body.cover === 'string' && body.cover.trim()) ? body.cover.trim().slice(0, 2000) : (typeof body.image === 'string' ? body.image.trim().slice(0, 2000) : ''),
-        aspect, youtube, youtubeChannel, avatar, visibility, likes: 0, views: 0, downloads: 0, likedBy: [], createdAt: now,
+        aspect, youtube, youtubeChannel, avatar, visibility, model: typeof body.model === 'string' ? body.model.trim().slice(0, 50) : '', likes: 0, views: 0, downloads: 0, likedBy: [], createdAt: now,
       };
       posts.push(p);
       if (posts.length > PUBLIC_MAX) posts.splice(0, posts.length - PUBLIC_MAX);
