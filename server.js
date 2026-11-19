@@ -5190,7 +5190,10 @@ async function apiRoute(req, res, urlPath) {
         try { buf = Buffer.from(b64, 'base64'); } catch (e) { return sendJSON(res, 200, { ok: false, error: 'ឯកសារខូច · Bad file data' }); }
         if (!buf.length || buf.length > 20 * 1024 * 1024) return sendJSON(res, 200, { ok: false, error: 'ឯកសារធំពេក — អតិបរមា 20 MB · File too big — max 20 MB' });
         const safeName = 'cover-' + Date.now().toString(36) + '-' + crypto.randomInt(100000, 999999) + ext;
-        const fpath = path.join(UPLOADS_DIR, safeName);
+        // NOTE: do NOT use UPLOADS_DIR here — it is a const declared
+        // later inside apiRoute (TDZ for this branch, which returns
+        // before reaching it). Use path.join(DATA_DIR, 'uploads') directly.
+        const fpath = path.join(DATA_DIR, 'uploads', safeName);
         try { fs.mkdirSync(path.join(DATA_DIR, 'uploads'), { recursive: true }); } catch (e) {}
         fs.writeFileSync(fpath, buf);
         const proto = req.headers && req.headers['x-forwarded-proto'] === 'http' ? 'http' : 'https';
@@ -5239,8 +5242,11 @@ async function apiRoute(req, res, urlPath) {
           if (!(await adminProviderKeyList('suno')).length) return sendJSON(res, 200, { ok: false, error: 'Admin មិនទាន់ដាក់ Suno Key ទេ' });
           return sendJSON(res, 200, { ok: false, error: 'Admin មិនទាន់ដាក់ Suno endpoint ទេ' });
         }
-        const _ded = await deductForGeneration(email, 0, SONG_COST, 'song:cover');
-        if (!_ded.ok) return sendJSON(res, 200, { ok: false, error: _ded.error || 'Credit មិនគ្រប់ទេ', needBuy: true, kind: 'song', balance: _ded.balance, cost: SONG_COST });
+        // COVER_COST is local: SONG_COST is a `let` scoped to the
+        // /api/gen/song callback and is NOT visible here.
+        const COVER_COST = 12; // Suno cover = 12 Song Credits flat (same as a Suno song).
+        const _ded = await deductForGeneration(email, 0, COVER_COST, 'song:cover');
+        if (!_ded.ok) return sendJSON(res, 200, { ok: false, error: _ded.error || 'Credit មិនគ្រប់ទេ', needBuy: true, kind: 'song', balance: _ded.balance, cost: COVER_COST });
         let out;
         try {
           out = await withProviderKeyRotation('suno', async (k, endpoint) => {
@@ -5269,7 +5275,7 @@ async function apiRoute(req, res, urlPath) {
           }, '', sunoKeys);
         } catch (e) {
           let refunded = false;
-          try { const _rf = await refundForGeneration(email, 0, SONG_COST, 'song:cover failed'); refunded = !!(_rf && _rf.ok); } catch (re) {}
+          try { const _rf = await refundForGeneration(email, 0, COVER_COST, 'song:cover failed'); refunded = !!(_rf && _rf.ok); } catch (re) {}
           if (e && e.coverRejected) {
             return sendJSON(res, 200, { ok: false, code: 'cover_rejected_413', refunded, error: 'បទនេះ Cover មិនបានទេ — វាជាបទដែល Suno បង្កើតរួចហើយ។ សូម Cover បទដែលអ្នកថត/មានខ្លួនឯងវិញ។ មិនបានកាត់ Credit ទេ · This audio can\'t be covered — it was made by Suno. Try covering your own recording instead. No credits used.' });
           }
