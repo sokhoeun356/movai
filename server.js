@@ -3524,6 +3524,10 @@ const MVSEP_STEM_ORDER = ['vocals', 'drums', 'bass', 'other', 'piano', 'guitar']
 // separation against the right key when it finishes via the status
 // endpoint after a poll timeout).
 const _mvsepHashKey = new Map();
+// hash -> audioUrl that created it (in-memory only; lets the status
+// endpoint cache a separation that finished via resume, so a later
+// re-tap reuses the finished job instead of creating a duplicate one).
+const _mvsepHashAudio = new Map();
 // Hashes already counted, so one separation is never counted twice (e.g.
 // if the Studio checks the status of a separation that already succeeded
 // through /api/studio/separate). In-memory only; capped so it cannot
@@ -3576,12 +3580,31 @@ function mvsepIsSuccess(j) {
   return j.success === true || j.success === 'true' || j.success === 1;
 }
 function mvsepIsLimitText(s) {
-  // A "limit" error means THIS key is temporarily unusable, so the
-  // rotation tries the next key. That includes the per-account queue
-  // block ("You already have unprocessed file in queue") — the key's
-  // single concurrent-job slot is occupied by a stuck job, so another
-  // key with a free queue must be tried instead.
-  return /limit|quota|exceed|daily|too many|unprocessed file in queue/i.test(String(s || ''));
+  // A "limit" error means THIS key's daily quota is spent, so the
+  // rotation tries the next key. NOTE: the per-account queue block
+  // ("You already have unprocessed file in queue") is NOT a quota
+  // error — it means the key's single concurrent-job slot is occupied
+  // by a file still being processed, so it is detected separately by
+  // mvsepIsQueueBusyText and reported as 'mvsep_busy' (retry soon),
+  // never as a daily limit (retry tomorrow). Mislabeling it as a
+  // daily limit told the owner all 11 keys were exhausted after only
+  // 1 separation in a day (2026-11-19).
+  return /limit|quota|exceed|daily|too many/i.test(String(s || ''));
+}
+function mvsepIsQueueBusyText(s) {
+  // MVSEP's per-account single-job queue block: this account already
+  // has a file waiting to be processed. Transient — the slot frees
+  // when MVSEP finishes that file. NOT a daily quota.
+  return /unprocessed file in queue/i.test(String(s || ''));
+}
+function mvsepQueueBusyErr(detail, httpStatus) {
+  // Distinct code so the rotation still tries the next key AND the
+  // endpoint can return 'mvsep_busy' (retry in minutes) instead of
+  // 'mvsep_limit' (retry tomorrow). Message MUST NOT contain "quota"
+  // or the endpoint's /quota exceeded/i check would mislabel it.
+  const e = rotErr('MVSEP queue busy — unprocessed file in queue' + (detail ? ': ' + String(detail).slice(0, 120) : ''), httpStatus || 0);
+  e.code = 'mvsep_queue_busy';
+  return e;
 }
 function mvsepQuotaErr(detail, httpStatus) {
   // Message MUST contain "quota" so _isRotatableError treats it as a
@@ -3613,6 +3636,7 @@ async function mvsepCreateSeparation(keyValue, audioUrl) {
   const r = await fetch(MVSEP_CREATE_URL, { method: 'POST', body: fd, headers: { 'User-Agent': 'MovAi/1.0 (https://movai-1.onrender.com)' }, signal: AbortSignal.timeout(120000) });
   const j = await r.json().catch(() => null);
   const text = mvsepErrText(j) || ('HTTP ' + r.status);
+  if (j && j.success === false && mvsepIsQueueBusyText(text)) throw mvsepQueueBusyErr(text, r.status);
   if (r.status === 429 || (j && j.success === false && mvsepIsLimitText(text))) throw mvsepQuotaErr(text, r.status);
   if (r.status === 401 || r.status === 403) throw rotErr('MVSEP: invalid API key (HTTP ' + r.status + ')', r.status);
   // The hash is the real proof of success — accept it whenever it is
@@ -3658,7 +3682,7 @@ async function mvsepSeparateWithKey(keyValue, audioUrl) {
   const hash = await mvsepCreateSeparation(keyValue, audioUrl);
   // Remember which key created this hash (in-memory) so a later status
   // check can count the separation against the right key.
-  try { _mvsepHashKey.set(hash, keyValue); } catch (e) {}
+  try { _mvsepHashKey.set(hash, keyValue); _mvsepHashAudio.set(hash, audioUrl); } catch (e) {}
   const deadline = Date.now() + MVSEP_POLL_TIMEOUT_MS;
   for (;;) {
     const res = await mvsepGetSeparation(hash);
@@ -3674,6 +3698,7 @@ async function mvsepSeparateWithKey(keyValue, audioUrl) {
 }
 function _isRotatableError(e) {
   if (!e) return false;
+  if (e.code === 'mvsep_queue_busy') return true; // queue busy: try the next key (it may have a free queue slot)
   const st = e && e.httpStatus;
   if (st === 401 || st === 403 || st === 429) return true;
   const msg = String((e && e.message) || '').toLowerCase();
@@ -3748,7 +3773,7 @@ async function withProviderKeyRotation(provider, fn, reqKey, candidatesOverride)
       // without reading server logs.
       attempts.push({ key: idx + 1, http: (e && e.httpStatus) || 0, err: String((e && e.message) || e).slice(0, 160) });
       if (!_isRotatableError(e)) { lastErr.attempts = attempts; throw lastErr; }
-      await keyHealthSet(p, idx, 'exhausted', String((e && e.message) || e).slice(0, 120));
+      await keyHealthSet(p, idx, (e && e.code === 'mvsep_queue_busy') ? 'busy' : 'exhausted', String((e && e.message) || e).slice(0, 120));
       if (oi < order.length - 1) console.log('[keys] ' + p + ' key ' + (idx + 1) + '/' + n + ' failed (' + String((e && e.message) || e).slice(0, 120) + '), trying next key');
     }
   }
@@ -6028,6 +6053,7 @@ async function apiRoute(req, res, urlPath) {
         } catch (e) {
           if (e && e.noKey) return sendJSON(res, 200, { ok: false, error: 'mvsep_no_key', message: { km: 'Admin មិនទាន់ដាក់ MVSEP API Key ទេ', en: 'Admin has not added an MVSEP API key yet' } });
           if (e && e.code === 'mvsep_timeout') return sendJSON(res, 200, { ok: false, error: 'mvsep_timeout', hash: e.hash || '', message: { km: 'MVSEP កំពុងបំបែកបទនេះ — សូមរង់ចាំបន្តិច ហើយចុច Split (AI) ម្តងទៀត', en: 'MVSEP is still separating this song — please wait a bit and tap Split (AI) again' } });
+          if (e && e.code === 'mvsep_queue_busy') return sendJSON(res, 200, { ok: false, error: 'mvsep_busy', message: { km: 'MVSEP កំពុងបំបែកបទមុន — សូមរង់ចាំបន្តិច (ប៉ុន្មាននាទី) ហើយចុច Split (AI) ម្តងទៀត', en: 'MVSEP is still processing a previous split — please wait a few minutes and try Split (AI) again' }, debugAttempts: (e && e.attempts) || undefined });
           if (e && /quota exceeded/i.test(String(e.message || ''))) return sendJSON(res, 200, { ok: false, error: 'mvsep_limit', message: { km: 'MVSEP ដល់កំណត់ 50 បទ/ថ្ងៃ លើ Key ទាំងអស់ហើយ — សូមសាកល្បងម្តងទៀតនៅថ្ងៃស្អែក', en: 'MVSEP daily limit of 50 songs/day reached on all keys — please try again tomorrow' }, debugAttempts: (e && e.attempts) || undefined });
           return sendJSON(res, 200, { ok: false, error: (e && e.message) || 'MVSEP: request failed' });
         }
@@ -6067,6 +6093,11 @@ async function apiRoute(req, res, urlPath) {
         if (r.done) {
           const kv = _mvsepHashKey.get(hash);
           if (kv) await recordMvsepSeparation(kv, hash);
+          // Cache it too (the POST path does) so a later re-tap of the
+          // same song reuses this finished job instead of creating a
+          // duplicate separation on another key.
+          const _au = _mvsepHashAudio.get(hash);
+          if (_au) await mvsepCachePut(_au, hash);
           return sendJSON(res, 200, { ok: true, done: true, hash, stems: r.stems });
         }
         return sendJSON(res, 200, { ok: true, done: false, status: 'processing', hash });
