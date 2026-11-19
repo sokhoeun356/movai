@@ -4164,6 +4164,12 @@ function sunoPreviewFromData(d) {
 }
 let _healStarted = false; // startup song-URL heal runs once (see apiRoute top)
 async function apiRoute(req, res, urlPath) {
+  // One Cloudinary upload at a time (serialised through _cloudQueue).
+  // MUST stay at the TOP of apiRoute: cloudinaryStoreSong is called from
+  // early branches (cover-upload) that return before the old declaration
+  // site (~line 8824) is reached — a `let` there is TDZ for those
+  // requests ("Cannot access '_cloudQueue' before initialization").
+  let _cloudQueue = Promise.resolve();
   // Startup heal (owner order 2026-11-18): once, on the first request
   // after (re)start, re-link dead Magic Hour / proxy-upload song URLs to
   // their Cloudinary copy when one exists. Fire-and-forget, never blocks.
@@ -5163,49 +5169,6 @@ async function apiRoute(req, res, urlPath) {
         }
         return sendJSON(res, 200, { ok: false, error: 'Provider មិនស្គាល់ទេ' });
       } catch (e) { return sendJSON(res, 200, { ok: false, error: 'សួរព័ត៌មានមិនបានទេ៖ ' + (e && e.message ? e.message : 'unknown') }); }
-    }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
-    return;
-  }
-  // ---- COVER (2026-11-19, v2.0.8): upload a song you already have ->
-  // Suno sings a COVER (same melody/lyrics, new style/voice).
-  // POST /api/gen/song/cover-upload — {email, filename, data(base64)}.
-  // Saves the file to ./data/uploads/ (transient source — NO GitHub
-  // backup: it is only needed until Cloudinary has fetched it once; the
-  // COVER songs are the durable artifacts and are saved via the normal
-  // History + Cloudinary flow), stores it on Cloudinary and returns the
-  // public Cloudinary MP3 URL, passed straight to Suno as uploadUrl.
-  // Accepts mp3/wav/flac/m4a (Suno takes mp3/wav/flac; Cloudinary
-  // transcodes m4a to MP3, so m4a works too). Max 8 min / 20 MB.
-  if (req.method === 'POST' && urlPath === '/api/gen/song/cover-upload') {
-    readJSONBody(req, 40 * 1024 * 1024).then(async (body) => {
-      try {
-        const email = normEmail(body.email || '');
-        if (!email) return sendJSON(res, 200, { ok: false, error: 'សូមចូលគណនីជាមុនសិន' });
-        const filename = String(body.filename || 'cover.mp3');
-        const ext = uploadSafeExt('audio', filename);
-        if (!ext) return sendJSON(res, 200, { ok: false, error: 'ឯកសារនេះមិនមែនជា Audio ទេ — សូមប្រើ mp3, wav, flac ឬ m4a · Audio only — mp3, wav, flac or m4a' });
-        const b64 = String(body.data || '').replace(/\s/g, '');
-        if (!b64 || !/^[A-Za-z0-9+/=]+$/.test(b64)) return sendJSON(res, 200, { ok: false, error: 'ទិន្នន័យឯកសារមិនត្រឹមត្រូវទេ · Bad file data' });
-        let buf;
-        try { buf = Buffer.from(b64, 'base64'); } catch (e) { return sendJSON(res, 200, { ok: false, error: 'ឯកសារខូច · Bad file data' }); }
-        if (!buf.length || buf.length > 20 * 1024 * 1024) return sendJSON(res, 200, { ok: false, error: 'ឯកសារធំពេក — អតិបរមា 20 MB · File too big — max 20 MB' });
-        const safeName = 'cover-' + Date.now().toString(36) + '-' + crypto.randomInt(100000, 999999) + ext;
-        // NOTE: do NOT use UPLOADS_DIR here — it is a const declared
-        // later inside apiRoute (TDZ for this branch, which returns
-        // before reaching it). Use path.join(DATA_DIR, 'uploads') directly.
-        const fpath = path.join(DATA_DIR, 'uploads', safeName);
-        try { fs.mkdirSync(path.join(DATA_DIR, 'uploads'), { recursive: true }); } catch (e) {}
-        fs.writeFileSync(fpath, buf);
-        const proto = req.headers && req.headers['x-forwarded-proto'] === 'http' ? 'http' : 'https';
-        const host = (req.headers && req.headers.host) || 'movai-proxy.onrender.com';
-        const pubUrl = proto + '://' + host + '/uploads/' + safeName;
-        const stored = await cloudinaryStoreSong(pubUrl, (filename || 'cover').replace(/\.[^.]+$/, ''));
-        if (!stored || stored === 'gone' || !stored.mp3Url) {
-          try { fs.unlinkSync(fpath); } catch (e) {}
-          return sendJSON(res, 200, { ok: false, error: 'អាប់ឡូតបទមិនបានទេ — សូមព្យាយាមម្ដងទៀត · Upload failed — please try again' });
-        }
-        return sendJSON(res, 200, { ok: true, url: stored.mp3Url, name: safeName, size: buf.length });
-      } catch (e) { return sendJSON(res, 200, { ok: false, error: 'អាប់ឡូតបទមិនបានទេ៖ ' + (e && e.message ? e.message : 'unknown') }); }
     }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
     return;
   }
@@ -8820,8 +8783,8 @@ async function apiRoute(req, res, urlPath) {
       detail: st ? st.detail : '',
     };
   }
-  // One Cloudinary upload at a time (serialised through _cloudQueue).
-  let _cloudQueue = Promise.resolve();
+  // (One Cloudinary upload at a time — _cloudQueue is declared at the
+  // TOP of apiRoute; see the comment there. Do NOT re-declare it here.)
   // Classify a Cloudinary upload error so the rotation knows what to do:
   // 'gone' = the SOURCE url expired (404/403/410) — no account can fix it.
   // 'quota' = this account is out of credits / rate-limited — mark it
@@ -9881,6 +9844,56 @@ async function apiRoute(req, res, urlPath) {
       }
     }));
   }
+  // NOTE (2026-11-19): this endpoint MUST stay here (next to
+  // /api/public/upload), AFTER the UPLOADS_DIR / _cloudQueue /
+  // _cloudinary declarations — it calls cloudinaryStoreSong, and
+  // apiRoute returns at the first matching branch, so an early
+  // position leaves those `let`/`const` in the Temporal Dead Zone
+  // (TDZ ReferenceError). Do NOT move it back next to /api/gen/song/cover.
+  // ---- COVER (2026-11-19, v2.0.8): upload a song you already have ->
+  // Suno sings a COVER (same melody/lyrics, new style/voice).
+  // POST /api/gen/song/cover-upload — {email, filename, data(base64)}.
+  // Saves the file to ./data/uploads/ (transient source — NO GitHub
+  // backup: it is only needed until Cloudinary has fetched it once; the
+  // COVER songs are the durable artifacts and are saved via the normal
+  // History + Cloudinary flow), stores it on Cloudinary and returns the
+  // public Cloudinary MP3 URL, passed straight to Suno as uploadUrl.
+  // Accepts mp3/wav/flac/m4a (Suno takes mp3/wav/flac; Cloudinary
+  // transcodes m4a to MP3, so m4a works too). Max 8 min / 20 MB.
+  if (req.method === 'POST' && urlPath === '/api/gen/song/cover-upload') {
+    readJSONBody(req, 40 * 1024 * 1024).then(async (body) => {
+      try {
+        const email = normEmail(body.email || '');
+        if (!email) return sendJSON(res, 200, { ok: false, error: 'សូមចូលគណនីជាមុនសិន' });
+        const filename = String(body.filename || 'cover.mp3');
+        const ext = uploadSafeExt('audio', filename);
+        if (!ext) return sendJSON(res, 200, { ok: false, error: 'ឯកសារនេះមិនមែនជា Audio ទេ — សូមប្រើ mp3, wav, flac ឬ m4a · Audio only — mp3, wav, flac or m4a' });
+        const b64 = String(body.data || '').replace(/\s/g, '');
+        if (!b64 || !/^[A-Za-z0-9+/=]+$/.test(b64)) return sendJSON(res, 200, { ok: false, error: 'ទិន្នន័យឯកសារមិនត្រឹមត្រូវទេ · Bad file data' });
+        let buf;
+        try { buf = Buffer.from(b64, 'base64'); } catch (e) { return sendJSON(res, 200, { ok: false, error: 'ឯកសារខូច · Bad file data' }); }
+        if (!buf.length || buf.length > 20 * 1024 * 1024) return sendJSON(res, 200, { ok: false, error: 'ឯកសារធំពេក — អតិបរមា 20 MB · File too big — max 20 MB' });
+        const safeName = 'cover-' + Date.now().toString(36) + '-' + crypto.randomInt(100000, 999999) + ext;
+        // NOTE: do NOT use UPLOADS_DIR here — it is a const declared
+        // later inside apiRoute (TDZ for this branch, which returns
+        // before reaching it). Use path.join(DATA_DIR, 'uploads') directly.
+        const fpath = path.join(DATA_DIR, 'uploads', safeName);
+        try { fs.mkdirSync(path.join(DATA_DIR, 'uploads'), { recursive: true }); } catch (e) {}
+        fs.writeFileSync(fpath, buf);
+        const proto = req.headers && req.headers['x-forwarded-proto'] === 'http' ? 'http' : 'https';
+        const host = (req.headers && req.headers.host) || 'movai-proxy.onrender.com';
+        const pubUrl = proto + '://' + host + '/uploads/' + safeName;
+        const stored = await cloudinaryStoreSong(pubUrl, (filename || 'cover').replace(/\.[^.]+$/, ''));
+        if (!stored || stored === 'gone' || !stored.mp3Url) {
+          try { fs.unlinkSync(fpath); } catch (e) {}
+          return sendJSON(res, 200, { ok: false, error: 'អាប់ឡូតបទមិនបានទេ — សូមព្យាយាមម្ដងទៀត · Upload failed — please try again' });
+        }
+        return sendJSON(res, 200, { ok: true, url: stored.mp3Url, name: safeName, size: buf.length });
+      } catch (e) { return sendJSON(res, 200, { ok: false, error: 'អាប់ឡូតបទមិនបានទេ៖ ' + (e && e.message ? e.message : 'unknown') }); }
+    }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
+    return;
+  }
+
   if (req.method === 'POST' && urlPath === '/api/public/upload') {
     const a = await adminKeyOk(req);
     if (!a.ok) return sendJSON(res, 200, { ok: false, error: a.error });
