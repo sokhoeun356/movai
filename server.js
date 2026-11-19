@@ -4022,6 +4022,22 @@ function sunoErrText(j, fb) {
   if (j && typeof j.msg === 'string' && j.msg) return j.msg;
   return genErrText(j, fb);
 }
+// Cover rejection (2026-11-19, Cover + credit safety): Suno's
+// copyright/dedup guard rejects a Suno-generated source with
+// GENERATE_AUDIO_FAILED + errorCode 413. Detect it from any of the
+// shapes sunoapi.org returns (body code 413, data.errorCode 413, or
+// '413' in the message) so the caller can refund + show the
+// plain-language message instead of a generic error. Only 413 evidence
+// counts here — any other failure is a generic failure (still refunded).
+function sunoCoverRejected(j) {
+  if (!j || typeof j !== 'object') return false;
+  if (j.code === 413) return true;
+  const d = j.data;
+  if (d && typeof d === 'object' && d.errorCode === 413) return true;
+  const msg = String(j.msg || '');
+  if (msg.indexOf('413') >= 0) return true;
+  return false;
+}
 // sunoapi.org credit endpoint: GET {endpoint}/api/v1/generate/credit
 // answers {code:200, data:<remaining integer>}. The API returns ONLY
 // the remaining balance — no total/used. Parse defensively.
@@ -4127,11 +4143,17 @@ async function translateImgPromptToEnglish(text) {
 function sunoSongsFromData(d) {
   const resp = (d && d.response) || {};
   const arr = Array.isArray(resp.sunoData) ? resp.sunoData : (Array.isArray(d && d.sunoData) ? d.sunoData : []);
+  // Suno track identity (2026-11-19, Cover): keep the taskId + audioId on
+  // every NEW song so a future History-song cover can use the
+  // taskId+audioId path. Old songs without IDs cannot use that path.
+  const taskId = typeof (d && d.taskId) === 'string' ? d.taskId : (typeof resp.taskId === 'string' ? resp.taskId : '');
   return arr.filter((c) => c && typeof c.audio_url === 'string' && c.audio_url).map((c) => ({
     url: c.audio_url,
     title: typeof c.title === 'string' ? c.title : '',
     image: typeof c.image_url === 'string' ? c.image_url : '',
     duration: typeof c.duration === 'number' ? c.duration : 0,
+    audioId: typeof c.id === 'string' ? c.id : (typeof c.audioId === 'string' ? c.audioId : ''),
+    taskId,
   }));
 }
 function sunoPreviewFromData(d) {
@@ -5141,6 +5163,120 @@ async function apiRoute(req, res, urlPath) {
         }
         return sendJSON(res, 200, { ok: false, error: 'Provider មិនស្គាល់ទេ' });
       } catch (e) { return sendJSON(res, 200, { ok: false, error: 'សួរព័ត៌មានមិនបានទេ៖ ' + (e && e.message ? e.message : 'unknown') }); }
+    }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
+    return;
+  }
+  // ---- COVER (2026-11-19, v2.0.8): upload a song you already have ->
+  // Suno sings a COVER (same melody/lyrics, new style/voice).
+  // POST /api/gen/song/cover-upload — {email, filename, data(base64)}.
+  // Saves the file to ./data/uploads/ (transient source — NO GitHub
+  // backup: it is only needed until Cloudinary has fetched it once; the
+  // COVER songs are the durable artifacts and are saved via the normal
+  // History + Cloudinary flow), stores it on Cloudinary and returns the
+  // public Cloudinary MP3 URL, passed straight to Suno as uploadUrl.
+  // Accepts mp3/wav/flac/m4a (Suno takes mp3/wav/flac; Cloudinary
+  // transcodes m4a to MP3, so m4a works too). Max 8 min / 20 MB.
+  if (req.method === 'POST' && urlPath === '/api/gen/song/cover-upload') {
+    readJSONBody(req, 40 * 1024 * 1024).then(async (body) => {
+      try {
+        const email = normEmail(body.email || '');
+        if (!email) return sendJSON(res, 200, { ok: false, error: 'សូមចូលគណនីជាមុនសិន' });
+        const filename = String(body.filename || 'cover.mp3');
+        const ext = uploadSafeExt('audio', filename);
+        if (!ext) return sendJSON(res, 200, { ok: false, error: 'ឯកសារនេះមិនមែនជា Audio ទេ — សូមប្រើ mp3, wav, flac ឬ m4a · Audio only — mp3, wav, flac or m4a' });
+        const b64 = String(body.data || '').replace(/\s/g, '');
+        if (!b64 || !/^[A-Za-z0-9+/=]+$/.test(b64)) return sendJSON(res, 200, { ok: false, error: 'ទិន្នន័យឯកសារមិនត្រឹមត្រូវទេ · Bad file data' });
+        let buf;
+        try { buf = Buffer.from(b64, 'base64'); } catch (e) { return sendJSON(res, 200, { ok: false, error: 'ឯកសារខូច · Bad file data' }); }
+        if (!buf.length || buf.length > 20 * 1024 * 1024) return sendJSON(res, 200, { ok: false, error: 'ឯកសារធំពេក — អតិបរមា 20 MB · File too big — max 20 MB' });
+        const safeName = 'cover-' + Date.now().toString(36) + '-' + crypto.randomInt(100000, 999999) + ext;
+        const fpath = path.join(UPLOADS_DIR, safeName);
+        try { fs.mkdirSync(path.join(DATA_DIR, 'uploads'), { recursive: true }); } catch (e) {}
+        fs.writeFileSync(fpath, buf);
+        const proto = req.headers && req.headers['x-forwarded-proto'] === 'http' ? 'http' : 'https';
+        const host = (req.headers && req.headers.host) || 'movai-proxy.onrender.com';
+        const pubUrl = proto + '://' + host + '/uploads/' + safeName;
+        const stored = await cloudinaryStoreSong(pubUrl, (filename || 'cover').replace(/\.[^.]+$/, ''));
+        if (!stored || stored === 'gone' || !stored.mp3Url) {
+          try { fs.unlinkSync(fpath); } catch (e) {}
+          return sendJSON(res, 200, { ok: false, error: 'អាប់ឡូតបទមិនបានទេ — សូមព្យាយាមម្ដងទៀត · Upload failed — please try again' });
+        }
+        return sendJSON(res, 200, { ok: true, url: stored.mp3Url, name: safeName, size: buf.length });
+      } catch (e) { return sendJSON(res, 200, { ok: false, error: 'អាប់ឡូតបទមិនបានទេ៖ ' + (e && e.message ? e.message : 'unknown') }); }
+    }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
+    return;
+  }
+  // POST /api/gen/song/cover — {email, uploadUrl | taskId+audioId,
+  // title, style, lyrics, vocalGender, model, instrumental}.
+  // Cost 12 song credits flat (same as a Suno song). CREDIT SAFETY
+  // (owner order 2026-11-19): the 12 credits are deducted BEFORE the
+  // Suno call and REFUNDED on ANY failure — network error, Suno error,
+  // AND Suno's 413 copyright rejection. A failed/rejected cover NEVER
+  // costs the user credits (deduct then refund = net 0). The refund is
+  // awaited before answering so the balance the website reads next is
+  // already correct. Status reuses /api/gen/song/status +
+  // /api/suno/callback (they already parse sunoData).
+  if (req.method === 'POST' && urlPath === '/api/gen/song/cover') {
+    readJSONBody(req, 64 * 1024).then(async (body) => {
+      try {
+        const email = normEmail(body.email || '');
+        if (!email) return sendJSON(res, 200, { ok: false, error: 'សូមចូលគណនីជាមុនសិន' });
+        const uploadUrl = typeof body.uploadUrl === 'string' ? body.uploadUrl.trim() : '';
+        const taskId = typeof body.taskId === 'string' ? body.taskId.trim() : '';
+        const audioId = typeof body.audioId === 'string' ? body.audioId.trim() : '';
+        const hasUpload = uploadUrl.length > 0;
+        const hasTrack = taskId.length > 0 && audioId.length > 0;
+        if (!hasUpload && !hasTrack) return sendJSON(res, 200, { ok: false, error: 'សូមជ្រើសរើសបទចម្រៀងជាមុនសិន · Please choose a song first' });
+        if (hasUpload && !/^https?:\/\//i.test(uploadUrl)) return sendJSON(res, 200, { ok: false, error: 'Link បទចម្រៀងមិនត្រឹមត្រូវទេ · Invalid audio URL' });
+        const model = sunoApiModel(body.model || 'v6');
+        const style = typeof body.style === 'string' ? body.style.slice(0, 1000) : '';
+        const title = typeof body.title === 'string' ? body.title.slice(0, 80) : '';
+        const lyrics = typeof body.lyrics === 'string' ? body.lyrics.slice(0, 5000) : '';
+        const instrumental = body.instrumental === true;
+        const vocalGender = (body.vocalGender === 'm' || body.vocalGender === 'f') ? body.vocalGender : undefined;
+        const sunoKeys = (await adminProviderKeyList('suno')).filter((e) => e.endpoint);
+        if (!sunoKeys.length) {
+          if (!(await adminProviderKeyList('suno')).length) return sendJSON(res, 200, { ok: false, error: 'Admin មិនទាន់ដាក់ Suno Key ទេ' });
+          return sendJSON(res, 200, { ok: false, error: 'Admin មិនទាន់ដាក់ Suno endpoint ទេ' });
+        }
+        const _ded = await deductForGeneration(email, 0, SONG_COST, 'song:cover');
+        if (!_ded.ok) return sendJSON(res, 200, { ok: false, error: _ded.error || 'Credit មិនគ្រប់ទេ', needBuy: true, kind: 'song', balance: _ded.balance, cost: SONG_COST });
+        let out;
+        try {
+          out = await withProviderKeyRotation('suno', async (k, endpoint) => {
+            const ep = endpoint.replace(/\/+$/, '');
+            const coverBody = { model, callBackUrl: SUNO_CALLBACK_URL, instrumental };
+            if (hasUpload) coverBody.uploadUrl = uploadUrl;
+            else { coverBody.taskId = taskId; coverBody.audioId = audioId; }
+            if (style) coverBody.style = style;
+            if (title) coverBody.title = title;
+            if (lyrics) coverBody.lyrics = lyrics;
+            if (vocalGender) coverBody.vocalGender = vocalGender;
+            const r = await fetch(ep + '/api/v1/generate/upload-cover', { method: 'POST', headers: { 'Authorization': 'Bearer ' + k, 'Content-Type': 'application/json' }, body: JSON.stringify(coverBody), signal: AbortSignal.timeout(60000) });
+            const j = await r.json().catch(() => null);
+            if (sunoCoverRejected(j)) {
+              // 413 = Suno's copyright/dedup guard: the source IS a
+              // Suno-generated recording and cannot be covered.
+              // Non-rotatable (the same audio is rejected by every
+              // key) — the caller refunds + shows the plain message.
+              const e413 = new Error('Suno: source audio rejected (413)');
+              e413.coverRejected = true;
+              e413.sunoMsg = sunoErrText(j, '');
+              throw e413;
+            }
+            if (j && j.code === 200 && j.data && typeof j.data.taskId === 'string' && j.data.taskId) return { jobId: j.data.taskId };
+            throw rotErr('Suno: ' + sunoErrText(j, 'HTTP ' + r.status), r.status);
+          }, '', sunoKeys);
+        } catch (e) {
+          let refunded = false;
+          try { const _rf = await refundForGeneration(email, 0, SONG_COST, 'song:cover failed'); refunded = !!(_rf && _rf.ok); } catch (re) {}
+          if (e && e.coverRejected) {
+            return sendJSON(res, 200, { ok: false, code: 'cover_rejected_413', refunded, error: 'បទនេះ Cover មិនបានទេ — វាជាបទដែល Suno បង្កើតរួចហើយ។ សូម Cover បទដែលអ្នកថត/មានខ្លួនឯងវិញ។ មិនបានកាត់ Credit ទេ · This audio can\'t be covered — it was made by Suno. Try covering your own recording instead. No credits used.' });
+          }
+          return sendJSON(res, 200, { ok: false, error: (e && e.message) || 'Suno: request failed', refunded });
+        }
+        return sendJSON(res, 200, { ok: true, jobId: out.jobId, credits: _ded.credits, songCredits: _ded.songCredits });
+      } catch (e) { return sendJSON(res, 200, { ok: false, error: 'ហៅ API មិនបានទេ៖ ' + (e && e.message ? e.message : 'unknown') }); }
     }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
     return;
   }
