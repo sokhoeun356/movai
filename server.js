@@ -1236,6 +1236,25 @@ async function coverPendingRefund(jobId) {
     return true;
   } catch (e) { return false; }
 }
+// Find one pending cover job by jobId (for the reuse check below).
+async function coverPendingById(jobId, email) {
+  try {
+    const a = await coverPendingLoad();
+    return a.find((x) => x && x.jobId === jobId && (!email || x.email === email) && !x.refunded) || null;
+  } catch (e) { return null; }
+}
+// Mark a check job as consumed (paid for at Generate) so a second
+// Generate can never reuse it for free.
+async function coverPendingMarkUsed(jobId) {
+  try {
+    const a = await coverPendingLoad();
+    const it = a.find((x) => x && x.jobId === jobId);
+    if (!it) return false;
+    it.used = true;
+    await coverPendingSave(a);
+    return true;
+  } catch (e) { return false; }
+}
 
 // Activity log (./data/activity.json) — one record per generation attempt
 // (create calls only: /api/gen/image, /api/gen/video, /api/gen/song) and
@@ -5916,6 +5935,100 @@ async function apiRoute(req, res, urlPath) {
     }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
     return;
   }
+  // POST /api/gen/song/cover-check — {email, uploadUrl, title, style,
+  // lyrics, vocalGender, model, instrumental, myVoice}.
+  // v2.2.45 (owner 2026-11-20 13:37): the Suno catalog/copyright check
+  // runs HERE, at UPLOAD time — BEFORE any MovAi credit is deducted.
+  // Suno has no separate pre-check API: the catalog check happens inside
+  // the upload-cover call, so this endpoint submits the upload-cover
+  // with the current title/style/lyrics and HOLDS the accepted job in
+  // cover-pending (checked:true + the params used). Generate reuses it
+  // (POST /api/gen/song/cover with reuseJobId) when the params still
+  // match; if they changed, Generate submits fresh (the audio already
+  // cleared the catalog check, so no rejection can surprise it there).
+  // On catalog/413 rejection NOTHING is deducted — the exact Suno
+  // message is returned for the upload area, and Generate stays blocked.
+  if (req.method === 'POST' && urlPath === '/api/gen/song/cover-check') {
+    readJSONBody(req, 64 * 1024).then(async (body) => {
+      try {
+        const email = normEmail(body.email || '');
+        if (!email) return sendJSON(res, 200, { ok: false, error: 'សូមចូលគណនីជាមុនសិន' });
+        const uploadUrl = typeof body.uploadUrl === 'string' ? body.uploadUrl.trim() : '';
+        if (!uploadUrl) return sendJSON(res, 200, { ok: false, error: 'សូមជ្រើសរើសបទចម្រៀងជាមុនសិន · Please choose a song first' });
+        if (!/^https?:\/\//i.test(uploadUrl)) return sendJSON(res, 200, { ok: false, error: 'Link បទចម្រៀងមិនត្រឹមត្រូវទេ · Invalid audio URL' });
+        const model = sunoApiModel(body.model || 'v6');
+        const style = typeof body.style === 'string' ? body.style.slice(0, 1000) : '';
+        const title = typeof body.title === 'string' ? body.title.slice(0, 80) : '';
+        const lyrics = typeof body.lyrics === 'string' ? body.lyrics.slice(0, 5000) : '';
+        const instrumental = body.instrumental === true;
+        const vocalGender = (body.vocalGender === 'm' || body.vocalGender === 'f') ? body.vocalGender : undefined;
+        const _myVoice = body.myVoice === true || body.voice === 'myvoice';
+        let _checkPersonaId = '';
+        if (_myVoice) {
+          const _mvUsers = await loadUsers();
+          const _mv = myVoiceGet(_mvUsers[normEmail(email)]);
+          if (!_mv || !_mv.voiceId || !_mv.voiceTaskId) return sendJSON(res, 200, { ok: false, error: 'សូមបង្កើត My Voice ជាមុនសិន · Please set up My Voice first', needMyVoice: true });
+          try {
+            const _chk = await sunoVoiceCall('/api/v1/voice/check-voice', 'POST', { task_id: _mv.voiceTaskId });
+            if (!(_chk && _chk.data && _chk.data.isAvailable === true)) return sendJSON(res, 200, { ok: false, error: 'My Voice មិនទាន់រួចរាល់ទេ — សូមព្យាយាមម្តងទៀត · My Voice is not ready yet, please try again' });
+          } catch (e) {
+            return sendJSON(res, 200, { ok: false, error: 'My Voice: ពិនិត្យមិនបានទេ — ' + ((e && e.message) || 'check failed') });
+          }
+          _checkPersonaId = _mv.voiceId;
+        }
+        const sunoKeys = (await adminProviderKeyList('suno')).filter((e) => e.endpoint);
+        if (!sunoKeys.length) {
+          if (!(await adminProviderKeyList('suno')).length) return sendJSON(res, 200, { ok: false, error: 'Admin មិនទាន់ដាក់ Suno Key ទេ' });
+          return sendJSON(res, 200, { ok: false, error: 'Admin មិនទាន់ដាក់ Suno endpoint ទេ' });
+        }
+        // NO MovAi deduction here — this is only the copyright check.
+        let out;
+        try {
+          out = await withProviderKeyRotation('suno', async (k, endpoint) => {
+            const ep = endpoint.replace(/\/+$/, '');
+            const checkBody = { model, callBackUrl: SUNO_CALLBACK_URL, instrumental, uploadUrl };
+            if (style) checkBody.style = style;
+            if (title) checkBody.title = title;
+            if (lyrics) checkBody.lyrics = lyrics;
+            if (vocalGender) checkBody.vocalGender = vocalGender;
+            if (_checkPersonaId) { checkBody.personaId = _checkPersonaId; checkBody.personaModel = 'voice_persona'; }
+            checkBody.audioWeight = 0.8;
+            checkBody.styleWeight = 0.5;
+            // NO timeout — Suno's timing is followed exactly (owner
+            // 12:18); Suno takes ~60s to accept a long upload.
+            const r = await fetch(ep + '/api/v1/generate/upload-cover', { method: 'POST', headers: { 'Authorization': 'Bearer ' + k, 'Content-Type': 'application/json' }, body: JSON.stringify(checkBody) });
+            const j = await r.json().catch(() => null);
+            if (sunoCoverRejected(j)) {
+              const e413 = new Error('Suno: source audio rejected (413)');
+              e413.coverRejected = true;
+              e413.sunoMsg = sunoErrText(j, '');
+              throw e413;
+            }
+            if (sunoCatalogRejected(j)) {
+              const eCat = new Error('Suno: This audio matches an existing recording in our catalog.');
+              eCat.coverCatalog = true;
+              eCat.sunoMsg = sunoErrText(j, '');
+              throw eCat;
+            }
+            if (j && j.code === 200 && j.data && typeof j.data.taskId === 'string' && j.data.taskId) return { jobId: j.data.taskId };
+            throw rotErr('Suno: ' + sunoErrText(j, 'HTTP ' + r.status), r.status);
+          }, '', sunoKeys);
+        } catch (e) {
+          if (e && e.coverRejected) {
+            return sendJSON(res, 200, { ok: false, code: 'cover_rejected_413', error: 'បទនេះ Cover មិនបានទេ — វាជាបទដែល Suno បង្កើតរួចហើយ។ សូម Cover បទដែលអ្នកថត/មានខ្លួនឯងវិញ។ មិនបានកាត់ Credit ទេ · This audio can\'t be covered — it was made by Suno. Try covering your own recording instead. No credits used.' });
+          }
+          if (e && e.coverCatalog) {
+            return sendJSON(res, 200, { ok: false, code: 'cover_rejected_catalog', error: 'Suno: This audio matches an existing recording in our catalog. បទនេះជាបទដែល Suno ស្គាល់រួចហើយ (បទល្បី) — Cover មិនបានទេ។ សូម Cover បទដែលអ្នកថត/មានខ្លួនឯងវិញ។ មិនបានកាត់ Credit ទេ · This song is a known recording in Suno\'s catalog — it can\'t be covered. Try your own recording instead. No credits used.' });
+          }
+          return sendJSON(res, 200, { ok: false, error: (e && e.message) || 'Suno: request failed' });
+        }
+        const _params = { title, style, lyrics, model, vocalGender: vocalGender || '', instrumental: !!instrumental, myVoice: !!_myVoice };
+        await coverPendingAdd({ jobId: out.jobId, email, uploadUrl, at: Date.now(), refunded: false, checked: true, used: false, params: _params });
+        return sendJSON(res, 200, { ok: true, jobId: out.jobId });
+      } catch (e) { return sendJSON(res, 200, { ok: false, error: 'ហៅ API មិនបានទេ៖ ' + (e && e.message ? e.message : 'unknown') }); }
+    }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
+    return;
+  }
   // POST /api/gen/song/cover — {email, uploadUrl | taskId+audioId,
   // title, style, lyrics, vocalGender, model, instrumental}.
   // Cost 12 song credits flat (same as a Suno song). CREDIT SAFETY
@@ -5968,9 +6081,32 @@ async function apiRoute(req, res, urlPath) {
         }
         // COVER_COST is local: SONG_COST is a `let` scoped to the
         // /api/gen/song callback and is NOT visible here.
+        // v2.2.45: reuse a job the upload-time check already created
+        // (POST /api/gen/song/cover-check). The check deducted NOTHING,
+        // so the 12 credits are deducted HERE, once, and the job is
+        // marked used so a second Generate can never reuse it for free.
+        // Reuse ONLY when the job is an unused check job for this user
+        // + audio AND the title/style/lyrics/voice still match what the
+        // check submitted with. Anything else falls through to the
+        // normal Suno submit below (the audio already cleared the
+        // catalog check, so no rejection can surprise it there).
+        const _reuseId = typeof body.reuseJobId === 'string' ? body.reuseJobId.trim() : '';
+        let _reuseJob = null;
+        if (_reuseId) {
+          const _cand = await coverPendingById(_reuseId, email);
+          if (_cand && _cand.checked === true && !_cand.used && _cand.uploadUrl === (hasUpload ? uploadUrl : ('task:' + taskId + ':' + audioId))) {
+            const _p = _cand.params || {};
+            const _same = (_p.title || '') === title && (_p.style || '') === style && (_p.lyrics || '') === lyrics && (_p.model || '') === model && (_p.vocalGender || '') === (vocalGender || '') && !!_p.instrumental === !!instrumental && !!_p.myVoice === (body.myVoice === true || body.voice === 'myvoice');
+            if (_same) _reuseJob = _cand;
+          }
+        }
         const COVER_COST = 12; // Suno cover = 12 Song Credits flat (same as a Suno song).
         const _ded = await deductForGeneration(email, 0, COVER_COST, 'song:cover');
         if (!_ded.ok) return sendJSON(res, 200, { ok: false, error: _ded.error || 'Credit មិនគ្រប់ទេ', needBuy: true, kind: 'song', balance: _ded.balance, cost: COVER_COST });
+        if (_reuseJob) {
+          await coverPendingMarkUsed(_reuseJob.jobId);
+          return sendJSON(res, 200, { ok: true, jobId: _reuseJob.jobId, reused: true, credits: _ded.credits, songCredits: _ded.songCredits });
+        }
         let out;
         try {
           out = await withProviderKeyRotation('suno', async (k, endpoint) => {
@@ -6042,7 +6178,7 @@ async function apiRoute(req, res, urlPath) {
         const uploadUrl = String(qp.get('uploadUrl') || '').trim().slice(0, 2000);
         if (!email) return sendJSON(res, 200, { ok: false, error: 'email មិនត្រឹមត្រូវទេ' });
         const job = await coverPendingLatest(email, uploadUrl || '', 30 * 60 * 1000);
-        return sendJSON(res, 200, { ok: true, job: job ? { jobId: job.jobId, at: job.at } : null });
+        return sendJSON(res, 200, { ok: true, job: job ? { jobId: job.jobId, at: job.at, checked: !!job.checked, used: !!job.used, params: job.params || null } : null });
       } catch (e) { return sendJSON(res, 200, { ok: false, error: 'cover-pending: ' + (e && e.message ? e.message : 'unknown') }); }
     })().catch(() => sendJSON(res, 200, { ok: false, error: 'សួរព័ត៌មានមិនបានទេ' }));
     return;
