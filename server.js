@@ -3920,7 +3920,7 @@ const UPDATES_SEED_MODELS = {
   groq: ['openai/gpt-oss-120b', 'llama-3.3-70b-versatile'],
   novai: ['cogview-3-flash', 'cogvideox-flash'],
   suno: ['v6', 'v6-wild', 'v6-mini'],
-  magichour: ['z-image-turbo', 'flux-2-klein', 'qwen-image-2.1', 'krea-2', 'gpt-image-2', 'nano-banana-2.1', 'nano-banana-pro', 'ltx-2.5', 'minimax-h3', 'kling-3.0', 'kling-4.0', 'veo-3.1', 'seedance-2.0', 'seedance-2.5'],
+  magichour: ['z-image-turbo', 'flux-2-klein', 'flux-schnell', 'qwen-image-2.1', 'krea-2', 'gpt-image-2', 'nano-banana-2.1', 'nano-banana-pro', 'ltx-2.5', 'minimax-h3', 'kling-3.0', 'kling-4.0', 'veo-3.1', 'seedance-2.0', 'seedance-2.5'],
   musicapi: ['suno-v6'],
   tavus: [],
   acemusic: [],
@@ -4626,18 +4626,20 @@ async function apiRoute(req, res, urlPath) {
         if (_gateErr) return sendJSON(res, 200, { ok: false, error: _gateErr });
         const _blkErr = await genBlockedCheck(normEmail(body.email), req);
         if (_blkErr) return sendJSON(res, 200, { ok: false, error: _blkErr });
-        // Free 10 images AND 10 thumbnails per 3-day window, SEPARATE
-        // counters (owner order 2026-11-18 20:20; was 10/day shared).
-        // NovAI + Agnes only (0 MovAi credits) — a COUNT cap, not a
-        // charge. Paid/own-key paths (magichour, cloudflare, gemini,
-        // hf) are NOT capped here — media credits / the user's own key
-        // already govern them. The slot is taken BEFORE the provider
-        // call and given back if the provider fails (see
-        // imgFreeRefund in the novai/agnes catch blocks below).
+        // Free 20 images per day AND 10 thumbnails per 3-day window,
+        // SEPARATE counters (owner order 2026-11-20 07:45 — 20/day).
+        // NovAI + Agnes + 'auto' only (0 MovAi credits) — a COUNT cap,
+        // not a charge. Paid/own-key paths (magichour, cloudflare,
+        // gemini, hf) are NOT capped here — media credits / the user's
+        // own key already govern them. The slot is taken BEFORE the
+        // provider call and given back if the provider fails (see
+        // imgFreeRefund in the novai/agnes catch blocks below). For
+        // 'auto', the slot is also given back when the image ends up
+        // coming from Magic Hour (TEST, paid) instead of Agnes.
         // The website passes isThumbnail:true for thumbnails so the
         // thumbnail counter is used; regular images use the image one.
         let _imgFree = null;
-        if (provider === 'novai' || provider === 'agnes') {
+        if (provider === 'novai' || provider === 'agnes' || provider === 'auto') {
           const _freeEm = normEmail(body.email);
           const _freeUsers = await loadUsers();
           const _freeU = _freeUsers[_freeEm];
@@ -4675,7 +4677,7 @@ async function apiRoute(req, res, urlPath) {
         // Server-side credit check (image): Magic Hour costs by model
         // (media credits). NovAI is free. Cloudflare/Gemini use the
         // user's own key, so no MovAi credit is charged.
-        const IMAGE_COSTS = { 'z-image-turbo': 5, 'flux-2-klein': 5, 'qwen-image-2.1': 10, 'krea-2': 10, 'gpt-image-2': 50, 'nano-banana-2.1': 50, 'nano-banana-pro': 150 };
+        const IMAGE_COSTS = { 'z-image-turbo': 5, 'flux-2-klein': 5, 'flux-schnell': 5, 'qwen-image-2.1': 10, 'krea-2': 10, 'gpt-image-2': 50, 'nano-banana-2.1': 50, 'nano-banana-pro': 150 };
         let imgCost = 0;
         if (provider === 'magichour') {
           const _m = typeof body.model === 'string' ? body.model.trim() : '';
@@ -4691,6 +4693,75 @@ async function apiRoute(req, res, urlPath) {
               return sendJSON(res, 200, { ok: false, error: 'Image.Video Credit មិនគ្រប់ទេ · Not enough Image/Video Credits — សូមទិញ Credit បន្ថែម', needBuy: true, kind: 'media', balance: Math.floor(numOr(_imgU.credits, 0)), cost: imgCost });
             }
           }
+        }
+        // ---- Auto image (v2.1.34, chat, provider 'auto') ----
+        // Try Agnes 2.5 -> 2.1 -> 2.0 (free, 0 MovAi credits, free
+        // 20/day). If none can create it, refund the free slot and try
+        // the Magic Hour TEST models (owner 08:01 — TEST only, NOT free,
+        // NOT in the free 20/day; if it works well it becomes Pro).
+        // Each Magic Hour model charges its normal MovAi media credits
+        // (IMAGE_COSTS) and is labelled isTest. The first model that
+        // succeeds wins; the response reports provider/model/cost/isTest
+        // so the website shows exactly what was used.
+        const _autoAgnesModels = ['agnes-image-2.5-flash', 'agnes-image-2.1-flash', 'agnes-image-2.0-flash'];
+        const _autoMHTestModels = ['qwen-image-2.1', 'flux-2-klein', 'krea-2', 'z-image-turbo', 'flux-schnell'];
+        function _autoAgnesRatio() {
+          const _ar = width / height;
+          const _ratios = [['21:9', 21 / 9], ['16:9', 16 / 9], ['3:2', 3 / 2], ['4:3', 4 / 3], ['1:1', 1], ['3:4', 3 / 4], ['2:3', 2 / 3], ['9:16', 9 / 16]];
+          let _r = '1:1', _bd = 1e9;
+          for (const _rr of _ratios) { const _d = Math.abs(Math.log(_ar / _rr[1])); if (_d < _bd) { _bd = _d; _r = _rr[0]; } }
+          return _r;
+        }
+        async function _tryAgnesAuto(model) {
+          return await withProviderKeyRotation('agnes', async (k) => {
+            const r = await fetch('https://apihub.agnes-ai.com/v1/images/generations', { method: 'POST', headers: { 'Authorization': 'Bearer ' + k, 'Content-Type': 'application/json' }, body: JSON.stringify({ model, prompt, size: '1K', ratio: _autoAgnesRatio(), n: 1 }), signal: AbortSignal.timeout(60000) });
+            const j = await r.json().catch(() => null);
+            const url = j && j.data && (Array.isArray(j.data) ? (j.data[0] && (j.data[0].url || j.data[0].image_url)) : (j.data.url || j.data.image_url));
+            if (url) return { done: true, imageUrl: url };
+            const id = j && (j.id || (j.data && !Array.isArray(j.data) && j.data.id));
+            if (id) return { jobId: id };
+            throw rotErr('Agnes: ' + genErrText(j, 'HTTP ' + r.status), r.status);
+          }, key);
+        }
+        async function _tryMHImageAuto(model) {
+          return await withProviderKeyRotation('magichour', async (k) => {
+            const r = await fetch('https://api.magichour.ai/v1/ai-image-generator', { method: 'POST', headers: { 'Authorization': 'Bearer ' + k, 'Content-Type': 'application/json' }, body: JSON.stringify({ name: 'MovAi image', model, style: { prompt } }), signal: AbortSignal.timeout(60000) });
+            const j = await r.json().catch(() => null);
+            const id = j && j.id;
+            if (id) return { jobId: id };
+            throw rotErr('Magic Hour: ' + genErrText(j, 'HTTP ' + r.status), r.status);
+          }, key);
+        }
+        if (provider === 'auto') {
+          let _autoOut = null, _autoProv = null, _autoModel = null, _autoCost = 0, _autoErr = null, _autoCredits, _autoSongCredits;
+          for (const _m of _autoAgnesModels) {
+            try { _autoOut = await _tryAgnesAuto(_m); _autoProv = 'agnes'; _autoModel = _m; break; }
+            catch (e) { _autoErr = e; if (e && e.noKey) break; }
+          }
+          if (!_autoOut) {
+            if (_imgFree) await imgFreeRefund(body.email, body.isThumbnail === true);
+            _imgFree = null;
+            const _uu = (await loadUsers())[normEmail(body.email)];
+            const _bal = _uu ? Math.floor(numOr(_uu.credits, 0)) : 0;
+            for (const _m of _autoMHTestModels) {
+              const _c = IMAGE_COSTS[_m] || 5;
+              if (_bal < _c) continue;
+              const _ded = await deductForGeneration(body.email, _c, 0, 'image:magichour:test:' + _m);
+              if (!_ded.ok) continue;
+              try {
+                _autoOut = await _tryMHImageAuto(_m);
+                _autoProv = 'magichour'; _autoModel = _m; _autoCost = _c; _autoCredits = _ded.credits; _autoSongCredits = _ded.songCredits;
+                break;
+              } catch (e) {
+                await refundForGeneration(body.email, _c, 0, 'image:magichour:test:' + _m + ' failed');
+                _autoErr = e;
+                if (e && e.noKey) break;
+              }
+            }
+          }
+          if (!_autoOut) return sendJSON(res, 200, { ok: false, error: (_autoErr && _autoErr.message) || 'Image failed — please try again' });
+          if (_autoOut.done) return sendJSON(res, 200, { ok: true, done: true, imageUrl: _autoOut.imageUrl, provider: _autoProv, model: _autoModel, imageModel: _autoModel, imgFree: _imgFree, imageCost: _autoCost, isTest: _autoProv === 'magichour' });
+          return sendJSON(res, 200, { ok: true, jobId: _autoOut.jobId, provider: _autoProv, model: _autoModel, imageModel: _autoModel, imgFree: _imgFree, imageCost: _autoCost, credits: _autoCredits, songCredits: _autoSongCredits, isTest: _autoProv === 'magichour' });
         }
         if (provider === 'magichour') {
           // Magic Hour image via the admin-stored keys (browser sends no
