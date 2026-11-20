@@ -4712,6 +4712,16 @@ async function apiRoute(req, res, urlPath) {
           for (const _rr of _ratios) { const _d = Math.abs(Math.log(_ar / _rr[1])); if (_d < _bd) { _bd = _d; _r = _rr[0]; } }
           return _r;
         }
+        // Magic Hour only accepts aspect_ratio 1:1 / 16:9 / 9:16 (v2.1.36:
+        // the fallback image request was missing image_count, which the
+        // Magic Hour API requires, and sent no aspect ratio at all).
+        function _mhImageRatio() {
+          const _ar = width / height;
+          const _ratios = [['16:9', 16 / 9], ['1:1', 1], ['9:16', 9 / 16]];
+          let _r = '1:1', _bd = 1e9;
+          for (const _rr of _ratios) { const _d = Math.abs(Math.log(_ar / _rr[1])); if (_d < _bd) { _bd = _d; _r = _rr[0]; } }
+          return _r;
+        }
         async function _tryAgnesAuto(model) {
           return await withProviderKeyRotation('agnes', async (k) => {
             const r = await fetch('https://apihub.agnes-ai.com/v1/images/generations', { method: 'POST', headers: { 'Authorization': 'Bearer ' + k, 'Content-Type': 'application/json' }, body: JSON.stringify({ model, prompt, size: '1K', ratio: _autoAgnesRatio(), n: 1 }), signal: AbortSignal.timeout(60000) });
@@ -4725,7 +4735,7 @@ async function apiRoute(req, res, urlPath) {
         }
         async function _tryMHImageAuto(model) {
           return await withProviderKeyRotation('magichour', async (k) => {
-            const r = await fetch('https://api.magichour.ai/v1/ai-image-generator', { method: 'POST', headers: { 'Authorization': 'Bearer ' + k, 'Content-Type': 'application/json' }, body: JSON.stringify({ name: 'MovAi image', model, style: { prompt } }), signal: AbortSignal.timeout(60000) });
+            const r = await fetch('https://api.magichour.ai/v1/ai-image-generator', { method: 'POST', headers: { 'Authorization': 'Bearer ' + k, 'Content-Type': 'application/json' }, body: JSON.stringify({ name: 'MovAi image', model, image_count: 1, aspect_ratio: _mhImageRatio(), resolution: '1k', style: { prompt } }), signal: AbortSignal.timeout(60000) });
             const j = await r.json().catch(() => null);
             const id = j && j.id;
             if (id) return { jobId: id };
@@ -4775,7 +4785,7 @@ async function apiRoute(req, res, urlPath) {
           let out;
           try {
             out = await withProviderKeyRotation('magichour', async (k) => {
-              const r = await fetch('https://api.magichour.ai/v1/ai-image-generator', { method: 'POST', headers: { 'Authorization': 'Bearer ' + k, 'Content-Type': 'application/json' }, body: JSON.stringify({ name: 'MovAi image', model, style: { prompt } }), signal: AbortSignal.timeout(60000) });
+              const r = await fetch('https://api.magichour.ai/v1/ai-image-generator', { method: 'POST', headers: { 'Authorization': 'Bearer ' + k, 'Content-Type': 'application/json' }, body: JSON.stringify({ name: 'MovAi image', model, image_count: 1, aspect_ratio: _mhImageRatio(), resolution: '1k', style: { prompt } }), signal: AbortSignal.timeout(60000) });
               const j = await r.json().catch(() => null);
               const id = j && j.id;
               if (id) return { jobId: id };
@@ -4895,6 +4905,7 @@ async function apiRoute(req, res, urlPath) {
               const r = await fetch('https://api.magichour.ai/v1/image-projects/' + encodeURIComponent(jobId), { headers: { 'Authorization': 'Bearer ' + k }, signal: AbortSignal.timeout(30000) });
               const j = await r.json().catch(() => null);
               const st = j && j.status;
+              if (j && j.id && j.id !== jobId) throw rotErr('Magic Hour: wrong project returned', 502);
               if (st === 'complete') {
                 const dl = j.downloads && j.downloads[0] && j.downloads[0].url;
                 if (dl) return { status: 'done', imageUrl: dl };
