@@ -5643,13 +5643,17 @@ async function apiRoute(req, res, urlPath) {
             if (!(await adminProviderKeyList('suno')).length) return sendJSON(res, 200, { ok: false, error: 'Admin មិនទាន់ដាក់ Suno Key ទេ' });
             return sendJSON(res, 200, { ok: false, error: 'Admin មិនទាន់ដាក់ Suno endpoint ទេ' });
           }
+          // v2.2.48: Instrumental ON = MUSIC ONLY (owner 15:26) — same
+          // rule as covers: never send lyrics (or a voice persona) when
+          // the user asked for no singing.
+          const _sunoInstr = (body.instrumental === true || body.make_instrumental === true);
           const genBody = {
             customMode: true,
-            instrumental: (body.instrumental === true || body.make_instrumental === true),
+            instrumental: _sunoInstr,
             callBackUrl: SUNO_CALLBACK_URL,
             model: sunoApiModel(model),
             style: (style || 'pop').slice(0, 1000),
-            lyrics: (lyrics || prompt || '').slice(0, 5000),
+            lyrics: _sunoInstr ? '' : (lyrics || prompt || '').slice(0, 5000),
             title: title.slice(0, 80),
           };
           if (voice === 'male') genBody.vocalGender = 'm';
@@ -5660,7 +5664,7 @@ async function apiRoute(req, res, urlPath) {
           // personaModel voice_persona. The model is forced to
           // MY_VOICE_MODEL (V6 if the live test proves it, else V5_5).
           // A missing/unavailable voice fails BEFORE any credit is deducted.
-          if (body.myVoice === true || body.voice === 'myvoice') {
+          if ((body.myVoice === true || body.voice === 'myvoice') && !_sunoInstr) {
             const _mvUsers = await loadUsers();
             const _mv = myVoiceGet(_mvUsers[normEmail(body.email)]);
             if (!_mv || !_mv.voiceId || !_mv.voiceTaskId) return sendJSON(res, 200, { ok: false, error: 'សូមបង្កើត My Voice ជាមុនសិន · Please set up My Voice first', needMyVoice: true });
@@ -6118,8 +6122,14 @@ async function apiRoute(req, res, urlPath) {
         const title = typeof body.title === 'string' ? body.title.slice(0, 80) : '';
         let lyrics = typeof body.lyrics === 'string' ? body.lyrics.slice(0, 5000) : '';
         const instrumental = body.instrumental === true;
+        // v2.2.48: Instrumental ON = MUSIC ONLY (owner 15:26). Never send
+        // lyrics (typed or transcribed) and never attach a voice persona
+        // when the user asked for no singing — the result must stay
+        // music-only. The lyrics stay in the box on the phone; only the
+        // Suno request drops them.
+        if (instrumental) lyrics = '';
         const vocalGender = (body.vocalGender === 'm' || body.vocalGender === 'f') ? body.vocalGender : undefined;
-        const _myVoice = body.myVoice === true || body.voice === 'myvoice';
+        const _myVoice = (body.myVoice === true || body.voice === 'myvoice') && !instrumental;
         let _checkPersonaId = '';
         if (_myVoice) {
           const _mvUsers = await loadUsers();
@@ -6262,13 +6272,17 @@ async function apiRoute(req, res, urlPath) {
         const title = typeof body.title === 'string' ? body.title.slice(0, 80) : '';
         let lyrics = typeof body.lyrics === 'string' ? body.lyrics.slice(0, 5000) : '';
         const instrumental = body.instrumental === true;
+        // v2.2.48: Instrumental ON = MUSIC ONLY (owner 15:26) — see
+        // cover-check. Dropped here, before the transcribe and the reuse
+        // match, so a music-only request never carries lyrics anywhere.
+        if (instrumental) lyrics = '';
         const vocalGender = (body.vocalGender === 'm' || body.vocalGender === 'f') ? body.vocalGender : undefined;
         // v2.2.42: My Voice for covers (Suno upload-cover supports
         // personaId + personaModel 'voice_persona'). Fail BEFORE any
         // credit is deducted if the voice is not ready — never silently
         // ignore the user's voice choice.
         let _coverPersonaId = '';
-        if (body.myVoice === true || body.voice === 'myvoice') {
+        if ((body.myVoice === true || body.voice === 'myvoice') && !instrumental) {
           const _mvUsers = await loadUsers();
           const _mv = myVoiceGet(_mvUsers[normEmail(email)]);
           if (!_mv || !_mv.voiceId || !_mv.voiceTaskId) return sendJSON(res, 200, { ok: false, error: 'សូមបង្កើត My Voice ជាមុនសិន · Please set up My Voice first', needMyVoice: true });
