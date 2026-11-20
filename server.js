@@ -1904,6 +1904,11 @@ const SETTINGS_DEFAULTS = {
   // earnings are active. When false (default) nothing earns and the
   // website hides the Monetization UI. Default OFF.
   monetization: false,
+  // Account-gated rollout (owner order 2026-11-20 09:54/10:02). When set,
+  // { version, audience } names the version being rolled out and who is
+  // offered it: "owner" = owner's accounts only (ADMIN_EMAILS), "all" =
+  // everyone. Empty version = no gated rollout (everyone offered).
+  rollout: { version: '', audience: 'all' },
   theme: 0, font: 50,
   glassClear: 45, glassBlur: 65, glassShine: 55,
   tshadow: 'none', txtblur: 0, bgb: 50, brandfx: 'none', mode: 'dark',
@@ -1967,6 +1972,13 @@ function cleanSettings(j, base) {
   // Monetization toggle (owner order 2026-11-18). Boolean; invalid
   // values keep the stored value (default OFF).
   if (typeof j.monetization === 'boolean') s.monetization = j.monetization;
+  // Rollout flag (owner order 2026-11-20). Object {version, audience};
+  // audience must be "owner" or "all"; invalid values keep the stored one.
+  if (j.rollout && typeof j.rollout === 'object' && !Array.isArray(j.rollout)) {
+    var _roV = typeof j.rollout.version === 'string' ? j.rollout.version.slice(0, 20) : '';
+    var _roA = (j.rollout.audience === 'owner' || j.rollout.audience === 'all') ? j.rollout.audience : 'all';
+    s.rollout = { version: _roV, audience: _roA };
+  }
   s.theme = Math.round(clampNum(j.theme, 0, 6, s.theme));
   s.font = clampNum(j.font, 0, 100, s.font);
   s.glassClear = clampNum(j.glassClear, 0, 100, s.glassClear);
@@ -7183,6 +7195,48 @@ async function apiRoute(req, res, urlPath) {
       if (!body || typeof body.enabled !== 'boolean') return sendJSON(res, 200, { ok: false, error: 'សូមដាក់ enabled: true/false' });
       const out = await saveSettings(Object.assign(await loadSettings(), { gift50: body.enabled }));
       return sendJSON(res, 200, { ok: true, enabled: out.gift50 === true });
+    }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
+    return;
+  }
+  // ---- Account-gated rollout (owner order 2026-11-20 09:54/10:02) ----
+  // GET /api/public/rollout?version=X&email=Y — PUBLIC. Tells the website
+  // whether version X is offered to this account. When the rollout flag
+  // names version X with audience "owner", only the owner's accounts
+  // (ADMIN_EMAILS) are offered it; everyone else stays on the old version
+  // with no update popup and no Update button. Any other version, or
+  // audience "all", or no flag at all, is offered to everyone.
+  // GET /api/admin/rollout reads the flag (admin key required).
+  // POST /api/admin/rollout {version, audience} sets it — the Admin toggle
+  // that opens a version to everyone when the owner announces it.
+  if (req.method === 'GET' && urlPath === '/api/public/rollout') {
+    const q = new URL(req.url, 'http://localhost').searchParams;
+    const ver = String(q.get('version') || '');
+    const email = normEmail(q.get('email') || '');
+    const s = await loadSettings();
+    const ro = (s && s.rollout && typeof s.rollout === 'object') ? s.rollout : {};
+    const roVer = String(ro.version || '');
+    const aud = String(ro.audience || 'all');
+    let offered = true;
+    if (roVer && ver && roVer === ver && aud === 'owner') {
+      offered = ADMIN_EMAILS.indexOf(email) >= 0;
+    }
+    return sendJSON(res, 200, { ok: true, version: ver, audience: aud, offered });
+  }
+  if (req.method === 'GET' && urlPath === '/api/admin/rollout') {
+    const a = await adminKeyOk(req);
+    if (!a.ok) return sendJSON(res, 200, { ok: false, error: a.error });
+    const s = await loadSettings();
+    const ro = (s && s.rollout && typeof s.rollout === 'object') ? s.rollout : {};
+    return sendJSON(res, 200, { ok: true, version: String(ro.version || ''), audience: String(ro.audience || 'all') });
+  }
+  if (req.method === 'POST' && urlPath === '/api/admin/rollout') {
+    const a = await adminKeyOk(req);
+    if (!a.ok) return sendJSON(res, 200, { ok: false, error: a.error });
+    readJSONBody(req, 64 * 1024).then(async (body) => {
+      if (!body || typeof body.version !== 'string' || (body.audience !== 'owner' && body.audience !== 'all')) return sendJSON(res, 200, { ok: false, error: 'សូមដាក់ version និង audience: owner/all' });
+      const out = await saveSettings(Object.assign(await loadSettings(), { rollout: { version: body.version.slice(0, 20), audience: body.audience } }));
+      const ro = out.rollout || {};
+      return sendJSON(res, 200, { ok: true, version: String(ro.version || ''), audience: String(ro.audience || 'all') });
     }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
     return;
   }
