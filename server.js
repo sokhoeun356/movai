@@ -1255,6 +1255,23 @@ async function coverPendingMarkUsed(jobId) {
     return true;
   } catch (e) { return false; }
 }
+// Count a vocal retry on a cover job (v2.2.46). A cover that comes back
+// instrumental-only (Whisper finds no vocals) is re-submitted at max
+// audioWeight with NO extra MovAi charge — the same cover attempt.
+// Capped at 3 retries per original job. Returns {ok:true, retries} or
+// {ok:false, limit:true} once the cap is hit, {ok:false} if not found.
+async function coverPendingVocalRetry(jobId) {
+  try {
+    const a = await coverPendingLoad();
+    const it = a.find((x) => x && x.jobId === jobId);
+    if (!it) return { ok: false };
+    const n = (it.vocalRetries || 0) + 1;
+    if (n > 3) return { ok: false, limit: true };
+    it.vocalRetries = n;
+    await coverPendingSave(a);
+    return { ok: true, retries: n };
+  } catch (e) { return { ok: false }; }
+}
 
 // Activity log (./data/activity.json) — one record per generation attempt
 // (create calls only: /api/gen/image, /api/gen/video, /api/gen/song) and
@@ -5992,7 +6009,7 @@ async function apiRoute(req, res, urlPath) {
             if (lyrics) checkBody.lyrics = lyrics;
             if (vocalGender) checkBody.vocalGender = vocalGender;
             if (_checkPersonaId) { checkBody.personaId = _checkPersonaId; checkBody.personaModel = 'voice_persona'; }
-            checkBody.audioWeight = 0.8;
+            checkBody.audioWeight = 0.95;
             checkBody.styleWeight = 0.5;
             // NO timeout — Suno's timing is followed exactly (owner
             // 12:18); Suno takes ~60s to accept a long upload.
@@ -6026,6 +6043,40 @@ async function apiRoute(req, res, urlPath) {
         await coverPendingAdd({ jobId: out.jobId, email, uploadUrl, at: Date.now(), refunded: false, checked: true, used: false, params: _params });
         return sendJSON(res, 200, { ok: true, jobId: out.jobId });
       } catch (e) { return sendJSON(res, 200, { ok: false, error: 'ហៅ API មិនបានទេ៖ ' + (e && e.message ? e.message : 'unknown') }); }
+    }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
+    return;
+  }
+  // POST /api/gen/song/cover-vocal-check — {email, audioUrl}.
+  // v2.2.46 (owner 2026-11-20 13:58): a cover MUST sing — the owner
+  // got a cover with music only, no voice. After a cover completes,
+  // the phone runs the result through Groq Whisper here; if Whisper
+  // finds no speech/vocals the cover is instrumental-only and the
+  // phone auto-retries once at max audioWeight (no extra MovAi charge).
+  // Reuses mvLyricsTranscribeSong (fetch + chunking + Whisper). NO
+  // MovAi deduction — Whisper is Groq (free). hasVocals needs real
+  // transcribed words (>= 10 letters); pure music transcribes to
+  // nothing (or a couple of hallucinated words), so it fails the bar.
+  if (req.method === 'POST' && urlPath === '/api/gen/song/cover-vocal-check') {
+    readJSONBody(req, 64 * 1024).then(async (body) => {
+      try {
+        const email = normEmail(body && body.email ? body.email : '');
+        if (!email) return sendJSON(res, 200, { ok: false, error: 'សូមចូលគណនីជាមុនសិន' });
+        const audioUrl = typeof body.audioUrl === 'string' ? body.audioUrl.trim() : '';
+        if (!audioUrl || !/^https?:\/\//i.test(audioUrl)) return sendJSON(res, 200, { ok: false, error: 'Link បទចម្រៀងមិនត្រឹមត្រូវទេ · Invalid audio URL' });
+        let tr;
+        try {
+          tr = await mvLyricsTranscribeSong(audioUrl);
+        } catch (e) {
+          if (e && e.noKey) return sendJSON(res, 200, { ok: false, error: 'Admin មិនទាន់ដាក់ Groq API Key ទេ · Admin has not set a Groq API Key yet' });
+          return sendJSON(res, 200, { ok: false, error: 'ស្ដាប់បទចម្រៀងមិនបាន (Whisper) · Could not transcribe the song (Whisper)' });
+        }
+        if (!tr || !tr.ok) return sendJSON(res, 200, { ok: false, error: (tr && tr.error) ? tr.error : 'ទាញយកបទចម្រៀងមិនបាន · Could not download the song audio' });
+        const segs = Array.isArray(tr.lyrics) ? tr.lyrics : [];
+        const txt = segs.map((x) => (x && x.text) || '').join(' ').trim();
+        const letters = txt.replace(/[^\p{L}]/gu, '');
+        const hasVocals = letters.length >= 10;
+        return sendJSON(res, 200, { ok: true, hasVocals, text: txt.slice(0, 120) });
+      } catch (e) { return sendJSON(res, 200, { ok: false, error: 'ពិនិត្យសំឡេងមិនបានទេ៖ ' + (e && e.message ? e.message : 'unknown') }); }
     }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
     return;
   }
@@ -6079,6 +6130,25 @@ async function apiRoute(req, res, urlPath) {
           if (!(await adminProviderKeyList('suno')).length) return sendJSON(res, 200, { ok: false, error: 'Admin មិនទាន់ដាក់ Suno Key ទេ' });
           return sendJSON(res, 200, { ok: false, error: 'Admin មិនទាន់ដាក់ Suno endpoint ទេ' });
         }
+        // v2.2.46: vocal retry — the cover came back instrumental-only
+        // (Whisper found no vocals). Re-submit with max audioWeight at
+        // NO extra MovAi charge (same cover attempt). Capped at 3
+        // retries per original job so one attempt can never mint free
+        // covers. The original job must belong to this user.
+        const _isVocalRetry = body.vocalRetry === true;
+        const _origJobId = typeof body.origJobId === 'string' ? body.origJobId.trim() : '';
+        let _vocalRetryOk = false;
+        if (_isVocalRetry) {
+          if (!_origJobId) return sendJSON(res, 200, { ok: false, error: 'Cover នេះសាកម្ដងទៀតមិនបានទេ — សូមបង្កើត Cover ថ្មី · This cover cannot be retried — please create a new cover' });
+          const _orig = await coverPendingById(_origJobId, email);
+          if (!_orig) return sendJSON(res, 200, { ok: false, error: 'Cover នេះសាកម្ដងទៀតមិនបានទេ — សូមបង្កើត Cover ថ្មី · This cover cannot be retried — please create a new cover' });
+          const _vr = await coverPendingVocalRetry(_origJobId);
+          if (!_vr.ok) {
+            if (_vr.limit) return sendJSON(res, 200, { ok: false, code: 'vocal_retry_limit', error: 'Cover នេះបានសាកច្រើនដងហើយ — សូមបង្កើត Cover ថ្មី · This cover has been retried enough — please create a new cover' });
+            return sendJSON(res, 200, { ok: false, error: 'Cover នេះសាកម្ដងទៀតមិនបានទេ — សូមបង្កើត Cover ថ្មី · This cover cannot be retried — please create a new cover' });
+          }
+          _vocalRetryOk = true;
+        }
         // COVER_COST is local: SONG_COST is a `let` scoped to the
         // /api/gen/song callback and is NOT visible here.
         // v2.2.45: reuse a job the upload-time check already created
@@ -6092,7 +6162,7 @@ async function apiRoute(req, res, urlPath) {
         // catalog check, so no rejection can surprise it there).
         const _reuseId = typeof body.reuseJobId === 'string' ? body.reuseJobId.trim() : '';
         let _reuseJob = null;
-        if (_reuseId) {
+        if (_reuseId && !_vocalRetryOk) {
           const _cand = await coverPendingById(_reuseId, email);
           if (_cand && _cand.checked === true && !_cand.used && _cand.uploadUrl === (hasUpload ? uploadUrl : ('task:' + taskId + ':' + audioId))) {
             const _p = _cand.params || {};
@@ -6101,7 +6171,8 @@ async function apiRoute(req, res, urlPath) {
           }
         }
         const COVER_COST = 12; // Suno cover = 12 Song Credits flat (same as a Suno song).
-        const _ded = await deductForGeneration(email, 0, COVER_COST, 'song:cover');
+        // v2.2.46: a vocal retry skips the deduction entirely (same attempt).
+        const _ded = _vocalRetryOk ? { ok: true } : await deductForGeneration(email, 0, COVER_COST, 'song:cover');
         if (!_ded.ok) return sendJSON(res, 200, { ok: false, error: _ded.error || 'Credit មិនគ្រប់ទេ', needBuy: true, kind: 'song', balance: _ded.balance, cost: COVER_COST });
         if (_reuseJob) {
           await coverPendingMarkUsed(_reuseJob.jobId);
@@ -6121,7 +6192,9 @@ async function apiRoute(req, res, urlPath) {
             if (_coverPersonaId) { coverBody.personaId = _coverPersonaId; coverBody.personaModel = 'voice_persona'; }
             // v2.2.41: keep the cover CLOSE to the original song (same melody/music,
             // AI re-sings it). audioWeight = audio consistency, styleWeight = style pull.
-            const _aw = (typeof body.audioWeight === 'number' && body.audioWeight >= 0 && body.audioWeight <= 1) ? body.audioWeight : 0.8;
+            // v2.2.46: default audioWeight raised 0.8 -> 0.95 (owner 13:58 — the
+            // cover came back music-only, no singing voice).
+            const _aw = _vocalRetryOk ? 1 : ((typeof body.audioWeight === 'number' && body.audioWeight >= 0 && body.audioWeight <= 1) ? body.audioWeight : 0.95);
             const _sw = (typeof body.styleWeight === 'number' && body.styleWeight >= 0 && body.styleWeight <= 1) ? body.styleWeight : 0.5;
             coverBody.audioWeight = _aw;
             coverBody.styleWeight = _sw;
@@ -6151,7 +6224,9 @@ async function apiRoute(req, res, urlPath) {
           }, '', sunoKeys);
         } catch (e) {
           let refunded = false;
-          try { const _rf = await refundForGeneration(email, 0, COVER_COST, 'song:cover failed'); refunded = !!(_rf && _rf.ok); } catch (re) {}
+          // v2.2.46: a vocal retry deducted nothing, so there is nothing
+          // to refund — only refund a normal (paid) cover attempt.
+          if (!_vocalRetryOk) { try { const _rf = await refundForGeneration(email, 0, COVER_COST, 'song:cover failed'); refunded = !!(_rf && _rf.ok); } catch (re) {} }
           if (e && e.coverRejected) {
             return sendJSON(res, 200, { ok: false, code: 'cover_rejected_413', refunded, error: 'បទនេះ Cover មិនបានទេ — វាជាបទដែល Suno បង្កើតរួចហើយ។ សូម Cover បទដែលអ្នកថត/មានខ្លួនឯងវិញ។ មិនបានកាត់ Credit ទេ · This audio can\'t be covered — it was made by Suno. Try covering your own recording instead. No credits used.' });
           }
@@ -6160,7 +6235,8 @@ async function apiRoute(req, res, urlPath) {
           }
           return sendJSON(res, 200, { ok: false, error: (e && e.message) || 'Suno: request failed', refunded });
         }
-        await coverPendingAdd({ jobId: out.jobId, email, uploadUrl: hasUpload ? uploadUrl : ('task:' + taskId + ':' + audioId), at: Date.now(), refunded: false });
+        await coverPendingAdd({ jobId: out.jobId, email, uploadUrl: hasUpload ? uploadUrl : ('task:' + taskId + ':' + audioId), at: Date.now(), refunded: false, vocalRetryOf: _vocalRetryOk ? _origJobId : '' });
+        if (_vocalRetryOk) return sendJSON(res, 200, { ok: true, jobId: out.jobId, vocalRetry: true });
         return sendJSON(res, 200, { ok: true, jobId: out.jobId, credits: _ded.credits, songCredits: _ded.songCredits });
       } catch (e) { return sendJSON(res, 200, { ok: false, error: 'ហៅ API មិនបានទេ៖ ' + (e && e.message ? e.message : 'unknown') }); }
     }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
