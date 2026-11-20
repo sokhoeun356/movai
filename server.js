@@ -3920,7 +3920,7 @@ const UPDATES_SEED_MODELS = {
   groq: ['openai/gpt-oss-120b', 'llama-3.3-70b-versatile'],
   novai: ['cogview-3-flash', 'cogvideox-flash'],
   suno: ['v6', 'v6-wild', 'v6-mini'],
-  magichour: ['z-image-turbo', 'flux-2-klein', 'qwen-image-2.1', 'krea-2', 'gpt-image-2', 'nano-banana-2.1', 'nano-banana-pro', 'ltx-2.5', 'minimax-h3', 'kling-3.0', 'kling-4.0', 'veo-3.1', 'seedance-2.5'],
+  magichour: ['z-image-turbo', 'flux-2-klein', 'qwen-image-2.1', 'krea-2', 'gpt-image-2', 'nano-banana-2.1', 'nano-banana-pro', 'ltx-2.5', 'minimax-h3', 'kling-3.0', 'kling-4.0', 'veo-3.1', 'seedance-2.0', 'seedance-2.5'],
   musicapi: ['suno-v6'],
   tavus: [],
   acemusic: [],
@@ -4878,12 +4878,37 @@ async function apiRoute(req, res, urlPath) {
         if (_blkErr) return sendJSON(res, 200, { ok: false, error: _blkErr });
         const reqKey = typeof body.key === 'string' ? body.key : '';
         const prompt = body.prompt.trim().slice(0, 4000);
-        const duration = [5, 10].includes(Number(body.duration)) ? Number(body.duration) : 5;
-        // Server-side credit check (video): Magic Hour costs 10 media
-        // credits per second. NovAI is free. Tavus/HF are not charged
+        const _durRaw = Number(body.duration);
+        const _durAllowed = [5, 10, 20, 30, 60];
+        let duration = 5;
+        if (_durAllowed.includes(_durRaw)) duration = _durRaw;
+        else if (Number.isFinite(_durRaw) && _durRaw > 0) {
+          let _best = _durAllowed[0], _bd = 1e9;
+          for (const _a of _durAllowed) { const _dd = Math.abs(_durRaw - _a); if (_dd < _bd) { _bd = _dd; _best = _a; } }
+          duration = _best;
+        }
+        // Magic Hour video tiers (v2.1.33): per-second media-credit rates
+        // from Magic Hour pricing (720p). Normal ltx-2.5 48/s (5-60s),
+        // Medium kling-3.0 60/s (5-15s), High seedance-2.0 216/s (5-10s),
+        // Strongest seedance-2.5 336/s (5-10s). Long videos fall back to Normal.
+        const MH_VIDEO_TIERS = {
+          'ltx-2.5': { rate: 48, maxDur: 60 },
+          'kling-3.0': { rate: 60, maxDur: 15 },
+          'seedance-2.0': { rate: 216, maxDur: 10 },
+          'seedance-2.5': { rate: 336, maxDur: 10 }
+        };
+        const MH_TIER_BY_KEY = { normal: 'ltx-2.5', medium: 'kling-3.0', high: 'seedance-2.0', strongest: 'seedance-2.5' };
+        let vidModel = 'ltx-2.5';
+        if (typeof body.model === 'string' && MH_VIDEO_TIERS[body.model]) vidModel = body.model;
+        else if (typeof body.tier === 'string' && MH_TIER_BY_KEY[body.tier]) vidModel = MH_TIER_BY_KEY[body.tier];
+        let vidTier = MH_VIDEO_TIERS[vidModel];
+        if (duration > vidTier.maxDur) { vidModel = 'ltx-2.5'; vidTier = MH_VIDEO_TIERS[vidModel]; }
+        const vidRate = vidTier.rate;
+        // Server-side credit check (video): Magic Hour costs vidRate media
+        // credits per second (tiered). NovAI is free. Tavus/HF are not charged
         // here (Tavus removed from the website; HF uses the user's key).
         let vidCost = 0;
-        if (provider === 'magichour') vidCost = 10 * duration;
+        if (provider === 'magichour') vidCost = vidRate * duration;
         if (vidCost > 0) {
           const _vidEm = normEmail(body.email);
           if (_vidEm) {
@@ -4925,22 +4950,22 @@ async function apiRoute(req, res, urlPath) {
           // Deduct FIRST (before the provider call) so the user account,
           // the server, and the Admin all show the same reduced balance
           // the moment Generate is tapped. Refunded below if the provider fails.
-          const _dedVid = await deductForGeneration(body.email, vidCost, 0, 'video:magichour:' + duration + 's');
+          const _dedVid = await deductForGeneration(body.email, vidCost, 0, 'video:magichour:' + vidModel + ':' + duration + 's');
           if (!_dedVid.ok) return sendJSON(res, 200, { ok: false, error: _dedVid.error || 'Credit មិនគ្រប់ទេ', needBuy: true, kind: 'media', balance: _dedVid.balance, cost: vidCost });
           let out;
           try {
             out = await withProviderKeyRotation('magichour', async (k) => {
-              const r = await fetch('https://api.magichour.ai/v1/text-to-video', { method: 'POST', headers: { 'Authorization': 'Bearer ' + k, 'Content-Type': 'application/json' }, body: JSON.stringify({ name: 'MovAi video', end_seconds: duration, aspect_ratio: aspect, resolution: resName, model: 'default', style: { prompt } }), signal: AbortSignal.timeout(60000) });
+              const r = await fetch('https://api.magichour.ai/v1/text-to-video', { method: 'POST', headers: { 'Authorization': 'Bearer ' + k, 'Content-Type': 'application/json' }, body: JSON.stringify({ name: 'MovAi video', end_seconds: duration, aspect_ratio: aspect, resolution: resName, model: vidModel, style: { prompt } }), signal: AbortSignal.timeout(60000) });
               const j = await r.json().catch(() => null);
               if (j && j.id) return { jobId: j.id };
               throw rotErr('Magic Hour: ' + genErrText(j, 'HTTP ' + r.status), r.status);
             }, reqKey);
           } catch (e) {
-            await refundForGeneration(body.email, vidCost, 0, 'video:magichour:' + duration + 's failed');
+            await refundForGeneration(body.email, vidCost, 0, 'video:magichour:' + vidModel + ':' + duration + 's failed');
             if (e && e.noKey) return sendJSON(res, 200, { ok: false, error: 'Admin មិនទាន់ដាក់ Magic Hour Key ទេ' });
             return sendJSON(res, 200, { ok: false, error: (e && e.message) || 'Magic Hour: request failed' });
           }
-          return sendJSON(res, 200, { ok: true, jobId: out.jobId, credits: _dedVid.credits, songCredits: _dedVid.songCredits });
+          return sendJSON(res, 200, { ok: true, jobId: out.jobId, credits: _dedVid.credits, songCredits: _dedVid.songCredits, videoModel: vidModel, videoRate: vidRate, videoCost: vidCost, duration });
         }
         if (provider === 'tavus') {
           const replicaId = String(body.replicaId || '').trim();
