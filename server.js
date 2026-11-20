@@ -918,7 +918,7 @@ async function pubUser(u, modelLogins, deviceInfo) {
   const map = modelLogins || await loadModelLogins();
   const model = u.model || '';
   const count = model && map && typeof map === 'object' ? (Number(map[model]) || 0) : 0;
-  const out = { id: u.id || '', email: u.email, name: u.name || '', firstName: u.firstName || '', lastName: u.lastName || '', address: u.address || '', credits: u.credits, songCredits: u.songCredits, balance: Math.round(numOr(u.balance, 0) * 100) / 100, earnBalance: Math.round(numOr(u.earnBalance, 0) * 100) / 100, plan: u.plan || '', songPlan: u.songPlan || '', freeDlUsed: featureFreeUsed(u, 'freeDlUsed'), freeMvUsed: featureFreeUsed(u, 'freeMvUsed'), freeVsUsed: featureFreeUsed(u, 'freeVsUsed'), freePostUsed: featureFreeUsed(u, 'freePostUsed'), freePostUsedByType: freePostUsedByType(u), mvLeft: featurePkgLeft(u, 'mvLeft'), vsLeft: featurePkgLeft(u, 'vsLeft'), bonusDl: featureBonus(u, 'bonusDl'), bonusMv: featureBonus(u, 'bonusMv'), bonusVs: featureBonus(u, 'bonusVs'), bonusPostByType: bonusPostByType(u), createdAt: u.createdAt, updatedAt: u.updatedAt, lastIp: u.lastIp || '', country: u.country || '', countryCode: u.countryCode || '', device: u.device || '', model, modelLogins: count, lastSeen: u.lastSeen || '', knownDevices: Array.isArray(u.knownDevices) ? u.knownDevices : [], hasPassword: !!(u.passwordHash && u.passwordSalt),
+  const out = { id: u.id || '', email: u.email, name: u.name || '', firstName: u.firstName || '', lastName: u.lastName || '', address: u.address || '', credits: u.credits, songCredits: u.songCredits, balance: Math.round(numOr(u.balance, 0) * 100) / 100, earnBalance: Math.round(numOr(u.earnBalance, 0) * 100) / 100, plan: u.plan || '', planExpiresAt: u.planExpiresAt || '', songPlan: u.songPlan || '', songPlanExpiresAt: u.songPlanExpiresAt || '', freeDlUsed: featureFreeUsed(u, 'freeDlUsed'), freeMvUsed: featureFreeUsed(u, 'freeMvUsed'), freeVsUsed: featureFreeUsed(u, 'freeVsUsed'), freePostUsed: featureFreeUsed(u, 'freePostUsed'), freePostUsedByType: freePostUsedByType(u), mvLeft: featurePkgLeft(u, 'mvLeft'), vsLeft: featurePkgLeft(u, 'vsLeft'), bonusDl: featureBonus(u, 'bonusDl'), bonusMv: featureBonus(u, 'bonusMv'), bonusVs: featureBonus(u, 'bonusVs'), bonusPostByType: bonusPostByType(u), createdAt: u.createdAt, updatedAt: u.updatedAt, lastIp: u.lastIp || '', country: u.country || '', countryCode: u.countryCode || '', device: u.device || '', model, modelLogins: count, lastSeen: u.lastSeen || '', knownDevices: Array.isArray(u.knownDevices) ? u.knownDevices : [], hasPassword: !!(u.passwordHash && u.passwordSalt),
     // Device fingerprint (anti-abuse): the device the account was
     // registered on (deviceId, never overwritten by later sign-ins from
     // other devices), the most recent device seen, and the model the
@@ -5976,7 +5976,7 @@ async function apiRoute(req, res, urlPath) {
         const model = sunoApiModel(body.model || 'v6');
         const style = typeof body.style === 'string' ? body.style.slice(0, 1000) : '';
         const title = typeof body.title === 'string' ? body.title.slice(0, 80) : '';
-        const lyrics = typeof body.lyrics === 'string' ? body.lyrics.slice(0, 5000) : '';
+        let lyrics = typeof body.lyrics === 'string' ? body.lyrics.slice(0, 5000) : '';
         const instrumental = body.instrumental === true;
         const vocalGender = (body.vocalGender === 'm' || body.vocalGender === 'f') ? body.vocalGender : undefined;
         const _myVoice = body.myVoice === true || body.voice === 'myvoice';
@@ -5998,11 +5998,31 @@ async function apiRoute(req, res, urlPath) {
           if (!(await adminProviderKeyList('suno')).length) return sendJSON(res, 200, { ok: false, error: 'Admin មិនទាន់ដាក់ Suno Key ទេ' });
           return sendJSON(res, 200, { ok: false, error: 'Admin មិនទាន់ដាក់ Suno endpoint ទេ' });
         }
+        // v2.2.47: Suno's upload-cover returns INSTRUMENTAL when no
+        // lyrics are sent — it does NOT carry the original lyrics
+        // (unlike suno.com, which pre-fills them). When the user left
+        // the lyrics empty, transcribe the uploaded song with Groq
+        // Whisper first and send THOSE words, so Suno always has
+        // something to sing. Fails soft: if the scan finds nothing
+        // usable, the check still submits (the vocal-check retry
+        // remains the safety net). No MovAi deduction — Whisper is Groq.
+        if (!lyrics && !instrumental) {
+          try {
+            const _tr = await mvLyricsTranscribeSong(uploadUrl);
+            if (_tr && _tr.ok && Array.isArray(_tr.lyrics) && _tr.lyrics.length) {
+              const _txt = _tr.lyrics.map((x) => (x && x.text) || '').filter(Boolean).join('\n').trim().slice(0, 5000);
+              if (_txt.replace(/[^\p{L}]/gu, '').length >= 10) lyrics = _txt;
+            }
+          } catch (e) {}
+        }
         // NO MovAi deduction here — this is only the copyright check.
         let out;
         try {
           out = await withProviderKeyRotation('suno', async (k, endpoint) => {
             const ep = endpoint.replace(/\/+$/, '');
+            // v2.2.47: instrumental is ALWAYS sent (false unless the
+            // user asked for instrumental) — Suno must never default
+            // to instrumental on a cover.
             const checkBody = { model, callBackUrl: SUNO_CALLBACK_URL, instrumental, uploadUrl };
             if (style) checkBody.style = style;
             if (title) checkBody.title = title;
@@ -6041,7 +6061,7 @@ async function apiRoute(req, res, urlPath) {
         }
         const _params = { title, style, lyrics, model, vocalGender: vocalGender || '', instrumental: !!instrumental, myVoice: !!_myVoice };
         await coverPendingAdd({ jobId: out.jobId, email, uploadUrl, at: Date.now(), refunded: false, checked: true, used: false, params: _params });
-        return sendJSON(res, 200, { ok: true, jobId: out.jobId });
+        return sendJSON(res, 200, { ok: true, jobId: out.jobId, lyrics });
       } catch (e) { return sendJSON(res, 200, { ok: false, error: 'ហៅ API មិនបានទេ៖ ' + (e && e.message ? e.message : 'unknown') }); }
     }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
     return;
@@ -6105,7 +6125,7 @@ async function apiRoute(req, res, urlPath) {
         const model = sunoApiModel(body.model || 'v6');
         const style = typeof body.style === 'string' ? body.style.slice(0, 1000) : '';
         const title = typeof body.title === 'string' ? body.title.slice(0, 80) : '';
-        const lyrics = typeof body.lyrics === 'string' ? body.lyrics.slice(0, 5000) : '';
+        let lyrics = typeof body.lyrics === 'string' ? body.lyrics.slice(0, 5000) : '';
         const instrumental = body.instrumental === true;
         const vocalGender = (body.vocalGender === 'm' || body.vocalGender === 'f') ? body.vocalGender : undefined;
         // v2.2.42: My Voice for covers (Suno upload-cover supports
@@ -6178,10 +6198,26 @@ async function apiRoute(req, res, urlPath) {
           await coverPendingMarkUsed(_reuseJob.jobId);
           return sendJSON(res, 200, { ok: true, jobId: _reuseJob.jobId, reused: true, credits: _ded.credits, songCredits: _ded.songCredits });
         }
+        // v2.2.47: no-lyrics cover — transcribe the source with Groq
+        // Whisper first (same as cover-check) so Suno always has words
+        // to sing. Only on the fresh-submit path: a reused check job
+        // already carries the lyrics it was submitted with. Fails soft.
+        if (!_reuseJob && !lyrics && !instrumental && hasUpload) {
+          try {
+            const _tr2 = await mvLyricsTranscribeSong(uploadUrl);
+            if (_tr2 && _tr2.ok && Array.isArray(_tr2.lyrics) && _tr2.lyrics.length) {
+              const _txt2 = _tr2.lyrics.map((x) => (x && x.text) || '').filter(Boolean).join('\n').trim().slice(0, 5000);
+              if (_txt2.replace(/[^\p{L}]/gu, '').length >= 10) lyrics = _txt2;
+            }
+          } catch (e) {}
+        }
         let out;
         try {
           out = await withProviderKeyRotation('suno', async (k, endpoint) => {
             const ep = endpoint.replace(/\/+$/, '');
+            // v2.2.47: instrumental is ALWAYS sent (false unless the
+            // user asked for instrumental) — Suno must never default
+            // to instrumental on a cover.
             const coverBody = { model, callBackUrl: SUNO_CALLBACK_URL, instrumental };
             if (hasUpload) coverBody.uploadUrl = uploadUrl;
             else { coverBody.taskId = taskId; coverBody.audioId = audioId; }
