@@ -1203,7 +1203,9 @@ async function coverPendingAdd(job) {
   try {
     const a = await coverPendingLoad();
     const now = Date.now();
-    const kept = a.filter((x) => x && now - (x.at || 0) < 24 * 3600 * 1000);
+    // v2.2.48: keep cover jobs 72h (was 24h) so a late failure can still
+    // be found and auto-refunded by the server sweep.
+    const kept = a.filter((x) => x && now - (x.at || 0) < 72 * 3600 * 1000);
     kept.push(job);
     await coverPendingSave(kept);
   } catch (e) {}
@@ -1212,7 +1214,7 @@ async function coverPendingLatest(email, uploadUrl, maxAgeMs) {
   try {
     const a = await coverPendingLoad();
     const now = Date.now();
-    const list = a.filter((x) => x && x.email === email && (!uploadUrl || x.uploadUrl === uploadUrl) && now - (x.at || 0) < (maxAgeMs || 30 * 60 * 1000) && !x.refunded);
+    const list = a.filter((x) => x && x.email === email && (!uploadUrl || x.uploadUrl === uploadUrl) && now - (x.at || 0) < (maxAgeMs || 72 * 3600 * 1000) && !x.refunded);
     if (!list.length) return null;
     return list[list.length - 1];
   } catch (e) { return null; }
@@ -1229,6 +1231,12 @@ async function coverPendingRefund(jobId) {
     const a = await coverPendingLoad();
     const it = a.find((x) => x && x.jobId === jobId && !x.refunded);
     if (!it) return false;
+    // v2.2.48: refund ONLY a job the user PAID for. A check job that was
+    // never used at Generate cost nothing (no deduction happened), and
+    // a vocal-retry job is a free re-submit of an already-paid attempt —
+    // refunding either would mint free credits. Legacy entries (no paid
+    // flag): paid = a fresh cover, or a check job consumed at Generate.
+    if (!(it.paid === true || (!it.vocalRetryOf && (!it.checked || it.used)))) return false;
     const rf = await refundForGeneration(it.email, 0, 12, 'song:cover failed');
     if (!(rf && rf.ok)) return false;
     it.refunded = true;
@@ -1251,6 +1259,7 @@ async function coverPendingMarkUsed(jobId) {
     const it = a.find((x) => x && x.jobId === jobId);
     if (!it) return false;
     it.used = true;
+    it.paid = true;
     await coverPendingSave(a);
     return true;
   } catch (e) { return false; }
@@ -1270,6 +1279,49 @@ async function coverPendingVocalRetry(jobId) {
     it.vocalRetries = n;
     await coverPendingSave(a);
     return { ok: true, retries: n };
+  } catch (e) { return { ok: false }; }
+}
+// v2.2.48: SERVER-SIDE auto-refund sweep (owner 15:05 — "credits are
+// deducted and NEVER come back"). The only refund triggers used to be
+// the PHONE calling cover-failed or polling /api/gen/song/status —
+// if the phone never reported a failure (app closed, poll missed it),
+// the 12 credits stayed deducted. The sweep lets the SERVER verify
+// failed cover jobs itself: throttled to once per 5 minutes, it takes
+// the oldest unrefunded PAID cover jobs older than 15 minutes, asks
+// Suno record-info for each, and refunds 12 song credits for every job
+// Suno says failed. It never refunds a running, successful, or unpaid
+// (check / vocal-retry) job. Fire-and-forget from cover-check / cover /
+// cover-pending / cover-failed.
+let coverSweepLastAt = 0;
+async function coverPendingSunoStatus(jobId) {
+  try {
+    const keys = (await adminProviderKeyList('suno')).filter((e) => e.endpoint);
+    if (!keys.length) return null;
+    return await withProviderKeyRotation('suno', async (k, endpoint) => {
+      const ep = endpoint.replace(/\/+$/, '');
+      const r = await fetch(ep + '/api/v1/generate/record-info?taskId=' + encodeURIComponent(jobId), { headers: { 'Authorization': 'Bearer ' + k }, signal: AbortSignal.timeout(30000) });
+      const j = await r.json().catch(() => null);
+      const d = (j && j.data) || null;
+      return (d && typeof d.status === 'string') ? d.status : null;
+    }, '', keys);
+  } catch (e) { return null; }
+}
+async function coverPendingSweep() {
+  try {
+    const now = Date.now();
+    if (now - coverSweepLastAt < 5 * 60 * 1000) return { ok: false, reason: 'throttled' };
+    coverSweepLastAt = now;
+    const a = await coverPendingLoad();
+    const due = a.filter((x) => x && !x.refunded && (x.paid === true || (!x.vocalRetryOf && (!x.checked || x.used))) && now - (x.at || 0) > 15 * 60 * 1000)
+      .sort((p, q) => (p.at || 0) - (q.at || 0)).slice(0, 5);
+    let refunded = 0;
+    for (const job of due) {
+      const st = await coverPendingSunoStatus(job.jobId);
+      if (st && sunoStatusIsFailed(st)) {
+        if (await coverPendingRefund(job.jobId)) refunded++;
+      }
+    }
+    return { ok: true, checked: due.length, refunded };
   } catch (e) { return { ok: false }; }
 }
 
@@ -4460,6 +4512,51 @@ function sunoCreditFrom(j) {
   if (typeof j.balance === 'number' && isFinite(j.balance)) return Math.floor(j.balance);
   return null;
 }
+// v2.2.48: a Suno job status that means FAILED (not running, not done).
+// Shared by the server-side cover auto-refund sweep and the Suno
+// callback hook — one rule, one place. SUCCESS / FIRST_SUCCESS /
+// PENDING / TEXT_SUCCESS are the only non-failed states the server
+// treats as alive; anything else present is a failure.
+function sunoStatusIsFailed(st) {
+  if (!st || typeof st !== 'string') return false;
+  const s = st.toUpperCase();
+  return s !== 'SUCCESS' && s !== 'FIRST_SUCCESS' && s !== 'PENDING' && s !== 'TEXT_SUCCESS';
+}
+// v2.2.48: live Suno credit balance per stored Suno key (the same
+// GET {endpoint}/api/v1/generate/credit call the Admin Suno card uses).
+// Returns {totalRemaining, keys:[{key, remaining, status, message?}]}.
+// Key VALUES are never returned (1-based indexes only). Shared by the
+// admin endpoint and the website Profile endpoint below.
+async function sunoBalanceAll() {
+  const list = await adminProviderKeyList('suno');
+  const keys = [];
+  let totalRemaining = 0;
+  for (let i = 0; i < list.length; i++) {
+    const ep = (list[i].endpoint || '').replace(/\/+$/, '');
+    if (!ep) { keys.push({ key: i + 1, remaining: null, status: 'unknown', message: 'មិនមាន gateway endpoint' }); continue; }
+    try {
+      const r = await fetch(ep + '/api/v1/generate/credit', { headers: { 'Authorization': 'Bearer ' + list[i].key }, signal: AbortSignal.timeout(15000) });
+      const j = await r.json().catch(() => null);
+      if (r.status === 401 || r.status === 403) { keys.push({ key: i + 1, remaining: null, status: 'blocked', message: 'Key មិនត្រឹមត្រូវ ឬត្រូវបានប្លុក (HTTP ' + r.status + ')' }); continue; }
+      const rem = sunoCreditFrom(j);
+      if (typeof rem === 'number') { keys.push({ key: i + 1, remaining: rem, status: rem > 0 ? 'green' : 'red' }); totalRemaining += rem; }
+      else keys.push({ key: i + 1, remaining: null, status: 'error', message: 'Suno ឆ្លើយ HTTP ' + r.status });
+    } catch (e) {
+      keys.push({ key: i + 1, remaining: null, status: 'error', message: 'មិនអាចភ្ជាប់បាន — ' + String((e && e.message) || e).slice(0, 120) });
+    }
+  }
+  return { totalRemaining, keys };
+}
+// v2.2.48: the Suno balance cached ~60s in memory so Profile refreshes
+// (and several admins opening Profile at once) don't hammer sunoapi.org.
+let sunoBalanceCache = { at: 0, data: null };
+async function sunoBalanceCached() {
+  const now = Date.now();
+  if (sunoBalanceCache.data && now - sunoBalanceCache.at < 60 * 1000) return sunoBalanceCache.data;
+  const data = await sunoBalanceAll();
+  sunoBalanceCache = { at: now, data };
+  return data;
+}
 // ---- Free image generations (owner order 2026-11-18) ----
 // Every user gets 20 FREE image generations per DAY (owner order
 // 2026-11-20 07:45 — Agnes Pro 10/day + NovAI 10/day combined, since
@@ -5412,6 +5509,10 @@ async function apiRoute(req, res, urlPath) {
         if (taskId) {
           const st = typeof d.status === 'string' ? d.status : '';
           sunoCallbacks.set(taskId, { status: st, songs: sunoSongsFromData(d), preview: sunoPreviewFromData(d), updatedAt: Date.now() });
+          // v2.2.48: Suno reports a failed job here — refund it on the
+          // SERVER at once (no phone report needed). coverPendingRefund
+          // is once-only and paid-only, so a stray callback is harmless.
+          if (st && sunoStatusIsFailed(st)) { try { coverPendingRefund(taskId).catch(function() {}); } catch (e) {} }
           if (sunoCallbacks.size > 200) { const k = sunoCallbacks.keys().next().value; sunoCallbacks.delete(k); }
         }
       } catch (e) {}
@@ -5952,6 +6053,44 @@ async function apiRoute(req, res, urlPath) {
     }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
     return;
   }
+  // v2.2.48: "File fetch failed" fix — re-host the cover source on Suno's
+  // own file host before upload-cover (docs.sunoapi.org: File Upload
+  // API, host https://sunoapiorg.redpandaai.co, same Bearer auth).
+  // Suno's fetcher chokes on the Cloudinary URL MovAi used to send
+  // (fl_attachment:<title> + on-the-fly re-encode transforms), so the
+  // source is uploaded to Suno first and Suno's own URL is passed as
+  // uploadUrl. Files auto-delete after 3 days, max 100MB. Uploads are
+  // free (no Suno credits). Falls back to a CLEAN direct Cloudinary URL
+  // (no fl_attachment, no transforms) when the re-host fails. The
+  // fl_attachment URL is kept ONLY for the user's own Download.
+  function sunoCleanAudioUrl(u) {
+    try {
+      if (!u || typeof u !== 'string' || u.indexOf('res.cloudinary.com/') < 0) return u;
+      let out = u;
+      // No version segment: drop a lone transform segment before movai/.
+      if (!/\/upload\/v\d+\//.test(out)) out = out.replace(/(\/upload\/)[^/]*\/(movai\/)/, '$1$2');
+      // Strip the transformation segment between /upload/ and the version.
+      out = out.replace(/(\/upload\/)[^/]*\/(v\d+\/)/, '$1$2');
+      // Belt and braces: remove any fl_attachment token that survives.
+      out = out.replace(/,?fl_attachment(?::[^/,]*)?/g, '');
+      return out;
+    } catch (e) { return u; }
+  }
+  async function sunoHostAudioUrl(key, sourceUrl, fileName) {
+    try {
+      const r = await fetch('https://sunoapiorg.redpandaai.co/api/file-url-upload', {
+        method: 'POST',
+        headers: { 'Authorization': 'Bearer ' + key, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fileUrl: sourceUrl, fileName: (fileName || 'cover.mp3').slice(0, 120) }),
+        signal: AbortSignal.timeout(60000),
+      });
+      const j = await r.json().catch(() => null);
+      const d = (j && j.data) || {};
+      const u = (typeof d.fileUrl === 'string' && d.fileUrl) || (typeof d.url === 'string' && d.url) || (typeof d.file_url === 'string' && d.file_url) || (typeof j.fileUrl === 'string' && j.fileUrl) || '';
+      if (u) return u;
+    } catch (e) {}
+    return sunoCleanAudioUrl(sourceUrl);
+  }
   // POST /api/gen/song/cover-check — {email, uploadUrl, title, style,
   // lyrics, vocalGender, model, instrumental, myVoice}.
   // v2.2.45 (owner 2026-11-20 13:37): the Suno catalog/copyright check
@@ -5966,6 +6105,7 @@ async function apiRoute(req, res, urlPath) {
   // On catalog/413 rejection NOTHING is deducted — the exact Suno
   // message is returned for the upload area, and Generate stays blocked.
   if (req.method === 'POST' && urlPath === '/api/gen/song/cover-check') {
+    try { coverPendingSweep().catch(function() {}); } catch (e) {}
     readJSONBody(req, 64 * 1024).then(async (body) => {
       try {
         const email = normEmail(body.email || '');
@@ -5998,23 +6138,13 @@ async function apiRoute(req, res, urlPath) {
           if (!(await adminProviderKeyList('suno')).length) return sendJSON(res, 200, { ok: false, error: 'Admin មិនទាន់ដាក់ Suno Key ទេ' });
           return sendJSON(res, 200, { ok: false, error: 'Admin មិនទាន់ដាក់ Suno endpoint ទេ' });
         }
-        // v2.2.47: Suno's upload-cover returns INSTRUMENTAL when no
-        // lyrics are sent — it does NOT carry the original lyrics
-        // (unlike suno.com, which pre-fills them). When the user left
-        // the lyrics empty, transcribe the uploaded song with Groq
-        // Whisper first and send THOSE words, so Suno always has
-        // something to sing. Fails soft: if the scan finds nothing
-        // usable, the check still submits (the vocal-check retry
-        // remains the safety net). No MovAi deduction — Whisper is Groq.
-        if (!lyrics && !instrumental) {
-          try {
-            const _tr = await mvLyricsTranscribeSong(uploadUrl);
-            if (_tr && _tr.ok && Array.isArray(_tr.lyrics) && _tr.lyrics.length) {
-              const _txt = _tr.lyrics.map((x) => (x && x.text) || '').filter(Boolean).join('\n').trim().slice(0, 5000);
-              if (_txt.replace(/[^\p{L}]/gu, '').length >= 10) lyrics = _txt;
-            }
-          } catch (e) {}
-        }
+        // v2.2.48: the check submits AT ONCE — the Whisper scan runs in
+        // parallel on the phone (coverScanLyrics) and fills the lyrics
+        // box when it finishes; the check itself is only the Suno
+        // catalog/copyright answer and does not need the lyrics. Waiting
+        // for the full scan first (v2.2.47) made the check take 20-60s+
+        // before Suno was even asked. Generate still gets lyrics: the
+        // box by then, or the server transcribes in /api/gen/song/cover.
         // NO MovAi deduction here — this is only the copyright check.
         let out;
         try {
@@ -6023,7 +6153,11 @@ async function apiRoute(req, res, urlPath) {
             // v2.2.47: instrumental is ALWAYS sent (false unless the
             // user asked for instrumental) — Suno must never default
             // to instrumental on a cover.
-            const checkBody = { model, callBackUrl: SUNO_CALLBACK_URL, instrumental, uploadUrl };
+            // v2.2.48: re-host the source on Suno's own file host first
+            // ("File fetch failed": Suno's fetcher chokes on the
+            // Cloudinary fl_attachment + re-encode URL). Falls back to
+            // a clean direct Cloudinary URL when the re-host fails.
+            const checkBody = { model, callBackUrl: SUNO_CALLBACK_URL, instrumental, uploadUrl: await sunoHostAudioUrl(k, uploadUrl, title) };
             if (style) checkBody.style = style;
             if (title) checkBody.title = title;
             if (lyrics) checkBody.lyrics = lyrics;
@@ -6060,7 +6194,7 @@ async function apiRoute(req, res, urlPath) {
           return sendJSON(res, 200, { ok: false, error: (e && e.message) || 'Suno: request failed' });
         }
         const _params = { title, style, lyrics, model, vocalGender: vocalGender || '', instrumental: !!instrumental, myVoice: !!_myVoice };
-        await coverPendingAdd({ jobId: out.jobId, email, uploadUrl, at: Date.now(), refunded: false, checked: true, used: false, params: _params });
+        await coverPendingAdd({ jobId: out.jobId, email, uploadUrl, at: Date.now(), refunded: false, checked: true, used: false, paid: false, params: _params });
         return sendJSON(res, 200, { ok: true, jobId: out.jobId, lyrics });
       } catch (e) { return sendJSON(res, 200, { ok: false, error: 'ហៅ API មិនបានទេ៖ ' + (e && e.message ? e.message : 'unknown') }); }
     }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
@@ -6111,6 +6245,7 @@ async function apiRoute(req, res, urlPath) {
   // already correct. Status reuses /api/gen/song/status +
   // /api/suno/callback (they already parse sunoData).
   if (req.method === 'POST' && urlPath === '/api/gen/song/cover') {
+    try { coverPendingSweep().catch(function() {}); } catch (e) {}
     readJSONBody(req, 64 * 1024).then(async (body) => {
       try {
         const email = normEmail(body.email || '');
@@ -6180,6 +6315,21 @@ async function apiRoute(req, res, urlPath) {
         // check submitted with. Anything else falls through to the
         // normal Suno submit below (the audio already cleared the
         // catalog check, so no rejection can surprise it there).
+        // v2.2.48: transcribe BEFORE the reuse match — a check job
+        // submitted with empty lyrics must NOT be reused when the song
+        // IS transcribable: the scanned words break the match, so
+        // Generate submits fresh WITH lyrics instead of reusing an
+        // empty-lyrics job (which Suno would render instrumental).
+        // Runs before any deduction (Whisper is Groq, free).
+        if (!lyrics && !instrumental && hasUpload) {
+          try {
+            const _tr0 = await mvLyricsTranscribeSong(uploadUrl);
+            if (_tr0 && _tr0.ok && Array.isArray(_tr0.lyrics) && _tr0.lyrics.length) {
+              const _txt0 = _tr0.lyrics.map((x) => (x && x.text) || '').filter(Boolean).join('\n').trim().slice(0, 5000);
+              if (_txt0.replace(/[^\p{L}]/gu, '').length >= 10) lyrics = _txt0;
+            }
+          } catch (e) {}
+        }
         const _reuseId = typeof body.reuseJobId === 'string' ? body.reuseJobId.trim() : '';
         let _reuseJob = null;
         if (_reuseId && !_vocalRetryOk) {
@@ -6198,19 +6348,9 @@ async function apiRoute(req, res, urlPath) {
           await coverPendingMarkUsed(_reuseJob.jobId);
           return sendJSON(res, 200, { ok: true, jobId: _reuseJob.jobId, reused: true, credits: _ded.credits, songCredits: _ded.songCredits });
         }
-        // v2.2.47: no-lyrics cover — transcribe the source with Groq
-        // Whisper first (same as cover-check) so Suno always has words
-        // to sing. Only on the fresh-submit path: a reused check job
-        // already carries the lyrics it was submitted with. Fails soft.
-        if (!_reuseJob && !lyrics && !instrumental && hasUpload) {
-          try {
-            const _tr2 = await mvLyricsTranscribeSong(uploadUrl);
-            if (_tr2 && _tr2.ok && Array.isArray(_tr2.lyrics) && _tr2.lyrics.length) {
-              const _txt2 = _tr2.lyrics.map((x) => (x && x.text) || '').filter(Boolean).join('\n').trim().slice(0, 5000);
-              if (_txt2.replace(/[^\p{L}]/gu, '').length >= 10) lyrics = _txt2;
-            }
-          } catch (e) {}
-        }
+        // v2.2.48: the no-lyrics transcribe moved ABOVE the reuse match
+        // (a transcribable song must break reuse of an empty-lyrics
+        // check job); a reused job already carries its own lyrics.
         let out;
         try {
           out = await withProviderKeyRotation('suno', async (k, endpoint) => {
@@ -6219,7 +6359,8 @@ async function apiRoute(req, res, urlPath) {
             // user asked for instrumental) — Suno must never default
             // to instrumental on a cover.
             const coverBody = { model, callBackUrl: SUNO_CALLBACK_URL, instrumental };
-            if (hasUpload) coverBody.uploadUrl = uploadUrl;
+            // v2.2.48: re-host on Suno's file host first (see cover-check).
+            if (hasUpload) coverBody.uploadUrl = await sunoHostAudioUrl(k, uploadUrl, title);
             else { coverBody.taskId = taskId; coverBody.audioId = audioId; }
             if (style) coverBody.style = style;
             if (title) coverBody.title = title;
@@ -6271,7 +6412,7 @@ async function apiRoute(req, res, urlPath) {
           }
           return sendJSON(res, 200, { ok: false, error: (e && e.message) || 'Suno: request failed', refunded });
         }
-        await coverPendingAdd({ jobId: out.jobId, email, uploadUrl: hasUpload ? uploadUrl : ('task:' + taskId + ':' + audioId), at: Date.now(), refunded: false, vocalRetryOf: _vocalRetryOk ? _origJobId : '' });
+        await coverPendingAdd({ jobId: out.jobId, email, uploadUrl: hasUpload ? uploadUrl : ('task:' + taskId + ':' + audioId), at: Date.now(), refunded: false, paid: !_vocalRetryOk, vocalRetryOf: _vocalRetryOk ? _origJobId : '' });
         if (_vocalRetryOk) return sendJSON(res, 200, { ok: true, jobId: out.jobId, vocalRetry: true });
         return sendJSON(res, 200, { ok: true, jobId: out.jobId, credits: _ded.credits, songCredits: _ded.songCredits });
       } catch (e) { return sendJSON(res, 200, { ok: false, error: 'ហៅ API មិនបានទេ៖ ' + (e && e.message ? e.message : 'unknown') }); }
@@ -6283,15 +6424,35 @@ async function apiRoute(req, res, urlPath) {
   // same upload), so the phone can resume polling a job whose first
   // response was lost instead of paying for a new cover.
   if (req.method === 'GET' && urlPath === '/api/gen/song/cover-pending') {
+    try { coverPendingSweep().catch(function() {}); } catch (e) {}
     (async () => {
       try {
         const qp = new URL(req.url, 'http://localhost').searchParams;
         const email = normEmail(qp.get('email') || '');
         const uploadUrl = String(qp.get('uploadUrl') || '').trim().slice(0, 2000);
         if (!email) return sendJSON(res, 200, { ok: false, error: 'email មិនត្រឹមត្រូវទេ' });
-        const job = await coverPendingLatest(email, uploadUrl || '', 30 * 60 * 1000);
-        return sendJSON(res, 200, { ok: true, job: job ? { jobId: job.jobId, at: job.at, checked: !!job.checked, used: !!job.used, params: job.params || null } : null });
+        const job = await coverPendingLatest(email, uploadUrl || '', 72 * 3600 * 1000);
+        return sendJSON(res, 200, { ok: true, job: job ? { jobId: job.jobId, at: job.at, checked: !!job.checked, used: !!job.used, paid: !!job.paid, refunded: !!job.refunded, params: job.params || null } : null });
       } catch (e) { return sendJSON(res, 200, { ok: false, error: 'cover-pending: ' + (e && e.message ? e.message : 'unknown') }); }
+    })().catch(() => sendJSON(res, 200, { ok: false, error: 'សួរព័ត៌មានមិនបានទេ' }));
+    return;
+  }
+  // GET /api/gen/song/cover-pending-list?email= — v2.2.48 diagnostic:
+  // every cover job the server still tracks for this user (newest last),
+  // with jobId/at/checked/used/paid/refunded/uploadUrl/vocalRetryOf/
+  // vocalRetries — so a lost deduction can be traced to its job and
+  // verified against Suno record-info. Public, email-param pattern
+  // (same as credit-history). Never returns key material.
+  if (req.method === 'GET' && urlPath === '/api/gen/song/cover-pending-list') {
+    (async () => {
+      try {
+        const qp = new URL(req.url, 'http://localhost').searchParams;
+        const email = normEmail(qp.get('email') || '');
+        if (!email) return sendJSON(res, 200, { ok: false, error: 'email មិនត្រឹមត្រូវទេ' });
+        const a = await coverPendingLoad();
+        const jobs = a.filter((x) => x && x.email === email).map((x) => ({ jobId: x.jobId, at: x.at, checked: !!x.checked, used: !!x.used, paid: !!x.paid, refunded: !!x.refunded, uploadUrl: x.uploadUrl || '', vocalRetryOf: x.vocalRetryOf || '', vocalRetries: x.vocalRetries || 0 }));
+        return sendJSON(res, 200, { ok: true, email, count: jobs.length, jobs });
+      } catch (e) { return sendJSON(res, 200, { ok: false, error: 'cover-pending-list: ' + (e && e.message ? e.message : 'unknown') }); }
     })().catch(() => sendJSON(res, 200, { ok: false, error: 'សួរព័ត៌មានមិនបានទេ' }));
     return;
   }
@@ -6301,6 +6462,7 @@ async function apiRoute(req, res, urlPath) {
   // refunds 12 song credits ONCE. A working or successful job is never
   // refunded.
   if (req.method === 'POST' && urlPath === '/api/gen/song/cover-failed') {
+    try { coverPendingSweep().catch(function() {}); } catch (e) {}
     readJSONBody(req, 64 * 1024).then(async (body) => {
       try {
         const email = normEmail(body.email || '');
@@ -7552,23 +7714,23 @@ async function apiRoute(req, res, urlPath) {
     if (!a.ok) return sendJSON(res, 200, { ok: false, error: a.error });
     const list = await adminProviderKeyList('suno');
     if (!list.length) return sendJSON(res, 200, { ok: false, error: 'Admin មិនទាន់ដាក់ Suno Key ទេ' });
-    const keys = [];
-    let totalRemaining = 0;
-    for (let i = 0; i < list.length; i++) {
-      const ep = (list[i].endpoint || '').replace(/\/+$/, '');
-      if (!ep) { keys.push({ key: i + 1, remaining: null, status: 'unknown', message: 'មិនមាន gateway endpoint' }); continue; }
-      try {
-        const r = await fetch(ep + '/api/v1/generate/credit', { headers: { 'Authorization': 'Bearer ' + list[i].key }, signal: AbortSignal.timeout(15000) });
-        const j = await r.json().catch(() => null);
-        if (r.status === 401 || r.status === 403) { keys.push({ key: i + 1, remaining: null, status: 'blocked', message: 'Key មិនត្រឹមត្រូវ ឬត្រូវបានប្លុក (HTTP ' + r.status + ')' }); continue; }
-        const rem = sunoCreditFrom(j);
-        if (typeof rem === 'number') { keys.push({ key: i + 1, remaining: rem, status: rem > 0 ? 'green' : 'red' }); totalRemaining += rem; }
-        else keys.push({ key: i + 1, remaining: null, status: 'error', message: 'Suno ឆ្លើយ HTTP ' + r.status });
-      } catch (e) {
-        keys.push({ key: i + 1, remaining: null, status: 'error', message: 'មិនអាចភ្ជាប់បាន — ' + String((e && e.message) || e).slice(0, 120) });
-      }
-    }
-    return sendJSON(res, 200, { ok: true, provider: 'suno', totalRemaining, keys });
+    const bal = await sunoBalanceAll();
+    return sendJSON(res, 200, { ok: true, provider: 'suno', totalRemaining: bal.totalRemaining, keys: bal.keys });
+  }
+  // GET /api/public/suno-balance?email=... — v2.2.48. The live Suno API
+  // credit balance for the OWNER's Profile on the website (same numbers
+  // as the Admin Suno card). ADMIN-ONLY: the requesting email must be in
+  // ADMIN_EMAILS — anyone else gets {ok:false} with NO balance and NO
+  // key info. Cached ~60s (sunoBalanceCached) so Profile refreshes
+  // don't hammer sunoapi.org. This is the SUNO API balance (bought from
+  // Suno) — SEPARATE from MovAi package credits; the two are never
+  // mixed. Key values are never returned.
+  if (req.method === 'GET' && urlPath === '/api/public/suno-balance') {
+    const email = normEmail(new URL(req.url, 'http://localhost').searchParams.get('email') || '');
+    if (!email || !ADMIN_EMAILS.includes(email)) return sendJSON(res, 200, { ok: false, error: 'not_admin' });
+    const bal = await sunoBalanceCached();
+    if (!bal.keys.length) return sendJSON(res, 200, { ok: false, error: 'Admin មិនទាន់ដាក់ Suno Key ទេ' });
+    return sendJSON(res, 200, { ok: true, provider: 'suno', totalRemaining: bal.totalRemaining, keys: bal.keys });
   }
   // GET /api/admin/feature-usage — admin key required. Feature-usage
   // counts for the Admin (how many times each new function was used):
@@ -9716,7 +9878,7 @@ async function apiRoute(req, res, urlPath) {
   }
   // Public view of a post. likedBy (liker emails) is never exposed.
   function pubPost(p) {
-    return { id: p.id, email: p.email, name: p.name || '', userId: p.userId || '', avatar: p.avatar || '', mode: p.mode, title: p.title, url: p.url, cover: p.cover || '', aspect: p.aspect || '', youtube: p.youtube || '', youtubeChannel: p.youtubeChannel || '', visibility: p.visibility, model: p.model || '', style: p.style || '', likes: p.likes || 0, views: p.views || 0, downloads: p.downloads || 0, createdAt: p.createdAt };
+    return { id: p.id, email: p.email, name: p.name || '', userId: p.userId || '', avatar: p.avatar || '', mode: p.mode, title: p.title, url: p.url, cover: p.cover || '', aspect: p.aspect || '', youtube: p.youtube || '', youtubeChannel: p.youtubeChannel || '', visibility: p.visibility, model: p.model || '', style: p.style || '', likes: p.likes || 0, views: p.views || 0, downloads: p.downloads || 0, saves: p.saves || 0, shares: p.shares || 0, createdAt: p.createdAt };
   }
   // ---- File uploads for the Admin app Post form (MP3 + cover image) ----
   // ---- Server-side MP3 conversion (WAV -> MP3 128kbps) ----
@@ -11371,7 +11533,7 @@ async function apiRoute(req, res, urlPath) {
         userId: typeof body.userId === 'string' ? body.userId.trim().slice(0, 50) : '',
         mode, title, url, style: typeof body.style === 'string' ? body.style.trim().slice(0, 200) : '',
         cover: (typeof body.cover === 'string' && body.cover.trim()) ? body.cover.trim().slice(0, 2000) : (typeof body.image === 'string' ? body.image.trim().slice(0, 2000) : ''),
-        aspect, youtube, youtubeChannel, avatar, visibility, model: typeof body.model === 'string' ? body.model.trim().slice(0, 50) : '', likes: 0, views: 0, downloads: 0, likedBy: [], createdAt: now,
+        aspect, youtube, youtubeChannel, avatar, visibility, model: typeof body.model === 'string' ? body.model.trim().slice(0, 50) : '', likes: 0, views: 0, downloads: 0, saves: 0, shares: 0, likedBy: [], createdAt: now,
       };
       posts.push(p);
       if (posts.length > PUBLIC_MAX) posts.splice(0, posts.length - PUBLIC_MAX);
@@ -11411,7 +11573,9 @@ async function apiRoute(req, res, urlPath) {
           await addNotification('post', f, '📢 បានផុសថ្មី · New post', p.title + ' (' + mode + ') — ' + (p.name || email));
         }
       }
-      return sendJSON(res, 200, { ok: true, post: pubPost(p) });
+      const _pd = pubPost(p);
+      _pd.hasPlan = !!_postU && hasActivePackage(_postU);
+      return sendJSON(res, 200, { ok: true, post: _pd });
     }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
     return;
   }
@@ -11453,11 +11617,17 @@ async function apiRoute(req, res, urlPath) {
     if (!read.ok) return sendJSON(res, 200, { ok: false, error: 'Server កំពុងរវល់ — សូមព្យាយាមម្ដងទៀត · Server busy — please try again' });
     const posts = read.posts.filter((p) => p && p.visibility === 'public' && !tombs.posts[p.id]);
     posts.sort((a, b) => ((b.views || 0) - (a.views || 0)) || ((b.likes || 0) - (a.likes || 0)) || String(a.createdAt || '').localeCompare(String(b.createdAt || '')));
+    // v2.2.48: the poster's active-package flag rides with each post so
+    // the feed can render the Profile-style name + badge (only when the
+    // poster has an active package). One users-map load for all posts.
+    let _feedUsers = null;
+    try { _feedUsers = await loadUsers(); } catch (e) {}
     const out = posts.map((p, i) => {
       const rank = i + 1;
       const d = pubPost(p);
       d.rank = rank;
       d.tier = rank <= 50 ? 1 : rank <= 200 ? 2 : 3;
+      d.hasPlan = !!(_feedUsers && hasActivePackage(_feedUsers[normEmail(p.email)]));
       return d;
     });
     // Deleted-post ids/urls so phones drop locked copies (tombstone
@@ -11477,25 +11647,56 @@ async function apiRoute(req, res, urlPath) {
     try { maybeSweepBrokenPosts(); } catch (e) {}
     return sendJSON(res, 200, { ok: true, posts: out, deletedIds, deletedUrls });
   }
-  // POST /api/public/like — PUBLIC. {postId, email}. One like per email;
-  // a repeat like from the same email returns the current count unchanged.
+  // POST /api/public/like — PUBLIC. {postId} (or {id}). v2.2.48:
+  // INCREMENT-ONLY (owner 15:06, like YouTube views): every call = +1,
+  // tapping again = +1 more, NO toggle-off, NO decrement, NEVER down.
+  // No email required, no per-user dedup (the old likedBy dedup is
+  // gone — it also silently dropped the client's {id} calls, which is
+  // why taps vanished on refresh). Returns the new server count.
   if (req.method === 'POST' && urlPath === '/api/public/like') {
     readJSONBody(req, 64 * 1024).then(async (body) => {
-      const postId = typeof body.postId === 'string' ? body.postId.trim() : '';
-      const email = normEmail(body && body.email) || (typeof body.email === 'string' ? body.email.trim().toLowerCase().slice(0, 200) : '');
+      const postId = (typeof body.postId === 'string' ? body.postId.trim() : '') || (typeof body.id === 'string' ? body.id.trim() : '');
       if (!postId) return sendJSON(res, 200, { ok: false, error: 'សូមដាក់ postId' });
-      if (!email) return sendJSON(res, 200, { ok: false, error: 'សូមដាក់ Gmail ត្រឹមត្រូវ' });
       const posts = await loadPublicPosts();
       const p = posts.find((x) => x.id === postId);
       if (!p) return sendJSON(res, 404, { ok: false, error: 'រក post នេះមិនឃើញទេ' });
-      if (!Array.isArray(p.likedBy)) p.likedBy = [];
-      if (!p.likedBy.includes(email)) {
-        p.likedBy.push(email);
-        p.likes = p.likedBy.length;
-        await savePublicPosts(posts);
-        scheduleBackup('public.json');
-      }
-      return sendJSON(res, 200, { ok: true, likes: p.likes || 0 });
+      p.likes = (p.likes || 0) + 1;
+      await savePublicPosts(posts);
+      scheduleBackup('public.json');
+      return sendJSON(res, 200, { ok: true, likes: p.likes });
+    }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
+    return;
+  }
+  // POST /api/public/save — PUBLIC. {postId}. v2.2.48: every call = +1
+  // to the post's save count (increment-only, like Like). The phone
+  // keeps its local playlist too; the SERVER count is the truth.
+  if (req.method === 'POST' && urlPath === '/api/public/save') {
+    readJSONBody(req, 64 * 1024).then(async (body) => {
+      const postId = (typeof body.postId === 'string' ? body.postId.trim() : '') || (typeof body.id === 'string' ? body.id.trim() : '');
+      if (!postId) return sendJSON(res, 200, { ok: false, error: 'សូមដាក់ postId' });
+      const posts = await loadPublicPosts();
+      const p = posts.find((x) => x.id === postId);
+      if (!p) return sendJSON(res, 404, { ok: false, error: 'រក post នេះមិនឃើញទេ' });
+      p.saves = (p.saves || 0) + 1;
+      await savePublicPosts(posts);
+      scheduleBackup('public.json');
+      return sendJSON(res, 200, { ok: true, saves: p.saves });
+    }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
+    return;
+  }
+  // POST /api/public/share — PUBLIC. {postId}. v2.2.48: every call = +1
+  // to the post's share count (increment-only, like Like).
+  if (req.method === 'POST' && urlPath === '/api/public/share') {
+    readJSONBody(req, 64 * 1024).then(async (body) => {
+      const postId = (typeof body.postId === 'string' ? body.postId.trim() : '') || (typeof body.id === 'string' ? body.id.trim() : '');
+      if (!postId) return sendJSON(res, 200, { ok: false, error: 'សូមដាក់ postId' });
+      const posts = await loadPublicPosts();
+      const p = posts.find((x) => x.id === postId);
+      if (!p) return sendJSON(res, 404, { ok: false, error: 'រក post នេះមិនឃើញទេ' });
+      p.shares = (p.shares || 0) + 1;
+      await savePublicPosts(posts);
+      scheduleBackup('public.json');
+      return sendJSON(res, 200, { ok: true, shares: p.shares });
     }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
     return;
   }
