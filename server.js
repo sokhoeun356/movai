@@ -4287,6 +4287,14 @@ function sunoCoverRejected(j) {
   if (msg.indexOf('413') >= 0) return true;
   return false;
 }
+// v2.2.44: Suno's catalog guard — a known commercial recording in Suno's
+// catalog cannot be covered ("This audio matches an existing recording in
+// our catalog."). Non-rotatable (every key rejects the same audio).
+function sunoCatalogRejected(j) {
+  if (!j || typeof j !== 'object') return false;
+  const hay = String(j.msg || '') + ' ' + String(j.error || '') + ' ' + String((j.data && (j.data.errorMessage || j.data.msg || j.data.error)) || '');
+  return /existing recording in our catalog/i.test(hay);
+}
 // ---- My Voice (Suno voice clone) — owner order 2026-11-19 ----
 // The voiceId lives ONLY on the server (u.myVoice) and is NEVER sent to
 // the client (pubUser allowlist does not include it). The client only
@@ -5942,7 +5950,10 @@ async function apiRoute(req, res, urlPath) {
             const _sw = (typeof body.styleWeight === 'number' && body.styleWeight >= 0 && body.styleWeight <= 1) ? body.styleWeight : 0.5;
             coverBody.audioWeight = _aw;
             coverBody.styleWeight = _sw;
-            const r = await fetch(ep + '/api/v1/generate/upload-cover', { method: 'POST', headers: { 'Authorization': 'Bearer ' + k, 'Content-Type': 'application/json' }, body: JSON.stringify(coverBody), signal: AbortSignal.timeout(120000) });
+            // v2.2.44: NO timeout on the upload-cover call — Suno's timing
+            // is followed exactly (owner 12:18); the phone's Cancel button
+            // stops the wait. Suno takes ~60s to accept a long upload.
+            const r = await fetch(ep + '/api/v1/generate/upload-cover', { method: 'POST', headers: { 'Authorization': 'Bearer ' + k, 'Content-Type': 'application/json' }, body: JSON.stringify(coverBody) });
             const j = await r.json().catch(() => null);
             if (sunoCoverRejected(j)) {
               // 413 = Suno's copyright/dedup guard: the source IS a
@@ -5954,6 +5965,12 @@ async function apiRoute(req, res, urlPath) {
               e413.sunoMsg = sunoErrText(j, '');
               throw e413;
             }
+            if (sunoCatalogRejected(j)) {
+              const eCat = new Error('Suno: This audio matches an existing recording in our catalog.');
+              eCat.coverCatalog = true;
+              eCat.sunoMsg = sunoErrText(j, '');
+              throw eCat;
+            }
             if (j && j.code === 200 && j.data && typeof j.data.taskId === 'string' && j.data.taskId) return { jobId: j.data.taskId };
             throw rotErr('Suno: ' + sunoErrText(j, 'HTTP ' + r.status), r.status);
           }, '', sunoKeys);
@@ -5962,6 +5979,9 @@ async function apiRoute(req, res, urlPath) {
           try { const _rf = await refundForGeneration(email, 0, COVER_COST, 'song:cover failed'); refunded = !!(_rf && _rf.ok); } catch (re) {}
           if (e && e.coverRejected) {
             return sendJSON(res, 200, { ok: false, code: 'cover_rejected_413', refunded, error: 'បទនេះ Cover មិនបានទេ — វាជាបទដែល Suno បង្កើតរួចហើយ។ សូម Cover បទដែលអ្នកថត/មានខ្លួនឯងវិញ។ មិនបានកាត់ Credit ទេ · This audio can\'t be covered — it was made by Suno. Try covering your own recording instead. No credits used.' });
+          }
+          if (e && e.coverCatalog) {
+            return sendJSON(res, 200, { ok: false, code: 'cover_rejected_catalog', refunded, error: 'Suno: This audio matches an existing recording in our catalog. បទនេះជាបទដែល Suno ស្គាល់រួចហើយ (បទល្បី) — Cover មិនបានទេ។ សូម Cover បទដែលអ្នកថត/មានខ្លួនឯងវិញ។ មិនបានកាត់ Credit ទេ · This song is a known recording in Suno\'s catalog — it can\'t be covered. Try your own recording instead. No credits used.' });
           }
           return sendJSON(res, 200, { ok: false, error: (e && e.message) || 'Suno: request failed', refunded });
         }
@@ -9331,7 +9351,7 @@ async function apiRoute(req, res, urlPath) {
   }
   // Public view of a post. likedBy (liker emails) is never exposed.
   function pubPost(p) {
-    return { id: p.id, email: p.email, name: p.name || '', userId: p.userId || '', avatar: p.avatar || '', mode: p.mode, title: p.title, url: p.url, cover: p.cover || '', aspect: p.aspect || '', youtube: p.youtube || '', youtubeChannel: p.youtubeChannel || '', visibility: p.visibility, model: p.model || '', likes: p.likes || 0, views: p.views || 0, downloads: p.downloads || 0, createdAt: p.createdAt };
+    return { id: p.id, email: p.email, name: p.name || '', userId: p.userId || '', avatar: p.avatar || '', mode: p.mode, title: p.title, url: p.url, cover: p.cover || '', aspect: p.aspect || '', youtube: p.youtube || '', youtubeChannel: p.youtubeChannel || '', visibility: p.visibility, model: p.model || '', style: p.style || '', likes: p.likes || 0, views: p.views || 0, downloads: p.downloads || 0, createdAt: p.createdAt };
   }
   // ---- File uploads for the Admin app Post form (MP3 + cover image) ----
   // ---- Server-side MP3 conversion (WAV -> MP3 128kbps) ----
@@ -10984,7 +11004,7 @@ async function apiRoute(req, res, urlPath) {
         id: clientId || newPublicId(), email,
         name: typeof body.name === 'string' ? body.name.trim().slice(0, 100) : '',
         userId: typeof body.userId === 'string' ? body.userId.trim().slice(0, 50) : '',
-        mode, title, url,
+        mode, title, url, style: typeof body.style === 'string' ? body.style.trim().slice(0, 200) : '',
         cover: (typeof body.cover === 'string' && body.cover.trim()) ? body.cover.trim().slice(0, 2000) : (typeof body.image === 'string' ? body.image.trim().slice(0, 2000) : ''),
         aspect, youtube, youtubeChannel, avatar, visibility, model: typeof body.model === 'string' ? body.model.trim().slice(0, 50) : '', likes: 0, views: 0, downloads: 0, likedBy: [], createdAt: now,
       };
