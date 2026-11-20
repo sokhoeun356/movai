@@ -1972,6 +1972,11 @@ const SETTINGS_DEFAULTS = {
   // Admin-locked models (master switch). Map "provider:model" -> true.
   // A locked model is not used/shown in MovAi. Empty = nothing locked.
   lockedModels: {},
+  // Deleted API providers (owner order 2026-11-20 13:07). Provider ids
+  // the owner deleted from the Admin API Keys page. A deleted provider's
+  // keys are removed and the website hides/stops offering it. Re-adding
+  // a key for the provider restores it.
+  deletedProviders: [],
   // Payment settings (admin-controlled, read by the website for the Buy
   // flow). khqrLink = Canadia Bank KHQR payment link (local payers);
   // binanceUsdtAddress = Binance USDT wallet address (foreign payers).
@@ -2071,6 +2076,20 @@ function cleanSettings(j, base) {
   } else {
     const baseLocked = (base && base.lockedModels && typeof base.lockedModels === 'object' && !Array.isArray(base.lockedModels)) ? base.lockedModels : {};
     s.lockedModels = Object.assign({}, baseLocked);
+  }
+  // Deleted providers (owner order 2026-11-20 13:07). When the field is
+  // present it REPLACES the stored list; when absent the stored value is
+  // kept. Only known provider ids are kept.
+  if (Array.isArray(j.deletedProviders)) {
+    const del = [];
+    for (const v of j.deletedProviders) {
+      const p = normProvider(v);
+      if (p && (KNOWN_KEY_PROVIDERS.includes(p) || p === 'cloudinary') && !del.includes(p)) del.push(p);
+    }
+    s.deletedProviders = del;
+  } else {
+    const baseDel = (base && Array.isArray(base.deletedProviders)) ? base.deletedProviders : [];
+    s.deletedProviders = baseDel.map((v) => normProvider(v)).filter((p) => p && (KNOWN_KEY_PROVIDERS.includes(p) || p === 'cloudinary'));
   }
   // Payment settings. Both fields are plain strings (max 500 chars);
   // missing/invalid fields keep the stored (base) value. An empty string
@@ -2223,6 +2242,21 @@ async function adminProviderKey(provider) {
   const list = await adminProviderKeyList(provider);
   return list.length ? list[0] : null;
 }
+// Deleted providers (owner order 2026-11-20 13:07). Stored in settings.
+// A deleted provider's keys are gone and the website hides/stops
+// offering it. Re-adding a key restores it.
+async function getDeletedProviders() {
+  try {
+    const s = await loadSettings();
+    const arr = s && Array.isArray(s.deletedProviders) ? s.deletedProviders : [];
+    const out = [];
+    for (const v of arr) {
+      const p = normProvider(v);
+      if (p && (KNOWN_KEY_PROVIDERS.includes(p) || p === 'cloudinary') && !out.includes(p)) out.push(p);
+    }
+    return out;
+  } catch (e) { return []; }
+}
 // Resolve a provider API key: the request's own key first, else the
 // admin-stored key. The browser now sends no key — the admin key is used.
 async function resolveProviderKey(reqKey, provider) {
@@ -2310,6 +2344,11 @@ async function keyHealthList() {
       }
       out[p].sort((a, b) => a.key - b.key);
     }
+  } catch (e) {}
+  // Deleted providers never appear (owner order 2026-11-20 13:07).
+  try {
+    const deleted = await getDeletedProviders();
+    for (const p of deleted) delete out[p];
   } catch (e) {}
   return out;
 }
@@ -7916,6 +7955,15 @@ async function apiRoute(req, res, urlPath) {
       keys[provider] = rec;
       await saveAdminKeys(keys);
       scheduleBackup('admin-keys.json');
+      // Re-adding a key restores a deleted provider (owner order 2026-11-20 13:07).
+      try {
+        const del = await getDeletedProviders();
+        if (del.includes(provider)) {
+          const cur = await loadSettings();
+          cur.deletedProviders = del.filter((p) => p !== provider);
+          await saveSettings(cur, cur);
+        }
+      } catch (e) {}
       return sendJSON(res, 200, { ok: true, provider, keyCount: rec.keys.length, hasKey: true, hasEndpoint: rec.keys.some((e) => e && e.endpoint && e.endpoint.trim()) });
     }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
     return;
@@ -7952,7 +8000,7 @@ async function apiRoute(req, res, urlPath) {
       const arr = keys[p] && Array.isArray(keys[p].keys) ? keys[p].keys : [];
       return { provider: p, hasKey: arr.length > 0, keyCount: arr.length, hasEndpoint: arr.some((e) => e && e.endpoint && e.endpoint.trim()) };
     });
-    return sendJSON(res, 200, { ok: true, keys: list });
+    return sendJSON(res, 200, { ok: true, keys: list, deleted: await getDeletedProviders() });
   }
   // GET /api/admin/keys/values?provider=X — admin key required. Returns
   // the FULL key values for one provider so the Admin app can show (eye)
@@ -8135,6 +8183,75 @@ async function apiRoute(req, res, urlPath) {
       cur.providers[mode] = { provider, model };
       const saved = await saveSettings(cur, cur);
       return sendJSON(res, 200, { ok: true, providers: saved.providers });
+    }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
+    return;
+  }
+  // DELETE /api/admin/providers — {provider} — admin key required.
+  // DELETES a whole provider/system (owner order 2026-11-20 13:07):
+  // removes ALL its stored keys, clears its key-health records, clears
+  // it from the active provider/mode, and records it in
+  // settings.deletedProviders so the website hides/stops offering it.
+  // 'cloudinary' deletes all admin-added Cloudinary accounts (the Main
+  // env account cannot be deleted — the server refuses that).
+  // Re-adding a key for the provider (POST /api/admin/keys) restores it.
+  if (req.method === 'DELETE' && urlPath === '/api/admin/providers') {
+    const a = await adminKeyOk(req);
+    if (!a.ok) return sendJSON(res, 200, { ok: false, error: a.error });
+    readJSONBody(req, 64 * 1024).then(async (body) => {
+      const provider = normProvider(body && body.provider);
+      if (!provider || !(KNOWN_KEY_PROVIDERS.includes(provider) || provider === 'cloudinary')) return sendJSON(res, 200, { ok: false, error: 'Provider មិនស្គាល់ទេ' });
+      let removedKeys = 0;
+      let removedCld = 0;
+      if (provider === 'cloudinary') {
+        const arr = await loadCloudinaryAccounts();
+        const kept = arr.filter((x) => x && x.id === 'env');
+        removedCld = arr.length - kept.length;
+        await saveCloudinaryAccounts(kept);
+        scheduleBackup('cloudinary-accounts.json');
+      } else {
+        const keys = await loadAdminKeys();
+        const rec = keys[provider];
+        removedKeys = rec && Array.isArray(rec.keys) ? rec.keys.length : 0;
+        if (keys[provider]) delete keys[provider];
+        await saveAdminKeys(keys);
+        scheduleBackup('admin-keys.json');
+      }
+      // Clear key-health records so provider-status stops listing it.
+      try {
+        await keyHealthEnsure();
+        if (_keyHealth[provider]) { delete _keyHealth[provider]; await keyHealthSave(); }
+      } catch (e) {}
+      // Clear it from the active provider/mode and mark it deleted.
+      const cur = await loadSettings();
+      if (cur.providers && typeof cur.providers === 'object') {
+        for (const m of ['image', 'video', 'song']) {
+          if (cur.providers[m] && cur.providers[m].provider === provider) cur.providers[m] = null;
+        }
+      }
+      const del = await getDeletedProviders();
+      if (!del.includes(provider)) del.push(provider);
+      cur.deletedProviders = del;
+      await saveSettings(cur, cur);
+      return sendJSON(res, 200, { ok: true, provider, deleted: true, removedKeys, removedCldAccounts: removedCld });
+    }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
+    return;
+  }
+  // POST /api/admin/providers/restore — {provider} — admin key required.
+  // Removes a provider from settings.deletedProviders (undoes a delete).
+  // Keys stay empty — the owner adds keys again to use it.
+  if (req.method === 'POST' && urlPath === '/api/admin/providers/restore') {
+    const a = await adminKeyOk(req);
+    if (!a.ok) return sendJSON(res, 200, { ok: false, error: a.error });
+    readJSONBody(req, 64 * 1024).then(async (body) => {
+      const provider = normProvider(body && body.provider);
+      if (!provider || !(KNOWN_KEY_PROVIDERS.includes(provider) || provider === 'cloudinary')) return sendJSON(res, 200, { ok: false, error: 'Provider មិនស្គាល់ទេ' });
+      const del = await getDeletedProviders();
+      const i = del.indexOf(provider);
+      if (i >= 0) del.splice(i, 1);
+      const cur = await loadSettings();
+      cur.deletedProviders = del;
+      await saveSettings(cur, cur);
+      return sendJSON(res, 200, { ok: true, provider, deleted: false });
     }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
     return;
   }
@@ -10637,7 +10754,7 @@ async function apiRoute(req, res, urlPath) {
   // red = exhausted (out of credits/quota/auth failed), unknown = not
   // used yet. Key values are never exposed — only index + status.
   if (req.method === 'GET' && urlPath === '/api/public/provider-status') {
-    return sendJSON(res, 200, { ok: true, providers: await keyHealthList() });
+    return sendJSON(res, 200, { ok: true, providers: await keyHealthList(), deleted: await getDeletedProviders() });
   }
   // POST /api/public/upload — ADMIN KEY required. JSON {kind: 'audio'|'image',
   // filename, data: base64}. Saves under ./data/uploads/ and returns the
