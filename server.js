@@ -5862,6 +5862,12 @@ async function apiRoute(req, res, urlPath) {
             if (title) coverBody.title = title;
             if (lyrics) coverBody.lyrics = lyrics;
             if (vocalGender) coverBody.vocalGender = vocalGender;
+            // v2.2.41: keep the cover CLOSE to the original song (same melody/music,
+            // AI re-sings it). audioWeight = audio consistency, styleWeight = style pull.
+            const _aw = (typeof body.audioWeight === 'number' && body.audioWeight >= 0 && body.audioWeight <= 1) ? body.audioWeight : 0.8;
+            const _sw = (typeof body.styleWeight === 'number' && body.styleWeight >= 0 && body.styleWeight <= 1) ? body.styleWeight : 0.5;
+            coverBody.audioWeight = _aw;
+            coverBody.styleWeight = _sw;
             const r = await fetch(ep + '/api/v1/generate/upload-cover', { method: 'POST', headers: { 'Authorization': 'Bearer ' + k, 'Content-Type': 'application/json' }, body: JSON.stringify(coverBody), signal: AbortSignal.timeout(60000) });
             const j = await r.json().catch(() => null);
             if (sunoCoverRejected(j)) {
