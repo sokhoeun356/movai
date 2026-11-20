@@ -1183,6 +1183,60 @@ async function refundForGeneration(email, mediaCost, songCost, reason) {
   return { ok: true, credits: Math.floor(numOr(u.credits, 0)), songCredits: Math.floor(numOr(u.songCredits, 0)) };
 }
 
+// ---- Pending Cover jobs (v2.2.42) ----
+// Suno accepts a cover and returns a jobId, but the phone may never
+// receive it (client timeout / Render drops the tiny response). The job
+// then runs on Suno while the app shows "Something went wrong" and the
+// credits stay deducted, because the callback only stores in memory and
+// the client never polls. Every accepted cover job is stored here (kv
+// 'cover-pending', Supabase-backed) so the phone can resume polling it
+// instead of paying for a new one, and a job Suno reports as failed is
+// refunded exactly once.
+async function coverPendingLoad() {
+  const a = await loadKvDoc('cover-pending', []);
+  return Array.isArray(a) ? a : [];
+}
+async function coverPendingSave(a) {
+  await saveKvDoc('cover-pending', a.slice(-100), 'cover-pending.json');
+}
+async function coverPendingAdd(job) {
+  try {
+    const a = await coverPendingLoad();
+    const now = Date.now();
+    const kept = a.filter((x) => x && now - (x.at || 0) < 24 * 3600 * 1000);
+    kept.push(job);
+    await coverPendingSave(kept);
+  } catch (e) {}
+}
+async function coverPendingLatest(email, uploadUrl, maxAgeMs) {
+  try {
+    const a = await coverPendingLoad();
+    const now = Date.now();
+    const list = a.filter((x) => x && x.email === email && (!uploadUrl || x.uploadUrl === uploadUrl) && now - (x.at || 0) < (maxAgeMs || 30 * 60 * 1000) && !x.refunded);
+    if (!list.length) return null;
+    return list[list.length - 1];
+  } catch (e) { return null; }
+}
+async function coverPendingRemove(jobId) {
+  try {
+    const a = await coverPendingLoad();
+    await coverPendingSave(a.filter((x) => x && x.jobId !== jobId));
+  } catch (e) {}
+}
+// Refund a tracked cover job ONCE. Returns true if a refund was issued.
+async function coverPendingRefund(jobId) {
+  try {
+    const a = await coverPendingLoad();
+    const it = a.find((x) => x && x.jobId === jobId && !x.refunded);
+    if (!it) return false;
+    const rf = await refundForGeneration(it.email, 0, 12, 'song:cover failed');
+    if (!(rf && rf.ok)) return false;
+    it.refunded = true;
+    await coverPendingSave(a);
+    return true;
+  } catch (e) { return false; }
+}
+
 // Activity log (./data/activity.json) — one record per generation attempt
 // (create calls only: /api/gen/image, /api/gen/video, /api/gen/song) and
 // per /api/admin/sync call (user sign-in/app open), so the Admin app can
@@ -5553,6 +5607,7 @@ async function apiRoute(req, res, urlPath) {
                 return { status: 'working', providerStatus: 'first', preview, streamUrl: preview };
               }
               if (st === 'PENDING' || st === 'TEXT_SUCCESS') return { status: 'working', providerStatus: 'queued' };
+              try { await coverPendingRefund(jobId); } catch (e2) {}
               throw rotErr('Suno: ' + (d.errorMessage || st || 'បង្កើតមិនបានទេ'), r.status);
             }, '', sunoKeys);
           } catch (e) {
@@ -5841,6 +5896,23 @@ async function apiRoute(req, res, urlPath) {
         const lyrics = typeof body.lyrics === 'string' ? body.lyrics.slice(0, 5000) : '';
         const instrumental = body.instrumental === true;
         const vocalGender = (body.vocalGender === 'm' || body.vocalGender === 'f') ? body.vocalGender : undefined;
+        // v2.2.42: My Voice for covers (Suno upload-cover supports
+        // personaId + personaModel 'voice_persona'). Fail BEFORE any
+        // credit is deducted if the voice is not ready — never silently
+        // ignore the user's voice choice.
+        let _coverPersonaId = '';
+        if (body.myVoice === true || body.voice === 'myvoice') {
+          const _mvUsers = await loadUsers();
+          const _mv = myVoiceGet(_mvUsers[normEmail(email)]);
+          if (!_mv || !_mv.voiceId || !_mv.voiceTaskId) return sendJSON(res, 200, { ok: false, error: 'សូមបង្កើត My Voice ជាមុនសិន · Please set up My Voice first', needMyVoice: true });
+          try {
+            const _chk = await sunoVoiceCall('/api/v1/voice/check-voice', 'POST', { task_id: _mv.voiceTaskId });
+            if (!(_chk && _chk.data && _chk.data.isAvailable === true)) return sendJSON(res, 200, { ok: false, error: 'My Voice មិនទាន់រួចរាល់ទេ — សូមព្យាយាមម្តងទៀត · My Voice is not ready yet, please try again' });
+          } catch (e) {
+            return sendJSON(res, 200, { ok: false, error: 'My Voice: ពិនិត្យមិនបានទេ — ' + ((e && e.message) || 'check failed') });
+          }
+          _coverPersonaId = _mv.voiceId;
+        }
         const sunoKeys = (await adminProviderKeyList('suno')).filter((e) => e.endpoint);
         if (!sunoKeys.length) {
           if (!(await adminProviderKeyList('suno')).length) return sendJSON(res, 200, { ok: false, error: 'Admin មិនទាន់ដាក់ Suno Key ទេ' });
@@ -5862,13 +5934,14 @@ async function apiRoute(req, res, urlPath) {
             if (title) coverBody.title = title;
             if (lyrics) coverBody.lyrics = lyrics;
             if (vocalGender) coverBody.vocalGender = vocalGender;
+            if (_coverPersonaId) { coverBody.personaId = _coverPersonaId; coverBody.personaModel = 'voice_persona'; }
             // v2.2.41: keep the cover CLOSE to the original song (same melody/music,
             // AI re-sings it). audioWeight = audio consistency, styleWeight = style pull.
             const _aw = (typeof body.audioWeight === 'number' && body.audioWeight >= 0 && body.audioWeight <= 1) ? body.audioWeight : 0.8;
             const _sw = (typeof body.styleWeight === 'number' && body.styleWeight >= 0 && body.styleWeight <= 1) ? body.styleWeight : 0.5;
             coverBody.audioWeight = _aw;
             coverBody.styleWeight = _sw;
-            const r = await fetch(ep + '/api/v1/generate/upload-cover', { method: 'POST', headers: { 'Authorization': 'Bearer ' + k, 'Content-Type': 'application/json' }, body: JSON.stringify(coverBody), signal: AbortSignal.timeout(60000) });
+            const r = await fetch(ep + '/api/v1/generate/upload-cover', { method: 'POST', headers: { 'Authorization': 'Bearer ' + k, 'Content-Type': 'application/json' }, body: JSON.stringify(coverBody), signal: AbortSignal.timeout(120000) });
             const j = await r.json().catch(() => null);
             if (sunoCoverRejected(j)) {
               // 413 = Suno's copyright/dedup guard: the source IS a
@@ -5891,8 +5964,75 @@ async function apiRoute(req, res, urlPath) {
           }
           return sendJSON(res, 200, { ok: false, error: (e && e.message) || 'Suno: request failed', refunded });
         }
+        await coverPendingAdd({ jobId: out.jobId, email, uploadUrl: hasUpload ? uploadUrl : ('task:' + taskId + ':' + audioId), at: Date.now(), refunded: false });
         return sendJSON(res, 200, { ok: true, jobId: out.jobId, credits: _ded.credits, songCredits: _ded.songCredits });
       } catch (e) { return sendJSON(res, 200, { ok: false, error: 'ហៅ API មិនបានទេ៖ ' + (e && e.message ? e.message : 'unknown') }); }
+    }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
+    return;
+  }
+  // GET /api/gen/song/cover-pending?email=&uploadUrl= — v2.2.42: the
+  // latest still-running cover job for this user (optionally for the
+  // same upload), so the phone can resume polling a job whose first
+  // response was lost instead of paying for a new cover.
+  if (req.method === 'GET' && urlPath === '/api/gen/song/cover-pending') {
+    (async () => {
+      try {
+        const qp = new URL(req.url, 'http://localhost').searchParams;
+        const email = normEmail(qp.get('email') || '');
+        const uploadUrl = String(qp.get('uploadUrl') || '').trim().slice(0, 2000);
+        if (!email) return sendJSON(res, 200, { ok: false, error: 'email មិនត្រឹមត្រូវទេ' });
+        const job = await coverPendingLatest(email, uploadUrl || '', 30 * 60 * 1000);
+        return sendJSON(res, 200, { ok: true, job: job ? { jobId: job.jobId, at: job.at } : null });
+      } catch (e) { return sendJSON(res, 200, { ok: false, error: 'cover-pending: ' + (e && e.message ? e.message : 'unknown') }); }
+    })().catch(() => sendJSON(res, 200, { ok: false, error: 'សួរព័ត៌មានមិនបានទេ' }));
+    return;
+  }
+  // POST /api/gen/song/cover-failed — {email, jobId}. The phone calls
+  // this when polling a cover fails. The server verifies with Suno
+  // record-info that the job REALLY failed (not still running) and
+  // refunds 12 song credits ONCE. A working or successful job is never
+  // refunded.
+  if (req.method === 'POST' && urlPath === '/api/gen/song/cover-failed') {
+    readJSONBody(req, 64 * 1024).then(async (body) => {
+      try {
+        const email = normEmail(body.email || '');
+        const jobId = typeof body.jobId === 'string' ? body.jobId.trim() : '';
+        if (!email || !jobId) return sendJSON(res, 200, { ok: false, error: 'email / jobId មិនត្រឹមត្រូវទេ' });
+        const a = await coverPendingLoad();
+        const it = a.find((x) => x && x.jobId === jobId && x.email === email);
+        if (!it) return sendJSON(res, 200, { ok: true, refunded: false, reason: 'no pending job' });
+        if (it.refunded) return sendJSON(res, 200, { ok: true, refunded: false, reason: 'already refunded' });
+        let failed = false;
+        try {
+          const keys = (await adminProviderKeyList('suno')).filter((e) => e.endpoint);
+          if (!keys.length) return sendJSON(res, 200, { ok: true, refunded: false, reason: 'no suno key' });
+          const out = await withProviderKeyRotation('suno', async (k, endpoint) => {
+            const ep = endpoint.replace(/\/+$/, '');
+            const r = await fetch(ep + '/api/v1/generate/record-info?taskId=' + encodeURIComponent(jobId), { headers: { 'Authorization': 'Bearer ' + k }, signal: AbortSignal.timeout(30000) });
+            const j = await r.json().catch(() => null);
+            return (j && j.data) || null;
+          }, '', keys);
+          const st = out && typeof out.status === 'string' ? out.status : '';
+          failed = !!st && st !== 'SUCCESS' && st !== 'FIRST_SUCCESS' && st !== 'PENDING' && st !== 'TEXT_SUCCESS';
+        } catch (e) { failed = false; }
+        if (!failed) return sendJSON(res, 200, { ok: true, refunded: false, reason: 'job not failed' });
+        const rf = await refundForGeneration(email, 0, 12, 'song:cover failed');
+        if (rf && rf.ok) { it.refunded = true; await coverPendingSave(a); return sendJSON(res, 200, { ok: true, refunded: true }); }
+        return sendJSON(res, 200, { ok: true, refunded: false, reason: 'refund failed' });
+      } catch (e) { return sendJSON(res, 200, { ok: false, error: 'cover-failed: ' + (e && e.message ? e.message : 'unknown') }); }
+    }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
+    return;
+  }
+  // POST /api/gen/song/cover-done — {email, jobId}. Clears a pending
+  // cover job after the phone polled it to success.
+  if (req.method === 'POST' && urlPath === '/api/gen/song/cover-done') {
+    readJSONBody(req, 64 * 1024).then(async (body) => {
+      try {
+        const jobId = typeof body.jobId === 'string' ? body.jobId.trim() : '';
+        if (!jobId) return sendJSON(res, 200, { ok: false, error: 'jobId មិនត្រឹមត្រូវទេ' });
+        await coverPendingRemove(jobId);
+        return sendJSON(res, 200, { ok: true });
+      } catch (e) { return sendJSON(res, 200, { ok: false, error: 'cover-done: ' + (e && e.message ? e.message : 'unknown') }); }
     }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
     return;
   }
