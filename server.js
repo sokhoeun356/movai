@@ -4121,12 +4121,21 @@ const IP_LIMIT_PER_MIN = 120;
 const IP_BLOCK_PER_MIN = 300;
 const IP_WINDOW_MS = 60 * 1000;
 const _ipRate = new Map();
-async function ipRateCheck(req) {
+async function ipRateCheck(req, opts) {
   const ip = getClientIp(req);
   if (!ip) return { ok: true };
   if ((await loadBlockedIps()).some((b) => b === ip)) return { ok: false, blocked: true };
   const lockMs = await adminLockoutRemainingMs(ip);
   if (lockMs > 0) return { ok: false, blocked: true, lockoutMs: lockMs };
+  // My Voice setup (v2.1.39, owner 2026-11-20 09:34): /api/voice/* is a
+  // rare, logged-in, multi-step flow (upload -> validate -> poll ->
+  // generate -> poll). A 429 mid-flow strands the user: Step 2 never
+  // appears and Save stays greyed with no way forward. Skip the
+  // per-minute counting for voice paths only — blocked IPs and the
+  // admin lockout above still apply, and Suno itself rate-limits the
+  // voice calls. (The owner's mobile IP is shared/CGNAT, so 120/min
+  // is tripped by normal use + the app's own polling.)
+  if (opts && opts.skipCount) return { ok: true };
   const now = Date.now();
   let rec = _ipRate.get(ip);
   if (!rec || (now - rec.windowStart) >= IP_WINDOW_MS) { rec = { count: 0, windowStart: now }; _ipRate.set(ip, rec); }
@@ -4436,7 +4445,7 @@ async function apiRoute(req, res, urlPath) {
   // A correct admin key is never rate-limited or blocked here (the admin
   // can never lock themselves out — see isAdminKeyRequest).
   if (!isAdminKeyRequest(req)) {
-    const ipc = await ipRateCheck(req);
+    const ipc = await ipRateCheck(req, { skipCount: urlPath.indexOf('/api/voice/') === 0 });
     if (!ipc.ok) {
       if (ipc.blocked) {
         const rem = ipc.lockoutMs || 0;
