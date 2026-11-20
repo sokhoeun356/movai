@@ -4292,19 +4292,23 @@ function sunoCreditFrom(j) {
   return null;
 }
 // ---- Free image generations (owner order 2026-11-18) ----
-// Every user gets 10 FREE image generations per 3-day window, and
-// 10 FREE thumbnails per 3-day window — SEPARATE counters (owner
-// order 2026-11-18 20:20; was 10/day shared). 0 MovAi credits; a
-// COUNT cap, not a charge. Stored on the user record as
-// imgFree3:{start:'YYYY-MM-DD', used:N} (images) and
-// thumbFree3:{start:'YYYY-MM-DD', used:N} (thumbnails); start is the
-// Phnom Penh date the window began, and the window renews when
-// today >= start + 3 days. A failed provider call refunds the slot.
-// The old imgDaily:{date, used} counter is still maintained (and
-// returned by GET /api/public/image-free) for display/back-compat,
-// but it is NOT enforced anymore.
-const IMG_FREE_DAILY_LIMIT = 10; // legacy daily counter (display only)
-const IMG_FREE_3DAY_LIMIT = 10;
+// Every user gets 20 FREE image generations per DAY (owner order
+// 2026-11-20 07:45 — Agnes Pro 10/day + NovAI 10/day combined, since
+// NovAI is no longer used for generation; chat Image uses ONLY Agnes
+// Pro agnes-image-2.5-flash), and 10 FREE thumbnails per 3-day window
+// — SEPARATE counters. 0 MovAi credits; a COUNT cap, not a charge.
+// Stored on the user record as imgFreeDaily:{start:'YYYY-MM-DD',
+// used:N} (images, 1-day window) and thumbFree3:{start:'YYYY-MM-DD',
+// used:N} (thumbnails, 3-day window); start is the Phnom Penh date
+// the window began, and the window renews when today >= start +
+// window days. A failed provider call refunds the slot. The old
+// imgFree3 (images, 3-day) and imgDaily:{date, used} counters are
+// still maintained for display/back-compat but are NOT enforced
+// anymore for images.
+const IMG_FREE_DAILY_LIMIT = 20; // images, per day (enforced)
+const IMG_FREE_DAILY_DAYS = 1;
+const THUMB_FREE_3DAY_LIMIT = 10; // thumbnails, per 3 days (enforced)
+const IMG_FREE_3DAY_LIMIT = 10; // legacy alias (thumbnails); back-compat
 const IMG_FREE_3DAY_DAYS = 3;
 function imgFreeTodayDate() {
   return new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Phnom_Penh' });
@@ -4315,16 +4319,20 @@ function _free3DateAdd(dateStr, days) {
   const d = new Date(Date.UTC(p[0], p[1] - 1, p[2]) + days * 86400000);
   return d.toISOString().slice(0, 10);
 }
-// Normalize a stored {start, used} 3-day window against today.
+// Normalize a stored {start, used} window against today.
 // Returns {start, used, resetDate}; a window that already ended
-// comes back fresh (start = today, used = 0).
-function _free3Window(rec) {
+// comes back fresh (start = today, used = 0). `days` is the window
+// length in days (1 = daily, 3 = 3-day).
+function _freeWindow(rec, days) {
   const today = imgFreeTodayDate();
   let start = (rec && typeof rec === 'object' && typeof rec.start === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(rec.start)) ? rec.start : today;
   let used = (rec && typeof rec === 'object') ? Math.max(0, Math.floor(Number(rec.used) || 0)) : 0;
-  if (today >= _free3DateAdd(start, IMG_FREE_3DAY_DAYS)) { start = today; used = 0; }
-  return { start, used, resetDate: _free3DateAdd(start, IMG_FREE_3DAY_DAYS) };
+  if (today >= _free3DateAdd(start, days)) { start = today; used = 0; }
+  return { start, used, resetDate: _free3DateAdd(start, days) };
 }
+// 3-day window (thumbnails). 1-day window (images).
+function _free3Window(rec) { return _freeWindow(rec, IMG_FREE_3DAY_DAYS); }
+function _freeDailyWindow(rec) { return _freeWindow(rec, IMG_FREE_DAILY_DAYS); }
 // Give one free-image/thumbnail slot back (provider call failed
 // before any image was produced). Never lets the count go below 0.
 // isThumbnail=true refunds the thumbnail counter, else the image one;
@@ -4336,8 +4344,8 @@ async function imgFreeRefund(email, isThumbnail) {
     const users = await loadUsers();
     const u = users[em];
     if (!u) return;
-    const key = isThumbnail ? 'thumbFree3' : 'imgFree3';
-    const win = _free3Window(u[key]);
+    const key = isThumbnail ? 'thumbFree3' : 'imgFreeDaily';
+    const win = isThumbnail ? _free3Window(u[key]) : _freeDailyWindow(u[key]);
     if (win.used > 0) u[key] = { start: win.start, used: win.used - 1 };
     const today = imgFreeTodayDate();
     if (u.imgDaily && typeof u.imgDaily === 'object' && u.imgDaily.date === today) {
@@ -4635,10 +4643,11 @@ async function apiRoute(req, res, urlPath) {
           const _freeU = _freeUsers[_freeEm];
           if (!_freeU) return sendJSON(res, 200, { ok: false, error: 'សូមចូលគណនេយ្យជាមុនសិន · Please sign in first', needLogin: true });
           const _isThumb = body.isThumbnail === true;
-          const _freeKey = _isThumb ? 'thumbFree3' : 'imgFree3';
-          const _win = _free3Window(_freeU[_freeKey]);
-          if (_win.used >= IMG_FREE_3DAY_LIMIT) {
-            return sendJSON(res, 200, { ok: false, error: (_isThumb ? 'Thumbnail Free អស់ហើយ (10/10) — នឹងបាន Free ម្ដងទៀតនៅថ្ងៃ ' + _win.resetDate + ' · Free thumbnails used up (10/10) — free again on ' + _win.resetDate : 'រូប Free អស់ហើយ (10/10) — នឹងបាន Free ម្ដងទៀតនៅថ្ងៃ ' + _win.resetDate + ' · Free images used up (10/10) — free again on ' + _win.resetDate), code: 'image_free_daily_limit', imgFree: { date: _win.start, limit: IMG_FREE_3DAY_LIMIT, used: _win.used, left: 0, resetDate: _win.resetDate, kind: _isThumb ? 'thumbnail' : 'image' } });
+          const _freeKey = _isThumb ? 'thumbFree3' : 'imgFreeDaily';
+          const _freeLimit = _isThumb ? THUMB_FREE_3DAY_LIMIT : IMG_FREE_DAILY_LIMIT;
+          const _win = _isThumb ? _free3Window(_freeU[_freeKey]) : _freeDailyWindow(_freeU[_freeKey]);
+          if (_win.used >= _freeLimit) {
+            return sendJSON(res, 200, { ok: false, error: (_isThumb ? 'Thumbnail Free អស់ហើយ (10/10) — នឹងបាន Free ម្ដងទៀតនៅថ្ងៃ ' + _win.resetDate + ' · Free thumbnails used up (10/10) — free again on ' + _win.resetDate : 'រូប Free អស់ហើយ (20/20) — នឹងបាន Free ម្ដងទៀតនៅថ្ងៃ ' + _win.resetDate + ' · Free images used up (20/20) — free again on ' + _win.resetDate), code: 'image_free_daily_limit', imgFree: { date: _win.start, limit: _freeLimit, used: _win.used, left: 0, resetDate: _win.resetDate, kind: _isThumb ? 'thumbnail' : 'image' } });
           }
           _freeU[_freeKey] = { start: _win.start, used: _win.used + 1 };
           // Keep the legacy daily counter in sync (display/back-compat
@@ -4648,7 +4657,7 @@ async function apiRoute(req, res, urlPath) {
           _freeU.imgDaily = { date: _freeToday, used: _dailyUsed + 1 };
           _freeUsers[_freeEm] = _freeU;
           await saveUsers(_freeUsers);
-          _imgFree = { date: _win.start, limit: IMG_FREE_3DAY_LIMIT, used: _win.used + 1, left: Math.max(0, IMG_FREE_3DAY_LIMIT - _win.used - 1), resetDate: _win.resetDate, kind: _isThumb ? 'thumbnail' : 'image' };
+          _imgFree = { date: _win.start, limit: _freeLimit, used: _win.used + 1, left: Math.max(0, _freeLimit - _win.used - 1), resetDate: _win.resetDate, kind: _isThumb ? 'thumbnail' : 'image' };
         }
         const key = typeof body.key === 'string' ? body.key : '';
         let prompt = body.prompt.trim().slice(0, 2000);
@@ -4859,7 +4868,9 @@ async function apiRoute(req, res, urlPath) {
     }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
     return;
   }
-  // POST /api/gen/video — {provider:'novai'|'magichour'|'tavus'|'hf', key, prompt, duration, res, width, height, replicaId}
+  // POST /api/gen/video — {provider:'novai'|'magichour'|'tavus'|'hf', key, prompt, duration, res, width, height, replicaId, model, tier, imageUrl}
+  // imageUrl (magichour only, v2.1.34): a public image URL -> the video
+  // is made FROM that image via Magic Hour /v1/image-to-video.
   if (req.method === 'POST' && urlPath === '/api/gen/video') {
     const genCtx = { provider: '', email: '' };
     await wrapGenLog(res, 'video', genCtx);
@@ -4904,6 +4915,18 @@ async function apiRoute(req, res, urlPath) {
         let vidTier = MH_VIDEO_TIERS[vidModel];
         if (duration > vidTier.maxDur) { vidModel = 'ltx-2.5'; vidTier = MH_VIDEO_TIERS[vidModel]; }
         const vidRate = vidTier.rate;
+        // Image-to-video (v2.1.34): if the chat sends an imageUrl, the
+        // video is made FROM that image via Magic Hour /v1/image-to-video.
+        // The URL must be a public http(s) URL ending in a supported
+        // image extension (Magic Hour rule). An invalid imageUrl is a
+        // clear error BEFORE any credit is deducted.
+        let vidImageUrl = null;
+        if (body.imageUrl !== undefined && body.imageUrl !== null && String(body.imageUrl).trim() !== '') {
+          const _iu = String(body.imageUrl).trim();
+          if (!/^https?:\/\/.+\.(jpg|jpeg|png|webp)(\?.*)?$/i.test(_iu)) return sendJSON(res, 200, { ok: false, error: 'រូបភាពសម្រាប់ធ្វើវីដេអូមិនត្រឹមត្រូវទេ · The image for the video is not a valid image URL' });
+          vidImageUrl = _iu;
+        }
+        const _vidKind = vidImageUrl ? 'img2vid' : 'text2vid';
         // Server-side credit check (video): Magic Hour costs vidRate media
         // credits per second (tiered). NovAI is free. Tavus/HF are not charged
         // here (Tavus removed from the website; HF uses the user's key).
@@ -4950,22 +4973,24 @@ async function apiRoute(req, res, urlPath) {
           // Deduct FIRST (before the provider call) so the user account,
           // the server, and the Admin all show the same reduced balance
           // the moment Generate is tapped. Refunded below if the provider fails.
-          const _dedVid = await deductForGeneration(body.email, vidCost, 0, 'video:magichour:' + vidModel + ':' + duration + 's');
+          const _dedVid = await deductForGeneration(body.email, vidCost, 0, 'video:magichour:' + _vidKind + ':' + vidModel + ':' + duration + 's');
           if (!_dedVid.ok) return sendJSON(res, 200, { ok: false, error: _dedVid.error || 'Credit មិនគ្រប់ទេ', needBuy: true, kind: 'media', balance: _dedVid.balance, cost: vidCost });
           let out;
           try {
             out = await withProviderKeyRotation('magichour', async (k) => {
-              const r = await fetch('https://api.magichour.ai/v1/text-to-video', { method: 'POST', headers: { 'Authorization': 'Bearer ' + k, 'Content-Type': 'application/json' }, body: JSON.stringify({ name: 'MovAi video', end_seconds: duration, aspect_ratio: aspect, resolution: resName, model: vidModel, style: { prompt } }), signal: AbortSignal.timeout(60000) });
+              const _mhUrl = vidImageUrl ? 'https://api.magichour.ai/v1/image-to-video' : 'https://api.magichour.ai/v1/text-to-video';
+              const _mhBody = vidImageUrl ? { name: 'MovAi video', end_seconds: duration, aspect_ratio: aspect, resolution: resName, model: vidModel, assets: { image_file_path: vidImageUrl }, style: { prompt } } : { name: 'MovAi video', end_seconds: duration, aspect_ratio: aspect, resolution: resName, model: vidModel, style: { prompt } };
+              const r = await fetch(_mhUrl, { method: 'POST', headers: { 'Authorization': 'Bearer ' + k, 'Content-Type': 'application/json' }, body: JSON.stringify(_mhBody), signal: AbortSignal.timeout(60000) });
               const j = await r.json().catch(() => null);
               if (j && j.id) return { jobId: j.id };
               throw rotErr('Magic Hour: ' + genErrText(j, 'HTTP ' + r.status), r.status);
             }, reqKey);
           } catch (e) {
-            await refundForGeneration(body.email, vidCost, 0, 'video:magichour:' + vidModel + ':' + duration + 's failed');
+            await refundForGeneration(body.email, vidCost, 0, 'video:magichour:' + _vidKind + ':' + vidModel + ':' + duration + 's failed');
             if (e && e.noKey) return sendJSON(res, 200, { ok: false, error: 'Admin មិនទាន់ដាក់ Magic Hour Key ទេ' });
             return sendJSON(res, 200, { ok: false, error: (e && e.message) || 'Magic Hour: request failed' });
           }
-          return sendJSON(res, 200, { ok: true, jobId: out.jobId, credits: _dedVid.credits, songCredits: _dedVid.songCredits, videoModel: vidModel, videoRate: vidRate, videoCost: vidCost, duration });
+          return sendJSON(res, 200, { ok: true, jobId: out.jobId, credits: _dedVid.credits, songCredits: _dedVid.songCredits, videoModel: vidModel, videoRate: vidRate, videoCost: vidCost, duration, videoKind: _vidKind });
         }
         if (provider === 'tavus') {
           const replicaId = String(body.replicaId || '').trim();
@@ -11097,13 +11122,13 @@ async function apiRoute(req, res, urlPath) {
   }
   // ---- "Free 2 + package allowance" limits (Download MP3, MV, Vocal Studio, Post to Public) ----
   // GET /api/public/image-free?email= — PUBLIC. Read-only; never
-  // creates a user. Free allowances per 3-day window (owner order
-  // 2026-11-18 20:20 — 10 free images AND 10 free thumbnails per
-  // 3 days, SEPARATE counters):
-  // {ok:true, date, images:{limit:10, used, left, start, resetDate},
+  // creates a user. Free allowances (owner order 2026-11-20 07:45 —
+  // 20 free images per DAY and 10 free thumbnails per 3 days,
+  // SEPARATE counters):
+  // {ok:true, date, images:{limit:20, used, left, start, resetDate},
   //  thumbnails:{limit:10, used, left, start, resetDate}}.
-  // The top-level limit/used/left fields are the legacy daily image
-  // counter, kept for backward compatibility (display only).
+  // The top-level limit/used/left fields are the enforced daily image
+  // allowance (20/day), kept for backward compatibility.
   // Unknown email -> {ok:false, error:'no_account'}.
   if (req.method === 'GET' && urlPath === '/api/public/image-free') {
     const email = normEmail(new URL(req.url, 'http://localhost').searchParams.get('email') || '');
@@ -11111,14 +11136,13 @@ async function apiRoute(req, res, urlPath) {
     const u = (await loadUsers())[email];
     if (!u) return sendJSON(res, 200, { ok: false, error: 'no_account' });
     const today = imgFreeTodayDate();
-    const imgWin = _free3Window(u.imgFree3);
+    const imgWin = _freeDailyWindow(u.imgFreeDaily);
     const thumbWin = _free3Window(u.thumbFree3);
-    const dailyUsed = (u.imgDaily && typeof u.imgDaily === 'object' && u.imgDaily.date === today) ? Math.max(0, Math.floor(Number(u.imgDaily.used) || 0)) : 0;
     return sendJSON(res, 200, {
       ok: true, date: today,
-      limit: IMG_FREE_3DAY_LIMIT, used: dailyUsed, left: Math.max(0, IMG_FREE_3DAY_LIMIT - dailyUsed),
-      images: { limit: IMG_FREE_3DAY_LIMIT, used: imgWin.used, left: Math.max(0, IMG_FREE_3DAY_LIMIT - imgWin.used), start: imgWin.start, resetDate: imgWin.resetDate },
-      thumbnails: { limit: IMG_FREE_3DAY_LIMIT, used: thumbWin.used, left: Math.max(0, IMG_FREE_3DAY_LIMIT - thumbWin.used), start: thumbWin.start, resetDate: thumbWin.resetDate }
+      limit: IMG_FREE_DAILY_LIMIT, used: imgWin.used, left: Math.max(0, IMG_FREE_DAILY_LIMIT - imgWin.used),
+      images: { limit: IMG_FREE_DAILY_LIMIT, used: imgWin.used, left: Math.max(0, IMG_FREE_DAILY_LIMIT - imgWin.used), start: imgWin.start, resetDate: imgWin.resetDate },
+      thumbnails: { limit: THUMB_FREE_3DAY_LIMIT, used: thumbWin.used, left: Math.max(0, THUMB_FREE_3DAY_LIMIT - thumbWin.used), start: thumbWin.start, resetDate: thumbWin.resetDate }
     });
   }
   // GET /api/public/ai-lyrics-free?email= — PUBLIC. Read-only; never
