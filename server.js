@@ -2703,24 +2703,46 @@ async function creatorFollowerCount(email) {
 async function monetizationFollowerCount(email) {
   return creatorFollowerCount(email);
 }
-// One logged-in view on a post: always accrues watch time for the
-// owner (eligibility progress, even before approval / while the toggle
-// is OFF); when monetization is ON and the owner is approved it also
-// accrues the $0.000001 view earning and moves whole cents into the
-// owner's Earn balance (fractional remainder stays pending).
-// Returns the owner's earnings record (or null for a guest view).
+// One view on a post (owner order 2026-11-20 09:08 - PER DAY rule):
+// EVERY organic play counts, guest or logged in, monetization ON or
+// OFF: Total views (rec.views), Today's views (viewsByDate[Phnom
+// Penh date]) and Earnings by country (byCountry[cc].views) all +1,
+// every time. Tomorrow's plays go into tomorrow's date key (fresh
+// daily count each day). Earnings are separate: only a LOGGED-IN view,
+// while monetization is ON and the owner is approved, accrues the
+// per-view earning (tiered rate) and moves whole cents into the
+// owner's Earn balance - guest views never earn. New-listener views
+// stay logged-in only (they need a viewer email). Watch time still
+// accrues from durationSec for logged-in views (eligibility).
+// Returns the owner's earnings record (or null when no owner).
 // Async because a whole-cent payout awaits the users GitHub flush.
 async function monetizationOnView(ownerEmail, viewerEmail, country, durationSec) {
   const owner = normEmail(ownerEmail);
   const viewer = normEmail(viewerEmail);
-  if (!owner || !viewer) return null;
+  if (!owner) return null;
   const got = await monetizationRecord(owner);
   if (!got) return null;
   const rec = got.rec;
   const dur = Math.max(0, Math.floor(numOr(durationSec, 0)));
-  if (dur > 0) rec.watchSeconds = numOr(rec.watchSeconds, 0) + dur;
+  if (dur > 0 && viewer) rec.watchSeconds = numOr(rec.watchSeconds, 0) + dur;
   const cc = (typeof country === 'string' && country.trim()) ? country.trim().toUpperCase().slice(0, 8) : 'Unknown';
-  if (await monetizationEnabled() && await monetizationIsApproved(owner)) {
+  // ---- Counts: EVERY view, no gate (owner 2026-11-20 09:08, PER DAY
+  // rule). Total views, Today's views (viewsByDate[Phnom Penh date])
+  // and Earnings by country (byCountry[cc].views) all +1 on every
+  // organic play — guest or logged in, monetization ON or OFF.
+  // Tomorrow's plays go into tomorrow's date key (fresh daily count
+  // each day). Promo-boosted views never enter here (they only add
+  // to the Total via promoApplyBoost and never earn).
+  if (!rec.viewsByDate || typeof rec.viewsByDate !== 'object') rec.viewsByDate = {};
+  const _today = imgFreeTodayDate();
+  rec.views = numOr(rec.views, 0) + 1;
+  rec.viewsByDate[_today] = numOr(rec.viewsByDate[_today], 0) + 1;
+  if (!rec.byCountry || typeof rec.byCountry !== 'object') rec.byCountry = {};
+  if (!rec.byCountry[cc] || typeof rec.byCountry[cc] !== 'object') rec.byCountry[cc] = { views: 0, earnMicro: 0 };
+  rec.byCountry[cc].views = numOr(rec.byCountry[cc].views, 0) + 1;
+  // ---- Earnings: logged-in viewer + monetization ON + approved only.
+  // Guest views earn nothing (unchanged policy).
+  if (viewer && await monetizationEnabled() && await monetizationIsApproved(owner)) {
     // Tiered rate (owner 2026-11-19 08:03 + 08:04): the HIGHER of the
     // viewer's tier and the poster's tier. Rounded to 0.1 micro on
     // every add so the stored totals stay exact (all tier rates are
@@ -2728,17 +2750,8 @@ async function monetizationOnView(ownerEmail, viewerEmail, country, durationSec)
     const _tierUsers = await loadUsers();
     const _tierMicro = viewEarnMicroForUsers(_tierUsers[viewer], _tierUsers[owner]);
     const _addMicro = (v) => Math.round((numOr(v, 0) + _tierMicro) * 10) / 10;
-    rec.views = numOr(rec.views, 0) + 1;
-    // Daily + new-listener views (owner order 2026-11-19 11:35).
-    // Same eligible basis as rec.views (monetization ON + approved).
-    // viewsByDate: {YYYY-MM-DD (Asia/Phnom_Penh): count} — today's
-    // views = viewsByDate[today]. viewers: {viewerEmail: firstDate} —
-    // a viewer's FIRST-EVER view counts once as a new-listener view.
-    // Counts start from this build (no historical per-view data).
-    // Guest views never reach here (viewer email required).
-    if (!rec.viewsByDate || typeof rec.viewsByDate !== 'object') rec.viewsByDate = {};
-    const _today = imgFreeTodayDate();
-    rec.viewsByDate[_today] = numOr(rec.viewsByDate[_today], 0) + 1;
+    // New-listener views: a viewer's FIRST-EVER view counts once.
+    // Logged-in only (needs a viewer email).
     if (!rec.viewers || typeof rec.viewers !== 'object') rec.viewers = {};
     if (!rec.viewers[viewer]) {
       rec.viewers[viewer] = _today;
@@ -2746,9 +2759,6 @@ async function monetizationOnView(ownerEmail, viewerEmail, country, durationSec)
     }
     rec.earnMicro = _addMicro(rec.earnMicro);
     rec.pendingMicro = _addMicro(rec.pendingMicro);
-    if (!rec.byCountry || typeof rec.byCountry !== 'object') rec.byCountry = {};
-    if (!rec.byCountry[cc] || typeof rec.byCountry[cc] !== 'object') rec.byCountry[cc] = { views: 0, earnMicro: 0 };
-    rec.byCountry[cc].views = numOr(rec.byCountry[cc].views, 0) + 1;
     rec.byCountry[cc].earnMicro = _addMicro(rec.byCountry[cc].earnMicro);
     // Move whole cents to the EARN balance (fractional remainder stays
     // pending). $0.01 = 10,000 micro-dollars. Earn money is NOT
@@ -4310,6 +4320,7 @@ const IMG_FREE_DAILY_DAYS = 1;
 const THUMB_FREE_3DAY_LIMIT = 10; // thumbnails, per 3 days (enforced)
 const IMG_FREE_3DAY_LIMIT = 10; // legacy alias (thumbnails); back-compat
 const IMG_FREE_3DAY_DAYS = 3;
+let _autoAgnesRot = 0; // auto-image rotation: next Agnes model to try first (v2.1.37)
 function imgFreeTodayDate() {
   return new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Phnom_Penh' });
 }
@@ -4366,7 +4377,7 @@ async function imgFreeRefund(email, isThumbnail) {
 // prompt, or null on any failure (the original prompt is then used
 // — a failed translation never blocks the image).
 async function translateImgPromptToEnglish(text) {
-  const sys = 'You are an image-prompt translator. Translate the following image description to English. Translate any non-English text; keep any English text exactly as it is. Preserve every subject, action, emotion, setting and detail exactly — do not add, remove or reinterpret anything. Reply with ONLY the English description, no explanations, no quotes, no markdown.';
+  const sys = 'You are an image-prompt translator. Translate the following image description to English as a vivid, detailed visual prompt for an image generator. Translate any non-English text; keep any English text exactly as it is. Preserve every subject, action, emotion, setting, style and detail exactly — do not add, remove or reinterpret anything. State the subject and action explicitly so the image shows the described scene, not a diagram, chart or text. Reply with ONLY the English description, no explanations, no quotes, no markdown.';
   try {
     const out = await withProviderKeyRotation('groq', async (k) => {
       const r = await fetch('https://api.groq.com/openai/v1/chat/completions', {
@@ -4672,6 +4683,9 @@ async function apiRoute(req, res, urlPath) {
           const _en = await translateImgPromptToEnglish(prompt);
           if (_en) prompt = _en.slice(0, 2000);
         }
+        // Quality suffix (v2.1.37): make the image vivid and detailed so
+        // it matches the request (style-neutral, no subject change).
+        if (!/highly detailed|sharp focus/i.test(prompt)) prompt = (prompt + ', highly detailed, sharp focus').slice(0, 2000);
         const width = Math.max(64, Math.min(2048, Number(body.width) || 768));
         const height = Math.max(64, Math.min(2048, Number(body.height) || 768));
         // Server-side credit check (image): Magic Hour costs by model
@@ -4695,14 +4709,22 @@ async function apiRoute(req, res, urlPath) {
           }
         }
         // ---- Auto image (v2.1.34, chat, provider 'auto') ----
-        // Try Agnes 2.5 -> 2.1 -> 2.0 (free, 0 MovAi credits, free
-        // 20/day). If none can create it, refund the free slot and try
-        // the Magic Hour TEST models (owner 08:01 — TEST only, NOT free,
-        // NOT in the free 20/day; if it works well it becomes Pro).
-        // Each Magic Hour model charges its normal MovAi media credits
-        // (IMAGE_COSTS) and is labelled isTest. The first model that
-        // succeeds wins; the response reports provider/model/cost/isTest
-        // so the website shows exactly what was used.
+        // FINAL auto order (owner 2026-11-20 09:06): Agnes -> Magic
+        // Hour -> NovAI, changing CONTINUOUSLY. Agnes rotates its
+        // starting model each generation (2.5 -> 2.1 -> 2.0 -> 2.5...)
+        // so the model actually varies instead of always using 2.5.
+        // Agnes is free (0 MovAi credits, free 20/day). If no Agnes
+        // model can create it, try the Magic Hour TEST models (owner
+        // 08:01 — TEST only, NOT free, NOT in the free 20/day; if it
+        // works well it becomes Pro). Each Magic Hour model charges
+        // its normal MovAi media credits (IMAGE_COSTS) and is labelled
+        // isTest. If Magic Hour also fails (or the user cannot afford
+        // it), NovAI cogview-3-flash last (free, 0 credits, counts in
+        // the free 20/day like Agnes). The free slot is refunded ONLY
+        // if the image ends up coming from Magic Hour (paid) or if
+        // nothing succeeds at all. The first model that succeeds wins;
+        // the response reports provider/model/cost/isTest so the
+        // website shows exactly what was used.
         const _autoAgnesModels = ['agnes-image-2.5-flash', 'agnes-image-2.1-flash', 'agnes-image-2.0-flash'];
         const _autoMHTestModels = ['qwen-image-2.1', 'flux-2-klein', 'krea-2', 'z-image-turbo', 'flux-schnell'];
         function _autoAgnesRatio() {
@@ -4742,15 +4764,32 @@ async function apiRoute(req, res, urlPath) {
             throw rotErr('Magic Hour: ' + genErrText(j, 'HTTP ' + r.status), r.status);
           }, key);
         }
+        async function _tryNovAIImageAuto() {
+          const _size = Math.min(2048, Math.max(64, width)) + 'x' + Math.min(2048, Math.max(64, height));
+          return await withProviderKeyRotation('novai', async (k) => {
+            const r = await fetch('https://aiapi-pro.com/v1/images/generations', { method: 'POST', headers: { 'Authorization': 'Bearer ' + k, 'Content-Type': 'application/json' }, body: JSON.stringify({ model: 'cogview-3-flash', prompt, size: _size }), signal: AbortSignal.timeout(120000) });
+            const j = await r.json().catch(() => null);
+            const url = j && j.data && j.data[0] && j.data[0].url;
+            if (url) return { done: true, imageUrl: url };
+            const id = j && (j.id || (j.data && j.data.id));
+            if (id) return { jobId: id };
+            throw rotErr('NovAI: ' + genErrText(j, 'HTTP ' + r.status), r.status);
+          }, key);
+        }
         if (provider === 'auto') {
           let _autoOut = null, _autoProv = null, _autoModel = null, _autoCost = 0, _autoErr = null, _autoCredits, _autoSongCredits;
-          for (const _m of _autoAgnesModels) {
+          // Rotate the starting Agnes model each auto generation (v2.1.37):
+          // 2.5 -> 2.1 -> 2.0 -> 2.5 ... so the model actually varies
+          // instead of always using 2.5. If the starting model fails,
+          // fall through to the next in the cycle.
+          const _rot = _autoAgnesRot % _autoAgnesModels.length;
+          _autoAgnesRot = _rot + 1;
+          const _autoOrder = _autoAgnesModels.slice(_rot).concat(_autoAgnesModels.slice(0, _rot));
+          for (const _m of _autoOrder) {
             try { _autoOut = await _tryAgnesAuto(_m); _autoProv = 'agnes'; _autoModel = _m; break; }
             catch (e) { _autoErr = e; if (e && e.noKey) break; }
           }
           if (!_autoOut) {
-            if (_imgFree) await imgFreeRefund(body.email, body.isThumbnail === true);
-            _imgFree = null;
             const _uu = (await loadUsers())[normEmail(body.email)];
             const _bal = _uu ? Math.floor(numOr(_uu.credits, 0)) : 0;
             for (const _m of _autoMHTestModels) {
@@ -4769,7 +4808,25 @@ async function apiRoute(req, res, urlPath) {
               }
             }
           }
-          if (!_autoOut) return sendJSON(res, 200, { ok: false, error: (_autoErr && _autoErr.message) || 'Image failed — please try again' });
+          // NovAI last (owner 2026-11-20 09:06 — FINAL auto order).
+          // Free (0 credits); the reserved free slot stays consumed.
+          if (!_autoOut) {
+            try {
+              _autoOut = await _tryNovAIImageAuto();
+              _autoProv = 'novai'; _autoModel = 'cogview-3-flash'; _autoCost = 0;
+            } catch (e) { _autoErr = e; }
+          }
+          if (!_autoOut) {
+            if (_imgFree) await imgFreeRefund(body.email, body.isThumbnail === true);
+            return sendJSON(res, 200, { ok: false, error: (_autoErr && _autoErr.message) || 'Image failed — please try again' });
+          }
+          // Magic Hour is paid (TEST), so it does NOT consume the free
+          // slot — give it back. Agnes and NovAI are free, so the slot
+          // stays consumed for them.
+          if (_autoProv === 'magichour') {
+            if (_imgFree) await imgFreeRefund(body.email, body.isThumbnail === true);
+            _imgFree = null;
+          }
           if (_autoOut.done) return sendJSON(res, 200, { ok: true, done: true, imageUrl: _autoOut.imageUrl, provider: _autoProv, model: _autoModel, imageModel: _autoModel, imgFree: _imgFree, imageCost: _autoCost, isTest: _autoProv === 'magichour' });
           return sendJSON(res, 200, { ok: true, jobId: _autoOut.jobId, provider: _autoProv, model: _autoModel, imageModel: _autoModel, imgFree: _imgFree, imageCost: _autoCost, credits: _autoCredits, songCredits: _autoSongCredits, isTest: _autoProv === 'magichour' });
         }
@@ -10848,10 +10905,12 @@ async function apiRoute(req, res, urlPath) {
     return;
   }
   // POST /api/public/view — PUBLIC. {postId, email?, country?, durationSec?}.
-  // Counts one view. When a logged-in user views, watch time accrues
-  // for the post owner (monetization eligibility) and — when monetization
-  // is ON and the owner is approved — the $0.000001 view earning.
-  // Guest views (no email) count toward the post total but earn nothing.
+  // Counts one view. EVERY view (guest or logged in) counts into the
+  // post total AND the owner's daily monetization counts (Total views,
+  // Today's views, Earnings by country — owner order 2026-11-20 09:08,
+  // PER DAY rule). Earnings (money) only accrue for a logged-in view
+  // while monetization is ON and the owner is approved; guest views
+  // earn nothing.
   if (req.method === 'POST' && urlPath === '/api/public/view') {
     readJSONBody(req, 64 * 1024).then(async (body) => {
       const postId = typeof body.postId === 'string' ? body.postId.trim() : '';
@@ -10862,17 +10921,18 @@ async function apiRoute(req, res, urlPath) {
       p.views = (p.views || 0) + 1;
       await savePublicPosts(posts);
       scheduleBackup('public.json');
-      // Monetization: a logged-in view accrues watch time + (when ON and
-      // the owner is approved) the view earning. Never blocks the view
-      // count — a monetization failure must not lose the view.
+      // Monetization (owner 2026-11-20 09:08 — PER DAY rule): EVERY
+      // view counts into the owner's Total / Today's views / Earnings
+      // by country — guest views too (email ''), not just logged-in
+      // ones. Earnings still only accrue for logged-in views while
+      // monetization is ON and the owner is approved. Never blocks
+      // the view count — a monetization failure must not lose the view.
       const _vEmail = normEmail(body && body.email);
-      if (_vEmail) {
-        try {
-          const _vCountry = (typeof body.country === 'string' && body.country.trim()) ? body.country.trim() : ((typeof body.countryCode === 'string' && body.countryCode.trim()) ? body.countryCode.trim() : '');
-          const _vDur = numOr(body && (body.durationSec !== undefined ? body.durationSec : body.duration), 0);
-          await monetizationOnView(p.email, _vEmail, _vCountry, _vDur);
-        } catch (e) {}
-      }
+      try {
+        const _vCountry = (typeof body.country === 'string' && body.country.trim()) ? body.country.trim() : ((typeof body.countryCode === 'string' && body.countryCode.trim()) ? body.countryCode.trim() : '');
+        const _vDur = numOr(body && (body.durationSec !== undefined ? body.durationSec : body.duration), 0);
+        await monetizationOnView(p.email, _vEmail, _vCountry, _vDur);
+      } catch (e) {}
       return sendJSON(res, 200, { ok: true, views: p.views });
     }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
     return;
