@@ -10468,6 +10468,50 @@ async function apiRoute(req, res, urlPath) {
     } catch (e) {}
     return null;
   }
+  // ---- PERMANENT COVER URLs (v2.2.52): a public post's cover must
+  // not die with its source. A Suno musicfile cover URL is deleted by
+  // Suno after ~15 days, so it is fetched server-side and re-hosted on
+  // Cloudinary under movai/covers/<sha256(source)> (deterministic, so
+  // the same cover is never uploaded twice). Returns the Cloudinary
+  // image URL, or null when it cannot be stored — the caller keeps the
+  // ORIGINAL cover URL and the post still succeeds (a cover never
+  // blocks a post). ----
+  async function permanentCoverUrl(sourceUrl) {
+    try {
+      const u = String(sourceUrl || '').trim();
+      if (!u || !/^https?:\/\//i.test(u)) return null;
+      if (!await cloudinaryConfigured()) return null;
+      const detId = 'movai/covers/' + require('crypto').createHash('sha256').update(u).digest('hex').slice(0, 24);
+      const cands = await cloudinaryCandidates();
+      for (const a of cands) {
+        try {
+          const c = cloudinaryConfigFor(a);
+          if (!c) continue;
+          const done = await Promise.race([
+            c.uploader.upload(u, { resource_type: 'image', public_id: detId, overwrite: false }),
+            new Promise(function(res) { setTimeout(function() { res('__timeout__'); }, 25000); })
+          ]);
+          if (done === '__timeout__') continue;
+          if (done && done.secure_url) return done.secure_url;
+          if (done && done.public_id) {
+            try { const cu = c.url(detId, { resource_type: 'image' }); if (cu) return cu; } catch (e2) {}
+          }
+        } catch (e) {
+          const kind = cloudinaryClassifyUploadError(String((e && e.message) || e));
+          if (kind === 'exists') {
+            try {
+              const c2 = cloudinaryConfigFor(a);
+              const cu = c2 && c2.url(detId, { resource_type: 'image' });
+              if (cu) return cu;
+            } catch (e2) {}
+            continue;
+          }
+          if (kind === 'quota' || kind === 'auth') { try { await cloudinaryMarkAccount(a, kind, String((e && e.message) || e)); } catch (e3) {} break; }
+        }
+      }
+      return null;
+    } catch (e) { return null; }
+  }
   // Startup heal: re-link dead song URLs to their Cloudinary copy.
   // Scans public.json + history.json. For a Magic Hour URL, the
   // Cloudinary copy (if stored earlier) is found via the deterministic
@@ -11541,12 +11585,24 @@ async function apiRoute(req, res, urlPath) {
         else if (bonusPostByType(_postU)[_postType] > 0) { _postBonus = true; }
         else return sendJSON(res, 200, { ok: false, error: 'post_out', message: 'You have used your 2 free public posts for this type — please buy a package to post unlimited.' });
       }
+      // Cover permanence (v2.2.52): a post's cover must not die with
+      // its source. Cloudinary + proxy /uploads/ covers are already
+      // durable and pass through. Any other http(s) cover URL (e.g. a
+      // Suno musicfile URL — Suno deletes generated files after ~15
+      // days) is fetched server-side and re-hosted on Cloudinary; if
+      // that fails, the ORIGINAL URL is kept and the post still
+      // succeeds — the cover never blocks a post.
+      let coverRaw = (typeof body.cover === 'string' && body.cover.trim()) ? body.cover.trim().slice(0, 2000) : (typeof body.image === 'string' ? body.image.trim().slice(0, 2000) : '');
+      if (coverRaw && /^https?:\/\//i.test(coverRaw) && !isCloudinaryUrl(coverRaw) && !isProxyUploadsUrl(coverRaw)) {
+        const permCover = await permanentCoverUrl(coverRaw);
+        if (permCover) coverRaw = permCover;
+      }
       const p = {
         id: clientId || newPublicId(), email,
         name: typeof body.name === 'string' ? body.name.trim().slice(0, 100) : '',
         userId: typeof body.userId === 'string' ? body.userId.trim().slice(0, 50) : '',
         mode, title, url, style: typeof body.style === 'string' ? body.style.trim().slice(0, 200) : '',
-        cover: (typeof body.cover === 'string' && body.cover.trim()) ? body.cover.trim().slice(0, 2000) : (typeof body.image === 'string' ? body.image.trim().slice(0, 2000) : ''),
+        cover: coverRaw,
         aspect, youtube, youtubeChannel, avatar, visibility, model: typeof body.model === 'string' ? body.model.trim().slice(0, 50) : '', likes: 0, views: 0, downloads: 0, saves: 0, shares: 0, likedBy: [], createdAt: now,
       };
       posts.push(p);
