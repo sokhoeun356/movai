@@ -2797,8 +2797,9 @@ async function monetizationOnView(ownerEmail, viewerEmail, country, durationSec)
   // and Earnings by country (byCountry[cc].views) all +1 on every
   // organic play — guest or logged in, monetization ON or OFF.
   // Tomorrow's plays go into tomorrow's date key (fresh daily count
-  // each day). Promo-boosted views never enter here (they only add
-  // to the Total via promoApplyBoost and never earn).
+  // each day). Promo-boosted views add to Total, Today's views and
+  // byCountry too, via promoApplyBoost (owner 2026-11-20 11:42) —
+  // they still never earn.
   if (!rec.viewsByDate || typeof rec.viewsByDate !== 'object') rec.viewsByDate = {};
   const _today = imgFreeTodayDate();
   rec.views = numOr(rec.views, 0) + 1;
@@ -11217,6 +11218,9 @@ async function apiRoute(req, res, urlPath) {
   // Boosted views NEVER generate view earnings: this code only touches
   // `views` / `watchSeconds` / `promoFollowers` and never earnMicro /
   // pendingMicro. Promo followers likewise generate NO earnings.
+  // Owner 2026-11-20 11:42: boosted views DO count into Today's views
+  // (viewsByDate[Phnom Penh date]) and byCountry, same as organic
+  // plays — automatic every day, no manual action.
   // Payment rule (same as the wallet package buy): deduct from the
   // spendable Wallet `balance` BEFORE adding; refund on failure.
   // Notifications use addNotification (Admin bell + Telegram), same as
@@ -11256,7 +11260,20 @@ async function apiRoute(req, res, urlPath) {
     }
     const got = await monetizationRecord(email);
     if (!got) throw new Error('no_account');
-    if (type === 'views') got.rec.views = numOr(got.rec.views, 0) + amount;
+    if (type === 'views') {
+      got.rec.views = numOr(got.rec.views, 0) + amount;
+      // Owner 2026-11-20 11:42: boosted (promo) views count into
+      // Today's views and byCountry too, same as organic plays —
+      // automatic every day (keyed by Phnom Penh date). They still
+      // never earn: no earnMicro / pendingMicro touched here.
+      // No viewer country exists for a boost, so they count as Unknown.
+      if (!got.rec.viewsByDate || typeof got.rec.viewsByDate !== 'object') got.rec.viewsByDate = {};
+      const _ptoday = imgFreeTodayDate();
+      got.rec.viewsByDate[_ptoday] = numOr(got.rec.viewsByDate[_ptoday], 0) + amount;
+      if (!got.rec.byCountry || typeof got.rec.byCountry !== 'object') got.rec.byCountry = {};
+      if (!got.rec.byCountry.Unknown || typeof got.rec.byCountry.Unknown !== 'object') got.rec.byCountry.Unknown = { views: 0, earnMicro: 0 };
+      got.rec.byCountry.Unknown.views = numOr(got.rec.byCountry.Unknown.views, 0) + amount;
+    }
     else if (type === 'follows') got.rec.promoFollowers = Math.max(0, Math.floor(numOr(got.rec.promoFollowers, 0)) + amount);
     else got.rec.watchSeconds = numOr(got.rec.watchSeconds, 0) + amount * 3600;
     await saveMonetizationEarnings(got.m);
