@@ -2081,6 +2081,23 @@ const SETTINGS_DEFAULTS = {
     botToken: '',
     chatId: '',
   },
+  // Telegram shop bot (telegram-gmail-bot) on/off switch (owner order
+  // 2026-11-20 20:48). This does NOT delete the bot — OFF suspends its
+  // Render service, ON resumes it. Service: srv-dbombv9srm7s73cegmug,
+  // https://telegram-gmail-bot.onrender.com, repo
+  // sokhoeun356/telegram-gmail-bot. enabled = the owner's desired state
+  // (default false = OFF: the owner ordered it off 2026-11-20 to save
+  // hours; it stays off until they turn it on). serviceId is preset to
+  // the known id but stays configurable (env TELEGRAM_BOT_SERVICE_ID
+  // wins; the Admin field can change it). renderApiKey is a SECRET
+  // Render API key (Dashboard -> Account Settings -> API Keys), never
+  // returned by any endpoint and never logged. The key can also be set
+  // via env RENDER_API_KEY (env wins).
+  telegramBot: {
+    enabled: false,
+    serviceId: 'srv-dbombv9srm7s73cegmug',
+    renderApiKey: '',
+  },
   // Email verification (login). The server sends a 6-digit code + a magic
   // link to the user's Gmail on EVERY login (also after sign-out + log in
   // again — verification is required every time). user = the Gmail the
@@ -2204,6 +2221,24 @@ function cleanSettings(j, base) {
   else if (telIn.chatId === null) chatId = '';
   else chatId = typeof baseTel.chatId === 'string' ? baseTel.chatId : '';
   s.telegram = { botToken, chatId };
+  // Telegram shop bot on/off (owner order 2026-11-20 20:48). enabled is
+  // a boolean (default true = running). serviceId is a plain string
+  // (Render service id, srv-...). renderApiKey is a SECRET: a non-empty
+  // string sets/rotates it; an empty string or missing field KEEPS the
+  // stored key (the Admin leaves the field blank when it does not know
+  // the key — that must never wipe it); null clears it. Invalid values
+  // keep the stored value.
+  const baseTb = (base && base.telegramBot && typeof base.telegramBot === 'object' && !Array.isArray(base.telegramBot)) ? base.telegramBot : SETTINGS_DEFAULTS.telegramBot;
+  const tbIn = (j.telegramBot && typeof j.telegramBot === 'object' && !Array.isArray(j.telegramBot)) ? j.telegramBot : {};
+  let tbKey;
+  if (typeof tbIn.renderApiKey === 'string' && tbIn.renderApiKey.trim()) tbKey = tbIn.renderApiKey.trim().replace(/\s+/g, '').slice(0, 200);
+  else if (tbIn.renderApiKey === null) tbKey = '';
+  else tbKey = typeof baseTb.renderApiKey === 'string' ? baseTb.renderApiKey : '';
+  s.telegramBot = {
+    enabled: typeof tbIn.enabled === 'boolean' ? tbIn.enabled : (typeof baseTb.enabled === 'boolean' ? baseTb.enabled : true),
+    serviceId: typeof tbIn.serviceId === 'string' ? tbIn.serviceId.trim().slice(0, 100) : (typeof baseTb.serviceId === 'string' ? baseTb.serviceId : ''),
+    renderApiKey: tbKey,
+  };
   // Email verification settings. appPassword is a SECRET: a non-empty
   // string sets/rotates it; an empty string or missing field KEEPS the
   // stored password (the Admin app leaves the field blank when it does
@@ -2251,6 +2286,8 @@ function publicSettings(s) {
   const out = Object.assign({}, s);
   const tel = (s && s.telegram && typeof s.telegram === 'object' && !Array.isArray(s.telegram)) ? s.telegram : {};
   out.telegram = { hasBotToken: !!(typeof tel.botToken === 'string' && tel.botToken.trim()), chatId: typeof tel.chatId === 'string' ? tel.chatId : '' };
+  const tb = (s && s.telegramBot && typeof s.telegramBot === 'object' && !Array.isArray(s.telegramBot)) ? s.telegramBot : {};
+  out.telegramBot = { hasRenderApiKey: !!(typeof tb.renderApiKey === 'string' && tb.renderApiKey.trim()), serviceId: typeof tb.serviceId === 'string' ? tb.serviceId : '', enabled: tb.enabled === true };
   const em = (s && s.email && typeof s.email === 'object' && !Array.isArray(s.email)) ? s.email : {};
   out.email = { user: typeof em.user === 'string' ? em.user : '', hasAppPassword: !!(typeof em.appPassword === 'string' && em.appPassword.trim()), hasBrevoApiKey: !!(typeof em.brevoApiKey === 'string' && em.brevoApiKey.trim()) };
   return out;
@@ -4386,6 +4423,132 @@ const SUNO_CALLBACK_URL = process.env.SUNO_CALLBACK_URL || 'https://movai-proxy.
 // In-memory only (a restart loses it — the status handler then falls
 // back to polling record-info, so nothing breaks).
 const sunoCallbacks = new Map();
+// v2.2.58 Instant Playback (streaming): per-song streaming state per
+// taskId, driven by the Suno webhook through 3 stages — TEXT_SUCCESS
+// (lyrics ready, no audio), FIRST_SUCCESS (stream_audio_url live),
+// SUCCESS (final audio_url) — then the server saves each song to
+// permanent Cloudinary storage in the background. Per-song status:
+// 'generating' | 'streaming' | 'saving' | 'ready' | 'failed'.
+// In-memory for speed; mirrored to Supabase kv_docs ('suno-stream:<id>')
+// so the status endpoint can recover it after a restart.
+const sunoStreamState = new Map();
+const sunoRecInfoCache = new Map(); // taskId -> {at, out} (12s throttle)
+function sunoStreamKey(taskId) { return 'suno-stream:' + taskId; }
+// Per-song stream/audio URLs straight from a Suno payload (callback or
+// record-info). Unlike sunoSongsFromData this keeps stream_audio_url and
+// audio_url SEPARATE — the stream URL is for live listening only and
+// must never be saved as the final file.
+function sunoStreamSongsFromData(d) {
+  const resp = (d && d.response) || {};
+  const arr = Array.isArray(resp.sunoData) ? resp.sunoData : (Array.isArray(d && d.sunoData) ? d.sunoData : []);
+  const taskId = typeof (d && d.taskId) === 'string' ? d.taskId : (typeof resp.taskId === 'string' ? resp.taskId : '');
+  return arr.filter((c) => c && ((typeof c.audio_url === 'string' && c.audio_url) || (typeof c.stream_audio_url === 'string' && c.stream_audio_url))).map((c) => ({
+    audioId: typeof c.id === 'string' ? c.id : (typeof c.audioId === 'string' ? c.audioId : ''),
+    title: typeof c.title === 'string' ? c.title : '',
+    image: typeof c.image_url === 'string' ? c.image_url : '',
+    duration: typeof c.duration === 'number' ? c.duration : 0,
+    streamAudioUrl: typeof c.stream_audio_url === 'string' ? c.stream_audio_url : '',
+    audioUrl: typeof c.audio_url === 'string' ? c.audio_url : '',
+    taskId,
+  }));
+}
+function sunoStreamLyricsFromData(d) {
+  const resp = (d && d.response) || {};
+  const arr = Array.isArray(resp.sunoData) ? resp.sunoData : (Array.isArray(d && d.sunoData) ? d.sunoData : []);
+  for (const c of arr) {
+    if (c && typeof c.lyric === 'string' && c.lyric) return c.lyric;
+    if (c && typeof c.lyrics === 'string' && c.lyrics) return c.lyrics;
+  }
+  if (typeof d.lyric === 'string' && d.lyric) return d.lyric;
+  if (typeof d.lyrics === 'string' && d.lyrics) return d.lyrics;
+  if (typeof resp.lyric === 'string' && resp.lyric) return resp.lyric;
+  return '';
+}
+// Merge a Suno payload into the streaming state. Returns {state, changed}.
+// Duplicate callbacks for the same taskId + Suno status are ignored
+// (changed=false) — the clip-level merge only adds what is new.
+function sunoStreamMerge(taskId, d, sunoStatus) {
+  var st = sunoStreamState.get(taskId);
+  if (!st) { st = { taskId, status: 'generating', lyrics: '', songs: [], updatedAt: Date.now(), saveStarted: false, lastCbStatus: '' }; sunoStreamState.set(taskId, st); }
+  var changed = false;
+  var clips = sunoStreamSongsFromData(d);
+  var lyric = sunoStreamLyricsFromData(d);
+  if (lyric && st.lyrics !== lyric) { st.lyrics = lyric; changed = true; }
+  function findClip(c) {
+    for (var i = 0; i < st.songs.length; i++) {
+      var s = st.songs[i];
+      if (s.audioId && c.audioId && s.audioId === c.audioId) return s;
+      if (!s.audioId && !c.audioId && s.title && c.title && s.title === c.title) return s;
+    }
+    return null;
+  }
+  if (sunoStatus === 'TEXT_SUCCESS') {
+    if (st.status !== 'generating' || st.lastCbStatus !== 'TEXT_SUCCESS') { st.status = 'generating'; changed = true; }
+  } else if (sunoStatus === 'FIRST_SUCCESS') {
+    if (st.status !== 'streaming' || st.lastCbStatus !== 'FIRST_SUCCESS') { st.status = 'streaming'; changed = true; }
+    clips.forEach(function(c) {
+      var ex = findClip(c);
+      if (!ex) { st.songs.push({ audioId: c.audioId, title: c.title, image: c.image, duration: c.duration, streamAudioUrl: c.streamAudioUrl, audioUrl: c.audioUrl, permanentMp3Url: '', status: 'streaming', taskId }); changed = true; }
+      else {
+        if (c.streamAudioUrl && ex.streamAudioUrl !== c.streamAudioUrl) { ex.streamAudioUrl = c.streamAudioUrl; changed = true; }
+        if (c.audioUrl && ex.audioUrl !== c.audioUrl) { ex.audioUrl = c.audioUrl; changed = true; }
+        if (ex.status !== 'streaming') { ex.status = 'streaming'; changed = true; }
+      }
+    });
+  } else if (sunoStatus === 'SUCCESS') {
+    if (st.status !== 'saving' && st.status !== 'ready') { st.status = 'saving'; changed = true; }
+    clips.forEach(function(c) {
+      var ex = findClip(c);
+      if (!ex) { st.songs.push({ audioId: c.audioId, title: c.title, image: c.image, duration: c.duration, streamAudioUrl: c.streamAudioUrl, audioUrl: c.audioUrl, permanentMp3Url: '', status: 'saving', taskId }); changed = true; }
+      else {
+        if (c.audioUrl && ex.audioUrl !== c.audioUrl) { ex.audioUrl = c.audioUrl; changed = true; }
+        if (c.streamAudioUrl && !ex.streamAudioUrl) { ex.streamAudioUrl = c.streamAudioUrl; changed = true; }
+        if (ex.status === 'streaming' || ex.status === 'generating') { ex.status = 'saving'; changed = true; }
+      }
+    });
+    if (!clips.length && !st.songs.length) { st.status = 'failed'; changed = true; }
+  } else if (sunoStatus && sunoStatusIsFailed(sunoStatus)) {
+    if (st.status !== 'failed') { st.status = 'failed'; st.songs.forEach(function(x) { x.status = 'failed'; }); changed = true; }
+  }
+  if (sunoStatus && st.lastCbStatus !== sunoStatus) { st.lastCbStatus = sunoStatus; changed = true; }
+  st.updatedAt = Date.now();
+  if (sunoStreamState.size > 200) { const k = sunoStreamState.keys().next().value; sunoStreamState.delete(k); }
+  return { state: st, changed };
+}
+// Fire-and-forget mirror to Supabase kv_docs (never blocks a response).
+function sunoStreamPersist(taskId) {
+  try {
+    var st = sunoStreamState.get(taskId);
+    if (!st) return;
+    var clean = { taskId: st.taskId, status: st.status, lyrics: st.lyrics || '', songs: st.songs.map(function(x) { return { audioId: x.audioId, title: x.title, image: x.image || '', duration: x.duration || 0, streamAudioUrl: x.streamAudioUrl || '', audioUrl: x.audioUrl || '', permanentMp3Url: x.permanentMp3Url || '', status: x.status, taskId: x.taskId }; }), updatedAt: st.updatedAt };
+    saveKvDoc(sunoStreamKey(taskId), clean).catch(function() {});
+  } catch (e) {}
+}
+// In-memory first, then kv_docs (restart recovery).
+async function sunoStreamLoad(taskId) {
+  var st = sunoStreamState.get(taskId);
+  if (st) return st;
+  try {
+    var doc = await loadKvDoc(sunoStreamKey(taskId), null);
+    if (doc && doc.taskId && Array.isArray(doc.songs)) {
+      st = { taskId: doc.taskId, status: doc.status || 'generating', lyrics: doc.lyrics || '', songs: doc.songs, updatedAt: doc.updatedAt || Date.now(), saveStarted: (doc.status === 'ready' || doc.status === 'saving'), lastCbStatus: '' };
+      sunoStreamState.set(taskId, st);
+      return st;
+    }
+  } catch (e) {}
+  return null;
+}
+// The status endpoint's songs array: url is the playable URL right now
+// (permanent when ready, else the live stream, else the final audio).
+// The stream URL is NEVER used for downloads — the client disables
+// Download until songStatus is 'ready'.
+function sunoStreamToSongs(state) {
+  if (!state || !Array.isArray(state.songs)) return [];
+  return state.songs.map(function(x) {
+    var url = x.permanentMp3Url || x.streamAudioUrl || x.audioUrl || '';
+    return { url, title: x.title || '', image: x.image || '', duration: x.duration || 0, audioId: x.audioId || '', taskId: x.taskId || state.taskId || '', songStatus: x.status || state.status || '', streamAudioUrl: x.streamAudioUrl || '', audioUrl: x.audioUrl || '', permanentMp3Url: x.permanentMp3Url || '' };
+  }).filter(function(x) { return !!x.url; });
+}
 function sunoApiModel(m) {
   const s = String(m || '').trim().toLowerCase();
   if (s === 'v6-wild' || s === 'v6_wild') return 'V6_WILD';
@@ -4658,14 +4821,39 @@ function sunoSongsFromData(d) {
   // every NEW song so a future History-song cover can use the
   // taskId+audioId path. Old songs without IDs cannot use that path.
   const taskId = typeof (d && d.taskId) === 'string' ? d.taskId : (typeof resp.taskId === 'string' ? resp.taskId : '');
-  return arr.filter((c) => c && typeof c.audio_url === 'string' && c.audio_url).map((c) => ({
-    url: c.audio_url,
+  return arr.filter((c) => c && ((typeof c.audio_url === 'string' && c.audio_url) || (typeof c.stream_audio_url === 'string' && c.stream_audio_url))).map((c) => ({
+    url: (typeof c.audio_url === 'string' && c.audio_url) ? c.audio_url : c.stream_audio_url,
     title: typeof c.title === 'string' ? c.title : '',
     image: typeof c.image_url === 'string' ? c.image_url : '',
     duration: typeof c.duration === 'number' ? c.duration : 0,
     audioId: typeof c.id === 'string' ? c.id : (typeof c.audioId === 'string' ? c.audioId : ''),
     taskId,
   }));
+}
+// v2.2.58: keep clip 1's URL identical between the early (FIRST_SUCCESS)
+// and final (SUCCESS) responses, so a song the user is already listening
+// to doesn't restart when the final render swaps it in. Prefer audio_url
+// when present; if only stream_audio_url existed early, keep using it
+// for that clip in the final songs array too.
+function sunoSongsKeepEarlyUrl(songs, firstSongs) {
+  if (!Array.isArray(songs) || !songs.length) return songs;
+  if (!Array.isArray(firstSongs) || !firstSongs.length) return songs;
+  var f = firstSongs[0];
+  if (!f || !f.url) return songs;
+  var s0 = songs[0];
+  if (!s0 || !s0.url) return songs;
+  if (s0.url === f.url) return songs;
+  var fid = f.audioId || '';
+  var sid = s0.audioId || '';
+  var same = false;
+  if (fid && sid && fid === sid) same = true;
+  else if (!fid && !sid) {
+    var ft = (f.title || '').trim();
+    var stt = (s0.title || '').trim();
+    if (ft && stt && ft === stt) same = true;
+  }
+  if (same) songs[0] = Object.assign({}, s0, { url: f.url });
+  return songs;
 }
 function sunoPreviewFromData(d) {
   const resp = (d && d.response) || {};
@@ -5496,6 +5684,34 @@ async function apiRoute(req, res, urlPath) {
     }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
     return;
   }
+  // v2.2.58 Instant Playback: save a finished Suno task's songs to
+  // permanent Cloudinary storage in the BACKGROUND. Called when SUCCESS
+  // arrives (webhook or record-info). Never awaited — the webhook must
+  // answer 200 in under a second and the status endpoint must not wait
+  // for the upload. Deduplicated by state.saveStarted. When every song
+  // has a permanent URL (or its upload failed and fell back to the Suno
+  // URL, which the client's histStoreSongNow then saves), the task
+  // becomes 'ready' and the client switches the player to the permanent
+  // URL and enables Download.
+  async function sunoStreamSave(taskId) {
+    var st = sunoStreamState.get(taskId);
+    if (!st || st.saveStarted) return;
+    st.saveStarted = true;
+    try {
+      var pending = st.songs.filter(function(x) { return x.audioUrl && !x.permanentMp3Url && x.status !== 'failed'; });
+      for (const x of pending) {
+        try {
+          const stored = await cloudinaryStoreSong(x.audioUrl, x.title || '');
+          if (stored && stored.mp3Url) { x.permanentMp3Url = stored.mp3Url; x.status = 'ready'; }
+          else { x.status = 'ready'; }
+        } catch (e) { try { console.error('[suno-stream] cloudinary save failed for ' + taskId + ': ' + String((e && e.message) || e).slice(0, 120)); } catch (e2) {} x.status = 'ready'; }
+      }
+      var allReady = st.songs.length > 0 && st.songs.every(function(x) { return x.status === 'ready' || x.status === 'failed'; });
+      if (allReady) st.status = 'ready';
+      st.updatedAt = Date.now();
+      sunoStreamPersist(taskId);
+    } catch (e) {}
+  }
   // POST /api/suno/callback — PUBLIC (no admin key). sunoapi.org calls
   // this when a generation changes stage (text / first / complete).
   // We store the result by taskId so /api/gen/song/status can answer
@@ -5508,7 +5724,29 @@ async function apiRoute(req, res, urlPath) {
         const taskId = typeof d.taskId === 'string' && d.taskId ? d.taskId : (typeof body.taskId === 'string' ? body.taskId : '');
         if (taskId) {
           const st = typeof d.status === 'string' ? d.status : '';
-          sunoCallbacks.set(taskId, { status: st, songs: sunoSongsFromData(d), preview: sunoPreviewFromData(d), updatedAt: Date.now() });
+          // v2.2.58: preserve the FIRST_SUCCESS preview — a SUCCESS
+          // callback must not erase the first song's early URL, or the
+          // client's early card loses its src identity and playback
+          // restarts on the final render.
+          var _prevCb = sunoCallbacks.get(taskId);
+          var _cbSongs = sunoSongsFromData(d);
+          var _cbPrev = sunoPreviewFromData(d);
+          var _firstSongs = (_prevCb && _prevCb.firstSongs && _prevCb.firstSongs.length) ? _prevCb.firstSongs : null;
+          var _firstPrev = (_prevCb && _prevCb.firstPreview) ? _prevCb.firstPreview : null;
+          if (st === 'FIRST_SUCCESS') {
+            if (_cbSongs.length) _firstSongs = _cbSongs;
+            if (_cbPrev) _firstPrev = _cbPrev;
+          }
+          sunoCallbacks.set(taskId, { status: st, songs: _cbSongs, preview: _cbPrev, firstSongs: _firstSongs, firstPreview: _firstPrev, updatedAt: Date.now() });
+          // v2.2.58 Instant Playback: drive the per-song streaming
+          // state (text -> streaming -> saving -> ready). Fire-and-
+          // forget only — the 200 below must go out in under a second,
+          // so nothing here is awaited.
+          try {
+            var _sm = sunoStreamMerge(taskId, d, st);
+            if (_sm.changed) sunoStreamPersist(taskId);
+            if (st === 'SUCCESS') { try { sunoStreamSave(taskId).catch(function() {}); } catch (e) {} }
+          } catch (e) {}
           // v2.2.48: Suno reports a failed job here — refund it on the
           // SERVER at once (no phone report needed). coverPendingRefund
           // is once-only and paid-only, so a stray callback is harmless.
@@ -5770,11 +6008,44 @@ async function apiRoute(req, res, urlPath) {
             return sendJSON(res, 200, { ok: false, error: 'Admin មិនទាន់ដាក់ Suno endpoint ទេ' });
           }
           const cb = sunoCallbacks.get(jobId);
-          if (cb && cb.status === 'SUCCESS' && cb.songs && cb.songs.length) {
-            return sendJSON(res, 200, { ok: true, status: 'done', songs: cb.songs });
+          // v2.2.58 Instant Playback: the per-song streaming state is
+          // the primary source (webhook-driven). It knows each song's
+          // status (generating/streaming/saving/ready) and URLs, so the
+          // client can play the live stream and switch to the permanent
+          // URL when it is ready.
+          var _ss = null;
+          try { _ss = await sunoStreamLoad(jobId); } catch (e) {}
+          if (_ss && _ss.status === 'ready' && _ss.songs && _ss.songs.length) {
+            return sendJSON(res, 200, { ok: true, status: 'done', songs: sunoStreamToSongs(_ss) });
           }
-          if (cb && cb.status === 'FIRST_SUCCESS' && cb.preview) {
-            return sendJSON(res, 200, { ok: true, status: 'working', providerStatus: 'first', preview: cb.preview, streamUrl: cb.preview });
+          if (_ss && _ss.status === 'streaming' && _ss.songs && _ss.songs.length) {
+            var _sp = sunoStreamToSongs(_ss);
+            var _prev = _sp.length ? (_sp[0].streamAudioUrl || _sp[0].url) : '';
+            return sendJSON(res, 200, { ok: true, status: 'working', providerStatus: 'first', preview: _prev, streamUrl: _prev, songs: _sp });
+          }
+          if (_ss && _ss.status === 'saving' && _ss.songs && _ss.songs.length) {
+            if (!_ss.saveStarted) { try { sunoStreamSave(jobId).catch(function() {}); } catch (e) {} }
+            return sendJSON(res, 200, { ok: true, status: 'working', providerStatus: 'saving', songs: sunoStreamToSongs(_ss) });
+          }
+          if (_ss && _ss.status === 'generating') {
+            return sendJSON(res, 200, { ok: true, status: 'working', providerStatus: 'text', lyrics: _ss.lyrics || '' });
+          }
+          if (_ss && _ss.status === 'failed') {
+            return sendJSON(res, 200, { ok: false, error: 'Suno: បង្កើតមិនបានទេ' });
+          }
+          if (cb && cb.status === 'SUCCESS' && cb.songs && cb.songs.length) {
+            return sendJSON(res, 200, { ok: true, status: 'done', songs: sunoSongsKeepEarlyUrl(cb.songs, cb.firstSongs) });
+          }
+          if (cb && cb.status === 'FIRST_SUCCESS' && (cb.preview || (cb.songs && cb.songs.length) || (cb.firstSongs && cb.firstSongs.length))) {
+            var _fs = (cb.firstSongs && cb.firstSongs.length) ? cb.firstSongs : (cb.songs && cb.songs.length ? cb.songs : []);
+            return sendJSON(res, 200, { ok: true, status: 'working', providerStatus: 'first', preview: cb.preview, streamUrl: cb.preview, songs: _fs });
+          }
+          // v2.2.58: record-info is only a FALLBACK (the webhook is the
+          // primary source) — throttle it to one Suno call per taskId
+          // per 12s even though the client polls every 5s.
+          var _riCached = sunoRecInfoCache.get(jobId);
+          if (_riCached && _riCached.out && Date.now() - _riCached.at < 12000) {
+            return sendJSON(res, 200, Object.assign({ ok: true }, _riCached.out));
           }
           let out;
           try {
@@ -5787,21 +6058,40 @@ async function apiRoute(req, res, urlPath) {
               if (!d || typeof d.status !== 'string') throw rotErr('Suno: ' + sunoErrText(j, 'HTTP ' + r.status), r.status);
               const st = d.status;
               if (st === 'SUCCESS') {
-                const songs = sunoSongsFromData(d);
-                if (songs.length) return { status: 'done', songs };
+                const songs = sunoSongsKeepEarlyUrl(sunoSongsFromData(d), cb && cb.firstSongs);
+                if (songs.length) {
+                  // v2.2.58: merge into the streaming state and save to
+                  // Cloudinary in the background; the client sees
+                  // 'saving' until the permanent URLs are ready, then
+                  // 'done'. (The webhook path does the same.)
+                  try {
+                    var _sm2 = sunoStreamMerge(jobId, d, 'SUCCESS');
+                    if (_sm2.changed) sunoStreamPersist(jobId);
+                    if (_sm2.state.status === 'ready') return { status: 'done', songs: sunoStreamToSongs(_sm2.state) };
+                    try { sunoStreamSave(jobId).catch(function() {}); } catch (e) {}
+                    return { status: 'working', providerStatus: 'saving', songs: sunoStreamToSongs(_sm2.state) };
+                  } catch (e) {}
+                  return { status: 'done', songs };
+                }
                 throw rotErr('Suno: បង្កើតបានតែគ្មានបទទេ', r.status);
               }
               if (st === 'FIRST_SUCCESS') {
                 const preview = sunoPreviewFromData(d);
-                return { status: 'working', providerStatus: 'first', preview, streamUrl: preview };
+                try { var _sm3 = sunoStreamMerge(jobId, d, 'FIRST_SUCCESS'); if (_sm3.changed) sunoStreamPersist(jobId); } catch (e) {}
+                return { status: 'working', providerStatus: 'first', preview, streamUrl: preview, songs: sunoSongsFromData(d) };
               }
-              if (st === 'PENDING' || st === 'TEXT_SUCCESS') return { status: 'working', providerStatus: 'queued' };
+              if (st === 'PENDING' || st === 'TEXT_SUCCESS') {
+                try { var _sm4 = sunoStreamMerge(jobId, d, st); if (_sm4.changed) sunoStreamPersist(jobId); } catch (e) {}
+                if (st === 'TEXT_SUCCESS') { var _lyr = ''; try { _lyr = sunoStreamLyricsFromData(d); } catch (e) {} return { status: 'working', providerStatus: 'text', lyrics: _lyr }; }
+                return { status: 'working', providerStatus: 'queued' };
+              }
               try { await coverPendingRefund(jobId); } catch (e2) {}
               throw rotErr('Suno: ' + (d.errorMessage || st || 'បង្កើតមិនបានទេ'), r.status);
             }, '', sunoKeys);
           } catch (e) {
             return sendJSON(res, 200, { ok: false, error: (e && e.message) || 'Suno: request failed' });
           }
+          try { sunoRecInfoCache.set(jobId, { at: Date.now(), out }); if (sunoRecInfoCache.size > 200) { const _rk = sunoRecInfoCache.keys().next().value; sunoRecInfoCache.delete(_rk); } } catch (e) {}
           return sendJSON(res, 200, Object.assign({ ok: true }, out));
         }
         if (provider === 'musicapi') {
@@ -7825,6 +8115,112 @@ async function apiRoute(req, res, urlPath) {
       if (!body || typeof body.enabled !== 'boolean') return sendJSON(res, 200, { ok: false, error: 'សូមដាក់ enabled: true/false' });
       const out = await saveSettings(Object.assign(await loadSettings(), { gift50: body.enabled }));
       return sendJSON(res, 200, { ok: true, enabled: out.gift50 === true });
+    }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
+    return;
+  }
+  // ---- Telegram shop bot on/off switch (owner order 2026-11-20 20:48) ----
+  // The owner turned the telegram-gmail-bot Render service OFF (suspend)
+  // to save hours, and wants an Admin switch to turn it back ON (resume)
+  // later. This is suspend/resume ONLY — it NEVER deletes the service.
+  // GET /api/admin/telegram-bot (admin key) reports the current state
+  // (live from Render when configured, else the stored desired state).
+  // POST /api/admin/telegram-bot {enabled} (admin key) suspends
+  // (enabled:false) or resumes (enabled:true) the service via the
+  // Render API v1 (POST /v1/services/{id}/suspend|resume, Bearer key).
+  // Config: env RENDER_API_KEY + TELEGRAM_BOT_SERVICE_ID win; else
+  // settings telegramBot.renderApiKey / telegramBot.serviceId (set in
+  // the Admin). If either is missing the endpoint returns a clear error
+  // (never fails silently). The Render API key value is never returned
+  // or logged by any endpoint. Service: srv-dbombv9srm7s73cegmug
+  // (https://telegram-gmail-bot.onrender.com). NOTE 2026-11-20: Render
+  // already suspended this service for bandwidth, so the Dashboard
+  // Suspend button is disabled and the service is 'Suspended by
+  // Render', NOT owner-suspended. It may resume when the quota resets
+  // Dec 1 — the toggle must then be able to suspend it via the Render
+  // API (a suspend call on an already-suspended service may be rejected
+  // as a no-op; the POST handler below treats "live state already
+  // matches" as success). Nothing was deleted.
+  async function telegramBotConfig() {
+    const s = await loadSettings().catch(() => null);
+    const tb = (s && s.telegramBot && typeof s.telegramBot === 'object' && !Array.isArray(s.telegramBot)) ? s.telegramBot : {};
+    const apiKey = (process.env.RENDER_API_KEY || '').trim() || (typeof tb.renderApiKey === 'string' ? tb.renderApiKey.trim() : '');
+    const serviceId = (process.env.TELEGRAM_BOT_SERVICE_ID || '').trim() || (typeof tb.serviceId === 'string' ? tb.serviceId.trim() : '');
+    return { apiKey, serviceId, desiredEnabled: tb.enabled !== false };
+  }
+  async function renderServiceState(apiKey, serviceId) {
+    const r = await fetch('https://api.render.com/v1/services/' + encodeURIComponent(serviceId), { headers: { 'Authorization': 'Bearer ' + apiKey, 'Accept': 'application/json' }, signal: AbortSignal.timeout(15000) });
+    const t = await r.text();
+    let d = null; try { d = t ? JSON.parse(t) : null; } catch (e) {}
+    if (!r.ok) throw new Error('Render API ' + r.status + (d && d.message ? ': ' + String(d.message).slice(0, 200) : ''));
+    const svc = (d && d.service && typeof d.service === 'object') ? d.service : {};
+    return { suspended: svc.suspended === true, name: typeof svc.name === 'string' ? svc.name : '', type: typeof svc.type === 'string' ? svc.type : '' };
+  }
+  async function renderServiceToggle(apiKey, serviceId, enable) {
+    const action = enable ? 'resume' : 'suspend';
+    const r = await fetch('https://api.render.com/v1/services/' + encodeURIComponent(serviceId) + '/' + action, { method: 'POST', headers: { 'Authorization': 'Bearer ' + apiKey, 'Accept': 'application/json' }, signal: AbortSignal.timeout(20000) });
+    const t = await r.text();
+    let d = null; try { d = t ? JSON.parse(t) : null; } catch (e) {}
+    if (!r.ok) throw new Error('Render API ' + r.status + (d && d.message ? ': ' + String(d.message).slice(0, 200) : ''));
+    return true;
+  }
+  if (req.method === 'GET' && urlPath === '/api/admin/telegram-bot') {
+    const a = await adminKeyOk(req);
+    if (!a.ok) return sendJSON(res, 200, { ok: false, error: a.error });
+    const cfg = await telegramBotConfig();
+    const base = { ok: true, enabled: cfg.desiredEnabled, suspended: null, live: false, serviceName: '', serviceId: cfg.serviceId || '', serviceIdConfigured: !!cfg.serviceId, renderKeyConfigured: !!cfg.apiKey };
+    if (!cfg.apiKey) return sendJSON(res, 200, Object.assign(base, { ok: false, error: 'render_api_key_not_configured', message: 'Render API Key មិនទាន់បានកំណត់ទេ · Render API key not configured — សូមដាក់ RENDER_API_KEY នៅលើ Server ឬវាយ Key នៅកាត Bot Telegram ខាងក្រោម' }));
+    if (!cfg.serviceId) return sendJSON(res, 200, Object.assign(base, { ok: false, error: 'telegram_bot_service_id_not_configured', message: 'Service ID របស់ Bot Telegram មិនទាន់បានកំណត់ទេ · Telegram bot service ID not configured — សូមដាក់ Service ID (srv-...) នៅកាត Bot Telegram ខាងក្រោម' }));
+    try {
+      const st = await renderServiceState(cfg.apiKey, cfg.serviceId);
+      return sendJSON(res, 200, Object.assign(base, { suspended: st.suspended, enabled: !st.suspended, serviceName: st.name, live: true }));
+    } catch (e) {
+      return sendJSON(res, 200, Object.assign(base, { ok: false, error: 'render_api_error', message: 'Render API error: ' + (e && e.message ? e.message : e) }));
+    }
+  }
+  if (req.method === 'POST' && urlPath === '/api/admin/telegram-bot') {
+    const a = await adminKeyOk(req);
+    if (!a.ok) return sendJSON(res, 200, { ok: false, error: a.error });
+    readJSONBody(req, 64 * 1024).then(async (body) => {
+      if (!body || typeof body !== 'object' || Array.isArray(body)) return sendJSON(res, 200, { ok: false, error: 'សូមដាក់ enabled: true/false' });
+      // Save config fields first (serviceId / renderApiKey). The desired
+      // state (enabled) is saved ONLY after Render accepts the action.
+      const patch = {};
+      if (typeof body.serviceId === 'string') patch.serviceId = body.serviceId.trim().slice(0, 100);
+      if (typeof body.renderApiKey === 'string' && body.renderApiKey.trim()) patch.renderApiKey = body.renderApiKey.trim();
+      if (Object.keys(patch).length) {
+        const cur = await loadSettings();
+        await saveSettings(Object.assign(cur, { telegramBot: Object.assign({}, cur.telegramBot || {}, patch) }));
+      }
+      // Config-only save (no toggle requested): report the saved config.
+      if (typeof body.enabled !== 'boolean') {
+        const cfg0 = await telegramBotConfig();
+        return sendJSON(res, 200, { ok: true, saved: true, enabled: cfg0.desiredEnabled, serviceIdConfigured: !!cfg0.serviceId, renderKeyConfigured: !!cfg0.apiKey, serviceId: cfg0.serviceId || '' });
+      }
+      const cfg = await telegramBotConfig();
+      if (!cfg.apiKey) return sendJSON(res, 200, { ok: false, error: 'render_api_key_not_configured', message: 'Render API Key មិនទាន់បានកំណត់ទេ · Render API key not configured — សូមដាក់ RENDER_API_KEY នៅលើ Server ឬវាយ Key នៅកាត Bot Telegram ខាងក្រោម' });
+      if (!cfg.serviceId) return sendJSON(res, 200, { ok: false, error: 'telegram_bot_service_id_not_configured', message: 'Service ID របស់ Bot Telegram មិនទាន់បានកំណត់ទេ · Telegram bot service ID not configured — សូមដាក់ Service ID (srv-...) នៅកាត Bot Telegram ខាងក្រោម' });
+      let tgToggleErr = null;
+      let tgToggleOk = false;
+      try {
+        await renderServiceToggle(cfg.apiKey, cfg.serviceId, body.enabled);
+        tgToggleOk = true;
+      } catch (e) {
+        tgToggleErr = e;
+        // Render may reject a suspend/resume that is already in effect
+        // (e.g. this service is already 'Suspended by Render' for
+        // bandwidth). Re-read the live state: if it already matches the
+        // requested state, the toggle is effectively done.
+        try {
+          const stNow = await renderServiceState(cfg.apiKey, cfg.serviceId);
+          if (stNow.suspended === !body.enabled) tgToggleOk = true;
+        } catch (e2) {}
+      }
+      if (!tgToggleOk) {
+        return sendJSON(res, 200, { ok: false, error: 'render_api_error', message: 'Render API error: ' + (tgToggleErr && tgToggleErr.message ? tgToggleErr.message : tgToggleErr) });
+      }
+      const cur2 = await loadSettings();
+      await saveSettings(Object.assign(cur2, { telegramBot: Object.assign({}, cur2.telegramBot || {}, { enabled: body.enabled }) }));
+      return sendJSON(res, 200, { ok: true, enabled: body.enabled, suspended: !body.enabled, serviceIdConfigured: true, renderKeyConfigured: true, serviceId: cfg.serviceId });
     }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
     return;
   }
