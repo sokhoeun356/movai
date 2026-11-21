@@ -9576,6 +9576,261 @@ async function apiRoute(req, res, urlPath) {
     }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
     return;
   }
+  // ---- MovAi Song-Selling Service (v2.2.61, owner-only preview) ----
+  // A seller lists a fixed-size package of their own songs; a buyer pays
+  // with Wallet (or KHQR + receipt, approved by Admin). MovAi keeps 5%,
+  // the seller gets 95% into Earn Balance (withdraw-only, like cashback).
+  // Storage (Supabase kv_docs, no new tables):
+  //   'sell-listings'   -> array of listings
+  //   'sell-downloaded' -> {email: [songKey, ...]} (songs the owner
+  //                        already downloaded — can never be listed)
+  //   'sell-sales'      -> array of completed-sale log entries
+  // Song key = the history_items item_key for that song (histKey: id: or
+  // url:). pairKey = taskId (the two clips of one generation share it).
+  // NO provider names anywhere in user-facing strings — 'MovAi' only.
+  const SELL_TIERS = [
+    { tier: 1, price: 1, songs: 6, bonus: 0, base: 6, cost: 0.60, movai: 0.05, seller: 0.95, net: 0.35 },
+    { tier: 2, price: 2, songs: 12, bonus: 0, base: 12, cost: 1.20, movai: 0.10, seller: 1.90, net: 0.70 },
+    { tier: 3, price: 3, songs: 18, bonus: 0, base: 18, cost: 1.80, movai: 0.15, seller: 2.85, net: 1.05 },
+    { tier: 4, price: 4, songs: 24, bonus: 0, base: 24, cost: 2.40, movai: 0.20, seller: 3.80, net: 1.40 },
+    { tier: 5, price: 5, songs: 32, bonus: 2, base: 30, cost: 3.20, movai: 0.25, seller: 4.75, net: 1.55 },
+    { tier: 10, price: 10, songs: 65, bonus: 5, base: 60, cost: 6.50, movai: 0.50, seller: 9.50, net: 3.00 },
+    { tier: 15, price: 15, songs: 98, bonus: 8, base: 90, cost: 9.80, movai: 0.75, seller: 14.25, net: 4.45 },
+    { tier: 20, price: 20, songs: 132, bonus: 12, base: 120, cost: 13.20, movai: 1.00, seller: 19.00, net: 5.80 },
+    { tier: 25, price: 25, songs: 165, bonus: 15, base: 150, cost: 16.50, movai: 1.25, seller: 23.75, net: 7.25 },
+  ];
+  function sellTierByTier(t) {
+    const n = Math.floor(numOr(t, 0));
+    return SELL_TIERS.find((x) => x.tier === n) || null;
+  }
+  function sellDisplayName(users, email) {
+    const u = users && users[email];
+    if (u && typeof u.name === 'string' && u.name.trim()) return u.name.trim().slice(0, 100);
+    return String(email || '').split('@')[0] || email || '';
+  }
+  function sellNewId(prefix) {
+    return prefix + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+  }
+  async function loadSellListings() {
+    const j = await loadKvDoc('sell-listings', []);
+    return Array.isArray(j) ? j.filter((x) => x && typeof x === 'object') : [];
+  }
+  async function saveSellListings(arr) {
+    await saveKvDoc('sell-listings', Array.isArray(arr) ? arr : [], 'sell-listings.json');
+  }
+  async function loadSellDownloaded() {
+    const j = await loadKvDoc('sell-downloaded', {});
+    return (j && typeof j === 'object' && !Array.isArray(j)) ? j : {};
+  }
+  async function saveSellDownloaded(m) {
+    await saveKvDoc('sell-downloaded', (m && typeof m === 'object') ? m : {}, 'sell-downloaded.json');
+  }
+  async function loadSellSales() {
+    const j = await loadKvDoc('sell-sales', []);
+    return Array.isArray(j) ? j : [];
+  }
+  async function saveSellSales(arr) {
+    await saveKvDoc('sell-sales', (Array.isArray(arr) ? arr : []).slice(-1000), 'sell-sales.json');
+  }
+  // Normalise one history item into a sellable song. Only song items
+  // count: an item whose mode/type is image, video or 3d is not a song.
+  function sellIsSongItem(it) {
+    if (!it || typeof it !== 'object') return false;
+    const m = typeof it.mode === 'string' ? it.mode.trim().toLowerCase() : (typeof it.type === 'string' ? it.type.trim().toLowerCase() : '');
+    if (m === 'image' || m === 'video' || m === '3d') return false;
+    const u = typeof it.url === 'string' ? it.url.trim() : (typeof it.src === 'string' ? it.src.trim() : '');
+    return !!u;
+  }
+  function sellSongFromHistory(it) {
+    const key = histKey(it);
+    const url = typeof it.url === 'string' ? it.url.trim() : (typeof it.src === 'string' ? it.src.trim() : '');
+    const ts = numOr(it.ts, 0);
+    return {
+      key,
+      title: typeof it.title === 'string' ? it.title.trim().slice(0, 200) : '',
+      url: url.slice(0, 2000),
+      image: typeof it.image === 'string' ? it.image.trim().slice(0, 2000) : (typeof it.cover === 'string' ? it.cover.trim().slice(0, 2000) : ''),
+      style: typeof it.style === 'string' ? it.style.trim().slice(0, 200) : '',
+      taskId: typeof it.taskId === 'string' ? it.taskId.trim() : '',
+      audioId: typeof it.audioId === 'string' ? it.audioId.trim() : '',
+      duration: numOr(it.duration, 0),
+      createdAt: typeof it.createdAt === 'string' ? it.createdAt : (ts ? new Date(ts).toISOString() : ''),
+      origin: it.origin === 'bought' ? 'bought' : 'created',
+    };
+  }
+  // Public (market-safe) view of one listed song: NEVER an audio URL.
+  function sellSongPublic(s) {
+    return { title: s.title || '', style: s.style || '', duration: numOr(s.duration, 0) };
+  }
+  // Why a song cannot be listed: null = sellable. Checked in this order.
+  function sellBlockedReason(email, song, listings, downloaded, posts) {
+    const dl = downloaded && Array.isArray(downloaded[email]) ? downloaded[email] : [];
+    if (dl.indexOf(song.key) >= 0) return 'downloaded';
+    if (Array.isArray(posts)) {
+      for (const p of posts) {
+        if (!p || p.email !== email) continue;
+        if (song.audioId && p.audioId && p.audioId === song.audioId) return 'posted';
+        if (song.url && p.url && p.url === song.url) return 'posted';
+      }
+    }
+    if (Array.isArray(listings)) {
+      for (const l of listings) {
+        if (!l || l.sellerEmail !== email || !Array.isArray(l.songs)) continue;
+        if (l.status === 'active' && l.songs.some((s) => s && s.key === song.key)) return 'listed';
+      }
+      for (const l of listings) {
+        if (!l || l.sellerEmail !== email || !Array.isArray(l.songs)) continue;
+        if (l.status === 'sold' && l.songs.some((s) => s && s.key === song.key)) return 'sold';
+      }
+    }
+    return null;
+  }
+  // NO RE-SALE: a song bought from someone else can NEVER be listed
+  // again — only songs the user created themselves are sellable.
+  // origin 'bought' is set on the buyer's history copies by
+  // completeSellSale; a missing origin means 'created'. Fallback for
+  // older transferred copies without the origin field: a song key that
+  // appears in a SOLD listing whose buyer is this user is also bought.
+  function sellIsBoughtSong(email, song, listings) {
+    if (!song) return false;
+    if (song.origin === 'bought') return true;
+    if (Array.isArray(listings)) {
+      for (const l of listings) {
+        if (!l || l.status !== 'sold' || l.buyerEmail !== email || !Array.isArray(l.songs)) continue;
+        if (l.songs.some((x) => x && x.key === song.key)) return true;
+      }
+    }
+    return false;
+  }
+  // BOUGHT-SONG EXPIRY (v2.2.61, CORRECTED 2026-11-21 ~12:49): bought
+  // songs ONLY — self-created songs never expire. Expiry = 3 MONTHS
+  // after purchase (soldAt + 90 days). The download deadline IS the
+  // expiry: the buyer must download all songs within the 3-month window;
+  // at 3 months any remaining songs are gone (no longer playable or
+  // downloadable). Expiry is purely time-based — no separate download
+  // check, no 'not-downloaded' reason. downloadedCount/totalCount are
+  // display-only. downloadedMap = 'sell-downloaded' (email -> [songKey]).
+  // Legacy listings without buyerKeys have no per-song download record
+  // (downloadedCount = total, display only).
+  function sellBoughtExpiry(listing, downloadedMap) {
+    const soldAt = (listing && typeof listing.soldAt === 'string' && listing.soldAt) ? listing.soldAt : (listing && typeof listing.createdAt === 'string' ? listing.createdAt : '');
+    const soldMs = Date.parse(soldAt);
+    const keys = (listing && Array.isArray(listing.buyerKeys)) ? listing.buyerKeys : [];
+    const totalCount = keys.length || (listing && Array.isArray(listing.songs) ? listing.songs.length : 0);
+    const dl = (downloadedMap && listing && Array.isArray(downloadedMap[listing.buyerEmail])) ? downloadedMap[listing.buyerEmail] : [];
+    const downloadedCount = keys.length ? keys.filter((k) => dl.indexOf(k) >= 0).length : totalCount;
+    if (!Number.isFinite(soldMs)) return { expiresAt: '', downloadBy: '', downloadedCount, totalCount, expired: false, reason: null };
+    const expiresAt = new Date(soldMs + 90 * 86400000).toISOString();
+    const downloadBy = expiresAt;
+    const expired = Date.now() > soldMs + 90 * 86400000;
+    return { expiresAt, downloadBy, downloadedCount, totalCount, expired, reason: expired ? 'expired' : null };
+  }
+  // Expiry for ONE bought history song: find the sold listing that
+  // transferred it to this buyer (by buyerKey, or by the sellListingId
+  // stamped on the copy); if no listing is found, fall back to the
+  // copy's own boughtAt field. Returns null when neither exists.
+  function sellExpiryForBoughtSong(email, it, listings, downloadedMap) {
+    if (!it || typeof it !== 'object') return null;
+    const key = histKey(it);
+    if (Array.isArray(listings)) {
+      for (const l of listings) {
+        if (!l || l.status !== 'sold' || l.buyerEmail !== email) continue;
+        const keys = Array.isArray(l.buyerKeys) ? l.buyerKeys : [];
+        if ((key && keys.indexOf(key) >= 0) || (typeof it.sellListingId === 'string' && it.sellListingId && l.id === it.sellListingId)) {
+          const e = sellBoughtExpiry(l, downloadedMap);
+          return { expiresAt: e.expiresAt, downloadBy: e.downloadBy, expired: e.expired, reason: e.reason };
+        }
+      }
+    }
+    const boughtAt = typeof it.boughtAt === 'string' ? it.boughtAt : '';
+    if (!boughtAt || !Number.isFinite(Date.parse(boughtAt))) return null;
+    const e = sellBoughtExpiry({ soldAt: boughtAt, buyerEmail: email, buyerKeys: key ? [key] : [], songs: [] }, downloadedMap);
+    return { expiresAt: e.expiresAt, downloadBy: e.downloadBy, expired: e.expired, reason: e.reason };
+  }
+  // Shared sale completion — used by BOTH the Wallet buy and the Admin
+  // approve of a 'song-sale' receipt request, so the two paths can never
+  // drift apart. Re-validates everything at call time (listing still
+  // active, buyer is not the seller, buyer balance covers the price),
+  // then: deducts the price from the buyer, credits 95% to the seller's
+  // Earn Balance (MovAi keeps 5%), marks the listing sold, logs the
+  // split, transfers the songs into the buyer's history (fresh ids, so
+  // the buyer's copies have their own history keys), and notifies the
+  // seller + buyer (Admin gets the Telegram copy via the kinds used).
+  // Returns {ok:true, songs, price, sellerGot, movaiGot, balance} or
+  // {ok:false, error, message:{km,en}} — and changes NOTHING on failure.
+  async function completeSellSale(listing, buyerEmail) {
+    const fail = (error, km, en) => ({ ok: false, error, message: { km, en } });
+    const listings = await loadSellListings();
+    const l = listings.find((x) => x && x.id === listing.id);
+    if (!l) return fail('listing_not_found', 'រកកញ្ចប់បទនេះមិនឃើញទេ', 'Listing not found');
+    if (l.status !== 'active') return fail('listing_not_active', 'កញ្ចប់បទនេះលក់រួចហើយ ឬលែងមានទេ', 'This listing is no longer available');
+    const buyer = normEmail(buyerEmail);
+    if (!buyer) return fail('invalid_email', 'សូមដាក់ Gmail ត្រឹមត្រូវ', 'Please enter a valid Gmail');
+    if (buyer === l.sellerEmail) return fail('cannot_buy_own', 'អ្នកមិនអាចទិញបទរបស់ខ្លួនឯងបានទេ', 'You cannot buy your own songs');
+    const users = await loadUsers();
+    const bu = users[buyer];
+    if (!bu) return fail('buyer_not_found', 'រក Gmail នេះមិនឃើញទេ — សូម Sign-up ជាមុនសិន', 'No account with this Gmail, please sign up first');
+    const su = users[l.sellerEmail];
+    if (!su) return fail('seller_not_found', 'រកអ្នកលក់នេះមិនឃើញទេ', 'Seller not found');
+    const price = walletMoney(l.price);
+    const bal = walletBalance(bu);
+    if (price > bal) return fail('insufficient_balance', 'លុយក្នុង Wallet មិនគ្រប់ទេ (ត្រូវការ $' + price.toFixed(2) + ', នៅសល់ $' + bal.toFixed(2) + ')', 'Insufficient wallet balance (need $' + price.toFixed(2) + ', have $' + bal.toFixed(2) + ')');
+    // Cents-safe 95/5 split: seller gets price*0.95 rounded, MovAi keeps
+    // the remainder so the two parts always add up to the price exactly.
+    const sellerGot = walletMoney(price * 0.95);
+    const movaiGot = walletMoney(price - sellerGot);
+    const now = new Date().toISOString();
+    bu.balance = walletMoney(bal - price);
+    su.earnBalance = walletMoney(walletEarnBalance(su) + sellerGot);
+    bu.updatedAt = now;
+    su.updatedAt = now;
+    await saveUsers(users);
+    l.status = 'sold';
+    l.buyerEmail = buyer;
+    l.soldAt = now;
+    l.sellerGot = sellerGot;
+    l.movai = movaiGot;
+    await saveSellListings(listings);
+    try {
+      const sales = await loadSellSales();
+      sales.push({ listingId: l.id, price, seller: l.sellerEmail, buyer, movai: movaiGot, sellerGot, at: now });
+      await saveSellSales(sales);
+    } catch (e) {}
+    // Transfer: the buyer gets their OWN history copies (fresh ids, so
+    // their history keys are new and independent of the seller's).
+    const transferred = [];
+    try {
+      const h = await loadHistory();
+      const mine = Array.isArray(h[buyer]) ? h[buyer] : [];
+      const copies = (Array.isArray(l.songs) ? l.songs : []).map((s) => {
+        const item = {
+          id: sellNewId('bought_'), title: s.title || '', url: s.url || '', image: s.image || '',
+          style: s.style || '', taskId: s.taskId || '', audioId: s.audioId || '',
+          duration: numOr(s.duration, 0), ts: Date.now(), createdAt: now,
+          origin: 'bought', boughtFrom: l.sellerEmail, boughtAt: now, sellListingId: l.id,
+        };
+        transferred.push({ key: histKey(item), title: item.title, url: item.url, image: item.image, style: item.style, taskId: item.taskId, audioId: item.audioId, duration: item.duration, createdAt: now });
+        return item;
+      });
+      h[buyer] = copies.concat(mine).slice(0, 300);
+      await saveHistory(h);
+      // BOUGHT-SONG EXPIRY (v2.2.61): remember the buyer's new history
+      // keys for this bundle, so the 6-month download deadline can be
+      // checked against the 'sell-downloaded' map later.
+      l.buyerKeys = transferred.map((t) => t.key);
+      await saveSellListings(listings);
+    } catch (e) {}
+    scheduleBackup('users.json');
+    const sellerName = sellDisplayName(users, l.sellerEmail);
+    const buyerName = sellDisplayName(users, buyer);
+    try {
+      await addNotification('purchase-approved', l.sellerEmail, '✅ លក់បទបានហើយ · Song package sold', 'កញ្ចប់ ' + l.songs.length + ' បទ តម្លៃ $' + price.toFixed(2) + ' លក់បានហើយ — អ្នកទទួលបាន $' + sellerGot.toFixed(2) + ' ចូល Earn Balance · Sold to ' + buyerName + ' — you received $' + sellerGot.toFixed(2) + ' in Earn Balance', { extra: { sellSale: true, listingId: l.id, price, sellerGot, movai: movaiGot, buyerId: bu.id || '—', buyerName } });
+    } catch (e) {}
+    try {
+      await addNotification('purchase-approved', buyer, '✅ ទិញបទបានហើយ · Song package bought', 'អ្នកបានទិញកញ្ចប់ ' + l.songs.length + ' បទ តម្លៃ $' + price.toFixed(2) + ' ពី ' + sellerName + ' — បទទាំងអស់បានចូល History របស់អ្នកហើយ · You bought ' + l.songs.length + ' songs for $' + price.toFixed(2) + ' from ' + sellerName + ' — they are now in your History', { extra: { sellSale: true, listingId: l.id, price, sellerGot, movai: movaiGot, buyerId: bu.id || '—', sellerName } });
+    } catch (e) {}
+    return { ok: true, songs: transferred, listingId: l.id, price, sellerGot, movaiGot, balance: walletBalance(bu) };
+  }
   const PURCHASE_REQUESTS_FILE = path.join(DATA_DIR, 'purchase-requests.json');
   async function loadPurchaseRequests() {
     const j = await loadKvDoc('purchase-requests', []);
@@ -9662,12 +9917,31 @@ async function apiRoute(req, res, urlPath) {
       const r = reqs.find((x) => x.id === id);
       if (!r) return sendJSON(res, 200, { ok: false, error: 'រកសំណើនេះមិនឃើញទេ' });
       if (r.status !== 'pending') return sendJSON(res, 200, { ok: false, error: 'សំណើនេះបានសម្រេចរួចហើយ' });
-      const pkg = r.kind === 'discount' ? null : (await loadPackages())[r.packageId];
-      if (!pkg && r.kind !== 'discount') return sendJSON(res, 200, { ok: false, error: 'កញ្ចប់នេះមិនស្គាល់ទេ' });
+      const pkg = (r.kind === 'discount' || r.kind === 'song-sale' || r.type === 'song-sale') ? null : (await loadPackages())[r.packageId];
+      if (!pkg && r.kind !== 'discount' && r.kind !== 'song-sale' && r.type !== 'song-sale') return sendJSON(res, 200, { ok: false, error: 'កញ្ចប់នេះមិនស្គាល់ទេ' });
       const users = await loadUsers();
       const u = users[r.email];
       if (!u) return sendJSON(res, 200, { ok: false, error: 'រកអ្នកប្រើនេះមិនឃើញទេ' });
       const now = new Date().toISOString();
+      if (r.kind === 'song-sale' || r.type === 'song-sale') {
+        // Song-sale receipt request (v2.2.61): complete the SAME sale as
+        // a Wallet buy (completeSellSale). On failure (listing gone, or
+        // buyer balance short at approve time) the request stays
+        // 'pending' so the Admin can retry or reject it — nothing is
+        // transferred and nothing is marked approved.
+        const _sl = (await loadSellListings()).find((x) => x && x.id === r.listingId);
+        if (!_sl) return sendJSON(res, 200, { ok: false, error: 'listing_not_found', message: { km: 'រកកញ្ចប់បទនេះមិនឃើញទេ', en: 'Listing not found' } });
+        const _done = await completeSellSale(_sl, r.email);
+        if (!_done.ok) return sendJSON(res, 200, _done);
+        r.status = 'approved';
+        r.decidedAt = now;
+        r.updatedAt = now;
+        await savePurchaseRequests(reqs);
+        scheduleBackup('purchase-requests.json');
+        scheduleBackup('users.json');
+        await markPurchaseRequestDecided(r.email, r.packageId, 'approved', now);
+        return sendJSON(res, 200, { ok: true, request: r, songs: _done.songs, sellerGot: _done.sellerGot, movaiGot: _done.movaiGot, price: _done.price });
+      }
       if (r.kind === 'discount') {
         // Discount pack (KHQR/USDT): grant 4 bonus uses of the feature.
         const df = typeof r.feature === 'string' ? r.feature.trim().toLowerCase() : '';
@@ -9747,6 +10021,21 @@ async function apiRoute(req, res, urlPath) {
       if (!r) return sendJSON(res, 200, { ok: false, error: 'រកសំណើនេះមិនឃើញទេ' });
       if (r.status !== 'pending') return sendJSON(res, 200, { ok: false, error: 'សំណើនេះបានសម្រេចរួចហើយ' });
       const now = new Date().toISOString();
+      if (r.kind === 'song-sale' || r.type === 'song-sale') {
+        // Song sale rejected (v2.2.61): NOTHING is transferred —
+        // completeSellSale never runs here — and the listing stays
+        // active for another buyer.
+        r.status = 'rejected';
+        r.decidedAt = now;
+        r.updatedAt = now;
+        await savePurchaseRequests(reqs);
+        const _ru2 = (await loadUsers())[r.email];
+        const _ruid2 = _ru2 && _ru2.id ? _ru2.id : '—';
+        const _rejPrice = walletMoney(r.amount || r.price || 0);
+        await addNotification('purchase-rejected', r.email, '❌ បដិសេធ · Song purchase rejected', 'សំណើទិញកញ្ចប់បទ តម្លៃ $' + _rejPrice.toFixed(2) + ' ត្រូវបានបដិសេធ — លុយមិនត្រូវបានកាត់ទេ · Your song purchase request ($' + _rejPrice.toFixed(2) + ') was rejected — nothing was charged', { extra: { pkg: 'song-sale', listingId: r.listingId || '', priceText: '$' + _rejPrice.toFixed(2), buyerId: _ruid2, decision: 'rejected' } });
+        await markPurchaseRequestDecided(r.email, r.packageId, 'rejected', now);
+        return sendJSON(res, 200, { ok: true, request: r });
+      }
       r.status = 'rejected';
       r.decidedAt = now;
       r.updatedAt = now;
@@ -11176,6 +11465,29 @@ async function apiRoute(req, res, urlPath) {
       // Unknown email -> {ok:false, error:'no_account'} (never served).
       // Locked -> {ok:false, error:'download_out', message} (never served).
       const _dlEmail = normEmail(qp.get('email') || '');
+      // BOUGHT-SONG EXPIRY (v2.2.61, 3 months): an expired bought song
+      // can no longer be downloaded. Checked BEFORE the free-download
+      // gate so an expired song never consumes a free download.
+      // Self-created songs always pass. No email param -> cannot tell
+      // whose song this is -> unchanged behaviour (allowed).
+      if (_dlEmail && u) {
+        try {
+          const _h = await loadHistory();
+          const _items = Array.isArray(_h[_dlEmail]) ? _h[_dlEmail] : [];
+          const _mine = _items.find((it) => {
+            if (!it || typeof it !== 'object') return false;
+            const _iu = (typeof it.url === 'string' && it.url.trim()) || (typeof it.src === 'string' ? it.src.trim() : '');
+            if (_iu !== u) return false;
+            return it.origin === 'bought' || (typeof it.boughtAt === 'string' && !!it.boughtAt) || (typeof it.sellListingId === 'string' && !!it.sellListingId);
+          });
+          if (_mine) {
+            const _listings = await loadSellListings();
+            const _downloaded = await loadSellDownloaded();
+            const _exp = sellExpiryForBoughtSong(_dlEmail, _mine, _listings, _downloaded);
+            if (_exp && _exp.expired) return sendJSON(res, 200, { ok: false, error: 'expired', message: { km: 'បទនេះផុតកំណត់ហើយ — ទាញយកលែងបានទេ', en: 'This song has expired — it can no longer be downloaded' } });
+          }
+        } catch (e) {}
+      }
       if (_dlEmail) {
         const _dlUsers = await loadUsers();
         const _dlU = _dlUsers[_dlEmail];
@@ -12011,6 +12323,222 @@ async function apiRoute(req, res, urlPath) {
       }
     }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
     return;
+  }
+  // ---- MovAi Song-Selling Service endpoints (v2.2.61) ----
+  // GET /api/public/sell/tiers — PUBLIC. The company-fixed sell tiers.
+  if (req.method === 'GET' && urlPath === '/api/public/sell/tiers') {
+    return sendJSON(res, 200, { ok: true, tiers: SELL_TIERS });
+  }
+  // GET /api/public/sell/market — PUBLIC. Active listings grouped by
+  // seller. Song audio URLs are NEVER included here — title/style/
+  // duration only. Seller email is shown (needed to identify sellers in
+  // the marketplace); no other user emails are exposed.
+  if (req.method === 'GET' && urlPath === '/api/public/sell/market') {
+    const listings = await loadSellListings();
+    const users = await loadUsers();
+    const bySeller = {};
+    const order = [];
+    const active = listings.filter((l) => l && l.status === 'active').sort((a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || '')));
+    for (const l of active) {
+      const em = l.sellerEmail || '';
+      if (!em) continue;
+      if (!bySeller[em]) { bySeller[em] = []; order.push(em); }
+      bySeller[em].push({ id: l.id, tier: l.tier, price: walletMoney(l.price), songCount: numOr(l.songCount, Array.isArray(l.songs) ? l.songs.length : 0), bonus: numOr(l.bonus, 0), songs: (Array.isArray(l.songs) ? l.songs : []).map(sellSongPublic), createdAt: l.createdAt || '' });
+    }
+    const sellers = order.map((em) => ({ sellerEmail: em, sellerName: sellDisplayName(users, em), listings: bySeller[em] }));
+    return sendJSON(res, 200, { ok: true, sellers });
+  }
+  // GET /api/public/sell/my-songs?email=... — PUBLIC. The seller's own
+  // songs from history_items, each with an origin ('created' = made by
+  // this user, 'bought' = bought from someone else) and a blocked status
+  // (null = can be listed): 'bought' (bought songs can NEVER be listed
+  // again — takes precedence over every other reason), 'downloaded'
+  // (already downloaded), 'posted' (already on Public), 'listed' (in an
+  // active listing), 'sold' (in a sold listing).
+  if (req.method === 'GET' && urlPath === '/api/public/sell/my-songs') {
+    const email = normEmail(new URL(req.url, 'http://localhost').searchParams.get('email') || '');
+    if (!email) return sendJSON(res, 200, { ok: false, error: 'សូមដាក់ Gmail ត្រឹមត្រូវ' });
+    const h = await loadHistory();
+    const listings = await loadSellListings();
+    const downloaded = await loadSellDownloaded();
+    const posts = await loadPublicPosts();
+    const items = (Array.isArray(h[email]) ? h[email] : []).filter(sellIsSongItem);
+    const songs = items.map((it) => {
+      const s = sellSongFromHistory(it);
+      const isBought = sellIsBoughtSong(email, s, listings);
+      const reason = isBought ? 'bought' : sellBlockedReason(email, s, listings, downloaded, posts);
+      // BOUGHT-SONG EXPIRY (v2.2.61): bought songs carry their expiry
+      // (3 months after purchase); self-created songs get expiry: null.
+      const expiry = isBought ? sellExpiryForBoughtSong(email, it, listings, downloaded) : null;
+      return { key: s.key, title: s.title, url: s.url, image: s.image, style: s.style, taskId: s.taskId, audioId: s.audioId, duration: s.duration, createdAt: s.createdAt, origin: s.origin, blocked: reason ? { reason } : null, pairKey: s.taskId, expiry };
+    });
+    return sendJSON(res, 200, { ok: true, email, songs });
+  }
+  // POST /api/public/sell/list — {email, tier, songKeys} — PUBLIC.
+  // Lists a fixed-size package of the seller's own songs. Validates the
+  // tier, the exact song count, ownership, the PAIR RULE (no two songs
+  // may share a taskId — the two clips of one generation are one song),
+  // and all four blocked reasons. On success the songs leave the
+  // seller's history (they now belong to the listing, not the seller).
+  // NOTE: no deleted-item tombstones are recorded here — tombstones are
+  // global by history key, and the SAME song must live on in the
+  // buyer's history after a sale; a tombstone would block the buyer's
+  // copy from ever syncing. The 'listed'/'sold' blocked checks stop a
+  // re-list instead.
+  if (req.method === 'POST' && urlPath === '/api/public/sell/list') {
+    readJSONBody(req, 64 * 1024).then(async (body) => {
+      const email = normEmail(body && body.email);
+      if (!email) return sendJSON(res, 200, { ok: false, error: 'invalid_email', message: { km: 'សូមដាក់ Gmail ត្រឹមត្រូវ', en: 'Please enter a valid Gmail' } });
+      const users = await loadUsers();
+      const u = users[email];
+      if (!u) return sendJSON(res, 200, { ok: false, error: 'user_not_found', message: { km: 'រក Gmail នេះមិនឃើញទេ — សូម Sign-up ជាមុនសិន', en: 'No account with this Gmail, please sign up first' } });
+      const tier = sellTierByTier(body && body.tier);
+      if (!tier) return sendJSON(res, 200, { ok: false, error: 'invalid_tier', message: { km: 'កញ្ចប់នេះមិនស្គាល់ទេ', en: 'Unknown tier' } });
+      const rawKeys = body && Array.isArray(body.songKeys) ? body.songKeys : [];
+      const songKeys = [];
+      for (const k of rawKeys) { if (typeof k === 'string' && k.trim() && songKeys.indexOf(k.trim()) < 0) songKeys.push(k.trim()); }
+      if (songKeys.length !== tier.songs) return sendJSON(res, 200, { ok: false, error: 'wrong_count', message: { km: 'កញ្ចប់នេះត្រូវការ ' + tier.songs + ' បទ (អ្នកបានជ្រើស ' + songKeys.length + ' បទ)', en: 'This tier needs ' + tier.songs + ' songs (you picked ' + songKeys.length + ')' }, expected: tier.songs, got: songKeys.length });
+      const h = await loadHistory();
+      const byKey = {};
+      for (const it of (Array.isArray(h[email]) ? h[email] : [])) {
+        if (!sellIsSongItem(it)) continue;
+        byKey[histKey(it)] = sellSongFromHistory(it);
+      }
+      const missing = songKeys.filter((k) => !byKey[k]);
+      if (missing.length) return sendJSON(res, 200, { ok: false, error: 'not_owned', message: { km: 'មានបទខ្លះមិនមែនជារបស់អ្នកទេ', en: 'Some songs do not belong to you' }, keys: missing });
+      const picked = songKeys.map((k) => byKey[k]);
+      // PAIR RULE: two clips of one generation share a taskId — they are
+      // one song and must never sit in the same package twice.
+      const seenTask = {};
+      for (const s of picked) {
+        if (!s.taskId) continue;
+        if (seenTask[s.taskId]) return sendJSON(res, 200, { ok: false, error: 'pair', message: { km: 'បទ 2 នេះគឺជាបទតែមួយ (បង្កើតមកពី generation តែមួយ) — សូមជ្រើសបទផ្សេង', en: 'Two of these songs are the same song (from one generation) — please pick a different song' }, taskId: s.taskId });
+        seenTask[s.taskId] = true;
+      }
+      const listings = await loadSellListings();
+      const downloaded = await loadSellDownloaded();
+      const posts = await loadPublicPosts();
+      // NO RE-SALE: a song bought from someone else can NEVER be listed
+      // again. Rejected here with nothing changed (no listing created,
+      // no songs removed). The fallback inside sellIsBoughtSong also
+      // catches older transferred copies without the origin field.
+      const boughtBlocked = [];
+      for (const s of picked) {
+        if (sellIsBoughtSong(email, s, listings)) boughtBlocked.push({ key: s.key, reason: 'bought' });
+      }
+      if (boughtBlocked.length) return sendJSON(res, 200, { ok: false, error: 'bought', message: { km: 'បទដែលបានទិញពីអ្នកផ្សេង មិនអាចដាក់លក់ម្ដងទៀតបានទេ — មានតែបទដែលអ្នកបង្កើតដោយខ្លួនឯងទេ ទើបដាក់លក់បាន', en: 'Songs bought from someone else cannot be listed for sale again — only songs you created yourself can be listed' }, blocked: boughtBlocked });
+      const blocked = [];
+      for (const s of picked) {
+        const reason = sellBlockedReason(email, s, listings, downloaded, posts);
+        if (reason) blocked.push({ key: s.key, reason });
+      }
+      if (blocked.length) return sendJSON(res, 200, { ok: false, error: 'blocked', message: { km: 'មានបទខ្លះដាក់លក់មិនបានទេ (បាន Download / បាន Post / បានដាក់លក់ / លក់រួចហើយ)', en: 'Some songs cannot be listed (downloaded / posted / already listed / already sold)' }, blocked });
+      const now = new Date().toISOString();
+      const listing = {
+        id: sellNewId('sell_'), sellerEmail: email, sellerName: sellDisplayName(users, email),
+        tier: tier.tier, price: tier.price, songCount: tier.songs, bonus: tier.bonus,
+        songs: picked, status: 'active', buyerEmail: null, createdAt: now, soldAt: null,
+      };
+      listings.push(listing);
+      await saveSellListings(listings);
+      h[email] = (Array.isArray(h[email]) ? h[email] : []).filter((it) => songKeys.indexOf(histKey(it)) < 0);
+      await saveHistory(h);
+      scheduleBackup('history.json');
+      try {
+        await addNotification('purchase-request', email, '🎵 ដាក់លក់បទ · Song package listed', 'អ្នកបានដាក់លក់កញ្ចប់ ' + tier.songs + ' បទ តម្លៃ $' + tier.price.toFixed(2) + ' — អ្នកនឹងទទួលបាន $' + (tier.price * 0.95).toFixed(2) + ' ពេលមានអ្នកទិញ · You listed ' + tier.songs + ' songs for $' + tier.price.toFixed(2) + ' — you will receive $' + (tier.price * 0.95).toFixed(2) + ' when someone buys', { extra: { sellListing: true, listingId: listing.id, pkg: 'sell-listing', price: tier.price, tier: tier.tier } });
+      } catch (e) {}
+      return sendJSON(res, 200, { ok: true, listingId: listing.id });
+    }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
+    return;
+  }
+  // POST /api/public/sell/buy — {email, listingId, method, receiptUrl|receiptData}
+  // — PUBLIC. method 'wallet': completes the sale at once (see
+  // completeSellSale). method 'receipt': creates a 'song-sale' purchase
+  // request for the Admin to approve (KHQR + receipt, like packages);
+  // nothing is transferred until the Admin approves.
+  if (req.method === 'POST' && urlPath === '/api/public/sell/buy') {
+    readJSONBody(req, 64 * 1024).then(async (body) => {
+      const email = normEmail(body && body.email);
+      if (!email) return sendJSON(res, 200, { ok: false, error: 'invalid_email', message: { km: 'សូមដាក់ Gmail ត្រឹមត្រូវ', en: 'Please enter a valid Gmail' } });
+      const listingId = typeof body.listingId === 'string' ? body.listingId.trim() : '';
+      if (!listingId) return sendJSON(res, 200, { ok: false, error: 'invalid_listing', message: { km: 'សូមជ្រើសកញ្ចប់បទដែលចង់ទិញ', en: 'Please choose a song package to buy' } });
+      const users = await loadUsers();
+      const u = users[email];
+      if (!u) return sendJSON(res, 200, { ok: false, error: 'user_not_found', message: { km: 'រក Gmail នេះមិនឃើញទេ — សូម Sign-up ជាមុនសិន', en: 'No account with this Gmail, please sign up first' } });
+      const listings = await loadSellListings();
+      const listing = listings.find((x) => x && x.id === listingId);
+      if (!listing) return sendJSON(res, 200, { ok: false, error: 'listing_not_found', message: { km: 'រកកញ្ចប់បទនេះមិនឃើញទេ', en: 'Listing not found' } });
+      if (listing.status !== 'active') return sendJSON(res, 200, { ok: false, error: 'listing_not_active', message: { km: 'កញ្ចប់បទនេះលក់រួចហើយ ឬលែងមានទេ', en: 'This listing is no longer available' } });
+      if (listing.sellerEmail === email) return sendJSON(res, 200, { ok: false, error: 'cannot_buy_own', message: { km: 'អ្នកមិនអាចទិញបទរបស់ខ្លួនឯងបានទេ', en: 'You cannot buy your own songs' } });
+      const method = typeof body.method === 'string' ? body.method.trim().toLowerCase() : 'wallet';
+      if (method === 'wallet') {
+        const done = await completeSellSale(listing, email);
+        if (!done.ok) return sendJSON(res, 200, done);
+        return sendJSON(res, 200, { ok: true, listingId: done.listingId, price: done.price, songs: done.songs, sellerGot: done.sellerGot, movaiGot: done.movaiGot, balance: done.balance });
+      }
+      if (method === 'receipt') {
+        const now = new Date().toISOString();
+        const price = walletMoney(listing.price);
+        const reqs = await loadPurchaseRequests();
+        const r = {
+          id: newPurchaseId(), email, packageId: 'song-sale', kind: 'song-sale', type: 'song-sale',
+          listingId: listing.id, buyerEmail: email, sellerEmail: listing.sellerEmail, price,
+          plan: 'Song sale · ' + (Array.isArray(listing.songs) ? listing.songs.length : 0) + ' songs · $' + price.toFixed(2),
+          amount: price, credits: 0, songCredits: 0, days: 0,
+          receiptUrl: (typeof body.receiptUrl === 'string' ? body.receiptUrl : (typeof body.receiptData === 'string' ? body.receiptData : '')).trim().slice(0, 500),
+          status: 'pending', createdAt: now, updatedAt: now,
+        };
+        reqs.push(r);
+        await savePurchaseRequests(reqs);
+        scheduleBackup('purchase-requests.json');
+        try {
+          await addNotification('purchase-request', email, '🛒 សំណើទិញបទ · Song purchase request', email + ' · ID: ' + (u.id || '—') + ' សុំទិញកញ្ចប់ ' + (Array.isArray(listing.songs) ? listing.songs.length : 0) + ' បទ តម្លៃ $' + price.toFixed(2) + ' ពី ' + sellDisplayName(users, listing.sellerEmail) + ' (KHQR — បានបង់ហើយ មានវិក្កយបត្រភ្ជាប់មក)', { extra: { pkg: 'song-sale', listingId: listing.id, priceText: '$' + price.toFixed(2), buyerId: u.id || '—', sellerEmail: listing.sellerEmail } });
+        } catch (e) {}
+        return sendJSON(res, 200, { ok: true, requestId: r.id, status: 'pending' });
+      }
+      return sendJSON(res, 200, { ok: false, error: 'invalid_method', message: { km: 'វិធីបង់ប្រាក់មិនត្រឹមត្រូវទេ', en: 'Invalid payment method' } });
+    }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
+    return;
+  }
+  // POST /api/public/sell/mark-downloaded — {email, songKey} — PUBLIC.
+  // Records that the owner downloaded this song (it can then never be
+  // listed). Fire-and-forget safe: always {ok:true} unless email missing.
+  if (req.method === 'POST' && urlPath === '/api/public/sell/mark-downloaded') {
+    readJSONBody(req, 64 * 1024).then(async (body) => {
+      const email = normEmail(body && body.email);
+      if (!email) return sendJSON(res, 200, { ok: false, error: 'សូមដាក់ Gmail ត្រឹមត្រូវ' });
+      const key = typeof body.songKey === 'string' ? body.songKey.trim() : '';
+      if (!key) return sendJSON(res, 200, { ok: true });
+      try {
+        const m = await loadSellDownloaded();
+        const arr = Array.isArray(m[email]) ? m[email] : [];
+        if (arr.indexOf(key) < 0) { arr.push(key); m[email] = arr; await saveSellDownloaded(m); }
+      } catch (e) {}
+      return sendJSON(res, 200, { ok: true });
+    }).catch(() => sendJSON(res, 200, { ok: true }));
+    return;
+  }
+  // GET /api/public/sell/my-listings?email=... — PUBLIC. The seller's own
+  // listings (active + sold): song titles, price, status, buyer name
+  // when sold. No audio URLs.
+  if (req.method === 'GET' && urlPath === '/api/public/sell/my-listings') {
+    const email = normEmail(new URL(req.url, 'http://localhost').searchParams.get('email') || '');
+    if (!email) return sendJSON(res, 200, { ok: false, error: 'សូមដាក់ Gmail ត្រឹមត្រូវ' });
+    const listings = await loadSellListings();
+    const users = await loadUsers();
+    const mine = listings.filter((l) => l && l.sellerEmail === email).sort((a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || '')));
+    return sendJSON(res, 200, { ok: true, email, listings: mine.map((l) => ({ id: l.id, tier: l.tier, price: walletMoney(l.price), songCount: numOr(l.songCount, Array.isArray(l.songs) ? l.songs.length : 0), bonus: numOr(l.bonus, 0), songs: (Array.isArray(l.songs) ? l.songs : []).map(sellSongPublic), status: l.status, buyerName: l.status === 'sold' && l.buyerEmail ? sellDisplayName(users, l.buyerEmail) : '', createdAt: l.createdAt || '', soldAt: l.soldAt || '' })) });
+  }
+  // GET /api/public/sell/my-purchases?email=... — PUBLIC. Listings this
+  // user bought: song titles, price, seller name, bought date.
+  if (req.method === 'GET' && urlPath === '/api/public/sell/my-purchases') {
+    const email = normEmail(new URL(req.url, 'http://localhost').searchParams.get('email') || '');
+    if (!email) return sendJSON(res, 200, { ok: false, error: 'សូមដាក់ Gmail ត្រឹមត្រូវ' });
+    const listings = await loadSellListings();
+    const users = await loadUsers();
+    const downloaded = await loadSellDownloaded();
+    const mine = listings.filter((l) => l && l.status === 'sold' && l.buyerEmail === email).sort((a, b) => String(b.soldAt || b.createdAt || '').localeCompare(String(a.soldAt || a.createdAt || '')));
+    return sendJSON(res, 200, { ok: true, email, purchases: mine.map((l) => ({ id: l.id, tier: l.tier, price: walletMoney(l.price), songCount: numOr(l.songCount, Array.isArray(l.songs) ? l.songs.length : 0), bonus: numOr(l.bonus, 0), songs: (Array.isArray(l.songs) ? l.songs : []).map(sellSongPublic), sellerName: sellDisplayName(users, l.sellerEmail), sellerEmail: l.sellerEmail || '', boughtAt: l.soldAt || l.createdAt || '', createdAt: l.createdAt || '', expiry: sellBoughtExpiry(l, downloaded) })) });
   }
   // POST /api/public/purchase-receipt — PUBLIC (no admin key). The website
   // uploads a payment-receipt screenshot (image only, max 5 MB) and gets
