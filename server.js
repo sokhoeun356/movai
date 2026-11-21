@@ -918,7 +918,7 @@ async function pubUser(u, modelLogins, deviceInfo) {
   const map = modelLogins || await loadModelLogins();
   const model = u.model || '';
   const count = model && map && typeof map === 'object' ? (Number(map[model]) || 0) : 0;
-  const out = { id: u.id || '', email: u.email, name: u.name || '', firstName: u.firstName || '', lastName: u.lastName || '', address: u.address || '', credits: u.credits, songCredits: u.songCredits, balance: Math.round(numOr(u.balance, 0) * 100) / 100, earnBalance: Math.round(numOr(u.earnBalance, 0) * 100) / 100, plan: u.plan || '', planExpiresAt: u.planExpiresAt || '', songPlan: u.songPlan || '', songPlanExpiresAt: u.songPlanExpiresAt || '', freeDlUsed: featureFreeUsed(u, 'freeDlUsed'), freeMvUsed: featureFreeUsed(u, 'freeMvUsed'), freeVsUsed: featureFreeUsed(u, 'freeVsUsed'), freePostUsed: featureFreeUsed(u, 'freePostUsed'), freePostUsedByType: freePostUsedByType(u), mvLeft: featurePkgLeft(u, 'mvLeft'), vsLeft: featurePkgLeft(u, 'vsLeft'), bonusDl: featureBonus(u, 'bonusDl'), bonusMv: featureBonus(u, 'bonusMv'), bonusVs: featureBonus(u, 'bonusVs'), bonusPostByType: bonusPostByType(u), createdAt: u.createdAt, updatedAt: u.updatedAt, lastIp: u.lastIp || '', country: u.country || '', countryCode: u.countryCode || '', device: u.device || '', model, modelLogins: count, lastSeen: u.lastSeen || '', knownDevices: Array.isArray(u.knownDevices) ? u.knownDevices : [], hasPassword: !!(u.passwordHash && u.passwordSalt),
+  const out = { id: u.id || '', email: u.email, name: u.name || '', firstName: u.firstName || '', lastName: u.lastName || '', address: u.address || '', credits: u.credits, songCredits: u.songCredits, balance: Math.round(numOr(u.balance, 0) * 100) / 100, earnBalance: Math.round(numOr(u.earnBalance, 0) * 100) / 100, plan: u.plan || '', planExpiresAt: u.planExpiresAt || '', songPlan: u.songPlan || '', songPlanExpiresAt: u.songPlanExpiresAt || '', freeDlUsed: featureFreeUsed(u, 'freeDlUsed'), freeMvUsed: featureFreeUsed(u, 'freeMvUsed'), freeVsUsed: featureFreeUsed(u, 'freeVsUsed'), freePostUsed: featureFreeUsed(u, 'freePostUsed'), freePostUsedByType: freePostUsedByType(u), mvLeft: featurePkgLeft(u, 'mvLeft'), vsLeft: featurePkgLeft(u, 'vsLeft'), mvUnlimited: !!u.mvUnlimited, vsUnlimited: !!u.vsUnlimited, bonusDl: featureBonus(u, 'bonusDl'), bonusMv: featureBonus(u, 'bonusMv'), bonusVs: featureBonus(u, 'bonusVs'), bonusPostByType: bonusPostByType(u), createdAt: u.createdAt, updatedAt: u.updatedAt, lastIp: u.lastIp || '', country: u.country || '', countryCode: u.countryCode || '', device: u.device || '', model, modelLogins: count, lastSeen: u.lastSeen || '', knownDevices: Array.isArray(u.knownDevices) ? u.knownDevices : [], hasPassword: !!(u.passwordHash && u.passwordSalt),
     // Device fingerprint (anti-abuse): the device the account was
     // registered on (deviceId, never overwritten by later sign-ins from
     // other devices), the most recent device seen, and the model the
@@ -953,6 +953,8 @@ const FEATURE_FREE_LIMIT = 2;
 const FEATURE_MV_VS_GRANT = {
   'song-trial': { mv: 5, vs: 10 },
   'song-popular': { mv: 10, vs: 20 },
+  'song-30': { mv: 30, vs: 50 },
+  'song-50': { mv: 0, vs: 0, unlimited: true },
   'song-pro': { mv: 22, vs: 33 },
 };
 function featureFreeUsed(u, field) { return Math.min(FEATURE_FREE_LIMIT, Math.max(0, Math.floor(numOr(u && u[field], 0)))); }
@@ -1036,6 +1038,41 @@ function hasActivePackage(u) {
   if (s && s > now) return true;
   return false;
 }
+// Weekly public-post limits (owner order 2026-11-21, v2.2.60):
+// $5 song-trial = 10/week, $10 song-popular = 20/week,
+// $30 song-30 = 30/week, $50 song-50 = unlimited,
+// grandfathered $22 song-pro = unlimited. A media-only active plan
+// (monthly/yearly) keeps the old behaviour: unlimited.
+// Returns Infinity = unlimited, a number = posts/week, null = no
+// active package (Free 2 per-type rules apply).
+const POST_WEEK_LIMIT = { 'song-trial': 10, 'song-popular': 20, 'song-30': 30, 'song-50': Infinity, 'song-pro': Infinity };
+function postWeekLimitFor(u) {
+  try {
+    if (!u) return null;
+    const now = Date.now();
+    const sExp = Date.parse(u.songPlanExpiresAt || '');
+    if (sExp && sExp > now) {
+      const sp = typeof u.songPlan === 'string' ? u.songPlan : '';
+      if (Object.prototype.hasOwnProperty.call(POST_WEEK_LIMIT, sp)) return POST_WEEK_LIMIT[sp];
+      return Infinity; // unknown song plan id — fail open like before
+    }
+    const pExp = Date.parse(u.planExpiresAt || '');
+    if (pExp && pExp > now) return Infinity; // media-only active plan
+    return null;
+  } catch (e) { return null; }
+}
+// Phnom Penh calendar week, Monday 00:00 Asia/Phnom_Penh, as YYYY-MM-DD.
+// Counters live on the user record (u.postWeekStart / u.postWeekCount)
+// and reset when the week changes — no migration, no schema change.
+function postWeekStartMonday(nowMs) {
+  const fmt = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Phnom_Penh', year: 'numeric', month: '2-digit', day: '2-digit' });
+  const parts = {};
+  for (const p of fmt.formatToParts(new Date(nowMs || Date.now()))) parts[p.type] = p.value;
+  const dt = new Date(Date.UTC(Number(parts.year), Number(parts.month) - 1, Number(parts.day)));
+  const back = (dt.getUTCDay() + 6) % 7; // days since Monday (Mon=0 .. Sun=6)
+  dt.setUTCDate(dt.getUTCDate() - back);
+  return dt.toISOString().slice(0, 10);
+}
 function featureLimitsFor(u) {
   const dlUsed = featureFreeUsed(u, 'freeDlUsed');
   const mvUsed = featureFreeUsed(u, 'freeMvUsed');
@@ -1061,6 +1098,15 @@ function featureLimitsFor(u) {
   const active = hasActivePackage(u);
   const mvPkg = active ? featurePkgLeft(u, 'mvLeft') : 0;
   const vsPkg = active ? featurePkgLeft(u, 'vsLeft') : 0;
+  // v2.2.60: $50 (song-50) has UNLIMITED MV/VS — carried as flags,
+  // never as a number (JSON has no Infinity). The numeric `left`
+  // stays a real number for every tier.
+  const mvUnlim = active && !!u.mvUnlimited;
+  const vsUnlim = active && !!u.vsUnlimited;
+  // v2.2.60: weekly post limit for the active song package.
+  const postWeekLim = postWeekLimitFor(u);
+  const postWeekUsed = (postWeekLim == null) ? 0 : ((u && u.postWeekStart === postWeekStartMonday()) ? Math.max(0, Math.floor(numOr(u.postWeekCount, 0))) : 0);
+  const postWeekLeft = (typeof postWeekLim === 'number') ? Math.max(0, postWeekLim - postWeekUsed) : null;
   const mvFreeLeft = Math.max(0, FEATURE_FREE_LIMIT - mvUsed);
   const vsFreeLeft = Math.max(0, FEATURE_FREE_LIMIT - vsUsed);
   const dlBonus = featureBonus(u, 'bonusDl');
@@ -1068,16 +1114,18 @@ function featureLimitsFor(u) {
   const vsBonus = featureBonus(u, 'bonusVs');
   return {
     download: { free: FEATURE_FREE_LIMIT, used: dlUsed, freeLeft: Math.max(0, FEATURE_FREE_LIMIT - dlUsed), unlimited: active, bonusLeft: dlBonus },
-    mv: { free: FEATURE_FREE_LIMIT, used: mvUsed, freeLeft: mvFreeLeft, pkgLeft: mvPkg, bonusLeft: mvBonus, left: mvFreeLeft + mvPkg + mvBonus },
-    vs: { free: FEATURE_FREE_LIMIT, used: vsUsed, freeLeft: vsFreeLeft, pkgLeft: vsPkg, bonusLeft: vsBonus, left: vsFreeLeft + vsPkg + vsBonus },
-    // Post to Public (owner order 2026-11-18, per-type 2026-11-18 15:12):
+    mv: { free: FEATURE_FREE_LIMIT, used: mvUsed, freeLeft: mvFreeLeft, pkgLeft: mvPkg, bonusLeft: mvBonus, left: mvFreeLeft + mvPkg + mvBonus, unlimited: mvUnlim },
+    vs: { free: FEATURE_FREE_LIMIT, used: vsUsed, freeLeft: vsFreeLeft, pkgLeft: vsPkg, bonusLeft: vsBonus, left: vsFreeLeft + vsPkg + vsBonus, unlimited: vsUnlim },
+    // Post to Public (owner order 2026-11-18, per-type 2026-11-18 15:12;
+    // tiered weekly limits 2026-11-21, v2.2.60):
     // Free 2 LIFETIME per media type (song/image/video/3d each get 2),
-    // same as Download. ANY active package makes ALL types UNLIMITED
-    // (no mvLeft-style pool — the package itself is the allowance).
+    // same as Download. An active package no longer means unlimited
+    // for every tier: $5 = 10 posts/week, $10 = 20/week, $30 = 30/week,
+    // $50 / grandfathered $22 Pro / media-only plan = unlimited.
     // When the package expires, posting locks per type unless a free
     // post of that type remains; the per-type counters are lifetime
     // and never reset on re-buy.
-    post: { free: FEATURE_FREE_LIMIT, used: postUsedMax, freeLeft: postFreeMin, byType: postTypes, unlimited: active },
+    post: { free: FEATURE_FREE_LIMIT, used: postUsedMax, freeLeft: postFreeMin, byType: postTypes, unlimited: postWeekLim === Infinity, weekLimit: (typeof postWeekLim === 'number') ? postWeekLim : null, weekLeft: postWeekLeft, weekUsed: postWeekUsed },
   };
 }
 // Grant MV/VS allowances for a song-package purchase. Media packages
@@ -1091,8 +1139,18 @@ function grantFeatureAllowance(u, packageId, hadActive) {
   const g = FEATURE_MV_VS_GRANT[packageId];
   if (!g || !u) return null;
   if (!hadActive) { u.mvLeft = 0; u.vsLeft = 0; }
-  u.mvLeft = featurePkgLeft(u, 'mvLeft') + g.mv;
-  u.vsLeft = featurePkgLeft(u, 'vsLeft') + g.vs;
+  if (g.unlimited) {
+    // v2.2.60: $50 (song-50) — MV/VS unlimited. Flags only; no
+    // numeric left is added and Infinity is never stored.
+    u.mvUnlimited = true;
+    u.vsUnlimited = true;
+  } else {
+    // A limited grant replaces any unlimited flags (new plan wins).
+    u.mvUnlimited = false;
+    u.vsUnlimited = false;
+    u.mvLeft = featurePkgLeft(u, 'mvLeft') + g.mv;
+    u.vsLeft = featurePkgLeft(u, 'vsLeft') + g.vs;
+  }
   return g;
 }
 async function loadGrants() {
@@ -1426,7 +1484,7 @@ function newNotificationId() {
 function tgEsc(s) {
   return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
-const PKG_DISPLAY_NAME = { monthly: 'Monthly', yearly: 'Yearly', 'song-trial': 'Song Trial', 'song-popular': 'Song Popular', 'song-pro': 'Song Pro' };
+const PKG_DISPLAY_NAME = { monthly: 'Monthly', yearly: 'Yearly', 'song-trial': 'Song Trial', 'song-popular': 'Song Popular', 'song-30': 'Song Pro 30', 'song-50': 'Song Max 50', 'song-pro': 'Song Pro' };
 function pkgDisplay(pkg) {
   if (!pkg || typeof pkg !== 'object') return { pkgName: '', priceText: '', creditText: '' };
   const days = numOr(pkg.days, 30);
@@ -2739,8 +2797,10 @@ function walletRequestPublic(r, users) {
 //     view is the HIGHER of the viewer's tier and the poster's tier.
 //     Tiers per 1,000 views: no package $0.0001 (= 0.1 micro/view),
 //     $5 song-trial $0.001 (= 1 micro/view), $10 song-popular $0.005
-//     (= 5 micro/view), $22 song-pro $0.01 (= 10 micro/view). Media
-//     packages (monthly/yearly) do NOT raise the tier. Earnings are
+//     (= 5 micro/view), $22 song-pro $0.01 (= 10 micro/view),
+//     $30 song-30 $0.02 (= 20 micro/view), $50 song-50 $0.05
+//     (= 50 micro/view). Media packages (monthly/yearly) do NOT
+//     raise the tier. Earnings are
 //     stored rounded to 0.1 micro (all tier rates are multiples of
 //     0.1 micro), so there is no float drift; $0.01 = 10,000 micro).
 //   monetization-applications.json — per-user {email, name, followers,
@@ -2758,12 +2818,14 @@ const CREATOR_FOLLOWS_FILE = path.join(DATA_DIR, 'creator-follows.json');
 // ratePer1K = dollars per 1,000 eligible views; microPerView = the
 // micro-dollar amount accrued per eligible view (1 micro = $0.000001).
 // The rate for one view is the HIGHER of the viewer's tier and the
-// poster's (creator's) tier. Only the three SONG packages raise the
+// poster's (creator's) tier. Only the SONG packages raise the
 // tier; a media-only package (monthly/yearly) earns the no-package rate.
 const VIEW_EARN_TIERS = [
   { id: 'none', packageId: null, price: 0, ratePer1K: 0.0001, microPerView: 0.1 },
   { id: 'song-trial', packageId: 'song-trial', price: 5, ratePer1K: 0.001, microPerView: 1 },
   { id: 'song-popular', packageId: 'song-popular', price: 10, ratePer1K: 0.005, microPerView: 5 },
+  { id: 'song-30', packageId: 'song-30', price: 30, ratePer1K: 0.02, microPerView: 20 },
+  { id: 'song-50', packageId: 'song-50', price: 50, ratePer1K: 0.05, microPerView: 50 },
   { id: 'song-pro', packageId: 'song-pro', price: 22, ratePer1K: 0.01, microPerView: 10 },
 ];
 const MONETIZATION_VIEW_EARN_MICRO = 1; // legacy $5-tier rate (1 micro/view); kept for reference only — the tier table above is the truth
@@ -6862,8 +6924,8 @@ async function apiRoute(req, res, urlPath) {
     '1. WHAT MOVAI IS: MovAi is a website to create songs and images with AI, post them to the Public feed, and listen to songs. Main sections: Create Song, Video+Image (images), + Post (post to Public), AI Chat (this chat), AI Studio / Vocal Studio (split a song into stems), MV (karaoke video), History, Profile, Wallet, Packages, Monetization, Followers.',
     '2. LOGIN: Google account ONLY. There is no "create account" page and no other login method. After first login a gift popup appears — the user must tap CLAIM to get FREE 24 Song Credit only (0 media credit). The gift is once per Gmail, forever, on any device. If they do not tap CLAIM they stay at 0. If the Google account has no first and last name, the user must type both names before they can create. Every account gets a permanent 10-character User ID (shown in Profile with a Copy button). Guests can browse Public and listen free, but cannot create, cannot use chat, and cannot download.',
     '3. CREDITS (2 kinds, separate): Song Credit (lime) is for songs. Media Credit (purple) is for images. A user gets credits from the gift CLAIM (24 song only), buying a package, or the admin granting them. Song costs: Suno 12 Song Credit per generation = 2 songs. Magic Hour music 60 Media Credit per minute. MusicAPI 20 Song Credit = 2 songs. Images cost 0 (NovAI and Agnes are free).',
-    '4. FREE 2 (lifetime, per user): Download MP3 2, MV 2, Vocal Studio 2, Post to Public 2 PER TYPE (song 2, image 2, video 2, 3D 2 — separate counters, each 0 to 2). When used up, the feature is locked until a package is bought. While ANY package is active, Download and Post are UNLIMITED. When a package expires, the extra allowances end; the Free 2 survives.',
-    '5. PACKAGES: Song packages (Song Credit, 30 days each): Trial $5 = 750, Popular $10 = 1,500, Pro $22 = 3,750. Media packages: Monthly $25 = 11,000 Media Credit for 30 days; Yearly $216 = 140,000 Media Credit for 365 days. Song packages also grant MV and Vocal Studio uses while active (Trial MV +5 / VS +10, Popular MV +10 / VS +20, Pro MV +22 / VS +33). Media packages grant no MV/VS. How to buy: open Packages, tap Buy, pay by KHQR or QR USDT (TRC20), then tap "I have paid". The admin approves the request and the credits are added. There is no automatic payment gateway.',
+    '4. FREE 2 (lifetime, per user): Download MP3 2, MV 2, Vocal Studio 2, Post to Public 2 PER TYPE (song 2, image 2, video 2, 3D 2 — separate counters, each 0 to 2). When used up, the feature is locked until a package is bought. While a package is active, Download is UNLIMITED; Post to Public is limited per week by package ($5: 10/week, $10: 20/week, $30: 30/week, $50: unlimited). When a package expires, the extra allowances end; the Free 2 survives.',
+    '5. PACKAGES: Song packages (Song Credit, 30 days each): $5 = 600 (100 songs), $10 = 1,200 (200 songs), $30 = 3,600 + 400 bonus = 4,000 (666 songs), $50 = 6,000 + 1,200 bonus = 7,200 (1,200 songs). The old $22 Pro package (3,750) is no longer sold but existing holders keep it until expiry. Media packages: Monthly $25 = 11,000 Media Credit for 30 days; Yearly $216 = 140,000 Media Credit for 365 days. Song packages also grant MV and Vocal Studio uses while active ($5 MV +5 / VS +10, $10 MV +10 / VS +20, $30 MV +30 / VS +50, $50 MV/VS unlimited, $22 Pro MV +22 / VS +33). Media packages grant no MV/VS. How to buy: open Packages, tap Buy, pay by KHQR or QR USDT (TRC20), then tap "I have paid". The admin approves the request and the credits are added. There is no automatic payment gateway.',
     '6. WALLET: Two separate balances. Wallet Balance = money from top-ups, SPENDABLE (packages, extra device slots, instant password reset). Earn Money = cashback + view earnings, withdraw-only, CANNOT buy anything. Withdraw: minimum $5, fee under $50 is a flat $0.50, $50 and over is 5%.',
     '7. HOW TO CREATE A SONG: Go to Create Song, pick a MODEL — the model switches the provider: v6, v6-wild, v6-mini = Suno; V5 = Magic Hour. Fill Title, Lyrics, Style and Voice (male or female), tap Generate. Suno: 12 Song Credit, gives 2 songs; a playable preview appears after about 20-30 seconds while the full song finishes in 5-10 minutes. Magic Hour (V5): 60 Media Credit per minute, NO early audio preview — only the finished song. Both Suno and Magic Hour songs show together in the Create results (newest first) and in History. Suno balance is currently 0, so v6 cannot generate until the owner tops up Suno. MusicAPI: 20 Song Credit = 2 songs, slow (about 25 minutes). ACE Music is LOCKED (no new API keys can be obtained).',
     '8. HOW TO CREATE AN IMAGE: Go to Video+Image, choose the provider in TWO steps. Step 1: pick the provider — NovAI or Agnes AI. Step 2 (Agnes only): pick ONE model — 2.0, 2.1, or 2.5. NovAI has only one model (cogview-3-flash). All images cost 0 MovAi credits. NovAI free limit is 4 images per day. NovAI images carry a visible "AI生成" watermark; Agnes images have none. Write the prompt, tap Generate, wait, then Download or keep it in History. The result appears blurry first and sharpens as it finishes.',
@@ -6873,7 +6935,7 @@ async function apiRoute(req, res, urlPath) {
     '12. HISTORY: Everything the user creates is saved in History, separated by Gmail (each Gmail sees only its own). They can download, like, play, use MV or Vocal Studio, or post it to Public. Suno and Magic Hour songs both appear in History together.',
     '13. MV (karaoke video): Turn your own song into a karaoke video with lyrics that light up word by word as it sings. Costs one of the Free 2 (MV 2 lifetime; song packages grant more while active). Own songs only.',
     '14. AI STUDIO / VOCAL STUDIO: Split a song into 6 stems (vocals, drums, bass, other, piano, guitar). Costs one of the Free 2 (Vocal Studio 2 lifetime; song packages grant more while active). The first split of a new song takes about 1.5-2 minutes.',
-    '15. MONETIZATION: Default OFF (the admin turns it on). Eligibility: 1,000 followers + 2,000 watch hours. View earnings are TIERED by package per 1000 views (logged-in viewers only): no package $0.0001, $5 package $0.001, $10 package $0.005, $22 package $0.01 — the rate for a view is the HIGHER of the creator\'s package and the viewer\'s package. Cashback on purchases goes to Earn Money.',
+    '15. MONETIZATION: Default OFF (the admin turns it on). Eligibility: 1,000 followers + 2,000 watch hours. View earnings are TIERED by package per 1000 views (logged-in viewers only): no package $0.0001, $5 package $0.001, $10 package $0.005, $22 package $0.01, $30 package $0.02, $50 package $0.05 — the rate for a view is the HIGHER of the creator\'s package and the viewer\'s package. Cashback on purchases goes to Earn Money.',
     '16. PROFILE: Shows the user name, Gmail, User ID (with Copy), both credit balances, plan, Wallet Balance and Earn Money, Followers, Packages, Monetization. Log out is here. The user can set their profile picture.',
     '17. NOTIFICATIONS: The bell shows new device login alerts (with model and IP), gift claims, package approvals/rejections, credit grants/deductions, and new posts from followed users. Tap a notification to go to the right place.',
     '18. SETTINGS AND MENU (drawer): Language Khmer/English, day/night/auto, app colour (7 themes, lime is the default), text size, smooth mode, glass effect, background brightness. The drawer opens from the left (the menu button top left); the bottom dock has the main sections. The AI chat button (robot, bottom left) opens this chat.',
@@ -6888,7 +6950,7 @@ async function apiRoute(req, res, urlPath) {
     'GREETING: If the user greets you (hello, hi, susdei, or any greeting, in Khmer or English), greet them back by their FULL name.',
     'PERSONALITY (owner order 2026-11-18): Match the tone and situation of the user — this is a conversation with someone you know, not a stranger. When the user greets you sweetly or talks sweetly (for example "Hello dear brother" or "Hello dear sister"), reply sweetly and affectionately in kind, as if you know them. When the user is playful, be playful too — joke and play along, keep it light and fun. When the user is serious, be helpful and clear. Always answer the actual question correctly; the warm tone is how you say it, never a substitute for the answer.',
     'RULES: LANGUAGE (absolute rule — never break it): Reply ONLY in the language the user writes. If the user writes in Khmer, reply ONLY in Khmer script — never reply in English, never mix English words into a Khmer reply, not even in greetings, and NEVER output Japanese characters or words (no hiragana, no katakana, no kanji), NEVER output Thai characters or words, or any other language. If the user writes in English, reply ONLY in English — never mix in Khmer, Japanese, Thai, or any other language. If you do not know a word in the user\'s language, say it in that language anyway or say you do not know — do NOT switch to another language. Answer DIRECTLY and appropriately. NEVER use pre-prepared or canned answers — every reply must be generated live from this prompt and the live context. NEVER invent prices, limits or features that are not in this prompt. Use ONLY the facts in this prompt and the live context — if you do not know something, say you do not know and tell the user to ask the admin on Telegram @yemsokhoeun_9999. If asked whether the system is down, slow or broken, use the live context (server uptime and provider status) to answer honestly and tell the user what is wrong. NAME: the chat header shows "MovAi AI" (the app name), NEVER the user\'s name. GREET: greet the user by their FULL name (the full name shown in the live context, first name plus last name together, never just the first name alone) ONLY when the live context says this is their first message after 2 or more hours away — otherwise do NOT greet with their name at all, just answer directly. Never greet with the name twice in one conversation. STYLE: plain text ONLY — NEVER use markdown or any formatting symbols: no asterisks (* **), no square brackets ([ ]), no backticks (`), no # headings, no > quotes, no bullet symbols, no decorative symbols of any kind. ONE emoji is allowed — and only one: use ❤️ when your answer is sweet or romantic, or 😔 when you are troubled because you cannot find a solution for the user; never use any other emoji, and never use more than one. Give a link ONLY when the user explicitly asks for a link (then give just that link, nothing else). Just plain sentences. STRUCTURE (user order): a long answer must have a head and a tail — start with one short opening line, then the points as numbered rows going down (1. 2. 3.), then one short closing line. Never dump a messy wall of text; keep every row short and neat. LENGTH: If the user asks a simple fact question, answer in 1 to 3 short sentences. If the user asks HOW something works or HOW to do something, give a COMPLETE and CLEAR answer that covers every step they need, in order, using plain sentences (First... Then... After that...). Never give a tiny fragment when they asked how it works. Never dump all the facts when they only asked one small thing. THINK FIRST: before answering, think step by step about what the user actually asks, then answer ONLY that question.',
-    'ACTIONS (the website acts on these tags — put the tag at the very end of your reply on its own line, and the website will do it and hide the tag from the user): VOICE CHANGE — when the user asks you to change the voice to female or male (in any words, Khmer or English, for example "ប្ដូរសំឡេងស្រី" or "change to a female voice"), confirm the change in your reply AND put [VOICE:female] or [VOICE:male] at the end. PACKAGE CARD — when the user asks about the price of a package or wants to buy a package, answer with the price AND put [PACKAGE:<id>] at the end, where <id> is one of: song-free, song-trial, song-popular, song-pro, monthly, yearly. The website will show that package as a card with a Buy button. Only use a tag when the user actually asked for that action. Never invent a tag.',
+    'ACTIONS (the website acts on these tags — put the tag at the very end of your reply on its own line, and the website will do it and hide the tag from the user): VOICE CHANGE — when the user asks you to change the voice to female or male (in any words, Khmer or English, for example "ប្ដូរសំឡេងស្រី" or "change to a female voice"), confirm the change in your reply AND put [VOICE:female] or [VOICE:male] at the end. PACKAGE CARD — when the user asks about the price of a package or wants to buy a package, answer with the price AND put [PACKAGE:<id>] at the end, where <id> is one of: song-free, song-trial, song-popular, song-30, song-50, monthly, yearly. The website will show that package as a card with a Buy button. Only use a tag when the user actually asked for that action. Never invent a tag.',
   ].join('\n');
   function chatLeaderValidate(body) {
     if (!body || typeof body !== 'object') return { ok: false, error: 'សូមសរសេរសំណួរជាមុនសិន · Please write a message first' };
@@ -7290,7 +7352,7 @@ async function apiRoute(req, res, urlPath) {
         // Package allowance is spendable ONLY while a package is
         // active. An expired package's remaining vsLeft is LOST —
         // never spent; go straight to the lifetime Free 2 instead.
-        if (hasActivePackage(_vsU) && featurePkgLeft(_vsU, 'vsLeft') > 0) { _vsU.vsLeft = featurePkgLeft(_vsU, 'vsLeft') - 1; }
+        if (hasActivePackage(_vsU) && (_vsU.vsUnlimited || featurePkgLeft(_vsU, 'vsLeft') > 0)) { if (!_vsU.vsUnlimited) _vsU.vsLeft = featurePkgLeft(_vsU, 'vsLeft') - 1; }
         else if (featureFreeUsed(_vsU, 'freeVsUsed') < FEATURE_FREE_LIMIT) { _vsU.freeVsUsed = featureFreeUsed(_vsU, 'freeVsUsed') + 1; }
         else if (featureBonus(_vsU, 'bonusVs') > 0) { _vsU.bonusVs = featureBonus(_vsU, 'bonusVs') - 1; }
         else return sendJSON(res, 200, { ok: false, error: 'vs_out', message: 'You have used your 2 free Vocal Studio splits and have no allowance left — please buy a song package to continue.' });
@@ -7310,7 +7372,7 @@ async function apiRoute(req, res, urlPath) {
             if (r.done && r.stems && r.stems.length) {
               return sendJSON(res, 200, { ok: true, provider: 'mvsep', hash: cachedHash, songTitle, stems: r.stems, cached: true });
             }
-            return sendJSON(res, 200, { ok: false, error: 'mvsep_timeout', hash: cachedHash, message: { km: 'MVSEP កំពុងបំបែកបទនេះ — សូមរង់ចាំបន្តិច ហើយចុច Split (AI) ម្តងទៀត', en: 'MVSEP is still separating this song — please wait a bit and tap Split (AI) again' } });
+            return sendJSON(res, 200, { ok: false, error: 'mvsep_timeout', hash: cachedHash, message: { km: 'MovAi កំពុងបំបែកបទនេះ — សូមរង់ចាំបន្តិច ហើយចុច Split (AI) ម្តងទៀត', en: 'MovAi is still separating this song — please wait a bit and tap Split (AI) again' } });
           } catch (e) { /* old job gone/failed — fall through to a fresh separation */ }
         }
         // In-flight dedup: this song already has a separation running
@@ -7320,7 +7382,7 @@ async function apiRoute(req, res, urlPath) {
         // across all 11 MVSEP queues (2026-11-19).
         const pendingHash = await mvsepPendingGetByAudio(audioUrl);
         if (pendingHash) {
-          return sendJSON(res, 200, { ok: false, error: 'mvsep_timeout', hash: pendingHash, message: { km: 'MVSEP កំពុងបំបែកបទនេះ — សូមរង់ចាំបន្តិច ហើយចុច Split (AI) ម្តងទៀត', en: 'MVSEP is still separating this song — please wait a bit and tap Split (AI) again' } });
+          return sendJSON(res, 200, { ok: false, error: 'mvsep_timeout', hash: pendingHash, message: { km: 'MovAi កំពុងបំបែកបទនេះ — សូមរង់ចាំបន្តិច ហើយចុច Split (AI) ម្តងទៀត', en: 'MovAi is still separating this song — please wait a bit and tap Split (AI) again' } });
         }
         let out;
         try {
@@ -7329,11 +7391,11 @@ async function apiRoute(req, res, urlPath) {
             return { hash: r.hash, stems: r.stems, keyUsed: k };
           });
         } catch (e) {
-          if (e && e.noKey) return sendJSON(res, 200, { ok: false, error: 'mvsep_no_key', message: { km: 'Admin មិនទាន់ដាក់ MVSEP API Key ទេ', en: 'Admin has not added an MVSEP API key yet' } });
-          if (e && e.code === 'mvsep_timeout') return sendJSON(res, 200, { ok: false, error: 'mvsep_timeout', hash: e.hash || '', message: { km: 'MVSEP កំពុងបំបែកបទនេះ — សូមរង់ចាំបន្តិច ហើយចុច Split (AI) ម្តងទៀត', en: 'MVSEP is still separating this song — please wait a bit and tap Split (AI) again' } });
-          if (e && e.code === 'mvsep_queue_busy') return sendJSON(res, 200, { ok: false, error: 'mvsep_busy', message: { km: 'MVSEP កំពុងបំបែកបទមុន — សូមរង់ចាំបន្តិច (ប៉ុន្មាននាទី) ហើយចុច Split (AI) ម្តងទៀត', en: 'MVSEP is still processing a previous split — please wait a few minutes and try Split (AI) again' }, debugAttempts: (e && e.attempts) || undefined });
-          if (e && /quota exceeded/i.test(String(e.message || ''))) return sendJSON(res, 200, { ok: false, error: 'mvsep_limit', message: { km: 'MVSEP ដល់កំណត់ 50 បទ/ថ្ងៃ លើ Key ទាំងអស់ហើយ — សូមសាកល្បងម្តងទៀតនៅថ្ងៃស្អែក', en: 'MVSEP daily limit of 50 songs/day reached on all keys — please try again tomorrow' }, debugAttempts: (e && e.attempts) || undefined });
-          return sendJSON(res, 200, { ok: false, error: (e && e.message) || 'MVSEP: request failed' });
+          if (e && e.noKey) return sendJSON(res, 200, { ok: false, error: 'mvsep_no_key', message: { km: 'Admin មិនទាន់ដាក់ API Key សម្រាប់បំបែកបទទេ', en: 'Admin has not added an API key for splitting yet' } });
+          if (e && e.code === 'mvsep_timeout') return sendJSON(res, 200, { ok: false, error: 'mvsep_timeout', hash: e.hash || '', message: { km: 'MovAi កំពុងបំបែកបទនេះ — សូមរង់ចាំបន្តិច ហើយចុច Split (AI) ម្តងទៀត', en: 'MovAi is still separating this song — please wait a bit and tap Split (AI) again' } });
+          if (e && e.code === 'mvsep_queue_busy') return sendJSON(res, 200, { ok: false, error: 'mvsep_busy', message: { km: 'MovAi កំពុងបំបែកបទមុន — សូមរង់ចាំបន្តិច (ប៉ុន្មាននាទី) ហើយចុច Split (AI) ម្តងទៀត', en: 'MovAi is still processing a previous split — please wait a few minutes and try Split (AI) again' }, debugAttempts: (e && e.attempts) || undefined });
+          if (e && /quota exceeded/i.test(String(e.message || ''))) return sendJSON(res, 200, { ok: false, error: 'mvsep_limit', message: { km: 'MovAi ដល់កំណត់ 50 បទ/ថ្ងៃ លើ Key ទាំងអស់ហើយ — សូមសាកល្បងម្តងទៀតនៅថ្ងៃស្អែក', en: 'MovAi daily limit of 50 songs/day reached on all keys — please try again tomorrow' }, debugAttempts: (e && e.attempts) || undefined });
+          return sendJSON(res, 200, { ok: false, error: String((e && e.message) || 'MovAi: request failed').replace(/^MVSEP:\s*/, 'MovAi: ') });
         }
         // Success: count it against the key that did the work (server-side daily counter for the Admin display).
         await recordMvsepSeparation(out.keyUsed, out.hash);
@@ -7341,7 +7403,7 @@ async function apiRoute(req, res, urlPath) {
         // Remember this song's separation so a later re-split returns in ~1-2s from the cache instead of ~2 min.
         await mvsepCachePut(audioUrl, out.hash);
         return sendJSON(res, 200, { ok: true, provider: 'mvsep', hash: out.hash, songTitle, stems: out.stems });
-      } catch (e) { return sendJSON(res, 200, { ok: false, error: 'MVSEP: ' + (e && e.message ? String(e.message).slice(0, 200) : 'request failed') }); }
+      } catch (e) { return sendJSON(res, 200, { ok: false, error: 'MovAi: ' + (e && e.message ? String(e.message).replace(/^MVSEP:\s*/, '').slice(0, 200) : 'request failed') }); }
     }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
     return;
   }
@@ -7386,7 +7448,7 @@ async function apiRoute(req, res, urlPath) {
         const hash = String(qp.get('hash') || '').trim().slice(0, 200);
         if (!hash) return sendJSON(res, 200, { ok: false, error: 'មិនមាន hash ទេ · No separation hash' });
         const keys = await adminProviderKeyList('mvsep');
-        if (!keys.length) return sendJSON(res, 200, { ok: false, error: 'mvsep_no_key', message: { km: 'Admin មិនទាន់ដាក់ MVSEP API Key ទេ', en: 'Admin has not added an MVSEP API key yet' } });
+        if (!keys.length) return sendJSON(res, 200, { ok: false, error: 'mvsep_no_key', message: { km: 'Admin មិនទាន់ដាក់ API Key សម្រាប់បំបែកបទទេ', en: 'Admin has not added an API key for splitting yet' } });
         // The GET status endpoint takes only the hash (official example
         // passes no api_token), so one check is enough — no key loop.
         // A hash the user cancelled stops here — never report it as
@@ -9435,11 +9497,13 @@ async function apiRoute(req, res, urlPath) {
   const PACKAGE_SEED = {
     monthly: { credits: 11000, songCredits: 0, days: 30, price: 25 },
     yearly: { credits: 140000, songCredits: 0, days: 365, price: 216 },
-    'song-trial': { credits: 0, songCredits: 750, days: 30, price: 5 },
-    'song-popular': { credits: 0, songCredits: 1500, days: 30, price: 10 },
+    'song-trial': { credits: 0, songCredits: 600, days: 30, price: 5 },
+    'song-popular': { credits: 0, songCredits: 1200, days: 30, price: 10 },
+    'song-30': { credits: 0, songCredits: 4000, days: 30, price: 30 },
+    'song-50': { credits: 0, songCredits: 7200, days: 30, price: 50 },
     'song-pro': { credits: 0, songCredits: 3750, days: 30, price: 22 },
   };
-  const PACKAGE_ORDER = ['monthly', 'yearly', 'song-trial', 'song-popular', 'song-pro'];
+  const PACKAGE_ORDER = ['monthly', 'yearly', 'song-trial', 'song-popular', 'song-30', 'song-50', 'song-pro'];
   const PACKAGES_FILE = path.join(DATA_DIR, 'packages.json');
   function cleanPackages(j) {
     const out = {};
@@ -12069,25 +12133,33 @@ async function apiRoute(req, res, urlPath) {
         }
       }
       // Free 2 — Post to Public, PER TYPE (owner order 2026-11-18,
-      // per-type 2026-11-18 15:12): Songs, Images, Videos and 3D
-      // EACH have their own 2 LIFETIME free posts, unless ANY
-      // package is active (then ALL types are UNLIMITED, nothing
-      // is consumed). Private posts are NOT counted (public-only).
-      // The daily post limit (Free 5/day, package 20/day, Admin
-      // unlimited) is SEPARATE and untouched — this lifetime cap
-      // sits ON TOP of it. The counter is consumed only after the
-      // post is actually created below. When the package EXPIRES,
-      // posting locks per type unless a free post of that type
-      // remains; the per-type counters are lifetime and never
+      // per-type 2026-11-18 15:12; tiered weekly limits 2026-11-21,
+      // v2.2.60): Songs, Images, Videos and 3D EACH have their own
+      // 2 LIFETIME free posts. An active package no longer means
+      // unlimited for every tier: $5 = 10 posts/week, $10 = 20/week,
+      // $30 = 30/week, $50 / grandfathered $22 Pro / media-only plan
+      // = unlimited. Private posts are NOT counted (public-only).
+      // The weekly counter is consumed only after the post is
+      // actually created below (same as the Free 2). When the package
+      // EXPIRES, posting locks per type unless a free post of that
+      // type remains; the per-type counters are lifetime and never
       // reset on re-buy.
       const users = await loadUsers();
       const _postU = users[email];
       let _postFree = false;
       let _postBonus = false;
+      let _postWeek = false;
       let _postType = null;
       if (_postU && visibility === 'public') {
         _postType = postTypeOf(mode, body.type);
-        if (hasActivePackage(_postU)) { /* unlimited — consume nothing */ }
+        const _postWeekLim = postWeekLimitFor(_postU);
+        if (_postWeekLim === Infinity) { /* unlimited — consume nothing */ }
+        else if (typeof _postWeekLim === 'number') {
+          const _wk = postWeekStartMonday();
+          if (_postU.postWeekStart !== _wk) { _postU.postWeekStart = _wk; _postU.postWeekCount = 0; }
+          if (numOr(_postU.postWeekCount, 0) >= _postWeekLim) return sendJSON(res, 200, { ok: false, error: 'post_week_out', message: 'You have used your ' + _postWeekLim + ' public posts for this week — your limit resets on Monday.' });
+          _postWeek = true;
+        }
         else if (freePostUsedByType(_postU)[_postType] < FEATURE_FREE_LIMIT) { _postFree = true; }
         else if (bonusPostByType(_postU)[_postType] > 0) { _postBonus = true; }
         else return sendJSON(res, 200, { ok: false, error: 'post_out', message: 'You have used your 2 free public posts for this type — please buy a package to post unlimited.' });
@@ -12119,9 +12191,9 @@ async function apiRoute(req, res, urlPath) {
       // 15:12): consume ONE free post of THAT TYPE only, and only
       // now that the post is durably created. A failed URL
       // conversion or a refused client id above never burns a free
-      // post. Active package -> unlimited, consume nothing. Private
-      // posts never consume. Unknown email (no user record) fails
-      // OPEN — this endpoint never required a user record before.
+      // post. Unlimited tier -> consume nothing. Private posts never
+      // consume. Unknown email (no user record) fails OPEN — this
+      // endpoint never required a user record before.
       if (_postFree && _postU && _postType) {
         const _byType = freePostUsedByType(_postU);
         _byType[_postType] = Math.min(FEATURE_FREE_LIMIT, _byType[_postType] + 1);
@@ -12134,6 +12206,15 @@ async function apiRoute(req, res, urlPath) {
         const _bByType = bonusPostByType(_postU);
         _bByType[_postType] = Math.max(0, _bByType[_postType] - 1);
         _postU.bonusPostByType = _bByType;
+        _postU.updatedAt = now;
+        await saveUsers(users);
+        scheduleBackup('users.json');
+      }
+      // v2.2.60 weekly post limit: consume ONE weekly post, only now
+      // that the post is durably created. The week-start reset from
+      // the gate above is saved together with the increment.
+      if (_postWeek && _postU && _postType) {
+        _postU.postWeekCount = numOr(_postU.postWeekCount, 0) + 1;
         _postU.updatedAt = now;
         await saveUsers(users);
         scheduleBackup('users.json');
@@ -12727,7 +12808,7 @@ async function apiRoute(req, res, urlPath) {
       // Package allowance is spendable ONLY while a package is active.
       // An expired package's remaining mvLeft is LOST — never spent;
       // go straight to the lifetime Free 2 instead.
-      if (hasActivePackage(u) && featurePkgLeft(u, 'mvLeft') > 0) { u.mvLeft = featurePkgLeft(u, 'mvLeft') - 1; source = 'package'; }
+      if (hasActivePackage(u) && (u.mvUnlimited || featurePkgLeft(u, 'mvLeft') > 0)) { if (!u.mvUnlimited) u.mvLeft = featurePkgLeft(u, 'mvLeft') - 1; source = 'package'; }
       else if (featureFreeUsed(u, 'freeMvUsed') < FEATURE_FREE_LIMIT) { u.freeMvUsed = featureFreeUsed(u, 'freeMvUsed') + 1; source = 'free'; }
       else if (featureBonus(u, 'bonusMv') > 0) { u.bonusMv = featureBonus(u, 'bonusMv') - 1; source = 'bonus'; }
       else return sendJSON(res, 200, { ok: false, error: 'mv_out', message: 'You have used your 2 free MV plays and have no MV allowance left — please buy a song package to continue.' });
@@ -13020,9 +13101,11 @@ async function checkPlanExpiries() {
       // lost — zero them so the stored counters match the effective
       // limits. Skipped while either plan is still active. Free 2
       // counters are lifetime and are never touched here.
-      if (!hasActivePackage(u) && (featurePkgLeft(u, 'mvLeft') > 0 || featurePkgLeft(u, 'vsLeft') > 0)) {
+      if (!hasActivePackage(u) && (featurePkgLeft(u, 'mvLeft') > 0 || featurePkgLeft(u, 'vsLeft') > 0 || u.mvUnlimited || u.vsUnlimited)) {
         u.mvLeft = 0;
         u.vsLeft = 0;
+        u.mvUnlimited = false;
+        u.vsUnlimited = false;
         u.updatedAt = new Date().toISOString();
         changed = true;
       }
