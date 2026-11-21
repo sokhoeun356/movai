@@ -1224,6 +1224,19 @@ async function deductForGeneration(email, mediaCost, songCost, reason) {
 }
 // Refund a generation charge (provider failed AFTER we deducted).
 // Adds the credits back and logs a 'refund' grant entry.
+// Wallet $ deduction -> Admin bell + Telegram (owner order
+// 2026-11-21 ~14:44 — EVERY deduction must notify the Admin with
+// amount + pool + date; generation-credit deductions already notify
+// inside deductForGeneration, instant-reset + withdrawal already
+// notify at their sites; these wallet sites sent NOTHING).
+async function notifyWalletDeduct(email, amount, poolLabel, reason, balanceAfter) {
+  try {
+    const amt = walletMoney(amount);
+    const dt = new Date().toISOString().slice(0, 10);
+    const em = normEmail(email) || email || '';
+    await addNotification('deduct', em, '➖ កាត់ $' + amt.toFixed(2) + ' · ' + reason, em + ' បានកាត់ $' + amt.toFixed(2) + ' ពី ' + poolLabel + ' សម្រាប់ ' + reason + ' · ' + dt + (typeof balanceAfter === 'number' ? ' (នៅសល់ $' + walletMoney(balanceAfter).toFixed(2) + ')' : ''), { telegramHtml: '➖ <b>Wallet deduction $' + amt.toFixed(2) + '</b>\n' + em + '\nPool: ' + poolLabel + ' · ' + reason + '\nDate: ' + dt + (typeof balanceAfter === 'number' ? '\nBalance left: $' + walletMoney(balanceAfter).toFixed(2) : '') });
+  } catch (e) {}
+}
 async function refundForGeneration(email, mediaCost, songCost, reason) {
   const em = normEmail(email);
   if (!em) return { ok: true };
@@ -4593,7 +4606,11 @@ async function sunoStreamLoad(taskId) {
   try {
     var doc = await loadKvDoc(sunoStreamKey(taskId), null);
     if (doc && doc.taskId && Array.isArray(doc.songs)) {
-      st = { taskId: doc.taskId, status: doc.status || 'generating', lyrics: doc.lyrics || '', songs: doc.songs, updatedAt: doc.updatedAt || Date.now(), saveStarted: (doc.status === 'ready' || doc.status === 'saving'), lastCbStatus: '' };
+      // v2.2.63 (S3): after a server restart NO save is running, so a
+      // 'saving' doc must load with saveStarted=false — otherwise the
+      // status endpoint never re-triggers the save and the task sits in
+      // 'saving' forever. ('ready' stays true: nothing left to save.)
+      st = { taskId: doc.taskId, status: doc.status || 'generating', lyrics: doc.lyrics || '', songs: doc.songs, updatedAt: doc.updatedAt || Date.now(), saveStarted: (doc.status === 'ready'), lastCbStatus: '' };
       sunoStreamState.set(taskId, st);
       return st;
     }
@@ -4604,11 +4621,18 @@ async function sunoStreamLoad(taskId) {
 // (permanent when ready, else the live stream, else the final audio).
 // The stream URL is NEVER used for downloads — the client disables
 // Download until songStatus is 'ready'.
-function sunoStreamToSongs(state) {
+function sunoStreamToSongs(state, preferFinal) {
   if (!state || !Array.isArray(state.songs)) return [];
   return state.songs.map(function(x) {
-    var url = x.permanentMp3Url || x.streamAudioUrl || x.audioUrl || '';
-    return { url, title: x.title || '', image: x.image || '', duration: x.duration || 0, audioId: x.audioId || '', taskId: x.taskId || state.taskId || '', songStatus: x.status || state.status || '', streamAudioUrl: x.streamAudioUrl || '', audioUrl: x.audioUrl || '', permanentMp3Url: x.permanentMp3Url || '' };
+    // v2.2.63: for a FINISHED song the FINAL audio URL is the playable
+    // one (the stream URL is only the live preview while generating).
+    // When preferFinal is set (song is done), the status is reported
+    // without the 'saving' block so Download is enabled — the download
+    // flow stores the file permanently on demand, as before v2.2.58.
+    var url = x.permanentMp3Url || (preferFinal ? (x.audioUrl || x.streamAudioUrl) : (x.streamAudioUrl || x.audioUrl)) || '';
+    var st = x.status || state.status || '';
+    if (preferFinal && !x.permanentMp3Url) st = '';
+    return { url, title: x.title || '', image: x.image || '', duration: x.duration || 0, audioId: x.audioId || '', taskId: x.taskId || state.taskId || '', songStatus: st, streamAudioUrl: x.streamAudioUrl || '', audioUrl: x.audioUrl || '', permanentMp3Url: x.permanentMp3Url || '' };
   }).filter(function(x) { return !!x.url; });
 }
 function sunoApiModel(m) {
@@ -5071,8 +5095,8 @@ async function apiRoute(req, res, urlPath) {
         const vocalLabel = voice === 'male' ? 'Male Vocal' : voice === 'female' ? 'Female Vocal' : 'Vocal';
         const sections = '[Intro – Sad Piano, ' + vocalLabel + ']\n[Verse 1]\n[Pre-Chorus]\n[Chorus – Emotional ' + vocalLabel + ']\n[Instrumental – Sad Violin Solo]\n[Verse 2]\n[Bridge – Deep Emotional Vocal]\n[Final Chorus – Powerful ' + vocalLabel + ']\n[Outro – Soft Piano Fade Out]';
         const sysPrompt = lang === 'kh'
-          ? 'អ្នកជាអ្នកនិពន្ធបទចម្រៀងអាជីព។ សូមសរសេរអត្ថបទចម្រៀងពេញលេញ ដើម វែង ជាភាសាខ្មែរ សម្រាប់ចំណងជើងបទដែលបានផ្តល់ឱ្យ — សរសេរពេញមួយបទតែម្ដង អត្ថបទពេញត្រូវមាន 4,750-6,000 អក្សរ (វែងគ្រប់គ្រាន់សម្រាប់បទចម្រៀងពេញលេញ 4-5 នាទី)។' + (voice === 'random' ? ' សូមជ្រើសរើសសំឡេងប្រុស ឬស្រីសម្រាប់បទនេះ (មួយណាសមជាង) ហើយសរសេរសំឡេងនោះនៅក្នុងស្លាកផ្នែកសំឡេងទាំងអស់ ឱ្យស៊ីសង្វាក់គ្នា។' : '') + ' មុនពេលសរសេរ សូមអានចំណងជើងឱ្យបានច្បាស់ ហើយកំណត់អារម្មណ៍ និងស្ទាយរបស់បទនេះជាមុនសិន៖ បើចំណងជើងមានន័យកំសត់ ឈឺចាប់ បែកបាក់ ឬត្រាម៉ា — សរសេរអត្ថបទកំសត់ ឈឺចាប់ អារម្មណ៍ខ្លាំង; បើចំណងជើងមានន័យសប្បាយ រីករាយ អបអរ — សរសេរអត្ថបទសប្បាយ រីករាយ; បើចំណងជើងជាបទ hiphop/rap — សរសេរតាមស្ទាយ hiphop មានចង្វាក់ rap; បើចំណងជើងជាបទបុរាណខ្មែរ — សរសេរតាមស្ទាយបុរាណ; បើស្ទាយផ្សេង — សរសេរតាមស្ទាយនោះ។ កុំសរសេរអត្ថបទទូទៅដែលដាក់បានគ្រប់បទ — អត្ថបទត្រូវតែសមនឹងអារម្មណ៍ និងស្ទាយរបស់ចំណងជើង។' + ' រចនាសម្ព័ន្ធអត្ថបទត្រូវដូចខាងក្រោមតាមលំដាប់៖\n' + sections + '\nច្បាប់សំខាន់បំផុត (ត្រូវអនុវត្តដាច់ខាត)៖ (1) កុំដាក់លេខនៅមុខបន្ទាត់អត្ថបទចម្រៀងដាច់ខាត — កុំសរសេរ «1.», «2.», «3.» ឬលេខណាមួយនៅមុខបន្ទាត់ឡើយ។ សរសេរបន្ទាត់អត្ថបទនីមួយៗធម្មតា មួយបន្ទាត់បន្ទាប់ពីមួយបន្ទាត់ ដោយគ្មានលេខនៅមុខ។ (2) កុំដាក់សញ្ញាក្បៀស (,) នៅចុងបន្ទាត់អត្ថបទចម្រៀងដាច់ខាត — បន្ទាត់អត្ថបទត្រូវបញ្ចប់ដោយគ្មានក្បៀស។ (3) អត្ថបទត្រូវតែមានន័យច្បាស់ និងត្រឹមត្រូវជាភាសាខ្មែរ — បន្ទាត់នីមួយៗត្រូវតែជាភាសាខ្មែរធម្មជាតិ ច្បាស់លាស់ ដែលមនុស្សពិតនិយាយ និងច្រៀងបាន ន័យត្រឹមត្រូវ វេយ្យាករណ៍ត្រឹមត្រូវ គ្មានពាក្យឥតន័យ។ ត្រូវយល់អត្ថន័យរបស់ចំណងជើងជាមុនសិន រួចសរសេរអត្ថបទដែលសមនឹងអត្ថន័យនោះយ៉ាងពិតប្រាកដ។ (4) អត្ថបទត្រូវតែជារឿងមួយ និងអារម្មណ៍មួយពីដើមដល់ចប់ — បន្ទាត់នីមួយៗត្រូវតភ្ជាប់គ្នា កុំលោតពីរូបភាពមួយទៅរូបភាពមួយដោយឥតហេតុផល។ កុំប្រើពាក្យប្រៀបធៀបចម្លែក ឬរូបភាពដែលមិនសមនឹងអត្ថន័យរបស់បទ (កុំមានក្រពើ កុំមានឆ្កែក្នុងព្រៃ ឬរូបភាពដែលមិនពាក់ព័ន្ធ)។ (5) ប្រើភាសាខ្មែរសាមញ្ញ ធម្មជាតិ ចេញពីបេះដូង — បន្ទាត់ខ្លីៗ ន័យច្បាស់ អារម្មណ៍ពិត។ កុំព្យាយាមសរសេរឱ្យល្អិតល្អន់ ឬស្មុគស្មាញពេក — នោះហើយដែលធ្វើឱ្យអត្ថបទឥតន័យ។ បន្ទាត់សាមញ្ញតែពិត ល្អជាងបន្ទាត់ល្អិតល្អន់តែខុស។ បើមិនច្បាស់ពាក្យ ឬឃ្លាខ្មែរណាមួយ សូមប្រើពាក្យសាមញ្ញដែលច្បាស់ជាង។ កុំបង្កើតពាក្យថ្មី និងកុំបង្ខំឱ្យច្រៀងត្រូវគ្នា (rhyme) រហូតដល់ធ្វើឱ្យខូចអត្ថន័យ។ (6) អត្ថបទត្រូវសរសេរដោយអារម្មណ៍ជ្រាលជ្រៅ ពិតប្រាកដ ចេញពីបេះដូង សមនឹងអារម្មណ៍របស់ចំណងជើង — អ្នកស្តាប់ត្រូវតែមានអារម្មណ៍ឈឺចាប់ កំសត់ ឬសប្បាយពិតប្រាកដនៅពេលអាន និងស្តាប់។ កុំសរសេរអត្ថបទស្ងួត គ្មានអារម្មណ៍ ឬទូទៅ។ ច្បាប់ផ្សេងទៀត៖ Verse នីមួយៗ 8-10 បន្ទាត់, Pre-Chorus 4-6 បន្ទាត់, Chorus នីមួយៗ 8 បន្ទាត់, Bridge 8 បន្ទាត់, Final Chorus 8-10 បន្ទាត់, Outro 4 បន្ទាត់។ អត្ថបទពេញត្រូវមាន 4,750-6,000 អក្សរ — បើខ្លីពេក សូមបន្ថែមបន្ទាត់ក្នុង Verse និង Chorus ឱ្យគ្រប់។ ពាក្យអារម្មណ៍នៅក្នុងស្លាកផ្នែក (Sad Piano, Emotional, Sad Violin Solo, Deep Emotional) ជាគំរូសម្រាប់បទកំសត់ — ត្រូវផ្លាស់វាតាមអារម្មណ៍ និងស្ទាយរបស់ចំណងជើង៖ បទសប្បាយ → Bright Happy Piano, Joyful Vocal, Happy Guitar Solo; បទ hiphop → Hip Hop Beat, Energetic Vocal; បទបុរាណ → Traditional Khmer Music, Traditional Vocal។ រក្សាលំដាប់ 9 ផ្នែកដដែល និងសំឡេងប្រុស/ស្រីតាមការកំណត់។ Instrumental ត្រូវតែសមនឹងបទនេះ — ជ្រើសរើសឧបករណ៍ភ្លេង និងអារម្មណ៍ដែលសមនឹងអត្ថបទ និងអត្ថន័យរបស់បទ (បទកំសត់ Sad Violin Solo សម; បទអារម្មណ៍ផ្សេង ជ្រើសរើសឧបករណ៍ផ្សេង — កុំប្រើឧបករណ៍ដូចគ្នាសម្រាប់បទទាំងអស់)។ Bridge ក៏ត្រូវតែសមនឹងអត្ថន័យរបស់បទដែរ — ជ្រើសរើសសំឡេង និងស្ទាយសម្រាប់បទនេះ មិនមែនដូចគ្នារាល់ពេលទេ។ អត្ថបទត្រូវមានអារម្មណ៍ជ្រាលជ្រៅ ចេញពីបេះដូង, ច្រៀងបានស្រួល, ន័យច្បាស់ត្រឹមត្រូវ, និងសមនឹងចំណងជើង។ សូមផ្តល់តែអត្ថបទចម្រៀងជាមួយស្លាកផ្នែកប៉ុណ្ណោះ — កុំមានការពន្យល់ ឬអត្ថបទបន្ថែម។'
-          : 'You are a professional songwriter. Write complete, original, LONG song lyrics in ' + (lang === 'en' ? 'English' : lang) + ' for the given song title — the FULL song at once, and the FULL lyrics must be 4,750-6,000 characters long (long enough for a full-length 4-5 minute song).' + (voice === 'random' ? ' Choose Male or Female vocal for this song (whichever fits it best) and write that vocal in every vocal section header, consistently.' : '') + ' Before writing, read the title carefully and determine this song\'s EMOTION and STYLE first: if the title is sad, painful, heartbroken, or about loss/trauma, write sad, heartbreaking, deeply emotional lyrics; if the title is happy, joyful, or celebratory, write happy, uplifting, joyful lyrics; if the title suggests hiphop/rap, write hiphop-style lyrics with rap flow and rhythm; if the title suggests traditional music, write traditional-style lyrics; if it suggests another style, match that style. Do NOT write generic lyrics that would fit any song — the lyrics MUST match the title\'s emotion and style.' + ' Structure the lyrics EXACTLY with these sections in this order:\n' + sections + '\nCRITICAL RULES (follow them absolutely): (1) NEVER number the lyric lines — do NOT write «1.», «2.», «3.» or any number in front of a line. Write each lyric line plainly, one line after another, with no number in front. (2) NEVER put a comma at the end of a lyric line — lyric lines must end WITHOUT a comma. (3) The lyrics must MAKE SENSE in the song language — every line must be clear, natural language that a real person would actually say and sing, with correct meaning and correct grammar, no nonsense. UNDERSTAND the meaning of the title first, then write lyrics that match that meaning exactly. (4) ONE coherent story and ONE emotion from start to finish — the lines must connect to each other, not jump randomly from one image to another. No random or odd metaphors (no crocodiles, no dogs in forests, no images that do not fit the meaning of the song). (5) Use SIMPLE, natural, heartfelt language — short lines, clear meaning, real feeling. Do NOT try to be overly poetic, fancy, or complex — that is what produces nonsense. A simple true line is better than a fancy wrong line. If you are unsure of a word or phrase, use a simpler one you are sure of. Never invent words and never force a rhyme that breaks the meaning. (6) The lyrics must be written with DEEP, REAL, HEARTFELT emotion matching the mood of the title — the listener must FEEL the sadness, joy, or pain. Not flat, not generic, not a list of facts. Other rules: each verse 8-10 lines, pre-chorus 4-6 lines, each chorus 8 lines, bridge 8 lines, final chorus 8-10 lines, outro 4 lines. The FULL lyrics must be 4,750-6,000 characters — if the song is too short, add more lines to the verses and choruses until it is long enough. The mood words in the section labels (Sad Piano, Emotional, Sad Violin Solo, Deep Emotional) are EXAMPLES for a sad song — change them to fit the title\'s emotion and style: happy song → Bright Happy Piano, Joyful Vocal, Happy Guitar Solo; hiphop song → Hip Hop Beat, Energetic Vocal; traditional song → Traditional Music, Traditional Vocal. Keep the 9 sections in this exact order and keep the Male/Female vocal from the voice setting. The Instrumental MUST fit this song — choose the instrument and mood that matches the song\'s lyrics and meaning (Sad Violin Solo fits a sad song; for a different mood choose a different instrument — never use the same instrument for every song). The Bridge MUST also fit this song\'s meaning — choose its vocal and style for this song, not the same one every time. Make the lyrics deeply emotional and heartfelt, singable, meaningful and correct, and fitting the title. Output ONLY the lyrics with the section labels — no explanations, no extra text.';
+          ? 'អ្នកជាអ្នកនិពន្ធបទចម្រៀងអាជីព។ សូមសរសេរអត្ថបទចម្រៀងពេញលេញ ដើម វែង ជាភាសាខ្មែរ សម្រាប់ចំណងជើងបទដែលបានផ្តល់ឱ្យ — សរសេរពេញមួយបទតែម្ដង អត្ថបទពេញត្រូវមាន 4,750-6,000 អក្សរ (វែងគ្រប់គ្រាន់សម្រាប់បទចម្រៀងពេញលេញ 4-5 នាទី)។' + (voice === 'random' ? ' សូមជ្រើសរើសសំឡេងប្រុស ឬស្រីសម្រាប់បទនេះ (មួយណាសមជាង) ហើយសរសេរសំឡេងនោះនៅក្នុងស្លាកផ្នែកសំឡេងទាំងអស់ ឱ្យស៊ីសង្វាក់គ្នា។' : '') + ' មុនពេលសរសេរ សូមអានចំណងជើងឱ្យបានច្បាស់ ហើយកំណត់អារម្មណ៍ និងស្ទាយរបស់បទនេះជាមុនសិន៖ បើចំណងជើងមានន័យកំសត់ ឈឺចាប់ បែកបាក់ ឬត្រាម៉ា — សរសេរអត្ថបទកំសត់ ឈឺចាប់ អារម្មណ៍ខ្លាំង; បើចំណងជើងមានន័យសប្បាយ រីករាយ អបអរ — សរសេរអត្ថបទសប្បាយ រីករាយ; បើចំណងជើងជាបទ hiphop/rap — សរសេរតាមស្ទាយ hiphop មានចង្វាក់ rap; បើចំណងជើងជាបទបុរាណខ្មែរ — សរសេរតាមស្ទាយបុរាណ; បើស្ទាយផ្សេង — សរសេរតាមស្ទាយនោះ។ កុំសរសេរអត្ថបទទូទៅដែលដាក់បានគ្រប់បទ — អត្ថបទត្រូវតែសមនឹងអារម្មណ៍ និងស្ទាយរបស់ចំណងជើង។' + ' រចនាសម្ព័ន្ធអត្ថបទត្រូវដូចខាងក្រោមតាមលំដាប់៖\n' + sections + '\nច្បាប់សំខាន់បំផុត (ត្រូវអនុវត្តដាច់ខាត)៖ (1) កុំដាក់លេខនៅមុខបន្ទាត់អត្ថបទចម្រៀងដាច់ខាត — កុំសរសេរ «1.», «2.», «3.» ឬលេខណាមួយនៅមុខបន្ទាត់ឡើយ។ សរសេរបន្ទាត់អត្ថបទនីមួយៗធម្មតា មួយបន្ទាត់បន្ទាប់ពីមួយបន្ទាត់ ដោយគ្មានលេខនៅមុខ។ (2) កុំដាក់សញ្ញាក្បៀស (,) នៅចុងបន្ទាត់អត្ថបទចម្រៀងដាច់ខាត — បន្ទាត់អត្ថបទត្រូវបញ្ចប់ដោយគ្មានក្បៀស។ (3) អត្ថបទត្រូវតែមានន័យច្បាស់ និងត្រឹមត្រូវជាភាសាខ្មែរ — បន្ទាត់នីមួយៗត្រូវតែជាភាសាខ្មែរធម្មជាតិ ច្បាស់លាស់ ដែលមនុស្សពិតនិយាយ និងច្រៀងបាន ន័យត្រឹមត្រូវ វេយ្យាករណ៍ត្រឹមត្រូវ គ្មានពាក្យឥតន័យ។ ត្រូវយល់អត្ថន័យរបស់ចំណងជើងជាមុនសិន រួចសរសេរអត្ថបទដែលសមនឹងអត្ថន័យនោះយ៉ាងពិតប្រាកដ។ (4) អត្ថបទត្រូវតែជារឿងមួយ និងអារម្មណ៍មួយពីដើមដល់ចប់ — បន្ទាត់នីមួយៗត្រូវតភ្ជាប់គ្នា កុំលោតពីរូបភាពមួយទៅរូបភាពមួយដោយឥតហេតុផល។ កុំប្រើពាក្យប្រៀបធៀបចម្លែក ឬរូបភាពដែលមិនសមនឹងអត្ថន័យរបស់បទ (កុំមានក្រពើ កុំមានឆ្កែក្នុងព្រៃ ឬរូបភាពដែលមិនពាក់ព័ន្ធ)។ (5) ប្រើភាសាខ្មែរសាមញ្ញ ធម្មជាតិ ចេញពីបេះដូង — បន្ទាត់ខ្លីៗ ន័យច្បាស់ អារម្មណ៍ពិត។ កុំព្យាយាមសរសេរឱ្យល្អិតល្អន់ ឬស្មុគស្មាញពេក — នោះហើយដែលធ្វើឱ្យអត្ថបទឥតន័យ។ បន្ទាត់សាមញ្ញតែពិត ល្អជាងបន្ទាត់ល្អិតល្អន់តែខុស។ បើមិនច្បាស់ពាក្យ ឬឃ្លាខ្មែរណាមួយ សូមប្រើពាក្យសាមញ្ញដែលច្បាស់ជាង។ កុំបង្កើតពាក្យថ្មី និងកុំបង្ខំឱ្យច្រៀងត្រូវគ្នា (rhyme) រហូតដល់ធ្វើឱ្យខូចអត្ថន័យ។ (6) អត្ថបទត្រូវសរសេរដោយអារម្មណ៍ជ្រាលជ្រៅ ពិតប្រាកដ ចេញពីបេះដូង សមនឹងអារម្មណ៍របស់ចំណងជើង — អ្នកស្តាប់ត្រូវតែមានអារម្មណ៍ឈឺចាប់ កំសត់ ឬសប្បាយពិតប្រាកដនៅពេលអាន និងស្តាប់។ កុំសរសេរអត្ថបទស្ងួត គ្មានអារម្មណ៍ ឬទូទៅ។ ច្បាប់ផ្សេងទៀត៖ Verse នីមួយៗ 10-12 បន្ទាត់, Pre-Chorus 6 បន្ទាត់, Chorus នីមួយៗ 10 បន្ទាត់, Bridge 8-10 បន្ទាត់, Final Chorus 10-12 បន្ទាត់, Outro 4-6 បន្ទាត់។ អត្ថបទពេញត្រូវមាន 4,750-6,000 អក្សរ — យ៉ាងហោចណាស់ 3,000 អក្សរដាច់ខាត កុំត្រឡប់មកវិញក្រោម 3,000 អក្សរ — បើខ្លីពេក សូមបន្ថែមបន្ទាត់ក្នុង Verse និង Chorus ឱ្យគ្រប់រហូតដល់វែងគ្រប់។ ពាក្យអារម្មណ៍នៅក្នុងស្លាកផ្នែក (Sad Piano, Emotional, Sad Violin Solo, Deep Emotional) ជាគំរូសម្រាប់បទកំសត់ — ត្រូវផ្លាស់វាតាមអារម្មណ៍ និងស្ទាយរបស់ចំណងជើង៖ បទសប្បាយ → Bright Happy Piano, Joyful Vocal, Happy Guitar Solo; បទ hiphop → Hip Hop Beat, Energetic Vocal; បទបុរាណ → Traditional Khmer Music, Traditional Vocal។ រក្សាលំដាប់ 9 ផ្នែកដដែល និងសំឡេងប្រុស/ស្រីតាមការកំណត់។ Instrumental ត្រូវតែសមនឹងបទនេះ — ជ្រើសរើសឧបករណ៍ភ្លេង និងអារម្មណ៍ដែលសមនឹងអត្ថបទ និងអត្ថន័យរបស់បទ (បទកំសត់ Sad Violin Solo សម; បទអារម្មណ៍ផ្សេង ជ្រើសរើសឧបករណ៍ផ្សេង — កុំប្រើឧបករណ៍ដូចគ្នាសម្រាប់បទទាំងអស់)។ Bridge ក៏ត្រូវតែសមនឹងអត្ថន័យរបស់បទដែរ — ជ្រើសរើសសំឡេង និងស្ទាយសម្រាប់បទនេះ មិនមែនដូចគ្នារាល់ពេលទេ។ អត្ថបទត្រូវមានអារម្មណ៍ជ្រាលជ្រៅ ចេញពីបេះដូង, ច្រៀងបានស្រួល, ន័យច្បាស់ត្រឹមត្រូវ, និងសមនឹងចំណងជើង។ សូមផ្តល់តែអត្ថបទចម្រៀងជាមួយស្លាកផ្នែកប៉ុណ្ណោះ — កុំមានការពន្យល់ ឬអត្ថបទបន្ថែម។'
+          : 'You are a professional songwriter. Write complete, original, LONG song lyrics in ' + (lang === 'en' ? 'English' : lang) + ' for the given song title — the FULL song at once, and the FULL lyrics must be 4,750-6,000 characters long (long enough for a full-length 4-5 minute song).' + (voice === 'random' ? ' Choose Male or Female vocal for this song (whichever fits it best) and write that vocal in every vocal section header, consistently.' : '') + ' Before writing, read the title carefully and determine this song\'s EMOTION and STYLE first: if the title is sad, painful, heartbroken, or about loss/trauma, write sad, heartbreaking, deeply emotional lyrics; if the title is happy, joyful, or celebratory, write happy, uplifting, joyful lyrics; if the title suggests hiphop/rap, write hiphop-style lyrics with rap flow and rhythm; if the title suggests traditional music, write traditional-style lyrics; if it suggests another style, match that style. Do NOT write generic lyrics that would fit any song — the lyrics MUST match the title\'s emotion and style.' + ' Structure the lyrics EXACTLY with these sections in this order:\n' + sections + '\nCRITICAL RULES (follow them absolutely): (1) NEVER number the lyric lines — do NOT write «1.», «2.», «3.» or any number in front of a line. Write each lyric line plainly, one line after another, with no number in front. (2) NEVER put a comma at the end of a lyric line — lyric lines must end WITHOUT a comma. (3) The lyrics must MAKE SENSE in the song language — every line must be clear, natural language that a real person would actually say and sing, with correct meaning and correct grammar, no nonsense. UNDERSTAND the meaning of the title first, then write lyrics that match that meaning exactly. (4) ONE coherent story and ONE emotion from start to finish — the lines must connect to each other, not jump randomly from one image to another. No random or odd metaphors (no crocodiles, no dogs in forests, no images that do not fit the meaning of the song). (5) Use SIMPLE, natural, heartfelt language — short lines, clear meaning, real feeling. Do NOT try to be overly poetic, fancy, or complex — that is what produces nonsense. A simple true line is better than a fancy wrong line. If you are unsure of a word or phrase, use a simpler one you are sure of. Never invent words and never force a rhyme that breaks the meaning. (6) The lyrics must be written with DEEP, REAL, HEARTFELT emotion matching the mood of the title — the listener must FEEL the sadness, joy, or pain. Not flat, not generic, not a list of facts. Other rules: each verse 10-12 lines, pre-chorus 6 lines, each chorus 10 lines, bridge 8-10 lines, final chorus 10-12 lines, outro 4-6 lines. The FULL lyrics must be 4,750-6,000 characters — absolute minimum 3,000 characters, NEVER return less than 3,000 characters — if the song is too short, add more lines to the verses and choruses until it is long enough. The mood words in the section labels (Sad Piano, Emotional, Sad Violin Solo, Deep Emotional) are EXAMPLES for a sad song — change them to fit the title\'s emotion and style: happy song → Bright Happy Piano, Joyful Vocal, Happy Guitar Solo; hiphop song → Hip Hop Beat, Energetic Vocal; traditional song → Traditional Music, Traditional Vocal. Keep the 9 sections in this exact order and keep the Male/Female vocal from the voice setting. The Instrumental MUST fit this song — choose the instrument and mood that matches the song\'s lyrics and meaning (Sad Violin Solo fits a sad song; for a different mood choose a different instrument — never use the same instrument for every song). The Bridge MUST also fit this song\'s meaning — choose its vocal and style for this song, not the same one every time. Make the lyrics deeply emotional and heartfelt, singable, meaningful and correct, and fitting the title. Output ONLY the lyrics with the section labels — no explanations, no extra text.';
         let out;
         try {
           out = await withProviderKeyRotation('groq', async (k) => {
@@ -5084,7 +5108,7 @@ async function apiRoute(req, res, urlPath) {
             for (const model of GROQ_LYRICS_MODELS) {
               let r, j;
               try {
-                r = await fetch('https://api.groq.com/openai/v1/chat/completions', { method: 'POST', headers: { 'Authorization': 'Bearer ' + k, 'Content-Type': 'application/json' }, body: JSON.stringify({ model, messages: [{ role: 'system', content: sysPrompt }, { role: 'user', content: 'Song title: ' + title }], temperature: 0.8, max_tokens: 6000 }), signal: AbortSignal.timeout(60000) });
+                r = await fetch('https://api.groq.com/openai/v1/chat/completions', { method: 'POST', headers: { 'Authorization': 'Bearer ' + k, 'Content-Type': 'application/json' }, body: JSON.stringify({ model, messages: [{ role: 'system', content: sysPrompt }, { role: 'user', content: 'Song title: ' + title }], temperature: 0.8, max_tokens: 12000 }), signal: AbortSignal.timeout(120000) });
                 j = await r.json().catch(() => null);
               } catch (e) {
                 throw rotErr('Groq: ' + (e && e.message ? e.message : 'request failed'), 0);
@@ -5111,7 +5135,40 @@ async function apiRoute(req, res, urlPath) {
         // Safety net (owner order 2026-11-19 10:08): strip any numbering
         // / trailing commas the model still emits (sanitizeLyricsText).
         const cleanLyrics = sanitizeLyricsText(out.lyrics);
-        return sendJSON(res, 200, { ok: true, lyrics: cleanLyrics, model: out.model, aiLyr: { limit: AI_LYRICS_DAILY_LIMIT, used: lyrUsed + 1, left: Math.max(0, AI_LYRICS_DAILY_LIMIT - (lyrUsed + 1)) } });
+        // LENGTH RETRY (owner order 2026-11-21 ~14:44 — owed since
+        // 2026-11-20): Groq cut lyrics short at max_tokens 6000
+        // (2,494-3,357 chars vs the 4,750-6,000 target). max_tokens
+        // is now 12000, but if the result is still under 3,000 chars,
+        // try ONCE more asking explicitly for LONGER and keep the
+        // longer of the two. Same daily slot — no extra charge.
+        let finalLyrics = cleanLyrics;
+        if (finalLyrics.length < 3000) {
+          try {
+            const out2 = await withProviderKeyRotation('groq', async (k) => {
+              let lastModelErr = null;
+              for (const model of GROQ_LYRICS_MODELS) {
+                let r, j;
+                try {
+                  r = await fetch('https://api.groq.com/openai/v1/chat/completions', { method: 'POST', headers: { 'Authorization': 'Bearer ' + k, 'Content-Type': 'application/json' }, body: JSON.stringify({ model, messages: [{ role: 'system', content: sysPrompt }, { role: 'user', content: 'Song title: ' + title + '\nIMPORTANT: the previous attempt was only ' + finalLyrics.length + ' characters — TOO SHORT. Write the FULL song again, LONGER: at least 4,750 characters (absolute minimum 3,000). Add more lines to every verse and chorus until it is long enough. Same 9 sections, same rules.' }], temperature: 0.8, max_tokens: 12000 }), signal: AbortSignal.timeout(120000) });
+                  j = await r.json().catch(() => null);
+                } catch (e) {
+                  throw rotErr('Groq: ' + (e && e.message ? e.message : 'request failed'), 0);
+                }
+                const content = j && j.choices && j.choices[0] && j.choices[0].message && typeof j.choices[0].message.content === 'string' ? j.choices[0].message.content.trim() : '';
+                if (content) return { lyrics: content, model };
+                const errMsg = genErrText(j, 'HTTP ' + r.status);
+                const modelGone = r.status === 404 || /model (not found|not available|does not exist)|no such model|unknown model|model_decommissioned/i.test(errMsg);
+                const modelLimited = r.status === 429;
+                if ((modelGone || modelLimited) && model !== GROQ_LYRICS_MODELS[GROQ_LYRICS_MODELS.length - 1]) { lastModelErr = errMsg; continue; }
+                throw rotErr('Groq: ' + errMsg, r.status);
+              }
+              throw rotErr('Groq: ' + (lastModelErr || 'no lyrics returned'), 0);
+            });
+            const clean2 = sanitizeLyricsText(out2.lyrics);
+            if (clean2.length > finalLyrics.length) { finalLyrics = clean2; out = out2; }
+          } catch (e2) { /* keep the first (short) result */ }
+        }
+        return sendJSON(res, 200, { ok: true, lyrics: finalLyrics, model: out.model, aiLyr: { limit: AI_LYRICS_DAILY_LIMIT, used: lyrUsed + 1, left: Math.max(0, AI_LYRICS_DAILY_LIMIT - (lyrUsed + 1)) } });
       } catch (e) { return sendJSON(res, 200, { ok: false, error: 'បង្កើតអត្ថបទមិនបានទេ — សូមសាកល្បងម្ដងទៀត · Could not generate lyrics, please try again' }); }
     }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
     return;
@@ -5799,16 +5856,25 @@ async function apiRoute(req, res, urlPath) {
             if (_cbSongs.length) _firstSongs = _cbSongs;
             if (_cbPrev) _firstPrev = _cbPrev;
           }
-          sunoCallbacks.set(taskId, { status: st, songs: _cbSongs, preview: _cbPrev, firstSongs: _firstSongs, firstPreview: _firstPrev, updatedAt: Date.now() });
-          // v2.2.58 Instant Playback: drive the per-song streaming
-          // state (text -> streaming -> saving -> ready). Fire-and-
-          // forget only — the 200 below must go out in under a second,
-          // so nothing here is awaited.
-          try {
-            var _sm = sunoStreamMerge(taskId, d, st);
-            if (_sm.changed) sunoStreamPersist(taskId);
-            if (st === 'SUCCESS') { try { sunoStreamSave(taskId).catch(function() {}); } catch (e) {} }
-          } catch (e) {}
+          // v2.2.63 (S6): vocal-removal (Split Stem) callbacks share this
+          // endpoint but are NOT generation callbacks — they carry stem
+          // URLs and no sunoData. Ignore them here (the split status
+          // endpoint polls record-info); merging one would corrupt the
+          // generation stream state for the same taskId.
+          var _isGenCb = (_cbSongs.length > 0) || st === 'TEXT_SUCCESS' || st === 'FIRST_SUCCESS';
+          if (!_isGenCb) { /* not a generation callback: ack only */ }
+          else {
+            sunoCallbacks.set(taskId, { status: st, songs: _cbSongs, preview: _cbPrev, firstSongs: _firstSongs, firstPreview: _firstPrev, updatedAt: Date.now() });
+            // v2.2.58 Instant Playback: drive the per-song streaming
+            // state (text -> streaming -> saving -> ready). Fire-and-
+            // forget only — the 200 below must go out in under a second,
+            // so nothing here is awaited.
+            try {
+              var _sm = sunoStreamMerge(taskId, d, st);
+              if (_sm.changed) sunoStreamPersist(taskId);
+              if (st === 'SUCCESS') { try { sunoStreamSave(taskId).catch(function() {}); } catch (e) {} }
+            } catch (e) {}
+          }
           // v2.2.48: Suno reports a failed job here — refund it on the
           // SERVER at once (no phone report needed). coverPendingRefund
           // is once-only and paid-only, so a stray callback is harmless.
@@ -6086,12 +6152,25 @@ async function apiRoute(req, res, urlPath) {
             return sendJSON(res, 200, { ok: true, status: 'working', providerStatus: 'first', preview: _prev, streamUrl: _prev, songs: _sp });
           }
           if (_ss && _ss.status === 'saving' && _ss.songs && _ss.songs.length) {
+            // v2.2.63 (S2): Suno already finished (SUCCESS seen) — the
+            // song is DONE even while the permanent Cloudinary save is
+            // still running. Return 'done' with the final Suno audio
+            // URLs; the client upgrades to the permanent URL when the
+            // save finishes. Only fall back to 'working' when no final
+            // audio URL exists yet (stream-only).
             if (!_ss.saveStarted) { try { sunoStreamSave(jobId).catch(function() {}); } catch (e) {} }
+            var _hasFinal = _ss.songs.some(function(x) { return x.audioUrl || x.permanentMp3Url; });
+            if (_hasFinal) {
+              return sendJSON(res, 200, { ok: true, status: 'done', songs: sunoStreamToSongs(_ss, true) });
+            }
             return sendJSON(res, 200, { ok: true, status: 'working', providerStatus: 'saving', songs: sunoStreamToSongs(_ss) });
           }
-          if (_ss && _ss.status === 'generating') {
-            return sendJSON(res, 200, { ok: true, status: 'working', providerStatus: 'text', lyrics: _ss.lyrics || '' });
-          }
+          // v2.2.63 REGRESSION FIX (S1): do NOT return early here. The old
+          // early return made the endpoint webhook-only: once the stream
+          // state existed ('generating'), record-info was never called
+          // again, so a lost/delayed Suno callback stalled the song
+          // forever. Fall through to the record-info fallback below
+          // (12s-throttled) so the real Suno stage is always re-checked.
           if (_ss && _ss.status === 'failed') {
             return sendJSON(res, 200, { ok: false, error: 'Suno: បង្កើតមិនបានទេ' });
           }
@@ -6122,16 +6201,16 @@ async function apiRoute(req, res, urlPath) {
               if (st === 'SUCCESS') {
                 const songs = sunoSongsKeepEarlyUrl(sunoSongsFromData(d), cb && cb.firstSongs);
                 if (songs.length) {
-                  // v2.2.58: merge into the streaming state and save to
-                  // Cloudinary in the background; the client sees
-                  // 'saving' until the permanent URLs are ready, then
-                  // 'done'. (The webhook path does the same.)
+                  // v2.2.63 REGRESSION FIX (S2): 'done' the moment Suno
+                  // reports SUCCESS with playable audio URLs (the
+                  // pre-v2.2.58 behaviour, 40-60s). The Cloudinary
+                  // permanent save still runs in the background and the
+                  // client swaps the URL in when it is ready
+                  // (histStoreSongNow) — it must NEVER gate 'done'.
                   try {
                     var _sm2 = sunoStreamMerge(jobId, d, 'SUCCESS');
                     if (_sm2.changed) sunoStreamPersist(jobId);
-                    if (_sm2.state.status === 'ready') return { status: 'done', songs: sunoStreamToSongs(_sm2.state) };
                     try { sunoStreamSave(jobId).catch(function() {}); } catch (e) {}
-                    return { status: 'working', providerStatus: 'saving', songs: sunoStreamToSongs(_sm2.state) };
                   } catch (e) {}
                   return { status: 'done', songs };
                 }
@@ -6151,6 +6230,12 @@ async function apiRoute(req, res, urlPath) {
               throw rotErr('Suno: ' + (d.errorMessage || st || 'បង្កើតមិនបានទេ'), r.status);
             }, '', sunoKeys);
           } catch (e) {
+            // v2.2.63 (S1): a transient record-info failure while Suno is
+            // still generating must not fail the poll — answer with the
+            // known working state and let the next poll retry.
+            if (_ss && _ss.status === 'generating') {
+              return sendJSON(res, 200, { ok: true, status: 'working', providerStatus: 'text', lyrics: _ss.lyrics || '' });
+            }
             return sendJSON(res, 200, { ok: false, error: (e && e.message) || 'Suno: request failed' });
           }
           try { sunoRecInfoCache.set(jobId, { at: Date.now(), out }); if (sunoRecInfoCache.size > 200) { const _rk = sunoRecInfoCache.keys().next().value; sunoRecInfoCache.delete(_rk); } } catch (e) {}
@@ -6231,6 +6316,154 @@ async function apiRoute(req, res, urlPath) {
         }
         return sendJSON(res, 200, { ok: false, error: 'Provider មិនស្គាល់ទេ' });
       } catch (e) { return sendJSON(res, 200, { ok: false, error: 'សួរព័ត៌មានមិនបានទេ៖ ' + (e && e.message ? e.message : 'unknown') }); }
+    }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
+    return;
+  }
+  // v2.2.63 (S4): POST /api/gen/song/timeout — {email, provider:'suno', jobId}.
+  // The client calls this when a Suno song produced NOTHING usable (no
+  // stream, no finished song) within 5 minutes. One last fresh
+  // record-info check: if Suno actually finished, return the songs (no
+  // refund — the user has them). Otherwise refund the 12 song credits
+  // EXACTLY ONCE per taskId (kv 'suno-refund:<taskId>') and mark the
+  // stream state failed so later polls stop.
+  if (req.method === 'POST' && urlPath === '/api/gen/song/timeout') {
+    readJSONBody(req, 64 * 1024).then(async (body) => {
+      try {
+        const email = normEmail(body.email || '');
+        const jobId = String(body.jobId || '');
+        const provider = String(body.provider || 'suno');
+        if (!email || !jobId) return sendJSON(res, 200, { ok: false, error: 'missing email/jobId' });
+        if (provider !== 'suno') return sendJSON(res, 200, { ok: false, error: 'provider not supported' });
+        const refundKey = 'suno-refund:' + jobId;
+        try { if (await loadKvDoc(refundKey, null)) return sendJSON(res, 200, { ok: true, refunded: false, alreadyRefunded: true }); } catch (e) {}
+        try {
+          const sunoKeys = (await adminProviderKeyList('suno')).filter((e) => e.endpoint);
+          if (sunoKeys.length) {
+            const done = await withProviderKeyRotation('suno', async (k, endpoint) => {
+              const ep = endpoint.replace(/\/+$/, '');
+              const r = await fetch(ep + '/api/v1/generate/record-info?taskId=' + encodeURIComponent(jobId), { headers: { 'Authorization': 'Bearer ' + k }, signal: AbortSignal.timeout(30000) });
+              const j = await r.json().catch(() => null);
+              const d = (j && j.data) || null;
+              if (!d || typeof d.status !== 'string') return null;
+              if (d.status === 'SUCCESS') {
+                const songs = sunoSongsFromData(d);
+                return songs.length ? songs : null;
+              }
+              return null;
+            }, '', sunoKeys);
+            if (done) return sendJSON(res, 200, { ok: true, refunded: false, status: 'done', songs: done });
+          }
+        } catch (e) {}
+        const rf = await refundForGeneration(email, 0, 12, 'song:suno timeout 5min');
+        try { await saveKvDoc(refundKey, { email, jobId, at: Date.now(), refunded: !!(rf && rf.ok) }, 'suno-refund.json'); } catch (e) {}
+        try { const _st = sunoStreamState.get(jobId); if (_st && _st.status !== 'ready') { _st.status = 'failed'; sunoStreamPersist(jobId); } } catch (e) {}
+        return sendJSON(res, 200, { ok: true, refunded: !!(rf && rf.ok) });
+      } catch (e) { return sendJSON(res, 200, { ok: false, error: 'timeout refund failed: ' + (e && e.message ? e.message : 'unknown') }); }
+    }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
+    return;
+  }
+  // v2.2.63 (S5): Suno 12-stem Split Stem (owner order 2026-11-21 — the $50
+  // card advertised it but the tool never existed). 50 MovAi song credits
+  // per use (Suno also charges 50 Suno credits per call, docs.sunoapi.org:
+  // POST /api/v1/vocal-removal/generate {taskId, audioId, type:'split_stem',
+  // callBackUrl}; status GET /api/v1/vocal-removal/record-info — SUCCESS
+  // returns the 12 stem URLs, valid 14 days).
+  // POST /api/stem/split — {email, taskId?, audioId?, audioUrl?, title?}
+  // Deducts 50 FIRST, then calls Suno. Submit failure refunds 50.
+  // POST /api/stem/status — {email, splitTaskId} — polls record-info.
+  // SUCCESS -> 12 stems. Failure -> refund 50 once per split task.
+  const SPLIT_STEM_COST = 50;
+  const SPLIT_STEM_NAMES = [
+    ['vocal', 'vocalUrl'], ['backingVocals', 'backingVocalsUrl'], ['drums', 'drumsUrl'],
+    ['bass', 'bassUrl'], ['guitar', 'guitarUrl'], ['keyboard', 'keyboardUrl'],
+    ['percussion', 'percussionUrl'], ['strings', 'stringsUrl'], ['synth', 'synthUrl'],
+    ['fx', 'fxUrl'], ['brass', 'brassUrl'], ['woodwinds', 'woodwindsUrl']
+  ];
+  function splitStemsFromData(d) {
+    const r = (d && d.response) || {};
+    const out = [];
+    SPLIT_STEM_NAMES.forEach(function(pair) {
+      const u = r[pair[1]];
+      if (typeof u === 'string' && u) out.push({ name: pair[0], url: u });
+    });
+    return out;
+  }
+  if (req.method === 'POST' && urlPath === '/api/stem/split') {
+    readJSONBody(req, 64 * 1024).then(async (body) => {
+      try {
+        const email = normEmail(body.email || '');
+        const taskId = String(body.taskId || '');
+        const audioId = String(body.audioId || '');
+        const audioUrl = String(body.audioUrl || '');
+        const title = String(body.title || '').slice(0, 80);
+        if (!email) return sendJSON(res, 200, { ok: false, error: 'missing email' });
+        if (!taskId && !audioUrl) return sendJSON(res, 200, { ok: false, error: 'missing song' });
+        const sunoKeys = (await adminProviderKeyList('suno')).filter((e) => e.endpoint);
+        if (!sunoKeys.length) {
+          if (!(await adminProviderKeyList('suno')).length) return sendJSON(res, 200, { ok: false, error: 'Admin មិនទាន់ដាក់ Suno Key ទេ' });
+          return sendJSON(res, 200, { ok: false, error: 'Admin មិនទាន់ដាក់ Suno endpoint ទេ' });
+        }
+        const _ded = await deductForGeneration(email, 0, SPLIT_STEM_COST, 'song:split-stem 12');
+        if (!_ded.ok) return sendJSON(res, 200, { ok: false, error: _ded.error || 'Song Credit មិនគ្រប់ទេ', needBuy: true, kind: 'song', balance: _ded.balance, cost: SPLIT_STEM_COST });
+        let out;
+        try {
+          out = await withProviderKeyRotation('suno', async (k, endpoint) => {
+            const ep = endpoint.replace(/\/+$/, '');
+            const stemBody = { type: 'split_stem', callBackUrl: SUNO_CALLBACK_URL };
+            if (taskId) { stemBody.taskId = taskId; if (audioId) stemBody.audioId = audioId; }
+            else stemBody.audioUrl = audioUrl;
+            const r = await fetch(ep + '/api/v1/vocal-removal/generate', { method: 'POST', headers: { 'Authorization': 'Bearer ' + k, 'Content-Type': 'application/json' }, body: JSON.stringify(stemBody), signal: AbortSignal.timeout(60000) });
+            const j = await r.json().catch(() => null);
+            const data = (j && j.data) || {};
+            const sid = typeof data.taskId === 'string' ? data.taskId : '';
+            if (j && j.code === 200 && sid) return { splitTaskId: sid };
+            throw rotErr('Suno Split Stem: ' + sunoErrText(j, 'HTTP ' + r.status), r.status);
+          }, '', sunoKeys);
+        } catch (e) {
+          await refundForGeneration(email, 0, SPLIT_STEM_COST, 'song:split-stem failed');
+          return sendJSON(res, 200, { ok: false, error: (e && e.message) || 'Suno Split Stem: request failed', refunded: true });
+        }
+        return sendJSON(res, 200, { ok: true, splitTaskId: out.splitTaskId, cost: SPLIT_STEM_COST });
+      } catch (e) { return sendJSON(res, 200, { ok: false, error: 'split failed: ' + (e && e.message ? e.message : 'unknown') }); }
+    }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
+    return;
+  }
+  if (req.method === 'POST' && urlPath === '/api/stem/status') {
+    readJSONBody(req, 64 * 1024).then(async (body) => {
+      try {
+        const splitTaskId = String(body.splitTaskId || body.taskId || '');
+        if (!splitTaskId) return sendJSON(res, 200, { ok: false, error: 'missing splitTaskId' });
+        const sunoKeys = (await adminProviderKeyList('suno')).filter((e) => e.endpoint);
+        if (!sunoKeys.length) return sendJSON(res, 200, { ok: false, error: 'Admin មិនទាន់ដាក់ Suno Key ទេ' });
+        let out;
+        try {
+          out = await withProviderKeyRotation('suno', async (k, endpoint) => {
+            const ep = endpoint.replace(/\/+$/, '');
+            const r = await fetch(ep + '/api/v1/vocal-removal/record-info?taskId=' + encodeURIComponent(splitTaskId), { headers: { 'Authorization': 'Bearer ' + k }, signal: AbortSignal.timeout(30000) });
+            const j = await r.json().catch(() => null);
+            const d = (j && j.data) || null;
+            if (!d || typeof d.status !== 'string') throw rotErr('Suno Split Stem: ' + sunoErrText(j, 'HTTP ' + r.status), r.status);
+            const st = d.status;
+            if (st === 'SUCCESS') {
+              const stems = splitStemsFromData(d);
+              if (stems.length) return { status: 'done', stems };
+              throw rotErr('Suno Split Stem: បង្កើតបានតែគ្មាន stem ទេ', r.status);
+            }
+            if (st === 'PENDING') return { status: 'working' };
+            throw rotErr('Suno Split Stem: ' + (d.errorMessage || st || 'បំបែកមិនបានទេ'), r.status);
+          }, '', sunoKeys);
+        } catch (e) {
+          try {
+            const rk = 'stem-refund:' + splitTaskId;
+            if (!(await loadKvDoc(rk, null))) {
+              const em = normEmail(body.email || '');
+              if (em) { await refundForGeneration(em, 0, SPLIT_STEM_COST, 'song:split-stem failed'); await saveKvDoc(rk, { email: em, splitTaskId, at: Date.now() }, 'stem-refund.json'); }
+            }
+          } catch (e2) {}
+          return sendJSON(res, 200, { ok: false, error: (e && e.message) || 'Suno Split Stem: request failed', refunded: true });
+        }
+        return sendJSON(res, 200, Object.assign({ ok: true }, out));
+      } catch (e) { return sendJSON(res, 200, { ok: false, error: 'split status failed: ' + (e && e.message ? e.message : 'unknown') }); }
     }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
     return;
   }
@@ -9785,6 +10018,7 @@ async function apiRoute(req, res, urlPath) {
     bu.updatedAt = now;
     su.updatedAt = now;
     await saveUsers(users);
+    await notifyWalletDeduct(buyer, price, 'Wallet', 'ទិញបទ · song purchase', bu.balance);
     l.status = 'sold';
     l.buyerEmail = buyer;
     l.soldAt = now;
@@ -10162,6 +10396,7 @@ async function apiRoute(req, res, urlPath) {
       u.balance = walletMoney(bal - price);
       u.credits = Math.max(0, Math.floor(numOr(u.credits, 0)) + pkg.credits);
       u.songCredits = Math.max(0, Math.floor(numOr(u.songCredits, 0)) + pkg.songCredits);
+      await notifyWalletDeduct(email, price, 'Wallet', 'ទិញ Package · package ' + packageId, u.balance);
       if (pkg.credits) { u.plan = packageId; u.planExpiresAt = new Date(Date.now() + Math.max(1, pkg.days || 30) * 86400000).toISOString(); }
       if (pkg.songCredits) { u.songPlan = packageId; u.songPlanExpiresAt = new Date(Date.now() + Math.max(1, pkg.days || 30) * 86400000).toISOString(); }
       // "Free 2 + package allowance": song packages grant MV/VS
@@ -10223,6 +10458,7 @@ async function apiRoute(req, res, urlPath) {
       if (_fp.deviceId) u.lastDeviceId = _fp.deviceId;
       u.updatedAt = now;
       await saveUsers(users);
+      await notifyWalletDeduct(email, price, 'Wallet', 'ទិញ Device Slot · device slots', u.balance);
       rec.slots = Math.floor(numOr(rec.slots, 0)) + count;
       rec.strikes = 0; // paid → compliant again
       rec.lastSeen = now;
@@ -11219,7 +11455,12 @@ async function apiRoute(req, res, urlPath) {
             if (!c) continue;
             memLog('cloudinary-upload ' + (a.label || a.cloudName) + ' attempt ' + attempt + ' ' + String(u).slice(0, 60));
             const detId = cloudinaryPublicIdForUrl(u);
-            const res = await c.uploader.upload(u, { resource_type: 'video', public_id: detId, overwrite: false });
+            // v2.2.63 (S3): bound the upload — a hung Cloudinary fetch
+            // must never stall the serial _cloudQueue (and every song's
+            // 'ready') forever. 120s, then this attempt fails and the
+            // queue moves on; the deterministic public_id means a later
+            // retry finds the asset if it did land.
+            const res = await Promise.race([c.uploader.upload(u, { resource_type: 'video', public_id: detId, overwrite: false }), new Promise(function(_, rej) { setTimeout(function() { rej(new Error('cloudinary upload timeout')); }, 120000); })]);
             const publicId = res && res.public_id;
             if (!publicId) continue;
             const mp3Url = cloudinaryMp3UrlFor(a, publicId, title);
@@ -11457,14 +11698,18 @@ async function apiRoute(req, res, urlPath) {
       const disp = 'attachment; filename="' + asciiName + '"; filename*=UTF-8\'\'' + encodeURIComponent(name).replace(/'/g, '%27');
       // "Free 2 + package allowance" — Download MP3 gate (owner order
       // 2026-11-18). The website passes ?email=<signed-in Gmail>.
-      // No email param (old clients / direct links) -> unchanged
-      // behaviour (allowed, nothing consumed). With an email: an
+      // BYPASS CLOSED (owner order 2026-11-21 ~14:44): no email
+      // param used to mean allowed with nothing consumed — anyone
+      // could download unlimited MP3s by calling this endpoint
+      // directly without ?email=. Now: no email -> never served
+      // (sign in first). With an email: an
       // active package downloads unlimited (no free use consumed);
       // otherwise one of the 2 free downloads is consumed and saved
       // BEFORE serving; when both are used the file is NOT served.
       // Unknown email -> {ok:false, error:'no_account'} (never served).
       // Locked -> {ok:false, error:'download_out', message} (never served).
       const _dlEmail = normEmail(qp.get('email') || '');
+      if (!_dlEmail) return sendJSON(res, 200, { ok: false, error: 'need_login', message: 'សូមចូលគណនេយ្យជាមុនសិន — សូម Sign in ដើម្បីទាញយក · Please sign in to download' });
       // BOUGHT-SONG EXPIRY (v2.2.61, 3 months): an expired bought song
       // can no longer be downloaded. Checked BEFORE the free-download
       // gate so an expired song never consumes a free download.
@@ -13109,6 +13354,7 @@ async function apiRoute(req, res, urlPath) {
       u.updatedAt = now;
       await saveUsers(users);
       scheduleBackup('users.json');
+      await notifyWalletDeduct(email, price, 'Wallet', 'Boost · promo boost', u.balance);
       let applied;
       try {
         applied = await promoApplyBoost(email, post, type, amount);
@@ -13154,6 +13400,7 @@ async function apiRoute(req, res, urlPath) {
       u.updatedAt = now;
       await saveUsers(users);
       scheduleBackup('users.json');
+      await notifyWalletDeduct(email, price, 'Wallet', 'Discount pack · ' + feature, u.balance);
       let bonusLeft;
       try {
         bonusLeft = grantDiscountBonus(u, feature, postType);
