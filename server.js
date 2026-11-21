@@ -4418,7 +4418,7 @@ async function genFairnessGate(email, provider) {
 // {endpoint}/api/v1/generate/record-info?taskId=...; credit GET
 // {endpoint}/api/v1/generate/credit. The gateway REQUIRES a callBackUrl
 // and calls it at stages text / first / complete.
-const SUNO_CALLBACK_URL = process.env.SUNO_CALLBACK_URL || 'https://movai-proxy.onrender.com/api/suno/callback';
+const SUNO_CALLBACK_URL = process.env.SUNO_CALLBACK_URL || 'https://movai-proxy-dphl.onrender.com/api/suno/callback';
 // Latest callback result per taskId: {status, songs, preview, updatedAt}.
 // In-memory only (a restart loses it — the status handler then falls
 // back to polling record-info, so nothing breaks).
@@ -6198,7 +6198,7 @@ async function apiRoute(req, res, urlPath) {
           fs.mkdirSync(path.join(DATA_DIR, 'uploads'), { recursive: true });
           fs.writeFileSync(path.join(DATA_DIR, 'uploads', name), buf);
           const proto = req.headers && req.headers['x-forwarded-proto'] === 'http' ? 'http' : 'https';
-          const host = (req.headers && req.headers.host) || 'movai-proxy.onrender.com';
+          const host = (req.headers && req.headers.host) || 'movai-proxy-dphl.onrender.com';
           if (!(await ghPutUploadVerified(name, b64))) return sendJSON(res, 200, { ok: false, error: 'រក្សាទុកឯកសារបរាជ័យ — សូមព្យាយាមម្តងទៀត' });
           url = proto + '://' + host + '/uploads/' + name;
         } catch (e) {
@@ -6632,6 +6632,23 @@ async function apiRoute(req, res, urlPath) {
               const _txt0 = _tr0.lyrics.map((x) => (x && x.text) || '').filter(Boolean).join('\n').trim().slice(0, 5000);
               if (_txt0.replace(/[^\p{L}]/gu, '').length >= 10) lyrics = _txt0;
             }
+          } catch (e) {}
+        }
+        // v2.2.59 TYPE A: no audio URL to transcribe from — fetch the
+        // source song's own lyrics from Suno record-info instead, so a
+        // cover with empty lyrics still sings (not instrumental).
+        if (!lyrics && !instrumental && hasTrack) {
+          try {
+            const _ri = await withProviderKeyRotation('suno', async (k, endpoint) => {
+              const ep = endpoint.replace(/\/+$/, '');
+              const r = await fetch(ep + '/api/v1/generate/record-info?taskId=' + encodeURIComponent(taskId), { headers: { 'Authorization': 'Bearer ' + k }, signal: AbortSignal.timeout(30000) });
+              return await r.json().catch(() => null);
+            }, '', sunoKeys);
+            const _d = (_ri && _ri.data) || null;
+            const _arr = (_d && _d.response && Array.isArray(_d.response.sunoData)) ? _d.response.sunoData : [];
+            const _clip = _arr.find((c) => c && c.id === audioId) || _arr[0];
+            const _lyr = _clip && (typeof _clip.lyric === 'string' ? _clip.lyric : (typeof _clip.lyrics === 'string' ? _clip.lyrics : ''));
+            if (_lyr && _lyr.replace(/[^\p{L}]/gu, '').length >= 10) lyrics = _lyr.trim().slice(0, 5000);
           } catch (e) {}
         }
         const _reuseId = typeof body.reuseJobId === 'string' ? body.reuseJobId.trim() : '';
@@ -8020,6 +8037,100 @@ async function apiRoute(req, res, urlPath) {
     if (!list.length) return sendJSON(res, 200, { ok: false, error: 'Admin មិនទាន់ដាក់ Suno Key ទេ' });
     const bal = await sunoBalanceAll();
     return sendJSON(res, 200, { ok: true, provider: 'suno', totalRemaining: bal.totalRemaining, keys: bal.keys });
+  }
+  // ---- v2.2.59: Render free-quota tracking (owner-only display) ----
+  // The server tracks its OWN usage this month and exposes it via
+  // GET /api/public/quota (admin-only). Hours = this process's cumulative
+  // awake time (Render Free only counts hours while the service is awake;
+  // the website/Admin are Static and cost 0 hours, so this server's
+  // uptime = the workspace's hour usage). Bandwidth = total response
+  // bytes this server sent (counted by the res.write/res.end wrapper in
+  // the createServer callback below). Both persist to Supabase kv_docs
+  // ('quota:<host>:<YYYY-MM>') so they survive restarts/sleeps, and
+  // reset automatically each month. The key includes the server host so
+  // the old and new servers NEVER mix their counters. Counters start at
+  // 0 when v2.2.59 first deploys — usage before that is not known (no
+  // Render API key). Bandwidth is server-only and does NOT include the
+  // Static website/Admin bandwidth, so it is a LOWER BOUND on total
+  // workspace bandwidth.
+  const QUOTA_HOURS_TOTAL = 750;
+  const QUOTA_BW_TOTAL = 5 * 1024 * 1024 * 1024; // 5 GB
+  function quotaHost() {
+    var h = (process.env.RENDER_EXTERNAL_HOSTNAME || '').trim();
+    if (h) return h;
+    return 'movai-proxy-dphl.onrender.com';
+  }
+  function quotaMonthKey(d) {
+    var t = d || new Date();
+    return t.getUTCFullYear() + '-' + String(t.getUTCMonth() + 1).padStart(2, '0');
+  }
+  function quotaKvKey() { return 'quota:' + quotaHost() + ':' + quotaMonthKey(); }
+  var quotaBootMs = Date.now();
+  var quotaAccumMs = 0; // awake ms from earlier sessions this month
+  var quotaBytesOut = 0; // response bytes this month (in-memory)
+  var quotaLoadedMonth = '';
+  var quotaLoadPromise = null;
+  async function quotaLoad() {
+    if (quotaLoadPromise) return quotaLoadPromise;
+    quotaLoadPromise = (async () => {
+      try {
+        var doc = await loadKvDoc(quotaKvKey(), null);
+        if (doc && doc.month === quotaMonthKey()) {
+          quotaAccumMs = Math.max(0, Number(doc.accumMs) || 0);
+          quotaBytesOut = Math.max(0, Number(doc.bytesOut) || 0);
+          quotaLoadedMonth = doc.month;
+        } else {
+          quotaAccumMs = 0; quotaBytesOut = 0;
+          quotaLoadedMonth = quotaMonthKey();
+        }
+      } catch (e) {}
+      return true;
+    })();
+    return quotaLoadPromise;
+  }
+  function quotaUsedMs() { return quotaAccumMs + (Date.now() - quotaBootMs); }
+  async function quotaPersist() {
+    try {
+      var now = Date.now();
+      if (quotaMonthKey() !== quotaLoadedMonth) {
+        // New month: reset and persist under the new key.
+        quotaAccumMs = 0; quotaBytesOut = 0;
+        quotaLoadedMonth = quotaMonthKey();
+        quotaBootMs = now;
+      } else {
+        // Fold this session's elapsed time into the accumulator and
+        // restart the clock (no double-counting).
+        quotaAccumMs += (now - quotaBootMs);
+        quotaBootMs = now;
+      }
+      await saveKvDoc(quotaKvKey(), { month: quotaMonthKey(), accumMs: quotaAccumMs, bytesOut: quotaBytesOut, host: quotaHost(), updatedAt: new Date().toISOString() });
+    } catch (e) {}
+  }
+  // Persist every 60s (cheap; a crash loses at most 60s of hours).
+  setInterval(function() { quotaPersist().catch(function() {}); }, 60000);
+  // GET /api/public/quota?email=... — ADMIN-ONLY (ADMIN_EMAILS). The
+  // requesting email must be an admin; anyone else gets not_admin.
+  if (req.method === 'GET' && urlPath === '/api/public/quota') {
+    const email = normEmail(new URL(req.url, 'http://localhost').searchParams.get('email') || '');
+    // Admin-only: an ADMIN_EMAILS email, OR the Admin key (Bearer) —
+    // the Admin app logs in with name + key and has no email. The key is
+    // only checked when a Bearer token is actually presented, so a plain
+    // request never touches the lockout logic.
+    var _qAdmin = !!(email && ADMIN_EMAILS.includes(email));
+    if (!_qAdmin) {
+      var _qh = String(req.headers['authorization'] || '');
+      if (/^Bearer\s+/.test(_qh)) {
+        try { var _qa = await adminKeyOk(req); _qAdmin = !!(_qa && _qa.ok); } catch (e) {}
+      }
+    }
+    if (!_qAdmin) return sendJSON(res, 200, { ok: false, error: 'not_admin' });
+    try { await quotaLoad(); } catch (e) {}
+    var _qUsedMs = quotaUsedMs();
+    var _qBw = quotaBytesOut;
+    return sendJSON(res, 200, { ok: true, month: quotaMonthKey(), serverHost: quotaHost(),
+      hoursUsedMs: _qUsedMs, hoursTotalMs: QUOTA_HOURS_TOTAL * 3600 * 1000, hoursLeftMs: Math.max(0, QUOTA_HOURS_TOTAL * 3600 * 1000 - _qUsedMs),
+      bandwidthUsedBytes: _qBw, bandwidthTotalBytes: QUOTA_BW_TOTAL, bandwidthLeftBytes: Math.max(0, QUOTA_BW_TOTAL - _qBw),
+      note: 'Server-only bandwidth (lower bound — Static website/Admin bandwidth not included). Counters start at v2.2.59 deploy.' });
   }
   // GET /api/public/suno-balance?email=... — v2.2.48. The live Suno API
   // credit balance for the OWNER's Profile on the website (same numbers
@@ -10821,7 +10932,7 @@ async function apiRoute(req, res, urlPath) {
     return typeof u === 'string' && u.indexOf('magichour.ai') >= 0;
   }
   function isProxyUploadsUrl(u) {
-    return typeof u === 'string' && u.indexOf('/uploads/') >= 0 && (u.indexOf('movai-proxy.onrender.com/uploads/') >= 0 || u.indexOf('://') < 0);
+    return typeof u === 'string' && u.indexOf('/uploads/') >= 0 && (u.indexOf('movai-proxy-dphl.onrender.com/uploads/') >= 0 || u.indexOf('://') < 0);
   }
   // Fast check: does the Cloudinary asset for this source URL already
   // exist (stored earlier under its deterministic public_id)? Tries every
@@ -11457,12 +11568,12 @@ async function apiRoute(req, res, urlPath) {
       const url = String((body && body.url) || '').trim();
       const title = String((body && (body.title || body.name)) || '').trim();
       const proto = req.headers && req.headers['x-forwarded-proto'] === 'http' ? 'http' : 'https';
-      const host = (req.headers && req.headers.host) || 'movai-proxy.onrender.com';
+      const host = (req.headers && req.headers.host) || 'movai-proxy-dphl.onrender.com';
       const ownBase = proto + '://' + host;
       try {
         if (!url) return sendJSON(res, 200, { ok: false, error: 'missing url' });
         // Already one of OUR permanent uploads URLs? Nothing to do.
-        if (url.indexOf('/uploads/') >= 0 && (url.indexOf(ownBase + '/uploads/') === 0 || url.indexOf('movai-proxy.onrender.com/uploads/') >= 0)) {
+        if (url.indexOf('/uploads/') >= 0 && (url.indexOf(ownBase + '/uploads/') === 0 || url.indexOf('movai-proxy-dphl.onrender.com/uploads/') >= 0)) {
           return sendJSON(res, 200, { ok: true, url });
         }
         // Already a Cloudinary MP3 URL? Rewrite its download filename
@@ -11763,7 +11874,7 @@ async function apiRoute(req, res, urlPath) {
         try { fs.mkdirSync(path.join(DATA_DIR, 'uploads'), { recursive: true }); } catch (e) {}
         fs.writeFileSync(fpath, buf);
         const proto = req.headers && req.headers['x-forwarded-proto'] === 'http' ? 'http' : 'https';
-        const host = (req.headers && req.headers.host) || 'movai-proxy.onrender.com';
+        const host = (req.headers && req.headers.host) || 'movai-proxy-dphl.onrender.com';
         const pubUrl = proto + '://' + host + '/uploads/' + safeName;
         const stored = await cloudinaryStoreSong(pubUrl, (filename || 'cover').replace(/\.[^.]+$/, ''));
         if (!stored || stored === 'gone' || !stored.mp3Url) {
@@ -11794,7 +11905,7 @@ async function apiRoute(req, res, urlPath) {
         const name = Date.now().toString(36) + '-' + crypto.randomInt(100000, 999999) + ext;
         fs.writeFileSync(path.join(UPLOADS_DIR, name), buf);
         const proto = req.headers && req.headers['x-forwarded-proto'] === 'http' ? 'http' : 'https';
-        const host = (req.headers && req.headers.host) || 'movai-proxy.onrender.com';
+        const host = (req.headers && req.headers.host) || 'movai-proxy-dphl.onrender.com';
         // Back up to GitHub BEFORE returning success, so the Admin app
         // only proceeds to create the post once the file is durable.
         // VERIFIED (owner order 2026-11-18): the backup is retried once,
@@ -11828,7 +11939,7 @@ async function apiRoute(req, res, urlPath) {
         const name = 'cover-' + Date.now().toString(36) + '-' + crypto.randomInt(100000, 999999) + ext;
         fs.writeFileSync(path.join(UPLOADS_DIR, name), buf);
         const proto = req.headers && req.headers['x-forwarded-proto'] === 'http' ? 'http' : 'https';
-        const host = (req.headers && req.headers.host) || 'movai-proxy.onrender.com';
+        const host = (req.headers && req.headers.host) || 'movai-proxy-dphl.onrender.com';
         if (!(await ghPutUploadVerified(name, b64))) return sendJSON(res, 200, { ok: false, error: 'រក្សាទុកឯកសារបរាជ័យ (GitHub backup) — សូមព្យាយាមម្តងទៀត · Upload backup failed, please try again' });
         return sendJSON(res, 200, { ok: true, url: proto + '://' + host + '/uploads/' + name, name, kind: 'image', size: buf.length });
       } catch (e) {
@@ -11859,7 +11970,7 @@ async function apiRoute(req, res, urlPath) {
         const name = 'rcpt-' + Date.now().toString(36) + '-' + crypto.randomInt(100000, 999999) + ext;
         fs.writeFileSync(path.join(UPLOADS_DIR, name), buf);
         const proto = req.headers && req.headers['x-forwarded-proto'] === 'http' ? 'http' : 'https';
-        const host = (req.headers && req.headers.host) || 'movai-proxy.onrender.com';
+        const host = (req.headers && req.headers.host) || 'movai-proxy-dphl.onrender.com';
         if (!(await ghPutUploadVerified(name, b64))) return sendJSON(res, 200, { ok: false, error: 'រក្សាទុកឯកសារបរាជ័យ (GitHub backup) — សូមព្យាយាមម្តងទៀត · Upload backup failed, please try again' });
         return sendJSON(res, 200, { ok: true, url: proto + '://' + host + '/uploads/' + name, name, size: buf.length });
       } catch (e) {
@@ -12719,6 +12830,19 @@ async function apiRoute(req, res, urlPath) {
 
 /* ------------------------------- static files ------------------------------ */
 const server = http.createServer((req, res) => {
+  // v2.2.59: count outbound response bytes for the quota display
+  // (GET /api/public/quota). Wraps write/end only; arguments pass
+  // through unchanged, so streaming and normal responses are unaffected.
+  var _qb = 0;
+  function _qlen(chunk, enc) {
+    if (!chunk) return 0;
+    if (Buffer.isBuffer(chunk)) return chunk.length;
+    if (typeof chunk === 'string') { try { return Buffer.byteLength(chunk, typeof enc === 'string' ? enc : 'utf8'); } catch (e) { return 0; } }
+    return 0;
+  }
+  var _qw = res.write, _qe = res.end;
+  res.write = function(chunk, enc, cb) { try { _qb += _qlen(chunk, enc); } catch (e) {} return _qw.apply(res, arguments); };
+  res.end = function(chunk, enc, cb) { try { _qb += _qlen(chunk, enc); } catch (e) {} var _r = _qe.apply(res, arguments); try { quotaBytesOut += _qb; } catch (e2) {} return _r; };
   let urlPath = decodeURIComponent(req.url.split('?')[0]);
   // CORS preflight for /api/* (the website and Admin app are other origins;
   // the Admin app also sends an Authorization header, which always preflights).
