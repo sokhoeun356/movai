@@ -1312,6 +1312,10 @@ async function coverPendingRefund(jobId) {
     if (!(rf && rf.ok)) return false;
     it.refunded = true;
     await coverPendingSave(a);
+    // v2.2.69: cross-mark the timeout-endpoint refund key so a later
+    // /api/gen/song/timeout call for this job sees 'already refunded'
+    // and can never refund the same 12 credits twice.
+    try { await saveKvDoc('suno-refund:' + jobId, { email: it.email, jobId: jobId, at: Date.now(), refunded: true }, 'suno-refund.json'); } catch (e) {}
     return true;
   } catch (e) { return false; }
 }
@@ -6189,6 +6193,7 @@ async function apiRoute(req, res, urlPath) {
             return sendJSON(res, 200, Object.assign({ ok: true }, _riCached.out));
           }
           let out;
+          var _jobFailed = false;
           try {
             out = await withProviderKeyRotation('suno', async (k, endpoint) => {
               const ep = endpoint.replace(/\/+$/, '');
@@ -6196,8 +6201,8 @@ async function apiRoute(req, res, urlPath) {
               const j = await r.json().catch(() => null);
               if (r.status === 401 || r.status === 403 || r.status === 429) throw rotErr('Suno: ' + sunoErrText(j, 'HTTP ' + r.status), r.status);
               const d = (j && j.data) || null;
-              if (!d || typeof d.status !== 'string') throw rotErr('Suno: ' + sunoErrText(j, 'HTTP ' + r.status), r.status);
-              const st = d.status;
+              if (!d || typeof d.status !== 'string') { _jobFailed = true; throw rotErr('Suno: មិនរកឃើញការងារនេះទេ · Suno could not find this job', r.status); }
+              const st = d.status.toUpperCase();
               if (st === 'SUCCESS') {
                 const songs = sunoSongsKeepEarlyUrl(sunoSongsFromData(d), cb && cb.firstSongs);
                 if (songs.length) {
@@ -6226,13 +6231,21 @@ async function apiRoute(req, res, urlPath) {
                 if (st === 'TEXT_SUCCESS') { var _lyr = ''; try { _lyr = sunoStreamLyricsFromData(d); } catch (e) {} return { status: 'working', providerStatus: 'text', lyrics: _lyr }; }
                 return { status: 'working', providerStatus: 'queued' };
               }
+              _jobFailed = true;
               try { await coverPendingRefund(jobId); } catch (e2) {}
-              throw rotErr('Suno: ' + (d.errorMessage || st || 'បង្កើតមិនបានទេ'), r.status);
+              throw rotErr('Suno: ' + (d.errorMessage || ('បង្កើតមិនបានទេ · ' + st)), r.status);
             }, '', sunoKeys);
           } catch (e) {
             // v2.2.63 (S1): a transient record-info failure while Suno is
             // still generating must not fail the poll — answer with the
             // known working state and let the next poll retry.
+            // v2.2.69: a DEFINITIVE job failure (Suno says failed, or the
+            // job is gone) must NEVER be masked as 'working' — the phone
+            // would spin forever on a dead job. Only transient failures
+            // (network/5xx) keep the 'working' mask below.
+            if (_jobFailed) {
+              return sendJSON(res, 200, { ok: false, error: (e && e.message) || 'Suno: request failed' });
+            }
             if (_ss && _ss.status === 'generating') {
               return sendJSON(res, 200, { ok: true, status: 'working', providerStatus: 'text', lyrics: _ss.lyrics || '' });
             }
@@ -6336,6 +6349,9 @@ async function apiRoute(req, res, urlPath) {
         if (provider !== 'suno') return sendJSON(res, 200, { ok: false, error: 'provider not supported' });
         const refundKey = 'suno-refund:' + jobId;
         try { if (await loadKvDoc(refundKey, null)) return sendJSON(res, 200, { ok: true, refunded: false, alreadyRefunded: true }); } catch (e) {}
+        // v2.2.69: a cover job refunded via coverPendingRefund (status-endpoint
+        // failure path) must not be refunded again here.
+        try { const _cpa = await coverPendingLoad(); const _cp = _cpa.find((x) => x && x.jobId === jobId); if (_cp && _cp.refunded) return sendJSON(res, 200, { ok: true, refunded: false, alreadyRefunded: true }); } catch (e) {}
         try {
           const sunoKeys = (await adminProviderKeyList('suno')).filter((e) => e.endpoint);
           if (sunoKeys.length) {
@@ -6345,7 +6361,7 @@ async function apiRoute(req, res, urlPath) {
               const j = await r.json().catch(() => null);
               const d = (j && j.data) || null;
               if (!d || typeof d.status !== 'string') return null;
-              if (d.status === 'SUCCESS') {
+              if (String(d.status).toUpperCase() === 'SUCCESS') {
                 const songs = sunoSongsFromData(d);
                 return songs.length ? songs : null;
               }
@@ -6356,6 +6372,9 @@ async function apiRoute(req, res, urlPath) {
         } catch (e) {}
         const rf = await refundForGeneration(email, 0, 12, 'song:suno timeout 5min');
         try { await saveKvDoc(refundKey, { email, jobId, at: Date.now(), refunded: !!(rf && rf.ok) }, 'suno-refund.json'); } catch (e) {}
+        // v2.2.69: mark the pending cover entry refunded too, so the
+        // cover-failed / status paths never refund the same job again.
+        try { const _cpa2 = await coverPendingLoad(); const _cp2 = _cpa2.find((x) => x && x.jobId === jobId); if (_cp2 && !_cp2.refunded) { _cp2.refunded = true; await coverPendingSave(_cpa2); } } catch (e) {}
         try { const _st = sunoStreamState.get(jobId); if (_st && _st.status !== 'ready') { _st.status = 'failed'; sunoStreamPersist(jobId); } } catch (e) {}
         return sendJSON(res, 200, { ok: true, refunded: !!(rf && rf.ok) });
       } catch (e) { return sendJSON(res, 200, { ok: false, error: 'timeout refund failed: ' + (e && e.message ? e.message : 'unknown') }); }
@@ -7088,6 +7107,10 @@ async function apiRoute(req, res, urlPath) {
         const it = a.find((x) => x && x.jobId === jobId && x.email === email);
         if (!it) return sendJSON(res, 200, { ok: true, refunded: false, reason: 'no pending job' });
         if (it.refunded) return sendJSON(res, 200, { ok: true, refunded: false, reason: 'already refunded' });
+        // v2.2.69: refund ONLY a job the user PAID for (same rule as
+        // coverPendingRefund) — an unpaid check job cost nothing, and
+        // refunding it would mint 12 free credits.
+        if (!(it.paid === true || (!it.vocalRetryOf && (!it.checked || it.used)))) return sendJSON(res, 200, { ok: true, refunded: false, reason: 'not paid' });
         let failed = false;
         try {
           const keys = (await adminProviderKeyList('suno')).filter((e) => e.endpoint);
@@ -7099,7 +7122,8 @@ async function apiRoute(req, res, urlPath) {
             return (j && j.data) || null;
           }, '', keys);
           const st = out && typeof out.status === 'string' ? out.status : '';
-          failed = !!st && st !== 'SUCCESS' && st !== 'FIRST_SUCCESS' && st !== 'PENDING' && st !== 'TEXT_SUCCESS';
+          const _stu = st.toUpperCase();
+          failed = !!st && _stu !== 'SUCCESS' && _stu !== 'FIRST_SUCCESS' && _stu !== 'PENDING' && _stu !== 'TEXT_SUCCESS';
         } catch (e) { failed = false; }
         if (!failed) return sendJSON(res, 200, { ok: true, refunded: false, reason: 'job not failed' });
         const rf = await refundForGeneration(email, 0, 12, 'song:cover failed');
