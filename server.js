@@ -12785,6 +12785,74 @@ async function apiRoute(req, res, urlPath) {
     const mine = listings.filter((l) => l && l.status === 'sold' && l.buyerEmail === email).sort((a, b) => String(b.soldAt || b.createdAt || '').localeCompare(String(a.soldAt || a.createdAt || '')));
     return sendJSON(res, 200, { ok: true, email, purchases: mine.map((l) => ({ id: l.id, tier: l.tier, price: walletMoney(l.price), songCount: numOr(l.songCount, Array.isArray(l.songs) ? l.songs.length : 0), bonus: numOr(l.bonus, 0), songs: (Array.isArray(l.songs) ? l.songs : []).map(sellSongPublic), sellerName: sellDisplayName(users, l.sellerEmail), sellerEmail: l.sellerEmail || '', boughtAt: l.soldAt || l.createdAt || '', createdAt: l.createdAt || '', expiry: sellBoughtExpiry(l, downloaded) })) });
   }
+  // POST /api/public/sell/unlist — {email, listingId} — PUBLIC.
+  // The seller cancels their own UNSOLD listing: the listing is removed
+  // and its songs return to the seller's history (pickable again for a
+  // fresh listing). Only the listing owner may unlist; a SOLD listing
+  // can never be deleted (the buyer owns those songs now).
+  if (req.method === 'POST' && urlPath === '/api/public/sell/unlist') {
+    readJSONBody(req, 64 * 1024).then(async (body) => {
+      const email = normEmail(body && body.email);
+      if (!email) return sendJSON(res, 200, { ok: false, error: 'invalid_email', message: { km: 'សូមដាក់ Gmail ត្រឹមត្រូវ', en: 'Please enter a valid Gmail' } });
+      const users = await loadUsers();
+      const u = users[email];
+      if (!u) return sendJSON(res, 200, { ok: false, error: 'user_not_found', message: { km: 'រក Gmail នេះមិនឃើញទេ — សូម Sign-up ជាមុនសិន', en: 'No account with this Gmail, please sign up first' } });
+      const listingId = typeof body.listingId === 'string' ? body.listingId.trim() : '';
+      if (!listingId) return sendJSON(res, 200, { ok: false, error: 'invalid_listing', message: { km: 'រកកញ្ចប់នេះមិនឃើញទេ', en: 'Listing not found' } });
+      const listings = await loadSellListings();
+      const idx = listings.findIndex((x) => x && x.id === listingId);
+      if (idx < 0) return sendJSON(res, 200, { ok: false, error: 'not_found', message: { km: 'រកកញ្ចប់នេះមិនឃើញទេ', en: 'Listing not found' } });
+      const l = listings[idx];
+      if (l.sellerEmail !== email) return sendJSON(res, 200, { ok: false, error: 'not_owner', message: { km: 'កញ្ចប់នេះមិនមែនជារបស់អ្នកទេ', en: 'This listing is not yours' } });
+      if (l.status === 'sold') return sendJSON(res, 200, { ok: false, error: 'sold', message: { km: 'កញ្ចប់ដែលលក់រួច លុបមិនបានទេ', en: 'A sold package cannot be deleted' } });
+      const songs = Array.isArray(l.songs) ? l.songs : [];
+      listings.splice(idx, 1);
+      await saveSellListings(listings);
+      // Return the songs to the seller's history (they left history when
+      // listed). Rebuild history items from the stored song records;
+      // skip any key that is already back in history.
+      const h = await loadHistory();
+      const cur = Array.isArray(h[email]) ? h[email] : [];
+      const have = {};
+      for (const it of cur) { const k = histKey(it); if (k) have[k] = true; }
+      const restored = [];
+      for (const sg of songs) {
+        if (!sg || typeof sg !== 'object') continue;
+        const url = typeof sg.url === 'string' ? sg.url.trim() : '';
+        if (!url) continue;
+        const item = {
+          id: (typeof sg.key === 'string' && sg.key.indexOf('id:') === 0) ? sg.key.slice(3) : '',
+          url,
+          title: typeof sg.title === 'string' ? sg.title : '',
+          style: typeof sg.style === 'string' ? sg.style : '',
+          taskId: typeof sg.taskId === 'string' ? sg.taskId : '',
+          audioId: typeof sg.audioId === 'string' ? sg.audioId : '',
+          duration: numOr(sg.duration, 0),
+          image: typeof sg.image === 'string' ? sg.image : '',
+          createdAt: typeof sg.createdAt === 'string' ? sg.createdAt : new Date().toISOString(),
+          ts: (typeof sg.createdAt === 'string' && Date.parse(sg.createdAt)) ? Date.parse(sg.createdAt) : Date.now(),
+          origin: 'created',
+          mode: 'song',
+        };
+        if (!item.id) delete item.id;
+        const k = histKey(item);
+        if (!k || have[k]) continue;
+        have[k] = true;
+        restored.push(item);
+      }
+      // Newest first (the picker sorts newest first, so restored songs
+      // are immediately pickable at the top).
+      restored.sort((a, b) => numOr(b.ts, 0) - numOr(a.ts, 0));
+      h[email] = restored.concat(cur);
+      await saveHistory(h);
+      scheduleBackup('history.json');
+      try {
+        await addNotification('purchase-request', email, '🎵 លុបកញ្ចប់លក់ · Listing removed', 'អ្នកបានលុបកញ្ចប់លក់តម្លៃ $' + walletMoney(l.price) + ' — បទចម្រៀង ' + restored.length + ' បទបានត្រឡប់មកវិញ · You removed your $' + walletMoney(l.price) + ' listing — ' + restored.length + ' songs are back', { extra: { sellListing: true, listingId: l.id, pkg: 'sell-unlist', price: l.price } });
+      } catch (e) {}
+      return sendJSON(res, 200, { ok: true, listingId: l.id, restored: restored.length });
+    }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
+    return;
+  }
   // POST /api/public/purchase-receipt — PUBLIC (no admin key). The website
   // uploads a payment-receipt screenshot (image only, max 5 MB) and gets
   // back a public URL, which it then sends with the purchase request as
