@@ -592,6 +592,11 @@ async function adminKeyOk(req) {
     try { await clearAdminLockout(getClientIp(req)); } catch (e) {}
     return { ok: true };
   }
+  // Wrong or missing key. When the Admin Lockout protection is switched
+  // OFF (owner order 2026-11-22), a wrong key is simply rejected — no IP
+  // block is checked and no failed attempt is recorded. The correct key
+  // is still required for every admin call.
+  if (!(await lockoutEnabled())) return { ok: false, error: 'Admin key មិនត្រឹមត្រូវទេ · Wrong admin key' };
   // Wrong or missing key. A manually-blocked IP stays blocked.
   const ip = getClientIp(req);
   if (ip && (await loadBlockedIps()).some((b) => b === ip)) {
@@ -2103,6 +2108,11 @@ const SETTINGS_DEFAULTS = {
   // when false the server only records device info / VPN flags / strike
   // counts and never blocks automatically. Default OFF.
   autoCatch: false,
+  // Admin Lockout protection toggle (owner order 2026-11-22): when true
+  // (default ON) wrong admin-key attempts are blocked per IP in graduated
+  // levels; when false the admin key is still required for every admin
+  // call, but no IP is ever blocked for wrong keys.
+  lockoutEnabled: true,
   // Device account-limit toggle (owner order 2026-11-18). deviceLimitEnabled
   // (default OFF) = enforce the free-account limit at registration;
   // deviceLimit (default 3) = how many free Google accounts one device
@@ -2200,6 +2210,8 @@ function cleanSettings(j, base) {
   // turns the device-limit auto-enforcement on; anything else keeps the
   // stored value (default OFF).
   if (typeof j.autoCatch === 'boolean') s.autoCatch = j.autoCatch;
+  // Admin Lockout protection toggle (owner order 2026-11-22). Default ON.
+  if (typeof j.lockoutEnabled === 'boolean') s.lockoutEnabled = j.lockoutEnabled;
   // Device account-limit toggle (owner order 2026-11-18). enabled is a
   // boolean; limit is a whole number 1-100 (default 3). Invalid values
   // keep the stored value.
@@ -3132,6 +3144,13 @@ const DEVICE_STRIKE_BLOCK_AT = 4; // block the device at strike 4
 // anything — it is only an indicator.
 async function autoCatchEnabled() {
   try { const s = await loadSettings(); return s && s.autoCatch === true; } catch (e) { return false; }
+}
+// Admin Lockout protection toggle (owner order 2026-11-22). When OFF the
+// admin key is still required for every admin call, but wrong keys never
+// block an IP. Default ON (protection as today). Read fresh on every
+// call so an Admin change takes effect immediately.
+async function lockoutEnabled() {
+  try { const s = await loadSettings(); return s && s.lockoutEnabled !== false; } catch (e) { return true; }
 }
 // Device account-limit setting (owner order 2026-11-18). Stored in
 // settings (GitHub-backed). deviceLimitEnabled (default OFF) = enforce
@@ -8498,6 +8517,24 @@ async function apiRoute(req, res, urlPath) {
       if (!body || typeof body.enabled !== 'boolean') return sendJSON(res, 200, { ok: false, error: 'សូមដាក់ enabled: true/false' });
       const out = await saveSettings(Object.assign(await loadSettings(), { autoCatch: body.enabled }));
       return sendJSON(res, 200, { ok: true, enabled: out.autoCatch === true });
+    }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
+    return;
+  }
+  // GET /api/admin/lockout — admin key required. Reads the Admin Lockout
+  // protection toggle (default ON). POST /api/admin/lockout {enabled}
+  // sets it. The Admin app has a toggle button for it.
+  if (req.method === 'GET' && urlPath === '/api/admin/lockout') {
+    const a = await adminKeyOk(req);
+    if (!a.ok) return sendJSON(res, 200, { ok: false, error: a.error });
+    return sendJSON(res, 200, { ok: true, enabled: await lockoutEnabled() });
+  }
+  if (req.method === 'POST' && urlPath === '/api/admin/lockout') {
+    const a = await adminKeyOk(req);
+    if (!a.ok) return sendJSON(res, 200, { ok: false, error: a.error });
+    readJSONBody(req, 64 * 1024).then(async (body) => {
+      if (!body || typeof body.enabled !== 'boolean') return sendJSON(res, 200, { ok: false, error: 'សូមដាក់ enabled: true/false' });
+      const out = await saveSettings(Object.assign(await loadSettings(), { lockoutEnabled: body.enabled }));
+      return sendJSON(res, 200, { ok: true, enabled: out.lockoutEnabled !== false });
     }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
     return;
   }
