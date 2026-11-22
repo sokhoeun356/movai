@@ -1,0 +1,777 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#f2faf6">
+<title>MovAi — Marketplace</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
+<style>
+  /* MovAi new — KIE.AI clean look, one single pale background, no layers. */
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0;overflow-x:hidden}
+  html{
+    background:linear-gradient(180deg,#e8f5f0 0%,#f2faf6 45%,#ffffff 100%);
+    background-attachment:fixed;
+    -webkit-text-size-adjust:100%;
+  }
+  body{
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+    color:#1f2937;
+    background:linear-gradient(180deg,#e8f5f0 0%,#f2faf6 45%,#ffffff 100%);
+    background-attachment:fixed;
+    min-height:100vh;
+  }
+  a{color:#1f2937;text-decoration:none}
+  button{font:inherit;color:inherit;background:transparent;border:0;padding:0;cursor:pointer}
+  img{display:block;max-width:100%}
+
+  .wrap{max-width:720px;margin:0 auto}
+
+  /* ---- Header: two rows, directly on the background (transparent) ---- */
+  header{position:sticky;top:0;z-index:20;
+    background:linear-gradient(180deg,#e8f5f0 0%,#f2faf6 45%,#ffffff 100%);
+    background-attachment:fixed;}
+  .hdr-row{display:flex;align-items:center;justify-content:space-between;gap:10px;
+    padding-left:16px;padding-right:16px}
+  .hdr-top{padding-top:14px;padding-bottom:10px;border-bottom:1px solid #e5e7eb}
+  .hdr-sub{padding-top:11px;padding-bottom:11px;border-bottom:1px solid #e5e7eb}
+  .hdr-logo{display:flex;align-items:center;gap:8px;color:#1f2937;min-width:0}
+  .hdr-logo svg{flex:none}
+  .hdr-logo b{font-size:1.3rem;font-weight:800;letter-spacing:-.02em;color:#1f2937;line-height:1}
+  .hdr-right{display:flex;align-items:center;gap:4px}
+  .icon-btn{font-size:1.35rem;line-height:1;color:#1f2937;padding:4px 9px;border-radius:8px}
+  .icon-btn:active{background:#e5e7eb}
+  .hdr-sec{display:flex;align-items:center;gap:10px;min-width:0;flex:1}
+  .hdr-sec .icon-btn{padding:4px 8px}
+  .hdr-sec-name{font-size:1rem;font-weight:600;color:#1f2937;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .sell-btn{flex:none;font-size:.9rem;font-weight:600;color:#1f2937;
+    border:1px solid #d1d5db;border-radius:8px;padding:6px 12px;background:transparent}
+  .sell-btn:active{background:#e5e7eb}
+
+  /* ---- Dropdown menu (plain, no shadow, no card) ---- */
+  .menu{position:absolute;left:16px;right:16px;top:100%;z-index:30;
+    background:#f2faf6;border:1px solid #e5e7eb;border-radius:10px;
+    padding:4px 0;display:none}
+  .menu.open{display:block}
+  .menu a{display:block;padding:11px 14px;font-size:.95rem;color:#1f2937;border-bottom:1px solid #eef1f0}
+  .menu a:last-child{border-bottom:0}
+  .menu a:active{background:#e5e7eb}
+
+  /* ---- Marketplace: plain rows directly on the background ---- */
+  main{padding-bottom:96px}
+  .info{padding:16px 16px 4px;font-size:.92rem;line-height:1.75;color:#1f2937}
+  .info p{margin:0 0 8px}
+  .sec{padding:20px 16px 4px;font-size:1rem;font-weight:700;color:#1f2937}
+  .sec-sub{padding:0 16px 4px;font-size:.82rem;color:#6b7280}
+  .status{padding:28px 16px;text-align:center;color:#6b7280;font-size:.95rem}
+  .retry{margin-top:10px;color:#1f2937;text-decoration:underline;font-size:.95rem}
+
+  .seller{padding:16px 16px 2px;font-size:.95rem;font-weight:700;color:#1f2937}
+  .listing{display:block;width:100%;text-align:left;background:transparent;border:0;
+    border-bottom:1px solid #eef1f0;padding:12px 16px;cursor:pointer}
+  .listing:active{background:#eef1f0}
+  .listing-top{display:flex;align-items:baseline;justify-content:space-between;gap:10px}
+  .listing-price{font-size:1.05rem;font-weight:800;color:#1f2937;white-space:nowrap}
+  .listing-count{font-size:.92rem;font-weight:600;color:#1f2937}
+  .listing-sub{display:block;font-size:.8rem;color:#6b7280;margin-top:3px}
+  .listing.open .listing-count{color:#0f766e}
+
+  .songs{border-bottom:1px solid #eef1f0}
+  .song{display:flex;align-items:center;gap:10px;padding:9px 16px 9px 28px;
+    border-top:1px solid #f3f4f6;font-size:.9rem}
+  .song-text{flex:1;min-width:0}
+  .song-title{display:block;font-size:.9rem;font-weight:600;color:#1f2937;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .song-style{display:block;font-size:.78rem;color:#6b7280;margin-top:2px;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .song-dur{flex:none;font-size:.85rem;color:#6b7280}
+  .song-note{padding:10px 16px 10px 28px;font-size:.82rem;color:#6b7280;line-height:1.6}
+  .buyrow{padding:4px 16px 14px 28px}
+  .own-note{padding:4px 16px 14px 28px;font-size:.9rem;color:#6b7280}
+  .plain-btn{display:inline-block;font-size:.9rem;font-weight:600;color:#1f2937;
+    border:1px solid #d1d5db;border-radius:8px;padding:8px 14px;background:transparent}
+  .plain-btn:active{background:#e5e7eb}
+  .plain-btn[disabled]{opacity:.5}
+
+  .trow{display:flex;align-items:baseline;justify-content:space-between;gap:10px;
+    padding:10px 16px;border-bottom:1px solid #eef1f0;font-size:.92rem}
+  .trow b{font-weight:700}
+  .trow span{color:#6b7280;font-size:.85rem}
+
+  /* ---- Buy panel: plain section directly on the background ---- */
+  .buybox{padding:6px 16px 8px}
+  .buybox p{margin:0 0 8px;font-size:.92rem;line-height:1.7}
+  .buylabel{font-weight:700}
+  .methodrow{display:flex;gap:10px;margin:4px 0 14px}
+  .methodrow button{flex:1;font-size:1rem;font-weight:700;color:#1f2937;
+    border:1px solid #d1d5db;border-radius:8px;padding:12px 8px;background:transparent}
+  .methodrow button:active{background:#e5e7eb}
+  .methodrow button.picked{background:#e5e7eb}
+  .amt{font-size:1.7rem;font-weight:800;color:#1f2937;margin:2px 0 10px}
+  .qrwrap{margin:6px 0 10px}
+  .qrwrap svg{display:block;width:220px;height:220px;max-width:100%}
+  .addr{word-break:break-all;font-size:.92rem;line-height:1.6}
+  .fine{font-size:.82rem;color:#6b7280}
+  .payload{word-break:break-all;font-size:.78rem;color:#6b7280;line-height:1.6}
+  .buybox input[type=file]{font:inherit;font-size:.9rem;color:#1f2937;margin:4px 0 8px;max-width:100%}
+  .buy-msg{font-size:.92rem;line-height:1.7}
+  .buy-msg.ok{color:#0f766e}
+  .signin-link{text-decoration:underline}
+  .divider{border:0;border-top:1px solid #e5e7eb;margin:18px 0 0}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header id="hdr">
+    <div class="hdr-row hdr-top">
+      <span class="hdr-logo">
+        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M9 18V5l10-2v11" stroke="#1f2937" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><circle cx="6.5" cy="18" r="2.5" fill="#1f2937"/><circle cx="16.5" cy="16" r="2.5" fill="#1f2937"/></svg>
+        <b>MovAi</b>
+      </span>
+      <span class="hdr-right">
+        <button class="icon-btn" id="dotsBtn" type="button" aria-label="Menu" aria-haspopup="true" aria-expanded="false">&#8942;</button>
+      </span>
+    </div>
+    <div class="hdr-row hdr-sub">
+      <span class="hdr-sec">
+        <button class="icon-btn" id="burgerBtn" type="button" aria-label="Menu" aria-haspopup="true" aria-expanded="false">&#9776;</button>
+        <span class="hdr-sec-name">Marketplace</span>
+      </span>
+      <button class="sell-btn" id="sellBtn" type="button">Sell Song</button>
+    </div>
+    <nav class="menu" id="menu" aria-label="Menu">
+      <a href="movai-new.html">Home</a>
+      <a href="movai-new-create.html">Create Song</a>
+      <a href="movai-new-market.html">Marketplace</a>
+      <a href="movai-new-songs.html">My Songs</a>
+      <a href="movai-new-profile.html">Profile</a>
+    </nav>
+  </header>
+
+  <main>
+    <div class="info">
+      <p><b>How it works:</b> sellers list bundles of their own songs. When you buy a bundle, the seller gets 95% and MovAi keeps 5%.</p>
+      <p>Bought songs expire 3 months after purchase — download them before then.</p>
+      <p>Pay by KHQR or QR USDT, then upload your payment receipt. The admin approves it and the songs become yours.</p>
+    </div>
+
+    <div class="sec">Song bundles for sale</div>
+    <div class="sec-sub">Tap a bundle to see its songs.</div>
+    <div id="market"></div>
+
+    <div class="sec">Bundle prices</div>
+    <div class="sec-sub">Fixed prices set by the company.</div>
+    <div id="tiers"></div>
+
+    <hr class="divider">
+    <section id="buyPanel" hidden>
+      <div class="sec" id="buyTitle">Buy this bundle</div>
+      <div class="buybox">
+        <p id="buySummary"></p>
+        <p id="buySignin" hidden>Sign in to buy. <a class="signin-link" href="movai-new-profile.html">Go to Profile to sign in</a></p>
+        <div id="buySteps" hidden>
+          <p class="buylabel">Choose how to pay:</p>
+          <div class="methodrow">
+            <button id="mKhqr" type="button">KHQR</button>
+            <button id="mUsdt" type="button">QR USDT</button>
+          </div>
+
+          <div id="payKhqr" hidden>
+            <p>Amount to pay</p>
+            <p class="amt" id="khqrAmt"></p>
+            <div class="qrwrap" id="khqrQr"></div>
+            <p>Scan with any bank app — the amount is already filled in. Pay to YEM SOKHOEUN.</p>
+            <p id="khqrPayloadWrap" hidden>KHQR code: <span class="payload" id="khqrPayload"></span></p>
+            <p><a class="signin-link" id="khqrLink" href="#">Open KHQR payment link</a></p>
+          </div>
+
+          <div id="payUsdt" hidden>
+            <p>Amount to pay</p>
+            <p class="amt" id="usdtAmt"></p>
+            <div class="qrwrap" id="usdtQr"></div>
+            <p>Send exactly this amount in USDT (TRC20 only) to:</p>
+            <p class="addr" id="usdtAddr"></p>
+            <p><button class="plain-btn" id="copyAddr" type="button">Copy address</button>
+            <span class="fine" id="copyMsg"></span></p>
+          </div>
+
+          <div id="receiptBox" hidden>
+            <p class="buylabel">Upload your payment receipt (after you pay):</p>
+            <input type="file" id="receiptFile" accept="image/jpeg,image/png,image/webp">
+            <p class="fine">JPG, PNG or WebP, max 5 MB.</p>
+            <p id="receiptName" class="fine"></p>
+            <p><button class="plain-btn" id="submitBuy" type="button">I have paid — send receipt for approval</button></p>
+            <p class="buy-msg" id="buyMsg"></p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="mineWrap" hidden>
+      <div class="sec">My purchases</div>
+      <div class="sec-sub">Bundles you bought, with their download deadline.</div>
+      <div id="mine"></div>
+    </section>
+
+    <div class="status" id="status">Loading marketplace&hellip;</div>
+  </main>
+</div>
+
+<script>
+(function(){
+  "use strict";
+  var API = "https://movai-proxy-dphl.onrender.com";
+  var MARKET_URL = API + "/api/public/sell/market";
+  var TIERS_URL = API + "/api/public/sell/tiers";
+  var SETTINGS_URL = API + "/api/admin/settings";
+  var RECEIPT_URL = API + "/api/public/purchase-receipt";
+  var BUY_URL = API + "/api/public/sell/buy";
+  var MY_PURCHASES_URL = API + "/api/public/sell/my-purchases";
+
+  /* Verified live defaults (GET /api/admin/settings, 2026-11-22): used only
+     if the settings request fails. The live value is always preferred. */
+  var PAY = {
+    khqrLink: "https://pay.canadiabank.com.kh/K6EkJR30W0BM3VVK",
+    usdtAddress: "TPHu2Z45PZ9xUB7AzqMehWKv72HysE9Vzd"
+  };
+  /* The 9 company-fixed tiers (GET /api/public/sell/tiers, verified live):
+     kept as a fallback if the tiers request fails. */
+  var FALLBACK_TIERS = [
+    { tier: 1, price: 1, songs: 6, bonus: 0 },
+    { tier: 2, price: 2, songs: 12, bonus: 0 },
+    { tier: 3, price: 3, songs: 18, bonus: 0 },
+    { tier: 4, price: 4, songs: 24, bonus: 0 },
+    { tier: 5, price: 5, songs: 32, bonus: 2 },
+    { tier: 10, price: 10, songs: 65, bonus: 5 },
+    { tier: 15, price: 15, songs: 98, bonus: 8 },
+    { tier: 20, price: 20, songs: 132, bonus: 12 },
+    { tier: 25, price: 25, songs: 165, bonus: 15 }
+  ];
+
+  /* KHQR base payload (owner's Canadia Bank KHQR, same payload the main
+     site uses). The amount is inserted at runtime — never 0.00. */
+  var KHQR_BASE_PAYLOAD = "00020101021129530016cadikhppxxx@cadi011300100045531070212Canadia Bank5204000053038405802KH5912YEM SOKHOEUN6010Phnom Penh";
+  var MAX_RECEIPT_BYTES = 5 * 1024 * 1024;
+
+  var marketEl = document.getElementById("market");
+  var tiersEl = document.getElementById("tiers");
+  var statusEl = document.getElementById("status");
+  var menuEl = document.getElementById("menu");
+  var dotsBtn = document.getElementById("dotsBtn");
+  var burgerBtn = document.getElementById("burgerBtn");
+  var sellBtn = document.getElementById("sellBtn");
+  var buyPanel = document.getElementById("buyPanel");
+  var buySummary = document.getElementById("buySummary");
+  var buySignin = document.getElementById("buySignin");
+  var buySteps = document.getElementById("buySteps");
+  var mKhqr = document.getElementById("mKhqr");
+  var mUsdt = document.getElementById("mUsdt");
+  var payKhqr = document.getElementById("payKhqr");
+  var payUsdt = document.getElementById("payUsdt");
+  var khqrAmt = document.getElementById("khqrAmt");
+  var khqrQr = document.getElementById("khqrQr");
+  var khqrPayloadWrap = document.getElementById("khqrPayloadWrap");
+  var khqrPayload = document.getElementById("khqrPayload");
+  var khqrLink = document.getElementById("khqrLink");
+  var usdtAmt = document.getElementById("usdtAmt");
+  var usdtQr = document.getElementById("usdtQr");
+  var usdtAddr = document.getElementById("usdtAddr");
+  var copyAddrBtn = document.getElementById("copyAddr");
+  var copyMsg = document.getElementById("copyMsg");
+  var receiptBox = document.getElementById("receiptBox");
+  var receiptFile = document.getElementById("receiptFile");
+  var receiptName = document.getElementById("receiptName");
+  var submitBuy = document.getElementById("submitBuy");
+  var buyMsg = document.getElementById("buyMsg");
+  var mineWrap = document.getElementById("mineWrap");
+  var mineEl = document.getElementById("mine");
+
+  var curListing = null;   // {id, price, songCount, sellerName}
+  var curMethod = null;    // "khqr" | "usdt"
+  var receiptFileObj = null;
+
+  /* ---- login: same session storage as the main site ----
+     "movai-session" holds the signed-in email; "movai_saved_account"
+     holds {email, rememberToken} as a fallback. */
+  function sessionEmail(){
+    try {
+      var em = localStorage.getItem("movai-session");
+      if (em && em.trim()) return em.trim().toLowerCase();
+    } catch (e) {}
+    try {
+      var raw = localStorage.getItem("movai_saved_account");
+      if (raw) {
+        var obj = JSON.parse(raw);
+        if (obj && obj.email) return String(obj.email).trim().toLowerCase();
+      }
+    } catch (e) {}
+    return "";
+  }
+  var myEmail = sessionEmail();
+
+  /* ---- helpers ---- */
+  function fmtMoney(n){
+    n = Number(n) || 0;
+    return "$" + n.toFixed(2);
+  }
+  function fmtTime(sec){
+    if (!isFinite(sec) || sec <= 0) return "–:––";
+    sec = Math.floor(sec);
+    return Math.floor(sec / 60) + ":" + String(sec % 60).padStart(2, "0");
+  }
+  function fmtDate(iso){
+    var s = String(iso || "").slice(0, 10);
+    return s || "—";
+  }
+  function serverMsg(d, fallback){
+    if (!d) return fallback;
+    if (typeof d.error === "string" && d.error) return d.error;
+    if (d.message) {
+      if (typeof d.message === "string") return d.message;
+      if (typeof d.message.en === "string") return d.message.en;
+    }
+    return fallback;
+  }
+  function postJSON(url, body){
+    return fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body)
+    }).then(function(r){ return r.json(); });
+  }
+
+  /* ---- menu ---- */
+  function setMenu(open){
+    menuEl.classList.toggle("open", !!open);
+    dotsBtn.setAttribute("aria-expanded", open ? "true" : "false");
+    burgerBtn.setAttribute("aria-expanded", open ? "true" : "false");
+  }
+  function toggleMenu(){ setMenu(!menuEl.classList.contains("open")); }
+  dotsBtn.addEventListener("click", function(e){ e.stopPropagation(); toggleMenu(); });
+  burgerBtn.addEventListener("click", function(e){ e.stopPropagation(); toggleMenu(); });
+  document.addEventListener("click", function(e){
+    if (menuEl.classList.contains("open") && !menuEl.contains(e.target)) setMenu(false);
+  });
+  document.addEventListener("keydown", function(e){ if (e.key === "Escape") setMenu(false); });
+  menuEl.addEventListener("click", function(e){
+    if (e.target && e.target.tagName === "A") setMenu(false);
+  });
+  sellBtn.addEventListener("click", function(){ window.location.href = "movai-new-songs.html"; });
+
+  /* ---- KHQR: EMVCo payload with the exact amount (tag 54) + CRC16 ----
+     Same construction the main site uses: amount to 2 decimals, tag 54
+     inserted after the currency code, CRC16-CCITT (poly 0x1021). */
+  function khqrCrc16(s){
+    var crc = 65535;
+    for (var i = 0; i < s.length; i++) {
+      crc ^= s.charCodeAt(i) << 8;
+      for (var b = 0; b < 8; b++) {
+        crc = (crc & 32768) ? ((crc << 1) ^ 4129) & 65535 : (crc << 1) & 65535;
+      }
+    }
+    return crc;
+  }
+  function khqrPayloadFor(amount){
+    var amt = (Math.round(Number(amount) * 100) / 100).toFixed(2);
+    var p = KHQR_BASE_PAYLOAD.replace("010211", "010212");
+    var tag54 = "54" + ("0" + amt.length).slice(-2) + amt;
+    p = p.replace("5303840", "5303840" + tag54);
+    var crc = khqrCrc16(p + "6304");
+    return p + "6304" + ("0000" + crc.toString(16).toUpperCase()).slice(-4);
+  }
+  function qrSvgFor(text, cellSize){
+    try {
+      if (typeof qrcode !== "function") return "";
+      var qr = qrcode(0, "M");
+      qr.addData(text, "Byte");
+      qr.make();
+      return qr.createSvgTag({ cellSize: cellSize || 6, margin: 8 });
+    } catch (e) { return ""; }
+  }
+
+  /* ---- payment settings (live, from the server) ---- */
+  function loadSettings(){
+    fetch(SETTINGS_URL, { cache: "no-store" })
+      .then(function(r){ return r.json(); })
+      .then(function(d){
+        var pay = d && d.settings && d.settings.payment;
+        if (pay) {
+          if (typeof pay.khqrLink === "string" && pay.khqrLink.trim()) PAY.khqrLink = pay.khqrLink.trim();
+          if (typeof pay.binanceUsdtAddress === "string" && pay.binanceUsdtAddress.trim()) PAY.usdtAddress = pay.binanceUsdtAddress.trim();
+        }
+      })
+      .catch(function(){ /* keep the verified defaults above */ });
+  }
+
+  /* ---- tiers ---- */
+  function renderTiers(tiers){
+    tiersEl.innerHTML = "";
+    tiers.forEach(function(t){
+      var row = document.createElement("div");
+      row.className = "trow";
+      var left = document.createElement("b");
+      left.textContent = fmtMoney(t.price) + " — " + (t.songs || 0) + " songs";
+      var right = document.createElement("span");
+      var extra = "";
+      if (t.bonus) extra = "includes " + t.bonus + " bonus";
+      right.textContent = extra;
+      row.appendChild(left);
+      row.appendChild(right);
+      tiersEl.appendChild(row);
+    });
+    var note = document.createElement("div");
+    note.className = "trow";
+    var n1 = document.createElement("b");
+    n1.textContent = "Seller gets 95% — MovAi keeps 5%";
+    var n2 = document.createElement("span");
+    n2.textContent = "on every sale";
+    note.appendChild(n1);
+    note.appendChild(n2);
+    tiersEl.appendChild(note);
+  }
+  function loadTiers(){
+    fetch(TIERS_URL, { cache: "no-store" })
+      .then(function(r){ return r.json(); })
+      .then(function(d){
+        if (d && d.ok === true && Array.isArray(d.tiers) && d.tiers.length) renderTiers(d.tiers);
+        else renderTiers(FALLBACK_TIERS);
+      })
+      .catch(function(){ renderTiers(FALLBACK_TIERS); });
+  }
+
+  /* ---- marketplace listings ----
+     GET /api/public/sell/market returns sellers with their active listings.
+     The server never sends audio URLs for listed songs (title / style /
+     duration only), so there is no preview play button here — the songs
+     are shared with the buyer after the admin approves the purchase. */
+  function setStatus(text){ statusEl.textContent = text; }
+  function showError(){
+    statusEl.innerHTML = "";
+    var t = document.createElement("div");
+    t.textContent = "Could not load the marketplace — please try again.";
+    var b = document.createElement("button");
+    b.className = "retry"; b.type = "button"; b.textContent = "Retry";
+    b.addEventListener("click", loadMarket);
+    statusEl.appendChild(t);
+    statusEl.appendChild(b);
+  }
+  function renderMarket(sellers){
+    marketEl.innerHTML = "";
+    var total = 0;
+    sellers.forEach(function(s){ total += (s.listings || []).length; });
+    if (!total) { setStatus("No bundles for sale yet."); return; }
+    setStatus("");
+    sellers.forEach(function(seller){
+      var listings = Array.isArray(seller.listings) ? seller.listings : [];
+      if (!listings.length) return;
+      var head = document.createElement("div");
+      head.className = "seller";
+      head.textContent = seller.sellerName || seller.sellerEmail || "Seller";
+      marketEl.appendChild(head);
+      listings.forEach(function(l){
+        var isMine = !!(myEmail && seller.sellerEmail && myEmail === String(seller.sellerEmail).toLowerCase());
+        var btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "listing";
+        var top = document.createElement("span");
+        top.className = "listing-top";
+        var count = document.createElement("span");
+        count.className = "listing-count";
+        count.textContent = (l.songCount || (Array.isArray(l.songs) ? l.songs.length : 0)) + " songs";
+        var price = document.createElement("span");
+        price.className = "listing-price";
+        price.textContent = fmtMoney(l.price);
+        top.appendChild(count);
+        top.appendChild(price);
+        var sub = document.createElement("span");
+        sub.className = "listing-sub";
+        var bonusTxt = l.bonus ? " · " + l.bonus + " bonus" : "";
+        sub.textContent = "Tier $" + (l.tier || "") + bonusTxt + (isMine ? " · this is your listing" : "") + " — tap to see the songs";
+        btn.appendChild(top);
+        btn.appendChild(sub);
+        var songsWrap = document.createElement("div");
+        songsWrap.className = "songs";
+        songsWrap.hidden = true;
+        (Array.isArray(l.songs) ? l.songs : []).forEach(function(sg){
+          var srow = document.createElement("div");
+          srow.className = "song";
+          var stext = document.createElement("span");
+          stext.className = "song-text";
+          var stitle = document.createElement("span");
+          stitle.className = "song-title";
+          stitle.textContent = sg.title || "Untitled";
+          var sstyle = document.createElement("span");
+          sstyle.className = "song-style";
+          sstyle.textContent = sg.style || "Song";
+          stext.appendChild(stitle);
+          stext.appendChild(sstyle);
+          var dur = document.createElement("span");
+          dur.className = "song-dur";
+          dur.textContent = fmtTime(sg.duration);
+          srow.appendChild(stext);
+          srow.appendChild(dur);
+          songsWrap.appendChild(srow);
+        });
+        var note = document.createElement("div");
+        note.className = "song-note";
+        note.textContent = "No preview here — the songs are shared with you after purchase.";
+        songsWrap.appendChild(note);
+        var buyrow = document.createElement("div");
+        buyrow.className = "buyrow";
+        if (isMine) {
+          var own = document.createElement("div");
+          own.className = "own-note";
+          own.textContent = "This is your listing — you cannot buy your own songs.";
+          buyrow.appendChild(own);
+        } else {
+          var buyBtn = document.createElement("button");
+          buyBtn.type = "button";
+          buyBtn.className = "plain-btn";
+          buyBtn.textContent = "Buy for " + fmtMoney(l.price);
+          buyBtn.addEventListener("click", function(e){
+            e.stopPropagation();
+            startBuy({
+              id: l.id,
+              price: Number(l.price) || 0,
+              songCount: l.songCount || (Array.isArray(l.songs) ? l.songs.length : 0),
+              sellerName: seller.sellerName || seller.sellerEmail || "Seller"
+            });
+          });
+          buyrow.appendChild(buyBtn);
+        }
+        songsWrap.appendChild(buyrow);
+        btn.addEventListener("click", function(){
+          var open = songsWrap.hidden;
+          songsWrap.hidden = !open;
+          btn.classList.toggle("open", open);
+        });
+        marketEl.appendChild(btn);
+        marketEl.appendChild(songsWrap);
+      });
+    });
+  }
+  function loadMarket(){
+    setStatus("Loading marketplace…");
+    marketEl.innerHTML = "";
+    fetch(MARKET_URL, { cache: "no-store" })
+      .then(function(r){ return r.json(); })
+      .then(function(d){
+        if (!d || d.ok !== true || !Array.isArray(d.sellers)) { showError(); return; }
+        renderMarket(d.sellers);
+      })
+      .catch(function(){ showError(); });
+  }
+
+  /* ---- buy flow ---- */
+  function resetBuyPanel(){
+    curMethod = null;
+    receiptFileObj = null;
+    receiptFile.value = "";
+    receiptName.textContent = "";
+    buyMsg.textContent = "";
+    buyMsg.className = "buy-msg";
+    copyMsg.textContent = "";
+    mKhqr.classList.remove("picked");
+    mUsdt.classList.remove("picked");
+    payKhqr.hidden = true;
+    payUsdt.hidden = true;
+    receiptBox.hidden = true;
+    khqrQr.innerHTML = "";
+    usdtQr.innerHTML = "";
+    khqrPayloadWrap.hidden = true;
+  }
+  function startBuy(listing){
+    curListing = listing;
+    resetBuyPanel();
+    buyPanel.hidden = false;
+    document.getElementById("buyTitle").textContent = "Buy this bundle";
+    buySummary.textContent = listing.songCount + " songs from " + listing.sellerName + " — " + fmtMoney(listing.price) + ".";
+    if (!myEmail) {
+      buySignin.hidden = false;
+      buySteps.hidden = true;
+    } else {
+      buySignin.hidden = true;
+      buySteps.hidden = false;
+    }
+    buyPanel.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+  function showMethod(method){
+    if (!curListing) return;
+    curMethod = method;
+    mKhqr.classList.toggle("picked", method === "khqr");
+    mUsdt.classList.toggle("picked", method === "usdt");
+    payKhqr.hidden = method !== "khqr";
+    payUsdt.hidden = method !== "usdt";
+    receiptBox.hidden = false;
+    buyMsg.textContent = "";
+    if (method === "khqr") {
+      var amt = curListing.price;
+      khqrAmt.textContent = fmtMoney(amt);
+      var payload = khqrPayloadFor(amt);
+      var svg = qrSvgFor(payload, 6);
+      khqrQr.innerHTML = "";
+      if (svg) {
+        khqrQr.innerHTML = svg;
+        khqrPayloadWrap.hidden = true;
+      } else {
+        /* QR library did not load: the generated payment code is still
+           shown as text, and the KHQR payment link below stays usable. */
+        khqrPayload.textContent = payload;
+        khqrPayloadWrap.hidden = false;
+        var warn = document.createElement("p");
+        warn.className = "fine";
+        warn.textContent = "QR image could not be drawn — use the KHQR payment link below and pay " + fmtMoney(amt) + ".";
+        khqrQr.appendChild(warn);
+      }
+      khqrLink.href = PAY.khqrLink;
+      khqrLink.textContent = "Open KHQR payment link";
+    } else {
+      usdtAmt.textContent = fmtMoney(curListing.price);
+      usdtAddr.textContent = PAY.usdtAddress;
+      var usvg = qrSvgFor(PAY.usdtAddress, 6);
+      usdtQr.innerHTML = "";
+      if (usvg) usdtQr.innerHTML = usvg;
+      else {
+        var w2 = document.createElement("p");
+        w2.className = "fine";
+        w2.textContent = "QR image could not be drawn — copy the address above.";
+        usdtQr.appendChild(w2);
+      }
+    }
+  }
+  mKhqr.addEventListener("click", function(){ showMethod("khqr"); });
+  mUsdt.addEventListener("click", function(){ showMethod("usdt"); });
+
+  copyAddrBtn.addEventListener("click", function(){
+    var addr = PAY.usdtAddress;
+    function done(ok){
+      copyMsg.textContent = ok ? "Copied." : "Copy failed — long-press the address to copy it.";
+    }
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(addr).then(function(){ done(true); }, function(){ done(false); });
+    } else {
+      try {
+        var ta = document.createElement("textarea");
+        ta.value = addr;
+        document.body.appendChild(ta);
+        ta.select();
+        var ok = document.execCommand("copy");
+        document.body.removeChild(ta);
+        done(ok);
+      } catch (e) { done(false); }
+    }
+  });
+
+  receiptFile.addEventListener("change", function(){
+    var f = receiptFile.files && receiptFile.files[0];
+    receiptFileObj = null;
+    receiptName.textContent = "";
+    buyMsg.textContent = "";
+    if (!f) return;
+    var okType = /^(image\/jpeg|image\/png|image\/webp)$/.test(f.type) ||
+      /\.(jpe?g|png|webp)$/i.test(f.name || "");
+    if (!okType) {
+      receiptName.textContent = "Please choose a JPG, PNG or WebP image.";
+      receiptFile.value = "";
+      return;
+    }
+    if (f.size > MAX_RECEIPT_BYTES) {
+      receiptName.textContent = "That image is too big (max 5 MB).";
+      receiptFile.value = "";
+      return;
+    }
+    receiptFileObj = f;
+    receiptName.textContent = "Receipt: " + f.name;
+  });
+
+  submitBuy.addEventListener("click", function(){
+    if (!curListing || !myEmail) return;
+    if (!curMethod) {
+      buyMsg.textContent = "Please choose KHQR or QR USDT first.";
+      buyMsg.className = "buy-msg";
+      return;
+    }
+    if (!receiptFileObj) {
+      buyMsg.textContent = "Please upload your payment receipt first (JPG, PNG or WebP, max 5 MB).";
+      buyMsg.className = "buy-msg";
+      return;
+    }
+    submitBuy.disabled = true;
+    buyMsg.textContent = "Uploading receipt…";
+    buyMsg.className = "buy-msg";
+    var reader = new FileReader();
+    reader.onload = function(){
+      var dataUrl = String(reader.result || "");
+      var b64 = dataUrl.indexOf(",") >= 0 ? dataUrl.split(",")[1] : dataUrl;
+      postJSON(RECEIPT_URL, { email: myEmail, filename: receiptFileObj.name, data: b64 })
+        .then(function(rd){
+          if (!rd || rd.ok !== true || !rd.url) {
+            throw new Error(serverMsg(rd, "Receipt upload failed — please try again."));
+          }
+          buyMsg.textContent = "Receipt uploaded — sending your purchase request…";
+          return postJSON(BUY_URL, {
+            email: myEmail,
+            listingId: curListing.id,
+            method: "receipt",
+            receiptUrl: rd.url
+          });
+        })
+        .then(function(bd){
+          if (!bd || bd.ok !== true) {
+            throw new Error(serverMsg(bd, "Purchase request failed — please try again."));
+          }
+          buyMsg.textContent = "Waiting for admin approval — request " + (bd.requestId || "") + ". Your songs will appear in My Songs after approval.";
+          buyMsg.className = "buy-msg ok";
+          submitBuy.disabled = false;
+          loadMarket();
+        })
+        .catch(function(err){
+          buyMsg.textContent = (err && err.message) ? err.message : "Something went wrong — please try again.";
+          buyMsg.className = "buy-msg";
+          submitBuy.disabled = false;
+        });
+    };
+    reader.onerror = function(){
+      buyMsg.textContent = "Could not read that image — please try another file.";
+      buyMsg.className = "buy-msg";
+      submitBuy.disabled = false;
+    };
+    reader.readAsDataURL(receiptFileObj);
+  });
+
+  /* ---- my purchases (bought bundles + 3-month download deadline) ---- */
+  function loadMyPurchases(){
+    if (!myEmail) return;
+    fetch(MY_PURCHASES_URL + "?email=" + encodeURIComponent(myEmail), { cache: "no-store" })
+      .then(function(r){ return r.json(); })
+      .then(function(d){
+        if (!d || d.ok !== true || !Array.isArray(d.purchases) || !d.purchases.length) return;
+        mineWrap.hidden = false;
+        mineEl.innerHTML = "";
+        d.purchases.forEach(function(p){
+          var row = document.createElement("div");
+          row.className = "trow";
+          var left = document.createElement("b");
+          var n = p.songCount || (Array.isArray(p.songs) ? p.songs.length : 0);
+          left.textContent = fmtMoney(p.price) + " — " + n + " songs from " + (p.sellerName || "");
+          var right = document.createElement("span");
+          var exp = p.expiry || {};
+          if (exp.expired) right.textContent = "Expired " + fmtDate(exp.expiresAt);
+          else right.textContent = "Download by " + fmtDate(exp.expiresAt);
+          row.appendChild(left);
+          row.appendChild(right);
+          mineEl.appendChild(row);
+        });
+      })
+      .catch(function(){ /* purchases stay hidden on error */ });
+  }
+
+  loadSettings();
+  loadTiers();
+  loadMarket();
+  loadMyPurchases();
+})();
+</script>
+</body>
+</html>

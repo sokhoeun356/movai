@@ -1,0 +1,809 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#f2faf6">
+<title>MovAi — Create Song</title>
+<style>
+  /* MovAi new — KIE.AI clean look, one single pale background, no layers. */
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0;overflow-x:hidden}
+  html{
+    background:linear-gradient(180deg,#e8f5f0 0%,#f2faf6 45%,#ffffff 100%);
+    background-attachment:fixed;
+    -webkit-text-size-adjust:100%;
+  }
+  body{
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+    color:#1f2937;
+    background:linear-gradient(180deg,#e8f5f0 0%,#f2faf6 45%,#ffffff 100%);
+    background-attachment:fixed;
+    min-height:100vh;
+  }
+  a{color:#1f2937;text-decoration:none}
+  button{font:inherit;color:inherit;background:transparent;border:0;padding:0;cursor:pointer}
+  button:disabled{opacity:.45;cursor:default}
+  img{display:block;max-width:100%}
+
+  .wrap{max-width:720px;margin:0 auto}
+
+  /* ---- Header: two rows, directly on the background (transparent) ---- */
+  header{position:sticky;top:0;z-index:20;
+    background:linear-gradient(180deg,#e8f5f0 0%,#f2faf6 45%,#ffffff 100%);
+    background-attachment:fixed;}
+  .hdr-row{display:flex;align-items:center;justify-content:space-between;gap:10px;
+    padding-left:16px;padding-right:16px}
+  .hdr-top{padding-top:14px;padding-bottom:10px;border-bottom:1px solid #e5e7eb}
+  .hdr-sub{padding-top:11px;padding-bottom:11px;border-bottom:1px solid #e5e7eb}
+  .hdr-logo{display:flex;align-items:center;gap:8px;color:#1f2937;min-width:0}
+  .hdr-logo svg{flex:none}
+  .hdr-logo b{font-size:1.3rem;font-weight:800;letter-spacing:-.02em;color:#1f2937;line-height:1}
+  .hdr-right{display:flex;align-items:center;gap:4px}
+  .icon-btn{font-size:1.35rem;line-height:1;color:#1f2937;padding:4px 9px;border-radius:8px}
+  .icon-btn:active{background:#e5e7eb}
+  .hdr-sec{display:flex;align-items:center;gap:10px;min-width:0;flex:1}
+  .hdr-sec .icon-btn{padding:4px 8px}
+  .hdr-sec-name{font-size:1rem;font-weight:600;color:#1f2937;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .hdr-btn{flex:none;font-size:.9rem;font-weight:600;color:#1f2937;
+    border:1px solid #d1d5db;border-radius:8px;padding:6px 12px;background:transparent}
+  .hdr-btn:active{background:#e5e7eb}
+
+  /* ---- Dropdown menu (plain, no shadow, no card) ---- */
+  .menu{position:absolute;left:16px;right:16px;top:100%;z-index:30;
+    background:#f2faf6;border:1px solid #e5e7eb;border-radius:10px;
+    padding:4px 0;display:none}
+  .menu.open{display:block}
+  .menu a{display:block;padding:11px 14px;font-size:.95rem;color:#1f2937;border-bottom:1px solid #eef1f0}
+  .menu a:last-child{border-bottom:0}
+  .menu a:active{background:#e5e7eb}
+  .menu a[aria-current="page"]{font-weight:700}
+
+  /* ---- Create form: plain elements directly on the background ---- */
+  main{padding:20px 16px 96px}
+  .field{margin-bottom:22px}
+  .lbl{display:block;font-size:.92rem;font-weight:700;color:#1f2937;margin-bottom:7px}
+  .hint{font-size:.82rem;color:#6b7280;margin-top:6px}
+  .txt{width:100%;font:inherit;font-size:.95rem;color:#1f2937;
+    background:#ffffff;border:1px solid #d1d5db;border-radius:8px;
+    padding:10px 12px}
+  .txt:focus{outline:2px solid #1f2937;outline-offset:0;border-color:#1f2937}
+  textarea.txt{resize:vertical;min-height:150px;line-height:1.5}
+  .count{text-align:right;font-size:.82rem;color:#6b7280;margin-top:5px}
+  .rowline{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .chip{font-size:.9rem;color:#1f2937;border:1px solid #d1d5db;border-radius:999px;
+    padding:7px 13px;background:transparent}
+  .chip:active{background:#e5e7eb}
+  .chip[aria-pressed="true"]{background:#1f2937;color:#ffffff;border-color:#1f2937}
+  .seg{display:flex;gap:8px;flex-wrap:wrap}
+  .seg-btn{font-size:.92rem;font-weight:600;color:#1f2937;
+    border:1px solid #d1d5db;border-radius:8px;padding:8px 14px;background:transparent}
+  .seg-btn:active{background:#e5e7eb}
+  .seg-btn[aria-pressed="true"]{background:#1f2937;color:#ffffff;border-color:#1f2937}
+  .acct{font-size:.95rem;color:#1f2937}
+  .acct b{font-weight:700}
+  .linklike{font-size:.92rem;color:#1f2937;text-decoration:underline;padding:0}
+  .bal{font-size:.95rem;color:#1f2937}
+  .bal b{font-weight:700}
+  .gen-btn{display:block;width:100%;font-size:1rem;font-weight:700;color:#ffffff;
+    background:#1f2937;border-radius:10px;padding:13px 16px}
+  .gen-btn:active{opacity:.85}
+  .prog{font-size:.95rem;color:#1f2937;margin-top:14px}
+  .prog .secs{font-weight:700}
+  .err{font-size:.95rem;color:#991b1b;margin-top:14px}
+  .err .retry{margin-top:8px;color:#1f2937;text-decoration:underline;font-size:.95rem;display:inline-block}
+  .ok-note{font-size:.95rem;color:#1f2937;margin-top:14px}
+  .res-row{display:flex;align-items:center;gap:12px;width:100%;text-align:left;
+    padding:12px 0;background:transparent;border:0;border-bottom:1px solid #eef1f0}
+  .play-btn{flex:none;width:44px;height:44px;border:1px solid #d1d5db;border-radius:50%;
+    font-size:1rem;color:#1f2937;line-height:1}
+  .play-btn:active{background:#e5e7eb}
+  .res-text{flex:1;min-width:0}
+  .res-title{display:block;font-size:.95rem;font-weight:600;color:#1f2937;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .res-sub{display:block;font-size:.8rem;color:#6b7280;margin-top:3px}
+  .res-dur{flex:none;font-size:.85rem;color:#6b7280}
+  .res-dl{flex:none;font-size:.85rem;color:#1f2937;text-decoration:underline}
+  .sec-title{font-size:1rem;font-weight:700;color:#1f2937;margin:26px 0 4px}
+  .divider{border:0;border-top:1px solid #e5e7eb;margin:26px 0 0}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header id="hdr">
+    <div class="hdr-row hdr-top">
+      <a class="hdr-logo" href="movai-new.html">
+        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M9 18V5l10-2v11" stroke="#1f2937" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><circle cx="6.5" cy="18" r="2.5" fill="#1f2937"/><circle cx="16.5" cy="16" r="2.5" fill="#1f2937"/></svg>
+        <b>MovAi</b>
+      </a>
+      <span class="hdr-right">
+        <button class="icon-btn" id="dotsBtn" type="button" aria-label="Menu" aria-haspopup="true" aria-expanded="false">&#8942;</button>
+      </span>
+    </div>
+    <div class="hdr-row hdr-sub">
+      <span class="hdr-sec">
+        <button class="icon-btn" id="burgerBtn" type="button" aria-label="Menu" aria-haspopup="true" aria-expanded="false">&#9776;</button>
+        <span class="hdr-sec-name">Create Song</span>
+      </span>
+      <a class="hdr-btn" href="movai-new-songs.html">My Songs</a>
+    </div>
+    <nav class="menu" id="menu" aria-label="Menu">
+      <a href="movai-new.html">Home</a>
+      <a href="movai-new-create.html" aria-current="page">Create Song</a>
+      <a href="movai-new-market.html">Marketplace</a>
+      <a href="movai-new-songs.html">My Songs</a>
+      <a href="movai-new-profile.html">Profile</a>
+    </nav>
+  </header>
+
+  <main>
+    <!-- Account -->
+    <div class="field" id="loginBox">
+      <label class="lbl" for="loginEmail">Sign in</label>
+      <input class="txt" id="loginEmail" type="email" inputmode="email" autocomplete="username"
+        placeholder="Your Gmail" style="margin-bottom:8px">
+      <input class="txt" id="loginPass" type="password" autocomplete="current-password"
+        placeholder="Password">
+      <div class="rowline" style="margin-top:10px">
+        <button class="seg-btn" id="signinBtn" type="button">Sign In</button>
+      </div>
+      <div class="hint">Sign in with your MovAi Gmail and password.</div>
+      <div class="err" id="loginErr" hidden></div>
+    </div>
+    <div class="field" id="userBox" hidden>
+      <div class="acct">Signed in as <b id="acctName"></b> (<span id="acctEmail"></span>)</div>
+      <div style="margin-top:8px"><button class="linklike" id="signoutBtn" type="button">Sign out</button></div>
+    </div>
+
+    <hr class="divider">
+
+    <!-- Title -->
+    <div class="field" style="margin-top:22px">
+      <label class="lbl" for="songTitle">Song title</label>
+      <input class="txt" id="songTitle" type="text" maxlength="80" placeholder="Song title">
+    </div>
+
+    <!-- Lyrics -->
+    <div class="field">
+      <label class="lbl" for="lyrics">Lyrics</label>
+      <textarea class="txt" id="lyrics" maxlength="5000"
+        placeholder="Write your lyrics here&#8230;"></textarea>
+      <div class="count" id="lyrCount">0 / 5000</div>
+    </div>
+
+    <!-- Style presets -->
+    <div class="field">
+      <span class="lbl" id="styleLbl">Style</span>
+      <div class="rowline" id="presetRow" role="group" aria-labelledby="styleLbl"></div>
+      <input class="txt" id="styleText" type="text" style="margin-top:10px"
+        placeholder="Tap a style above, or type your own style" aria-label="Style text">
+    </div>
+
+    <!-- Model -->
+    <div class="field">
+      <span class="lbl" id="modelLbl">Model</span>
+      <div class="seg" id="modelRow" role="group" aria-labelledby="modelLbl">
+        <button class="seg-btn" type="button" data-model="v6" aria-pressed="true">V6 Ultra</button>
+        <button class="seg-btn" type="button" data-model="v6-wild" aria-pressed="false">V6 Pro</button>
+        <button class="seg-btn" type="button" data-model="v6-mini" aria-pressed="false">V6 Mini</button>
+        <button class="seg-btn" type="button" data-model="v5_5" aria-pressed="false">V5.5</button>
+      </div>
+    </div>
+
+    <!-- Voice -->
+    <div class="field">
+      <span class="lbl" id="voiceLbl">Voice</span>
+      <div class="seg" id="voiceRow" role="group" aria-labelledby="voiceLbl">
+        <button class="seg-btn" type="button" data-voice="male" aria-pressed="true">Male</button>
+        <button class="seg-btn" type="button" data-voice="female" aria-pressed="false">Female</button>
+      </div>
+    </div>
+
+    <!-- Balance + Generate -->
+    <div class="field">
+      <div class="bal" id="balLine">Song credits: &hellip;</div>
+      <div class="hint" style="margin-bottom:12px">One creation costs 12 credits and makes 2 songs.</div>
+      <button class="gen-btn" id="genBtn" type="button" disabled>Generate</button>
+      <div class="hint" id="genHint">Sign in to create a song.</div>
+      <div class="prog" id="prog" hidden></div>
+      <div class="err" id="genErr" hidden></div>
+    </div>
+
+    <!-- Results -->
+    <div id="resultBox" hidden>
+      <div class="sec-title" id="resultTitle">Your songs</div>
+      <div id="results"></div>
+      <div class="ok-note" id="resultNote" hidden></div>
+    </div>
+  </main>
+</div>
+<audio id="au" preload="none"></audio>
+
+<script>
+(function(){
+  "use strict";
+  var API = "https://movai-proxy-dphl.onrender.com";
+  var SONG_COST = 12; // song credits per creation (server: 12 flat, 2 songs)
+  var POLL_EVERY_MS = 5000;
+  var POLL_MAX_MS = 10 * 60 * 1000; // 10 minutes, same as the old site's wait
+  var SESSION_KEY = "movai-session"; // old site: plain email string
+  var USER_KEY = "movai-user"; // cached user object (name + balances)
+  var MODEL_KEY = "movai-song-model"; // old site key, shared with the old site
+
+  // Style presets — exact names + style text copied from the old site.
+  var PRESETS = {"🥹Sad.Trap💔": "Emotional Sad Melodic Trap, Deep Heartbreak Ballad, 72 BPM, minor key, haunting soft piano intro, emotional cinematic violin strings, atmospheric pads, deep warm 808 bass, slow trap drums, subtle hi-hats, emotional male vocal with slightly raspy and trembling voice, intimate verses, powerful heartbreaking chorus, vulnerable crying vocal delivery, beautiful melodic hooks, dramatic instrumental drop, piano-only emotional bridge, cinematic outro, melancholic atmosphere, deeply touching, tearjerking, professional studio production, modern emotional trap sound.", "😔 Sad Trap 💔": "Sad Emotional Melodic Hip Hop, Fast Male Rap Flow, Slow 72 BPM Instrumental, Deep Heartbroken Male Voice, Rapid Double-Time Rap Verses, Slow Melancholic Piano Melody, Soft Emotional Strings, Deep 808 Bass, Slow Hip Hop Drums, Atmospheric Pads, Clear English Pronunciation, Rhythmic Fast Rap Delivery, Emotional Melodic Singing Chorus, Lonely Night Mood, One-Sided Love, Painful Storytelling, Crying Vocal Texture, Cinematic Piano Bridge, Powerful Final Chorus, Professional Studio Quality.", "😭 Sad💔": "Male Khmer emotional sad ballad, heartbreaking vocal, deep sorrowful male voice, emotional melodic singing, crying vocal delivery, painful storytelling rap, melodic rap, slow tempo 68-74 BPM, minor key, cinematic piano, acoustic guitar, emotional strings, atmospheric pads, deep bass, soft trap drums, powerful emotional chorus, dramatic vocal climax, intimate verse, tearjerking outro, high quality studio production.", "💔Sad Drama😔": "Extremely Sad Khmer Emotional Ballad, Deep Mature Male Solo Vocal, Slow Tempo  sixty-two BPM, Heartbreaking Piano Intro, Emotional Acoustic Guitar, Sad Cinematic Violin, Deep Warm Male Voice, Emotional Storytelling, Painful and Melancholic Atmosphere, Soft Whispering Intro, Powerful Emotional Chorus, Dramatic Violin Instrumental Solo, Emotional Vocal Expression, Slow Piano Outro, Khmer Language Lyrics, 5-6 Minutes Song, No Female Vocal, No Duet.", "💔Pop Ballad ♥️": "Khmer Countryside Sad Song, Traditional Khmer Rural Ballad, Deep Emotional Male Solo Vocal, Heartbroken Love Story, Painful Family Conflict, Feeling Worthless and Broken, Extremely Sad Melancholic Mood, Slow Khmer Country Rhythm, Traditional Khmer Acoustic Guitar, Sad Tro Sau and Khmer Flute, Emotional Violin, Soft Traditional Khmer Instrumentation, Rural Village Atmosphere, Lonely Male Singing, Crying and Trembling Vocal, Deep Emotional Storytelling, Powerful Heartbreaking Chorus, Slow Tempo 60-65 BPM, Nostalgic Countryside Feeling, No Female Vocal, No Rap, Authentic Khmer Sad Music.", "♥️បទបែបស្រែ🥰": "Authentic Traditional Khmer Countryside Sad Ballad, Deep Emotional Male Solo Vocal, Extremely Heartbreaking Tearful Singing, Crying and Trembling Voice, Slow Tempo 58-62 BPM, Traditional Khmer Khloy Flute, Khmer Tro Sau, Tro Khmer, Chapey Dang Veng, Soft Acoustic Guitar, Traditional Khmer Wind Instruments, Emotional Violin, Gentle Piano, Rural Cambodian Village Atmosphere, Rice Fields at Sunset, Poor Man's Unrequited Love Story, Deep Sad Storytelling, Powerful Crying Chorus, Dramatic Final Chorus, Long Traditional Instrumental Solo, No Female Vocal, No Rap, No Electronic Dance Beat, Pure Khmer Rural Music.", "😔Trap Sad Hip-hop💔": "Slow Tempo 58-62 BPM, Trap, Sad, Hip-hop Reaper, male vocals", "😈Freestyle Rep BassTrap🫨": "Hip-hop, Freestyle, Rep, Bass, Trap", "🤙កន្ទ្រឹម💃": "Authentic Traditional Khmer Kantreum Folk Music, Joyful Cambodian Folk Dance Song, Ramvong Circle Dance Rhythm, Jrochak Traditional Dance Beat, Lam Lao Singing Style, Saravan Dance Rhythm, Deep Emotional Male Solo Vocal, Traditional Khmer Tro Sau, Tro Khmer, Khloy Flute, Chapey Dang Veng, Traditional Khmer Drums, Festive Village Celebration Atmosphere, Upbeat Danceable Tempo, Khmer Language Lyrics, No Female Vocal, No Rap, Pure Traditional Khmer Folk Music.", "😭Sad Emotional Rap💔": "Khmer Male Emotional Vocal, Deep Sad Trap, Emotional Hip Hop, Cinematic Piano, Dark Ambient Pads, Heavy 808 Bass, Powerful Drums, Melodic Rap, Raw Heartbroken Male Voice, Deep Expressive Vocal, Soft Intimate Verses, Explosive Screaming Chorus, Aggressive Emotional Belting, Crying Vocal Texture, Dynamic Vocal Build-up, Dramatic Strings, Atmospheric Sound Design, Powerful Final Chorus, Slow Emotional Intro, Modern Khmer Music Production, 75 BPM, High Quality Studio Production.", "💃កន្ទ្រឹម EDM🥲": "Khmer Traditional Kantrem Remix Dance, Modern Khmer Kantrem EDM, High Energy Dance Beat, Bouncy Rhythmic Drums, Catchy Synth Melody, Traditional Khmer Instrument Fusion, Deep Punchy Bass, Playful Melodic Vocal Runs, Male Khmer Vocal, Emotional Romantic Lyrics with a Happy Dance Feeling, Catchy Repeating Chorus, Melodic Call and Response, Energetic Instrumental Breaks, Creative Melody Variations, Festival Party Atmosphere, Professional Studio Production, 130 BPM, 4:30 to 5:00 minutes."};
+
+  var loginBox = document.getElementById("loginBox");
+  var userBox = document.getElementById("userBox");
+  var loginEmail = document.getElementById("loginEmail");
+  var loginPass = document.getElementById("loginPass");
+  var signinBtn = document.getElementById("signinBtn");
+  var loginErr = document.getElementById("loginErr");
+  var acctName = document.getElementById("acctName");
+  var acctEmail = document.getElementById("acctEmail");
+  var signoutBtn = document.getElementById("signoutBtn");
+  var songTitle = document.getElementById("songTitle");
+  var lyricsEl = document.getElementById("lyrics");
+  var lyrCount = document.getElementById("lyrCount");
+  var presetRow = document.getElementById("presetRow");
+  var styleText = document.getElementById("styleText");
+  var modelRow = document.getElementById("modelRow");
+  var voiceRow = document.getElementById("voiceRow");
+  var balLine = document.getElementById("balLine");
+  var genBtn = document.getElementById("genBtn");
+  var genHint = document.getElementById("genHint");
+  var progEl = document.getElementById("prog");
+  var genErr = document.getElementById("genErr");
+  var resultBox = document.getElementById("resultBox");
+  var resultTitle = document.getElementById("resultTitle");
+  var resultsEl = document.getElementById("results");
+  var resultNote = document.getElementById("resultNote");
+  var au = document.getElementById("au");
+
+  var user = null; // {email, name, songCredits, ...} from the server
+  var model = "v6";
+  var voice = "male";
+  var selectedPreset = "";
+  var busy = false;
+  var cancelGen = false;
+  var tickTimer = null;
+  var genStart = 0;
+  var curJobId = "";
+  var playingIdx = -1;
+  var resultSongs = [];
+
+  /* ---- menu (same as the home page) ---- */
+  var menuEl = document.getElementById("menu");
+  var dotsBtn = document.getElementById("dotsBtn");
+  var burgerBtn = document.getElementById("burgerBtn");
+  function setMenu(open){
+    menuEl.classList.toggle("open", !!open);
+    dotsBtn.setAttribute("aria-expanded", open ? "true" : "false");
+    burgerBtn.setAttribute("aria-expanded", open ? "true" : "false");
+  }
+  function toggleMenu(){ setMenu(!menuEl.classList.contains("open")); }
+  dotsBtn.addEventListener("click", function(e){ e.stopPropagation(); toggleMenu(); });
+  burgerBtn.addEventListener("click", function(e){ e.stopPropagation(); toggleMenu(); });
+  document.addEventListener("click", function(e){
+    if (menuEl.classList.contains("open") && !menuEl.contains(e.target)) setMenu(false);
+  });
+  document.addEventListener("keydown", function(e){ if (e.key === "Escape") setMenu(false); });
+  menuEl.addEventListener("click", function(e){
+    if (e.target && e.target.tagName === "A") setMenu(false);
+  });
+
+  /* ---- helpers ---- */
+  function sleep(ms){ return new Promise(function(res){ setTimeout(res, ms); }); }
+  function fmtTime(sec){
+    if (!isFinite(sec) || sec <= 0) return "–:––";
+    sec = Math.floor(sec);
+    return Math.floor(sec / 60) + ":" + String(sec % 60).padStart(2, "0");
+  }
+  function playUrl(u){
+    var s = String(u || "");
+    s = s.replace(/,fl_attachment/g, "").replace(/fl_attachment,/g, "");
+    s = s.replace(/\/fl_attachment\//g, "/");
+    s = s.replace(/([?&])fl_attachment=[^&]*&/g, "$1");
+    s = s.replace(/([?&])fl_attachment=[^&]*$/, "");
+    return s;
+  }
+  // Server error text may carry a provider prefix; provider names must
+  // never appear on screen, so strip them from anything shown.
+  function cleanErr(msg){
+    var s = String(msg || "").trim();
+    s = s.replace(/^\s*(Suno|MusicAPI|Magic Hour|NovAI|Groq|OpenRouter|ACE Music|Agnes|MVSEP)\s*:\s*/i, "");
+    s = s.replace(/\b(Suno|MusicAPI|Magic Hour|NovAI|Groq|OpenRouter|ACE Music|Agnes|MVSEP)\b/gi, "");
+    s = s.replace(/:\s*:/g, ":").replace(/\s{2,}/g, " ").trim();
+    return s || "Could not create the song. Please try again.";
+  }
+  function apiPost(path, body, timeoutMs){
+    var ctrl = null, timer = null;
+    var opts = { method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body || {}) };
+    if (window.AbortController) {
+      ctrl = new AbortController();
+      opts.signal = ctrl.signal;
+      var ms = timeoutMs || 60000;
+      if (ms > 0) timer = setTimeout(function(){ try { ctrl.abort(); } catch (e) {} }, ms);
+    }
+    return fetch(API + path, opts).then(function(r){
+      if (timer) clearTimeout(timer);
+      return r.json().catch(function(){ return null; });
+    }).catch(function(e){
+      if (timer) clearTimeout(timer);
+      throw e;
+    });
+  }
+  function loadStored(){
+    try { return JSON.parse(localStorage.getItem(USER_KEY) || "null"); } catch (e) { return null; }
+  }
+  function saveStored(u){
+    try {
+      if (u) localStorage.setItem(USER_KEY, JSON.stringify(u));
+      else localStorage.removeItem(USER_KEY);
+    } catch (e) {}
+  }
+  function sessionEmail(){
+    try { return (localStorage.getItem(SESSION_KEY) || "").trim(); } catch (e) { return ""; }
+  }
+  function setSession(email){
+    try {
+      if (email) localStorage.setItem(SESSION_KEY, email);
+      else localStorage.removeItem(SESSION_KEY);
+    } catch (e) {}
+  }
+
+  /* ---- account ---- */
+  function showBalance(){
+    if (!user) { balLine.textContent = "Song credits: —"; return; }
+    var c = Math.floor(Number(user.songCredits) || 0);
+    balLine.innerHTML = "";
+    var b = document.createElement("b");
+    b.textContent = "Song credits: " + c;
+    balLine.appendChild(b);
+  }
+  function renderAccount(){
+    var loggedIn = !!(user && user.email);
+    loginBox.hidden = loggedIn;
+    userBox.hidden = !loggedIn;
+    genBtn.disabled = !loggedIn || busy;
+    genHint.textContent = loggedIn ? "" : "Sign in to create a song.";
+    if (loggedIn) {
+      acctName.textContent = user.name || user.email;
+      acctEmail.textContent = user.email;
+    }
+    showBalance();
+  }
+  function refreshBalance(){
+    if (!user || !user.email) return Promise.resolve();
+    // POST /api/admin/sync {email} returns {ok:true, user:{...songCredits}}
+    // — the server balance is the only truth, so refresh it from there.
+    return apiPost("/api/admin/sync", { email: user.email }, 30000).then(function(j){
+      if (j && j.ok === true && j.user) {
+        user = j.user;
+        saveStored(user);
+        renderAccount();
+      } else if (j && j.ok === false && j.error) {
+        // Server refused this account (e.g. blocked): sign out locally.
+        signOutLocal();
+        showLoginErr(j.error);
+      }
+    }).catch(function(){ /* offline / server waking: keep the cached balance */ });
+  }
+  function showLoginErr(msg){
+    loginErr.textContent = cleanErr(msg);
+    loginErr.hidden = false;
+  }
+  function signOutLocal(){
+    user = null;
+    setSession("");
+    saveStored(null);
+    renderAccount();
+  }
+  signinBtn.addEventListener("click", function(){
+    var email = (loginEmail.value || "").trim().toLowerCase();
+    var pass = loginPass.value || "";
+    loginErr.hidden = true;
+    if (!email || !pass) { showLoginErr("Please enter your Gmail and password."); return; }
+    signinBtn.disabled = true;
+    signinBtn.textContent = "Signing in…";
+    // POST /api/auth/signin {email, password} -> {ok:true, user:{...}}
+    apiPost("/api/auth/signin", { email: email, password: pass }, 30000).then(function(j){
+      signinBtn.disabled = false;
+      signinBtn.textContent = "Sign In";
+      if (!j || j.ok !== true || !j.user) {
+        showLoginErr(j && j.error ? j.error : "Sign-in failed. Please try again.");
+        return;
+      }
+      user = j.user;
+      setSession(user.email); // same key the old site uses, shared by all new pages
+      saveStored(user);
+      loginPass.value = "";
+      renderAccount();
+      refreshBalance();
+    }).catch(function(){
+      signinBtn.disabled = false;
+      signinBtn.textContent = "Sign In";
+      showLoginErr("Could not reach the server. Please check your connection and try again.");
+    });
+  });
+  loginPass.addEventListener("keydown", function(e){
+    if (e.key === "Enter") signinBtn.click();
+  });
+  signoutBtn.addEventListener("click", function(){
+    signOutLocal();
+    resultBox.hidden = true;
+    resultsEl.innerHTML = "";
+    resultSongs = [];
+  });
+
+  /* ---- lyrics counter ---- */
+  function updateCount(){
+    lyrCount.textContent = String((lyricsEl.value || "").length) + " / 5000";
+  }
+  lyricsEl.addEventListener("input", updateCount);
+
+  /* ---- style presets (exact names from the old site) ---- */
+  Object.keys(PRESETS).forEach(function(name){
+    var b = document.createElement("button");
+    b.type = "button";
+    b.className = "chip";
+    b.textContent = name;
+    b.setAttribute("aria-pressed", "false");
+    b.addEventListener("click", function(){
+      selectedPreset = name;
+      styleText.value = PRESETS[name];
+      var chips = presetRow.querySelectorAll(".chip");
+      chips.forEach(function(c){ c.setAttribute("aria-pressed", c === b ? "true" : "false"); });
+    });
+    presetRow.appendChild(b);
+  });
+  styleText.addEventListener("input", function(){
+    if (selectedPreset && styleText.value !== PRESETS[selectedPreset]) {
+      selectedPreset = "";
+      var chips = presetRow.querySelectorAll(".chip");
+      chips.forEach(function(c){ c.setAttribute("aria-pressed", "false"); });
+    }
+  });
+
+  /* ---- model + voice ---- */
+  try {
+    var savedModel = localStorage.getItem(MODEL_KEY) || "";
+    if (savedModel === "v6" || savedModel === "v6-wild" ||
+        savedModel === "v6-mini" || savedModel === "v5_5") model = savedModel;
+  } catch (e) {}
+  function syncModelRow(){
+    var btns = modelRow.querySelectorAll(".seg-btn");
+    btns.forEach(function(b){
+      b.setAttribute("aria-pressed", b.getAttribute("data-model") === model ? "true" : "false");
+    });
+  }
+  modelRow.addEventListener("click", function(e){
+    var b = e.target && e.target.closest ? e.target.closest("[data-model]") : null;
+    if (!b) return;
+    model = b.getAttribute("data-model");
+    try { localStorage.setItem(MODEL_KEY, model); } catch (err) {}
+    syncModelRow();
+  });
+  syncModelRow();
+  voiceRow.addEventListener("click", function(e){
+    var b = e.target && e.target.closest ? e.target.closest("[data-voice]") : null;
+    if (!b) return;
+    voice = b.getAttribute("data-voice");
+    var btns = voiceRow.querySelectorAll(".seg-btn");
+    btns.forEach(function(x){
+      x.setAttribute("aria-pressed", x === b ? "true" : "false");
+    });
+  });
+
+  /* ---- results ---- */
+  function normSongs(j){
+    var arr = null;
+    if (j && Array.isArray(j.songs)) arr = j.songs;
+    else if (j && Array.isArray(j.data)) arr = j.data;
+    else if (j && j.data && Array.isArray(j.data.songs)) arr = j.data.songs;
+    if (!arr) return [];
+    return arr.map(function(x){
+      if (typeof x === "string") return { url: x, title: "" };
+      if (!x || typeof x !== "object") return { url: "", title: "" };
+      return {
+        url: x.url || x.audio_url || x.audioUrl || x.streamAudioUrl ||
+             x.stream_audio_url || x.permanentMp3Url || x.permanent_mp3_url || "",
+        title: x.title || ""
+      };
+    }).filter(function(x){ return !!x.url; });
+  }
+  function probeDuration(song, durEl){
+    try {
+      var a = new Audio();
+      a.preload = "metadata";
+      a.onloadedmetadata = function(){ durEl.textContent = fmtTime(a.duration); };
+      a.onerror = function(){};
+      a.src = playUrl(song.url);
+      setTimeout(function(){ try { a.src = ""; } catch (e) {} }, 20000);
+    } catch (e) {}
+  }
+  function renderResults(songs, isPreview){
+    resultSongs = songs;
+    resultsEl.innerHTML = "";
+    playingIdx = -1;
+    resultBox.hidden = false;
+    resultTitle.textContent = isPreview ? "Your songs (preview — still finishing…)" : "Your songs";
+    resultNote.hidden = true;
+    songs.forEach(function(song, i){
+      var row = document.createElement("div");
+      row.className = "res-row";
+      var pb = document.createElement("button");
+      pb.type = "button";
+      pb.className = "play-btn";
+      pb.textContent = "▶";
+      pb.setAttribute("aria-label", "Play song " + (i + 1));
+      pb.addEventListener("click", function(){ togglePlay(i, pb); });
+      var text = document.createElement("span");
+      text.className = "res-text";
+      var t = document.createElement("span");
+      t.className = "res-title";
+      t.textContent = song.title || ("Song " + (i + 1));
+      var sub = document.createElement("span");
+      sub.className = "res-sub";
+      sub.textContent = isPreview ? "Preview" : "Song " + (i + 1) + " of " + songs.length;
+      text.appendChild(t);
+      text.appendChild(sub);
+      var dur = document.createElement("span");
+      dur.className = "res-dur";
+      dur.textContent = "–:––";
+      var dl = document.createElement("a");
+      dl.className = "res-dl";
+      dl.href = playUrl(song.url);
+      dl.textContent = "Download";
+      dl.setAttribute("download", "");
+      row.appendChild(pb);
+      row.appendChild(text);
+      row.appendChild(dur);
+      row.appendChild(dl);
+      resultsEl.appendChild(row);
+      probeDuration(song, dur);
+    });
+  }
+  function togglePlay(i, btn){
+    var song = resultSongs[i];
+    if (!song) return;
+    var url = playUrl(song.url);
+    if (playingIdx === i && !au.paused) {
+      au.pause();
+      btn.textContent = "▶";
+      return;
+    }
+    if (playingIdx !== i) {
+      au.src = url;
+      playingIdx = i;
+      var btns = resultsEl.querySelectorAll(".play-btn");
+      btns.forEach(function(b){ b.textContent = "▶"; });
+    }
+    btn.textContent = "❚❚";
+    au.play().catch(function(){ btn.textContent = "▶"; });
+  }
+  au.addEventListener("ended", function(){
+    playingIdx = -1;
+    var btns = resultsEl.querySelectorAll(".play-btn");
+    btns.forEach(function(b){ b.textContent = "▶"; });
+  });
+  au.addEventListener("pause", function(){
+    var btns = resultsEl.querySelectorAll(".play-btn");
+    btns.forEach(function(b, i){ if (i === playingIdx) b.textContent = "▶"; });
+  });
+
+  /* ---- generation ---- */
+  function showGenErr(msg, showRetry){
+    genErr.innerHTML = "";
+    var t = document.createElement("div");
+    t.textContent = cleanErr(msg);
+    genErr.appendChild(t);
+    if (showRetry) {
+      var r = document.createElement("button");
+      r.type = "button";
+      r.className = "retry";
+      r.textContent = "Retry";
+      r.addEventListener("click", function(){ genErr.hidden = true; doGenerate(); });
+      genErr.appendChild(r);
+    }
+    genErr.hidden = false;
+  }
+  function setProg(sec, stage){
+    progEl.innerHTML = "";
+    var t = document.createElement("span");
+    t.textContent = "Generating… ";
+    var s = document.createElement("span");
+    s.className = "secs";
+    s.textContent = sec + "s";
+    var st = document.createElement("span");
+    st.textContent = stage ? " — Stage: " + stage : "";
+    progEl.appendChild(t);
+    progEl.appendChild(s);
+    progEl.appendChild(st);
+    progEl.hidden = false;
+  }
+  function stopTick(){
+    if (tickTimer) { clearInterval(tickTimer); tickTimer = null; }
+  }
+  function startTick(getStage){
+    stopTick();
+    genStart = Date.now();
+    tickTimer = setInterval(function(){
+      var sec = Math.floor((Date.now() - genStart) / 1000);
+      setProg(sec, getStage ? getStage() : "");
+    }, 1000);
+  }
+  function setBusy(b){
+    busy = b;
+    genBtn.disabled = b || !user;
+    genBtn.textContent = b ? "Generating…" : "Generate";
+  }
+  function doGenerate(){
+    if (busy) return;
+    if (!user || !user.email) {
+      showGenErr("Please sign in first.", false);
+      return;
+    }
+    var title = (songTitle.value || "").trim();
+    var lyrics = (lyricsEl.value || "").trim();
+    var style = (styleText.value || "").trim();
+    genErr.hidden = true;
+    if (!title) { showGenErr("Please enter a song title.", false); songTitle.focus(); return; }
+    if (!lyrics) { showGenErr("Please write your lyrics first.", false); lyricsEl.focus(); return; }
+    if (Math.floor(Number(user.songCredits) || 0) < SONG_COST) {
+      showGenErr("Not enough Song Credits — you need " + SONG_COST +
+        " credits for one creation. Please buy more credit first.", false);
+      return;
+    }
+    var styleFull = [style, voice === "male" ? "male vocals" : "female vocals"]
+      .filter(function(x){ return !!x; }).join(", ");
+    var body = {
+      provider: "suno",
+      email: user.email,
+      title: title,
+      name: title,
+      lyrics: lyrics,
+      prompt: lyrics,
+      style: styleFull,
+      tags: styleFull,
+      voice: voice,
+      model: model,
+      instrumental: false,
+      make_instrumental: false
+    };
+    var stage = "sending";
+    var stageOf = function(){ return stage; };
+    setBusy(true);
+    cancelGen = false;
+    curJobId = "";
+    resultBox.hidden = true;
+    resultsEl.innerHTML = "";
+    resultSongs = [];
+    setProg(0, stage);
+    startTick(stageOf);
+    // POST /api/gen/song -> {ok:true, jobId, songCredits} or {ok:false, error}
+    apiPost("/api/gen/song", body, 60000).then(function(j){
+      if (cancelGen) return;
+      if (!j || j.ok !== true) {
+        stopTick();
+        progEl.hidden = true;
+        setBusy(false);
+        showGenErr(j && j.error ? j.error : "Could not start the creation.", true);
+        return;
+      }
+      if (typeof j.songCredits === "number") {
+        user.songCredits = j.songCredits;
+        saveStored(user);
+        renderAccount();
+      }
+      var jobId = j.jobId || j.job_id || j.task_id || "";
+      if (!jobId) {
+        stopTick();
+        progEl.hidden = true;
+        setBusy(false);
+        var early = normSongs(j);
+        if (early.length) { renderResults(early.slice(0, 2), false); refreshBalance(); return; }
+        showGenErr("The server answered without a job to follow.", true);
+        return;
+      }
+      curJobId = jobId;
+      pollStatus(jobId, stageOf, function(s){ stage = s; });
+    }).catch(function(e){
+      if (cancelGen) return;
+      stopTick();
+      progEl.hidden = true;
+      setBusy(false);
+      showGenErr("Could not reach the server. Please check your connection and try again.", true);
+    });
+  }
+  function pollStatus(jobId, stageOf, setStage){
+    var t0 = Date.now();
+    var fails = 0;
+    var earlyKey = "";
+    function step(){
+      if (cancelGen) return;
+      if (Date.now() - t0 > POLL_MAX_MS) {
+        // Timed out: tell the server so it can refund the credits.
+        apiPost("/api/gen/song/timeout", { provider: "suno", jobId: jobId }, 30000)
+          .catch(function(){})
+          .then(function(r){
+            stopTick();
+            progEl.hidden = true;
+            setBusy(false);
+            var msg = "The creation took too long and was stopped.";
+            if (r && r.refunded) msg += " Your credits were refunded.";
+            showGenErr(msg, true);
+            refreshBalance();
+          });
+        return;
+      }
+      // POST /api/gen/song/status {provider, jobId} every 5s
+      apiPost("/api/gen/song/status", { provider: "suno", jobId: jobId }, 30000).then(function(j){
+        if (cancelGen) return;
+        fails = 0;
+        if (!j) { fails++; if (fails >= 4) { finishFail("The server stopped answering."); return; } sleep(POLL_EVERY_MS).then(step); return; }
+        if (j.ok === false) { finishFail(j.error || "Creation failed."); return; }
+        var st = String(j.status || j.state || "").toLowerCase();
+        var stageText = String(j.providerStatus || j.status || "working");
+        setStage(stageText);
+        setProg(Math.floor((Date.now() - genStart) / 1000), stageText);
+        if (st === "failed" || st === "error") { finishFail(j.error || "Creation failed."); return; }
+        var songs = normSongs(j);
+        if (songs.length) {
+          var key = songs.map(function(x){ return x.url; }).join("|");
+          if (key !== earlyKey) {
+            earlyKey = key;
+            renderResults(songs.slice(0, 2), st !== "done" && st !== "complete" &&
+              st !== "completed" && st !== "succeeded" && st !== "success" && st !== "finished");
+          }
+        }
+        if (st === "done" || st === "complete" || st === "completed" ||
+            st === "succeeded" || st === "success" || st === "finished" || j.done === true) {
+          stopTick();
+          progEl.hidden = true;
+          setBusy(false);
+          if (!songs.length) { showGenErr("The creation finished but returned no songs.", true); return; }
+          renderResults(songs.slice(0, 2), false);
+          resultNote.hidden = false;
+          resultNote.textContent = "Done — your 2 songs are ready. " +
+            "They were made with " + SONG_COST + " credits.";
+          refreshBalance();
+          return;
+        }
+        sleep(POLL_EVERY_MS).then(step);
+      }).catch(function(){
+        if (cancelGen) return;
+        fails++;
+        if (fails >= 4) { finishFail("Could not reach the server while waiting."); return; }
+        sleep(POLL_EVERY_MS).then(step);
+      });
+    }
+    function finishFail(msg){
+      stopTick();
+      progEl.hidden = true;
+      setBusy(false);
+      showGenErr(msg, true);
+      refreshBalance();
+    }
+    sleep(POLL_EVERY_MS).then(step);
+  }
+  genBtn.addEventListener("click", doGenerate);
+
+  /* ---- restore session on load ---- */
+  (function init(){
+    updateCount();
+    var em = sessionEmail();
+    var cached = loadStored();
+    if (em && cached && cached.email && String(cached.email).toLowerCase() === em.toLowerCase()) {
+      user = cached;
+    } else if (em) {
+      user = { email: em, name: "", songCredits: 0 };
+    }
+    renderAccount();
+    if (user && user.email) refreshBalance();
+  })();
+})();
+</script>
+</body>
+</html>

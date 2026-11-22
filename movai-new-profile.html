@@ -1,0 +1,508 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#f2faf6">
+<title>MovAi — Profile</title>
+<style>
+  /* MovAi new — KIE.AI clean look, one single pale background, no layers. */
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0;overflow-x:hidden}
+  html{
+    background:linear-gradient(180deg,#e8f5f0 0%,#f2faf6 45%,#ffffff 100%);
+    background-attachment:fixed;
+    -webkit-text-size-adjust:100%;
+  }
+  body{
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+    color:#1f2937;
+    background:linear-gradient(180deg,#e8f5f0 0%,#f2faf6 45%,#ffffff 100%);
+    background-attachment:fixed;
+    min-height:100vh;
+  }
+  a{color:#1f2937;text-decoration:none}
+  button{font:inherit;color:inherit;background:transparent;border:0;padding:0;cursor:pointer}
+  img{display:block;max-width:100%}
+
+  .wrap{max-width:720px;margin:0 auto}
+
+  /* ---- Header: two rows, directly on the background (transparent) ---- */
+  header{position:sticky;top:0;z-index:20;
+    background:linear-gradient(180deg,#e8f5f0 0%,#f2faf6 45%,#ffffff 100%);
+    background-attachment:fixed;}
+  .hdr-row{display:flex;align-items:center;justify-content:space-between;gap:10px;
+    padding-left:16px;padding-right:16px}
+  .hdr-top{padding-top:14px;padding-bottom:10px;border-bottom:1px solid #e5e7eb}
+  .hdr-sub{padding-top:11px;padding-bottom:11px;border-bottom:1px solid #e5e7eb}
+  .hdr-logo{display:flex;align-items:center;gap:8px;color:#1f2937;min-width:0}
+  .hdr-logo svg{flex:none}
+  .hdr-logo b{font-size:1.3rem;font-weight:800;letter-spacing:-.02em;color:#1f2937;line-height:1}
+  .hdr-right{display:flex;align-items:center;gap:4px}
+  .icon-btn{font-size:1.35rem;line-height:1;color:#1f2937;padding:4px 9px;border-radius:8px}
+  .icon-btn:active{background:#e5e7eb}
+  .hdr-sec{display:flex;align-items:center;gap:10px;min-width:0;flex:1}
+  .hdr-sec .icon-btn{padding:4px 8px}
+  .hdr-sec-name{font-size:1rem;font-weight:600;color:#1f2937;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .outline-btn{flex:none;font-size:.9rem;font-weight:600;color:#1f2937;
+    border:1px solid #d1d5db;border-radius:8px;padding:6px 12px;background:transparent}
+  .outline-btn:active{background:#e5e7eb}
+  .outline-btn[hidden]{display:none}
+
+  /* ---- Dropdown menu (plain, no shadow, no card) ---- */
+  .menu{position:absolute;left:16px;right:16px;top:100%;z-index:30;
+    background:#f2faf6;border:1px solid #e5e7eb;border-radius:10px;
+    padding:4px 0;display:none}
+  .menu.open{display:block}
+  .menu a{display:block;padding:11px 14px;font-size:.95rem;color:#1f2937;border-bottom:1px solid #eef1f0}
+  .menu a:last-child{border-bottom:0}
+  .menu a:active{background:#e5e7eb}
+
+  /* ---- Profile: plain rows directly on the background ---- */
+  main{padding-bottom:96px}
+  .sect{padding:8px 16px 0}
+  .sect-title{font-size:.85rem;font-weight:700;color:#6b7280;text-transform:uppercase;
+    letter-spacing:.04em;margin:18px 0 2px}
+  .sect-title:first-child{margin-top:14px}
+  .row{display:flex;align-items:baseline;justify-content:space-between;gap:12px;
+    padding:12px 0;border-bottom:1px solid #eef1f0}
+  .row-label{font-size:.95rem;color:#1f2937}
+  .row-value{font-size:.95rem;font-weight:600;color:#1f2937;text-align:right;
+    white-space:nowrap}
+  .row-sub{font-size:.8rem;color:#6b7280}
+  .who-name{font-size:1.15rem;font-weight:700;color:#1f2937}
+  .who-email{font-size:.9rem;color:#6b7280;margin-top:3px;word-break:break-all}
+
+  /* ---- Sign-in form: plain fields directly on the background ---- */
+  .field{width:100%;font:inherit;font-size:.95rem;color:#1f2937;
+    background:transparent;border:1px solid #d1d5db;border-radius:8px;
+    padding:11px 12px;margin:0}
+  .field:focus{outline:2px solid #0f766e;outline-offset:0}
+  .field-label{display:block;font-size:.9rem;font-weight:600;color:#1f2937;margin:14px 0 6px}
+  .primary-btn{width:100%;font-size:.95rem;font-weight:700;color:#1f2937;
+    border:1px solid #1f2937;border-radius:8px;padding:12px;margin-top:18px;background:transparent}
+  .primary-btn:active{background:#e5e7eb}
+  .primary-btn:disabled{opacity:.5}
+  .msg{font-size:.9rem;color:#b91c1c;margin-top:12px;min-height:1.2em}
+  .msg.ok{color:#0f766e}
+  .note{font-size:.85rem;color:#6b7280;margin-top:14px}
+  .link-btn{font-size:.95rem;font-weight:600;color:#1f2937;text-decoration:underline;
+    padding:0}
+  .status{padding:28px 16px;text-align:center;color:#6b7280;font-size:.95rem}
+  [hidden]{display:none !important}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header id="hdr">
+    <div class="hdr-row hdr-top">
+      <a class="hdr-logo" href="movai-new.html">
+        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M9 18V5l10-2v11" stroke="#1f2937" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><circle cx="6.5" cy="18" r="2.5" fill="#1f2937"/><circle cx="16.5" cy="16" r="2.5" fill="#1f2937"/></svg>
+        <b>MovAi</b>
+      </a>
+      <span class="hdr-right">
+        <button class="icon-btn" id="dotsBtn" type="button" aria-label="Menu" aria-haspopup="true" aria-expanded="false">&#8942;</button>
+      </span>
+    </div>
+    <div class="hdr-row hdr-sub">
+      <span class="hdr-sec">
+        <button class="icon-btn" id="burgerBtn" type="button" aria-label="Menu" aria-haspopup="true" aria-expanded="false">&#9776;</button>
+        <span class="hdr-sec-name">Profile</span>
+      </span>
+      <button class="outline-btn" id="signOutBtn" type="button" hidden>Sign out</button>
+    </div>
+    <nav class="menu" id="menu" aria-label="Menu">
+      <a href="movai-new.html">Home</a>
+      <a href="movai-new-create.html">Create Song</a>
+      <a href="movai-new-market.html">Marketplace</a>
+      <a href="movai-new-songs.html">My Songs</a>
+      <a href="movai-new-profile.html">Profile</a>
+    </nav>
+  </header>
+
+  <main>
+    <div class="status" id="status" hidden>Loading profile&hellip;</div>
+
+    <!-- Not logged in -->
+    <div class="sect" id="loginView" hidden>
+      <div class="sect-title">Sign in</div>
+      <label class="field-label" for="emailInput">Gmail</label>
+      <input class="field" id="emailInput" type="email" inputmode="email" autocomplete="email"
+        placeholder="you@gmail.com">
+      <label class="field-label" for="passwordInput">Password</label>
+      <input class="field" id="passwordInput" type="password" autocomplete="current-password"
+        placeholder="Your MovAi password">
+      <button class="primary-btn" id="signInBtn" type="button">Sign In</button>
+      <p class="msg" id="loginMsg" role="alert"></p>
+      <p class="note">Sign in with the Gmail and password of your MovAi account.</p>
+    </div>
+
+    <!-- Logged in -->
+    <div class="sect" id="profileView" hidden>
+      <div class="who-name" id="whoName">&mdash;</div>
+      <div class="who-email" id="whoEmail">&mdash;</div>
+
+      <div class="sect-title">Credits</div>
+      <div class="row"><span class="row-label">Song credits</span><span class="row-value" id="songCredits">&mdash;</span></div>
+      <div class="row"><span class="row-label">Media credits</span><span class="row-value" id="mediaCredits">&mdash;</span></div>
+
+      <div class="sect-title">Wallet</div>
+      <div class="row"><span class="row-label">Wallet Balance</span><span class="row-value" id="walletBalance">&mdash;</span></div>
+      <div class="row"><span class="row-label">Earn Money</span><span class="row-value" id="earnBalance">&mdash;</span></div>
+
+      <div class="sect-title">Community</div>
+      <div class="row"><span class="row-label">Followers</span><span class="row-value" id="followers">&mdash;</span></div>
+
+      <!-- Owner-only Suno balance section is built here by script, only for admin emails. -->
+      <div id="adminSection"></div>
+
+      <div class="sect-title">Account</div>
+      <div class="row"><span class="row-label">User ID</span><span class="row-value" id="userId">&mdash;</span></div>
+      <div class="row"><span class="row-label">&nbsp;</span><button class="link-btn" id="signOutLink" type="button">Sign out</button></div>
+      <p class="msg" id="profileMsg" role="status"></p>
+    </div>
+  </main>
+</div>
+
+<script>
+(function(){
+  "use strict";
+  var API = "https://movai-proxy-dphl.onrender.com";
+  var SESSION_KEY = "movai-session";       // same key as the old site: stores the email string
+  var USERS_KEY = "movai-users";           // same key as the old site: per-email user cache
+  var SAVED_KEY = "movai_saved_account";   // same key as the old site: {email, rememberToken, ...}
+  var ADMIN_EMAILS = ["sokhoeun7788@gmail.com", "yemsokhoeun98@gmail.com", "sokhoeun356@gmail.com"];
+  var BILLING_URL = "https://sunoapi.org/billing";
+
+  var statusEl = document.getElementById("status");
+  var loginView = document.getElementById("loginView");
+  var profileView = document.getElementById("profileView");
+  var emailInput = document.getElementById("emailInput");
+  var passwordInput = document.getElementById("passwordInput");
+  var signInBtn = document.getElementById("signInBtn");
+  var loginMsg = document.getElementById("loginMsg");
+  var profileMsg = document.getElementById("profileMsg");
+  var signOutBtn = document.getElementById("signOutBtn");
+  var signOutLink = document.getElementById("signOutLink");
+  var menuEl = document.getElementById("menu");
+  var dotsBtn = document.getElementById("dotsBtn");
+  var burgerBtn = document.getElementById("burgerBtn");
+
+  var currentEmail = "";
+  var currentUser = null;
+
+  /* ---- menu ---- */
+  function setMenu(open){
+    menuEl.classList.toggle("open", !!open);
+    dotsBtn.setAttribute("aria-expanded", open ? "true" : "false");
+    burgerBtn.setAttribute("aria-expanded", open ? "true" : "false");
+  }
+  function toggleMenu(){ setMenu(!menuEl.classList.contains("open")); }
+  dotsBtn.addEventListener("click", function(e){ e.stopPropagation(); toggleMenu(); });
+  burgerBtn.addEventListener("click", function(e){ e.stopPropagation(); toggleMenu(); });
+  document.addEventListener("click", function(e){
+    if (menuEl.classList.contains("open") && !menuEl.contains(e.target)) setMenu(false);
+  });
+  document.addEventListener("keydown", function(e){ if (e.key === "Escape") setMenu(false); });
+  menuEl.addEventListener("click", function(e){
+    if (e.target && e.target.tagName === "A") setMenu(false);
+  });
+
+  /* ---- storage helpers (same keys as the old site) ---- */
+  function storeGet(key){
+    try { return localStorage.getItem(key); } catch (e) { return null; }
+  }
+  function storeSet(key, value){
+    try { localStorage.setItem(key, value); } catch (e) {}
+  }
+  function storeRemove(key){
+    try { localStorage.removeItem(key); } catch (e) {}
+  }
+  function cacheUser(user){
+    if (!user || !user.email) return;
+    try {
+      var all = {};
+      try { all = JSON.parse(localStorage.getItem(USERS_KEY) || "{}") || {}; } catch (e) { all = {}; }
+      all[String(user.email).toLowerCase()] = user;
+      localStorage.setItem(USERS_KEY, JSON.stringify(all));
+    } catch (e) {}
+  }
+  function cachedUser(email){
+    try {
+      var all = JSON.parse(localStorage.getItem(USERS_KEY) || "{}") || {};
+      return all[String(email || "").toLowerCase()] || null;
+    } catch (e) { return null; }
+  }
+  function savedAccount(){
+    try {
+      var raw = storeGet(SAVED_KEY);
+      if (!raw) return null;
+      var o = JSON.parse(raw);
+      if (o && o.email && o.rememberToken) return o;
+    } catch (e) {}
+    return null;
+  }
+
+  /* ---- api ---- */
+  function apiJson(path, method, body){
+    var opts = { method: method || "GET", headers: { "Content-Type": "application/json" }, cache: "no-store" };
+    if (body !== undefined) opts.body = JSON.stringify(body);
+    return fetch(API + path, opts).then(function(r){ return r.json(); });
+  }
+  function fmtMoney(n){
+    var v = Number(n);
+    if (!isFinite(v)) return "\u2014";
+    return "$" + v.toFixed(2);
+  }
+  function fmtInt(n){
+    var v = Number(n);
+    if (!isFinite(v)) return "\u2014";
+    return String(Math.floor(v));
+  }
+
+  /* ---- views ---- */
+  function showLogin(){
+    statusEl.hidden = true;
+    profileView.hidden = true;
+    loginView.hidden = false;
+    signOutBtn.hidden = true;
+  }
+  function showProfile(){
+    statusEl.hidden = true;
+    loginView.hidden = true;
+    profileView.hidden = false;
+    signOutBtn.hidden = false;
+  }
+  function showLoading(){
+    loginView.hidden = true;
+    profileView.hidden = true;
+    signOutBtn.hidden = true;
+    statusEl.hidden = false;
+    statusEl.textContent = "Loading profile\u2026";
+  }
+
+  /* ---- render ---- */
+  function renderUser(user){
+    currentUser = user || null;
+    currentEmail = user && user.email ? String(user.email).toLowerCase() : "";
+    var name = (user && (user.name || "").trim()) ||
+      [user && user.firstName || "", user && user.lastName || ""].join(" ").trim() ||
+      currentEmail;
+    document.getElementById("whoName").textContent = name || "\u2014";
+    document.getElementById("whoEmail").textContent = currentEmail || "\u2014";
+    // pubUser shape: songCredits = song credits, credits = media credits,
+    // balance = Wallet Balance ($), earnBalance = Earn Money ($).
+    document.getElementById("songCredits").textContent = fmtInt(user ? user.songCredits : null);
+    document.getElementById("mediaCredits").textContent = fmtInt(user ? user.credits : null);
+    document.getElementById("walletBalance").textContent = fmtMoney(user ? user.balance : null);
+    document.getElementById("earnBalance").textContent = fmtMoney(user ? user.earnBalance : null);
+    document.getElementById("userId").textContent = (user && user.id) ? String(user.id) : "\u2014";
+    document.getElementById("followers").textContent = "\u2014";
+  }
+
+  // Owner-only section: built ONLY when the logged-in email is an admin
+  // email. For everyone else this element is never created at all.
+  function renderAdminSection(email){
+    var host = document.getElementById("adminSection");
+    host.innerHTML = "";
+    if (!email || ADMIN_EMAILS.indexOf(String(email).toLowerCase()) < 0) return;
+    var title = document.createElement("div");
+    title.className = "sect-title";
+    title.textContent = "Suno balance";
+    host.appendChild(title);
+    var row = document.createElement("div");
+    row.className = "row";
+    var label = document.createElement("span");
+    label.className = "row-label";
+    label.textContent = "Suno balance";
+    var value = document.createElement("span");
+    value.className = "row-value";
+    value.id = "sunoBalance";
+    value.textContent = "Loading\u2026";
+    row.appendChild(label);
+    row.appendChild(value);
+    host.appendChild(row);
+    var linkRow = document.createElement("div");
+    linkRow.className = "row";
+    var linkLabel = document.createElement("span");
+    linkLabel.className = "row-label";
+    linkLabel.textContent = "Buy more credit";
+    var link = document.createElement("a");
+    link.className = "link-btn";
+    link.href = BILLING_URL;
+    link.target = "_blank";
+    link.rel = "noopener";
+    link.textContent = "Buy Credit";
+    linkRow.appendChild(linkLabel);
+    linkRow.appendChild(link);
+    host.appendChild(linkRow);
+    apiJson("/api/public/suno-balance?email=" + encodeURIComponent(email), "GET")
+      .then(function(d){
+        var el = document.getElementById("sunoBalance");
+        if (!el) return;
+        if (d && d.ok === true && isFinite(Number(d.totalRemaining))) {
+          el.textContent = fmtInt(d.totalRemaining);
+        } else {
+          el.textContent = "\u2014";
+        }
+      })
+      .catch(function(){
+        var el = document.getElementById("sunoBalance");
+        if (el) el.textContent = "\u2014";
+      });
+  }
+
+  function loadFollowers(email){
+    if (!email) return;
+    apiJson("/api/public/followers?email=" + encodeURIComponent(email), "GET")
+      .then(function(d){
+        if (d && d.ok === true && isFinite(Number(d.count))) {
+          document.getElementById("followers").textContent = fmtInt(d.count);
+        }
+      })
+      .catch(function(){ /* stays "—" */ });
+  }
+
+  // Refresh the profile from the server (server credits are the truth).
+  // POST /api/admin/sync {email} -> {ok:true, user}
+  function refreshProfile(email){
+    return apiJson("/api/admin/sync", "POST", { email: email })
+      .then(function(d){
+        if (d && d.ok === true && d.user) {
+          cacheUser(d.user);
+          renderUser(d.user);
+          renderAdminSection(d.user.email || email);
+          loadFollowers(d.user.email || email);
+          return d.user;
+        }
+        return null;
+      });
+  }
+
+  function afterLogin(user, email){
+    storeSet(SESSION_KEY, String(email).toLowerCase());
+    cacheUser(user);
+    profileMsg.textContent = "";
+    renderUser(user);
+    showProfile();
+    renderAdminSection(user.email || email);
+    loadFollowers(user.email || email);
+    // Refresh from the server so the numbers are the server truth.
+    refreshProfile(user.email || email).catch(function(){});
+  }
+
+  /* ---- sign in ---- */
+  // POST /api/auth/signin {email, password} -> {ok:true, user}
+  // or {ok:false, error, noAccount?} — the server's exact error is shown.
+  function doSignIn(){
+    var email = String(emailInput.value || "").trim().toLowerCase();
+    var password = String(passwordInput.value || "");
+    if (!email || email.indexOf("@") < 0) {
+      loginMsg.textContent = "Please enter a valid Gmail address.";
+      return;
+    }
+    if (!password) {
+      loginMsg.textContent = "Please enter your password.";
+      return;
+    }
+    loginMsg.textContent = "";
+    signInBtn.disabled = true;
+    signInBtn.textContent = "Signing in\u2026";
+    apiJson("/api/auth/signin", "POST", { email: email, password: password })
+      .then(function(d){
+        signInBtn.disabled = false;
+        signInBtn.textContent = "Sign In";
+        if (!d) { loginMsg.textContent = "Could not reach the server — please try again."; return; }
+        if (d.ok !== true || !d.user) {
+          loginMsg.textContent = d.error ? String(d.error) : "Wrong Gmail or password.";
+          return;
+        }
+        passwordInput.value = "";
+        afterLogin(d.user, email);
+      })
+      .catch(function(){
+        signInBtn.disabled = false;
+        signInBtn.textContent = "Sign In";
+        loginMsg.textContent = "Could not reach the server — please try again.";
+      });
+  }
+  signInBtn.addEventListener("click", doSignIn);
+  passwordInput.addEventListener("keydown", function(e){ if (e.key === "Enter") doSignIn(); });
+  emailInput.addEventListener("keydown", function(e){ if (e.key === "Enter") passwordInput.focus(); });
+
+  /* ---- sign out ---- */
+  function doSignOut(){
+    var email = currentEmail;
+    var sv = savedAccount();
+    // Revoke the saved login for this account, if one was saved on this device.
+    if (sv && sv.email && String(sv.email).toLowerCase() === email) {
+      apiJson("/api/auth/forget", "POST", { email: sv.email, rememberToken: sv.rememberToken }).catch(function(){});
+      storeRemove(SAVED_KEY);
+    }
+    storeRemove(SESSION_KEY);
+    currentEmail = "";
+    currentUser = null;
+    document.getElementById("adminSection").innerHTML = "";
+    profileMsg.textContent = "";
+    loginMsg.textContent = "";
+    passwordInput.value = "";
+    showLogin();
+  }
+  signOutBtn.addEventListener("click", doSignOut);
+  signOutLink.addEventListener("click", doSignOut);
+
+  /* ---- boot ---- */
+  function boot(){
+    var sess = "";
+    try { sess = (storeGet(SESSION_KEY) || "").trim().toLowerCase(); } catch (e) { sess = ""; }
+    if (sess) {
+      showLoading();
+      var cached = cachedUser(sess);
+      refreshProfile(sess)
+        .then(function(user){
+          if (user) { showProfile(); return; }
+          // Server refresh failed: fall back to the cached record, if any.
+          if (cached) {
+            renderUser(cached);
+            showProfile();
+            renderAdminSection(cached.email || sess);
+            loadFollowers(cached.email || sess);
+            profileMsg.textContent = "Showing saved details — could not reach the server.";
+          } else {
+            storeRemove(SESSION_KEY);
+            showLogin();
+          }
+        })
+        .catch(function(){
+          if (cached) {
+            renderUser(cached);
+            showProfile();
+            renderAdminSection(cached.email || sess);
+            loadFollowers(cached.email || sess);
+            profileMsg.textContent = "Showing saved details — could not reach the server.";
+          } else {
+            showLogin();
+          }
+        });
+      return;
+    }
+    // No session: try the saved login from the old site, if one exists.
+    var sv = savedAccount();
+    if (sv) {
+      showLoading();
+      apiJson("/api/auth/remember-login", "POST", { email: sv.email, rememberToken: sv.rememberToken })
+        .then(function(d){
+          if (d && d.ok === true && d.user) { afterLogin(d.user, sv.email); return; }
+          storeRemove(SAVED_KEY);
+          showLogin();
+        })
+        .catch(function(){ showLogin(); });
+      return;
+    }
+    showLogin();
+  }
+  boot();
+})();
+</script>
+</body>
+</html>
