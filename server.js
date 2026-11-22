@@ -1853,7 +1853,12 @@ function verifyTokenCheck(token) {
 // A subscription: {email, endpoint, keys:{p256dh, auth}, role, createdAt,
 // updatedAt}. role 'admin' marks an admin device (the Admin app subscribes
 // with {email:<admin gmail>, role:'admin'}).
-const ADMIN_EMAILS = ['sokhoeun7788@gmail.com', 'yemsokhoeun98@gmail.com', 'sokhoeun356@gmail.com'];
+// Admin Gmails (per deployment via env MOVAI_ADMIN_EMAILS, comma-separated;
+// default = the old setup's three admin Gmails). The NEW deployment sets
+// MOVAI_ADMIN_EMAILS=hoeunsok138@gmail.com on Render — never hard-code a
+// second deployment's Gmails here, or the next single-file push clobbers
+// them (this happened 2026-11-22 with the lockout-toggle push).
+const ADMIN_EMAILS = (process.env.MOVAI_ADMIN_EMAILS || 'sokhoeun7788@gmail.com,yemsokhoeun98@gmail.com,sokhoeun356@gmail.com').split(',').map(function (s) { return String(s || '').trim().toLowerCase(); }).filter(Boolean);
 // ---- Admin-key Google session (Admin website Google sign-in) ----
 // After Google sign-in the Admin app proves its Gmail with a Google ID
 // token; the server verifies it and issues a short-lived (15 min)
@@ -1861,7 +1866,11 @@ const ADMIN_EMAILS = ['sokhoeun7788@gmail.com', 'yemsokhoeun98@gmail.com', 'sokh
 // only (a restart simply asks the admin to sign in again). It is used
 // ONLY to reveal / reset the Admin Key — it never replaces the Admin
 // Key itself, and key-entry attempts keep the graduated lockout.
-const MOVAI_GOOGLE_CLIENT_ID = '809358546010-dspkik0o4ahg7km15dspro5cj3qjk384.apps.googleusercontent.com';
+// Google OAuth client for Admin Google sign-in (per deployment via env
+// MOVAI_GOOGLE_CLIENT_ID; default = the old GCP project). The NEW
+// deployment sets MOVAI_GOOGLE_CLIENT_ID to its own client
+// (280046437602-16mnff5qtpeb2jk4r5cass8rmaaj2vof...) on Render.
+const MOVAI_GOOGLE_CLIENT_ID = process.env.MOVAI_GOOGLE_CLIENT_ID || '809358546010-dspkik0o4ahg7km15dspro5cj3qjk384.apps.googleusercontent.com';
 const ADMIN_KEY_SESSION_MS = 15 * 60 * 1000;
 const _adminKeySessions = new Map(); // token -> {email, name, picture, expiresAt}
 const _adminKeyRate = new Map(); // email + ':' + action -> {count, windowStart}
@@ -9378,6 +9387,21 @@ async function apiRoute(req, res, urlPath) {
       return sendJSON(res, 200, { ok: true });
     }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
     return;
+  }
+  // POST /api/admin/lockout/reset-all — requires header Authorization:
+  // Bearer <session> (Google sign-in as an admin Gmail, 15-min session
+  // from /api/admin/key/verify-google). Wipes EVERY IP's Admin lockout
+  // record (strikes, levels, countdowns) so the owner can always get
+  // back in, even when the key login is blocked. It does NOT change the
+  // protection ON/OFF setting and does NOT reveal or change the Admin
+  // Key. Max 5 unblocks per Gmail per hour.
+  if (req.method === 'POST' && urlPath === '/api/admin/lockout/reset-all') {
+    const s = adminKeySessionFromReq(req);
+    if (!s) return sendJSON(res, 200, { ok: false, error: 'Session ផុតកំណត់ហើយ សូមចូល Google ម្តងទៀត · Session expired, please sign in with Google again' });
+    if (!adminKeyRateOk(s.email, 'unblock-all')) return sendJSON(res, 200, { ok: false, error: 'ដោះប្លុកច្រើនដងពេកហើយ សាកល្បងម្តងទៀត 1 ម៉ោងក្រោយ · Too many unblocks, try again in 1 hour' });
+    await clearAllAdminLockouts();
+    try { await addNotification('security', s.email, '🔓 Admin ប្លុកត្រូវបានដោះ · Admin lockouts cleared', 'ប្លុក Admin ទាំងអស់ត្រូវបានដោះដោយ ' + s.email + ' (តាមរយៈ Google sign-in)'); } catch (e) {}
+    return sendJSON(res, 200, { ok: true });
   }
   // Test one provider key with a lightweight authenticated call.
   // status: 'ok' = works (green), 'blocked' = 401/403 invalid or blocked
