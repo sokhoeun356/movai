@@ -524,6 +524,15 @@ async function clearAdminLockout(ip) {
     if (all[ip]) { delete all[ip]; await saveAdminLockouts(all); scheduleBackup('admin-lockouts.json'); }
   } catch (e) {}
 }
+// Owner order 2026-11-22: switching protection OFF resets EVERYTHING to
+// zero — every IP's lockout record, strikes, level and countdown are wiped,
+// so no old countdown survives. Switching back ON starts completely fresh.
+async function clearAllAdminLockouts() {
+  try {
+    await saveAdminLockouts({});
+    scheduleBackup('admin-lockouts.json');
+  } catch (e) {}
+}
 async function recordFailedAdminAttempt(req, ip) {
   try {
     if (!ip) return 0;
@@ -8522,7 +8531,10 @@ async function apiRoute(req, res, urlPath) {
   }
   // GET /api/admin/lockout — admin key required. Reads the Admin Lockout
   // protection toggle (default ON). POST /api/admin/lockout {enabled}
-  // sets it. The Admin app has a toggle button for it.
+  // sets it. The Admin app has a toggle button for it. Owner order
+  // 2026-11-22: setting it OFF resets ALL blocks to zero (every IP's
+  // lockout record, strikes and countdown are wiped); turning it back ON
+  // starts fresh — no old countdown survives.
   if (req.method === 'GET' && urlPath === '/api/admin/lockout') {
     const a = await adminKeyOk(req);
     if (!a.ok) return sendJSON(res, 200, { ok: false, error: a.error });
@@ -8534,6 +8546,7 @@ async function apiRoute(req, res, urlPath) {
     readJSONBody(req, 64 * 1024).then(async (body) => {
       if (!body || typeof body.enabled !== 'boolean') return sendJSON(res, 200, { ok: false, error: 'សូមដាក់ enabled: true/false' });
       const out = await saveSettings(Object.assign(await loadSettings(), { lockoutEnabled: body.enabled }));
+      if (body.enabled === false) await clearAllAdminLockouts();
       return sendJSON(res, 200, { ok: true, enabled: out.lockoutEnabled !== false });
     }).catch(() => sendJSON(res, 400, errBody('bad_request', 'ទិន្នន័យមិនត្រឹមត្រូវទេ', 'Bad request')));
     return;
